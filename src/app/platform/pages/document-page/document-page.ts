@@ -49,7 +49,7 @@ import {
   DocumentPageResolvedLineDataSource,
 } from '../document-page-data-source-resolver.service';
 import { DocumentPageCommandRoutingResolverService } from '../document-page-command-routing-resolver.service';
-import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
+import { DocumentPageCommandAssemblerService } from '../document-page-command-assembler.service';
 import { DocumentPageListLifecycleContext, DocumentPageListLifecycleService } from '../document-page-list-lifecycle.service';
 import { RuntimeValueMapperService } from '../../data/runtime-value-mapper.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
@@ -110,7 +110,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly timeoutPolicy = inject(RUNTIME_TIMEOUT_POLICY);
   private readonly dataSourceResolver = inject(DocumentPageDataSourceResolverService);
   private readonly commandRoutingResolver = inject(DocumentPageCommandRoutingResolverService);
-  private readonly popupCommandPermission = inject(DocumentPageCommandPermissionService);
+  private readonly commandAssembler = inject(DocumentPageCommandAssemblerService);
   private readonly listLifecycle = inject(DocumentPageListLifecycleService);
   private readonly valueMapper = inject(RuntimeValueMapperService);
   private readonly sessionService = inject(SessionService);
@@ -920,129 +920,25 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private resolvePopupHeaderToolbarButtons(): EntryCommandButtonConfig[] {
-    const supportsCreate = this.listConfig.dataSource.supportsCreate !== false;
-    const supportsDelete = this.listConfig.dataSource.supportsDelete !== false;
-
-    const defaults: EntryCommandButtonConfig[] = [
-      {
-        label: 'New',
-        actionKey: 'cmd:new',
-        isPrimary: true,
-        order: 10,
-        icon: 'bi bi-plus-lg',
-        disabled: !supportsCreate,
-        tooltip: !supportsCreate ? 'Create is not supported for this page.' : undefined,
-      },
-      {
-        label: 'Delete',
-        actionKey: 'cmd:delete',
-        isPrimary: true,
-        order: 20,
-        icon: 'bi bi-trash',
-        tone: 'danger',
-        disabled: !supportsDelete,
-        tooltip: !supportsDelete ? 'Delete is not supported for this page.' : undefined,
-      },
-      {
-        label: 'Refresh',
-        actionKey: 'cmd:refresh',
-        isPrimary: true,
-        order: 30,
-        icon: 'bi bi-arrow-clockwise',
-      },
-    ];
-
-    const configured = (this.headerConfig.toolbarButtons ?? []).map((button) => ({ ...button }));
-    return this
-      .mergePopupDefaultCommands(defaults, configured)
-      .map((button) => this.applyPopupCommandPermission(button));
+    return this.commandAssembler.resolveHeaderToolbarButtons({
+      dataSource: this.listConfig.dataSource,
+      toolbarButtons: this.headerConfig.toolbarButtons,
+      pageId: this.listConfig.pageId || this.pageId,
+    });
   }
 
   private resolvePopupLineToolbarButtons(): EntryCommandButtonConfig[] {
-    if (!this.lineConfig) {
-      return [];
-    }
-
-    const supportsCreate = this.lineConfig.dataSource.supportsCreate !== false;
-    const supportsDelete = this.lineConfig.dataSource.supportsDelete !== false;
-
-    const defaults: EntryCommandButtonConfig[] = [
-      {
-        label: 'Line',
-        actionKey: 'cmd:line-new',
-        isPrimary: true,
-        order: 10,
-        icon: 'bi bi-plus-lg',
-        disabled: !supportsCreate,
-        tooltip: !supportsCreate ? 'Line create is not supported for this page.' : undefined,
-      },
-      {
-        label: 'Delete Line',
-        actionKey: 'cmd:line-delete',
-        isPrimary: true,
-        order: 20,
-        icon: 'bi bi-trash',
-        tone: 'danger',
-        disabled: !supportsDelete,
-        tooltip: !supportsDelete ? 'Line delete is not supported for this page.' : undefined,
-      },
-      {
-        label: 'Refresh Lines',
-        actionKey: 'cmd:line-refresh',
-        isPrimary: true,
-        order: 30,
-        icon: 'bi bi-arrow-clockwise',
-      },
-    ];
-
-    const configured = (this.lineConfig.toolbarButtons ?? []).map((button) => ({ ...button }));
-    return this
-      .mergePopupDefaultCommands(defaults, configured)
-      .map((button) => this.applyPopupCommandPermission(button));
+    return this.commandAssembler.resolveLineToolbarButtons({
+      lineConfig: this.lineConfig,
+      pageId: this.listConfig.pageId || this.pageId,
+    });
   }
 
   private resolvePopupDetailToolbarButtons(): EntryCommandButtonConfig[] | undefined {
-    if (!this.headerConfig.detailToolbarButtons?.length) {
-      return this.headerConfig.detailToolbarButtons;
-    }
-
-    return this.headerConfig.detailToolbarButtons
-      .map((button) => ({ ...button }))
-      .map((button) => this.applyPopupCommandPermission(button));
-  }
-
-  private applyPopupCommandPermission(button: EntryCommandButtonConfig): EntryCommandButtonConfig {
-    return this.popupCommandPermission.apply(button, this.listConfig.pageId || this.pageId);
-  }
-
-  private mergePopupDefaultCommands(
-    defaults: EntryCommandButtonConfig[],
-    configured: EntryCommandButtonConfig[],
-  ): EntryCommandButtonConfig[] {
-    const configuredByAction = new Map<string, EntryCommandButtonConfig>();
-    for (const button of configured) {
-      configuredByAction.set(this.normalizePopupCommandKey(button.actionKey), button);
-    }
-
-    const merged: EntryCommandButtonConfig[] = defaults.map((fallback) => {
-      const configuredButton = configuredByAction.get(this.normalizePopupCommandKey(fallback.actionKey));
-      return configuredButton ? { ...fallback, ...configuredButton } : fallback;
+    return this.commandAssembler.resolveDetailToolbarButtons({
+      toolbarButtons: this.headerConfig.detailToolbarButtons,
+      pageId: this.listConfig.pageId || this.pageId,
     });
-
-    const mergedKeys = new Set(merged.map((button) => this.normalizePopupCommandKey(button.actionKey)));
-    for (const button of configured) {
-      const key = this.normalizePopupCommandKey(button.actionKey);
-      if (!mergedKeys.has(key)) {
-        merged.push(button);
-        mergedKeys.add(key);
-      }
-    }
-
-    return merged;
-  }
-
-  private normalizePopupCommandKey(actionKey: unknown): string {
-    return this.popupCommandPermission.normalizePopupCommandKey(actionKey);
   }
 
   private buildSubtitle(
