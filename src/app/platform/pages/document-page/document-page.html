@@ -1,0 +1,29 @@
+<app-list-page
+  [config]="listConfig"
+  [data]="rows"
+  [showCommandBar]="false"
+  [hasMore]="hasMore"
+  [loading]="loading"
+  [errorMessage]="error"
+  [selectedRecord]="selectedRow"
+  (loadMore)="loadNextPage()"
+  (rowSelected)="openRecord($event)"
+  (primaryAction)="openRecord($event)"
+  (selectionChanged)="selectedRow = $event"
+  (checkedKeysChanged)="handleCheckedKeysChanged($event)"
+  (errorDismissed)="clearListError()"
+  (command)="handleCommand($event)">
+</app-list-page>
+
+<app-list-filter-panel
+  [enabled]="listConfig.tools?.advancedFilter !== false"
+  [storageKey]="listFilterStorageKey"
+  [columns]="listConfig.dataSurface?.columns ?? []"
+  [filterOptions]="listConfig.filterConfig?.fields ?? []"
+  (command)="handleCommand($event)">
+</app-list-filter-panel>
+
+<app-run-modal-host
+  (action)="handlePopupAction($event)"
+  (closed)="handlePopupClosed($event)">
+</app-run-modal-host>

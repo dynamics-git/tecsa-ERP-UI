@@ -1,5 +1,5 @@
-import { RunModalConfigModule } from '../../shared/erp-core/public-api';
-import { runModalPageModules } from '../../pages/run-modal-page-modules';
+import { RunModalConfigModule } from '../../platform/public-api';
+import { runModalPageModules } from '../../features/run-modal-page-modules';
 
 type PageOpenTarget = 'list' | 'entry';
 type PageTypeName = 'list' | 'card' | 'document' | 'worksheet' | 'setup';

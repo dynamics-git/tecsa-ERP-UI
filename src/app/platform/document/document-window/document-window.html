@@ -1,0 +1,300 @@
+<section class="entry-pane" [class.maximized]="entryMaximized" [class.embedded]="embedded" [class.interaction-locked]="isInteractionLocked" [style.z-index]="overlayZIndex" aria-label="New account journal">
+  <header class="entry-header">
+    <div>
+      <span>{{ pageLabel }}</span>
+      <h2>{{ title }}</h2>
+      <p>{{ subtitle }}</p>
+    </div>
+
+    <div class="entry-window-actions">
+      <div class="entry-status-chip" [class]="'entry-status-chip tone-' + (resolvedStatusMessage?.tone ?? 'idle')" aria-live="polite">
+        @if (resolvedStatusMessage && (!isInteractionLocked || resolvedStatusMessage.blocking !== true)) {
+          <span class="status-dot" aria-hidden="true">
+            @if (resolvedStatusMessage.tone === 'info') {
+              <span class="status-spinner"></span>
+            } @else if (resolvedStatusMessage.tone === 'success') {
+              <i class="bi bi-check-lg"></i>
+            } @else if (resolvedStatusMessage.tone === 'warning') {
+              <i class="bi bi-exclamation-lg"></i>
+            } @else if (resolvedStatusMessage.tone === 'error') {
+              <i class="bi bi-x-lg"></i>
+            }
+          </span>
+            <span class="status-label" [attr.title]="resolvedStatusLabel">{{ resolvedStatusLabel }}</span>
+        } @else {
+          <span class="status-label">Ready</span>
+        }
+      </div>
+
+      @if (isInteractionLocked && resolvedStatusMessage && resolvedStatusMessage.tone !== 'info') {
+        <button
+          type="button"
+          class="entry-retry-button"
+          title="Retry data load"
+          (click)="action.emit({ actionKey: 'cmd:retry-hydrate' })">
+          Retry
+        </button>
+      }
+
+      @if (!embedded) {
+        <button
+          type="button"
+          [title]="entryMaximized ? 'Restore' : 'Maximize'"
+          (click)="toggleEntrySize()"
+        >
+          <i [class]="entryMaximized ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen'"></i>
+        </button>
+        <button type="button" title="Close" (click)="closed.emit()">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (resolvedPrimaryHeaderToolbarButtons.length || resolvedGroupedHeaderToolbarButtons.length) {
+    <div class="entry-commandbar">
+      @if (resolvedPrimaryHeaderToolbarButtons.length) {
+        <div class="entry-commandbar-primary">
+          @for (command of resolvedPrimaryHeaderToolbarButtons; track command.actionKey + '-' + command.label) {
+            <button
+              type="button"
+              [class.primary]="command.tone === 'primary'"
+              [title]="command.tooltip ?? null"
+              [disabled]="command.disabled || isInteractionLocked"
+              (click)="handleEntryCommandAction(command.actionKey)">
+              @if (command.icon) {
+                <i [class]="command.icon"></i>
+              }
+              {{ command.label }}
+              @if (command.trailingIcon) {
+                <i [class]="command.trailingIcon"></i>
+              }
+            </button>
+          }
+        </div>
+      }
+
+      @if (resolvedGroupedHeaderToolbarButtons.length) {
+        <div class="entry-commandbar-groups">
+          @for (group of resolvedGroupedHeaderToolbarButtons; track group.name) {
+            <details class="group-menu" (toggle)="handleGroupMenuToggle($event)">
+              <summary>
+                {{ group.name }}
+                <i class="bi bi-chevron-down"></i>
+              </summary>
+
+              <div class="group-menu-items">
+                @for (command of group.buttons; track command.actionKey + '-' + command.label) {
+                  <button
+                    type="button"
+                    [title]="command.tooltip ?? null"
+                    [disabled]="command.disabled || isInteractionLocked"
+                    (click)="handleGroupedHeaderCommandAction(command.actionKey, $event)">
+                    @if (command.icon) {
+                      <i [class]="command.icon"></i>
+                    }
+                    {{ command.label }}
+                  </button>
+                }
+              </div>
+            </details>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <div class="entry-body" [attr.aria-busy]="isInteractionLocked">
+    @if (isInteractionLocked) {
+      <div class="entry-local-loader" aria-live="polite" aria-busy="true">
+        <div class="entry-local-loader-card" role="status" aria-atomic="true">
+          <span class="status-spinner" aria-hidden="true"></span>
+          <span>{{ resolvedStatusLabel || 'Loading...' }}</span>
+        </div>
+      </div>
+    }
+
+    <div class="entry-work">
+      @if (resolvedHeaderSections.length) {
+        @for (headerSection of resolvedHeaderSections; track headerSection.id) {
+          <section class="entry-section">
+            <div class="section-title">
+              <h3>{{ headerSection.title ?? 'Section' }}</h3>
+
+              @if (headerSection.actionLabel && headerSection.actionDialog) {
+                <button type="button" [disabled]="isInteractionLocked" (click)="openEntryDialog(headerSection.actionDialog)">{{ headerSection.actionLabel }}</button>
+              } @else if (headerSection.metaText) {
+                <span>{{ headerSection.metaText }}</span>
+              }
+            </div>
+
+            <app-dynamic-form
+              [sections]="[headerSection]"
+              [data]="resolvedHeaderData"
+              (fieldInteracted)="handleHeaderFieldInteracted($event)"
+              (dropdownOpened)="handleHeaderDropdownOpened($event)"
+              (fieldChanged)="handleHeaderFieldChanged($event)">
+            </app-dynamic-form>
+          </section>
+
+          @if (shouldRenderLinesAfter(headerSection)) {
+            <ng-container [ngTemplateOutlet]="lineStackTemplate"></ng-container>
+          }
+        }
+      }
+
+      @if (shouldRenderLinesAtEnd) {
+        <ng-container [ngTemplateOutlet]="lineStackTemplate"></ng-container>
+      }
+
+    </div>
+
+    @if (resolvedFactPanelSections.length) {
+      <aside class="entry-info">
+        <app-fact-box
+          [sections]="resolvedFactPanelSections"
+          (action)="handleFactPanelAction($event)">
+        </app-fact-box>
+      </aside>
+    }
+
+  </div>
+
+  <ng-template #lineStackTemplate>
+    <section class="entry-section lines-section">
+      <div class="section-title">
+        <h3>Lines</h3>
+        <span>{{ resolvedLineRows.length }} lines</span>
+      </div>
+
+      @if (resolvedPrimaryLineToolbarButtons.length || resolvedGroupedLineToolbarButtons.length) {
+        <div class="line-commandbar">
+          @if (resolvedPrimaryLineToolbarButtons.length) {
+            <div class="entry-commandbar-primary">
+              @for (command of resolvedPrimaryLineToolbarButtons; track command.actionKey + '-' + command.label) {
+                <button
+                  type="button"
+                  [class.primary]="command.tone === 'primary'"
+                  [title]="command.tooltip ?? null"
+                  [disabled]="command.disabled || isInteractionLocked"
+                  (click)="handleLineToolbarAction(command.actionKey)">
+                  @if (command.icon) {
+                    <i [class]="command.icon"></i>
+                  }
+                  {{ command.label }}
+                  @if (command.trailingIcon) {
+                    <i [class]="command.trailingIcon"></i>
+                  }
+                </button>
+              }
+            </div>
+          }
+
+          @if (resolvedGroupedLineToolbarButtons.length) {
+            <div class="entry-commandbar-groups">
+              @for (group of resolvedGroupedLineToolbarButtons; track group.name) {
+                <details class="group-menu" (toggle)="handleGroupMenuToggle($event)">
+                  <summary>
+                    {{ group.name }}
+                    <i class="bi bi-chevron-down"></i>
+                  </summary>
+
+                  <div class="group-menu-items">
+                    @for (command of group.buttons; track command.actionKey + '-' + command.label) {
+                      <button
+                        type="button"
+                        [title]="command.tooltip ?? null"
+                        [disabled]="command.disabled || isInteractionLocked"
+                        (click)="handleGroupedLineCommandAction(command.actionKey, $event)">
+                        @if (command.icon) {
+                          <i [class]="command.icon"></i>
+                        }
+                        {{ command.label }}
+                      </button>
+                    }
+                  </div>
+                </details>
+              }
+            </div>
+          }
+        </div>
+
+
+      }
+
+      <app-document-lines
+        [columns]="resolvedLineColumns"
+        [rows]="resolvedLineRows"
+        [showSelection]="true"
+        (action)="handleLineAction($event)"
+        (dropdownOpened)="handleLineDropdownOpened($event)"
+        (selectionChanged)="handleLineSelectionChanged($event)"
+        (rowChanged)="handleLineRowChanged($event)">
+      </app-document-lines>
+    </section>
+
+    @if (resolvedFooterSections.length) {
+      <section class="entry-section footer-section" aria-label="Document footer">
+        @for (footerSection of resolvedFooterSections; track footerSection.id) {
+          @if (footerSection.title) {
+            <div class="section-title">
+              <h3>{{ footerSection.title }}</h3>
+            </div>
+          }
+
+          <div class="document-footer">
+            @for (row of resolveFooterRows(footerSection); track row.id) {
+              <div [class.total-main]="row.emphasis">
+                <span>{{ row.label }}</span>
+                <strong>{{ resolveFooterValue(row) }}</strong>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+  </ng-template>
+
+  @if (activeEntryDialog) {
+    <div class="nested-backdrop" (click)="closeEntryDialog()"></div>
+
+    <section class="nested-modal" aria-label="Entry detail dialog">
+      <header class="nested-header">
+        <div>
+          <span>{{ title }}</span>
+          <h3>{{ detailTitle }}</h3>
+        </div>
+        <button type="button" title="Close" (click)="closeEntryDialog()">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </header>
+
+      @if (resolvedDetailToolbarButtons.length) {
+        <div class="nested-commandbar">
+          @for (command of resolvedDetailToolbarButtons; track command.actionKey + '-' + command.label) {
+            <button
+              type="button"
+              [class.primary]="command.tone === 'primary'"
+              [disabled]="command.disabled || isInteractionLocked"
+              (click)="handleNestedCommandAction(command.actionKey)">
+              @if (command.icon) {
+                <i [class]="command.icon"></i>
+              }
+              {{ command.label }}
+              @if (command.trailingIcon) {
+                <i [class]="command.trailingIcon"></i>
+              }
+            </button>
+          }
+        </div>
+      }
+
+      <div class="nested-body">
+        <section class="nested-section">
+          <h4>{{ detailTitle }}</h4>
+          <p>{{ detailMessage }}</p>
+        </section>
+      </div>
+    </section>
+  }
+</section>

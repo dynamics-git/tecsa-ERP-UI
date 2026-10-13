@@ -1,0 +1,248 @@
+<div class="app-workspace">
+  @if (showCommandBar) {
+    <app-command-bar
+      [standardActions]="resolvedStandardActions"
+      [commands]="resolvedCommands"
+      (command)="command.emit($event)">
+      <div app-command-work>
+        <div class="work-title">{{ config?.title ?? 'List' }}</div>
+        <div class="work-meta">
+          @if (config?.module) {
+            <span>{{ config?.module }}</span>
+          }
+          @if (config?.company) {
+            <span>{{ config?.company }}</span>
+          }
+          @if (config?.viewSuffix) {
+            <span>{{ config?.viewSuffix }}</span>
+          }
+        </div>
+      </div>
+    </app-command-bar>
+  }
+
+  <section class="workspace-layout" [class.factbox-closed]="!factboxOpen">
+
+    <div class="workspace-grid">
+
+      @if (normalizedErrorMessage) {
+        <div class="list-error-banner" role="alert" aria-live="assertive">
+          <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+          <span>{{ normalizedErrorMessage }}</span>
+          <button type="button" class="list-error-dismiss" aria-label="Dismiss error" (click)="dismissError()">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+        </div>
+      }
+
+      <div class="dataset-strip">
+
+        <div class="dataset-views">
+          @if (views.length) {
+            @for (view of views; track view.id) {
+              <button [class.active]="isViewActive(view.id)" (click)="setActiveView(view.id)">{{ view.label }}</button>
+            }
+          } @else {
+            <button class="active">All</button>
+          }
+        </div>
+
+        <div class="dataset-right">
+
+          @if (isBasicFilterEnabled) {
+            <div class="filter-chips">
+              <span><i class="bi bi-funnel"></i> All statuses</span>
+              <span><i class="bi bi-sort-numeric-down"></i> No. asc</span>
+              @if (selectedCount > 0) {
+                <span>{{ selectedCount }} selected <button type="button" (click)="clearSelection()">Clear</button></span>
+              }
+            </div>
+          }
+
+          @if (isBasicFilterEnabled) {
+            <div class="dataset-search">
+              <i class="bi bi-search"></i>
+              <input
+                type="text"
+                [value]="searchText"
+                [placeholder]="searchPlaceholder"
+                (input)="handleSearchInput($event)"
+              />
+            </div>
+          }
+
+          <div class="dataset-tools">
+            <button type="button" title="Group">
+              <i class="bi bi-collection"></i>
+            </button>
+            <button
+              type="button"
+              [title]="'Density: ' + densityLabel"
+              [attr.aria-label]="'Density: ' + densityLabel"
+              (click)="cycleDensity()">
+              <i class="bi bi-text-paragraph"></i>
+            </button>
+            <button type="button" title="Save view">
+              <i class="bi bi-bookmark"></i>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div #gridScroll class="grid-scroll" (scroll)="onGridScroll($event)">
+
+        <table
+          class="app-grid"
+          [class.density-compact]="density === 'compact'"
+          [class.density-spacious]="density === 'spacious'"
+          [style.min-width]="gridMinWidth">
+        <colgroup>
+          <col class="row-action-col" />
+          <col class="select-col" />
+          @for (column of columns; track column.field ?? column.id ?? column.label) {
+            <col [style.width]="getColumnWidth(column)" />
+          }
+        </colgroup>
+
+        <thead>
+          <tr>
+            <th class="row-action-col"></th>
+            <th class="select-col">
+              <label class="grid-check">
+                <input
+                  type="checkbox"
+                  [disabled]="!isMultiSelect"
+                  [checked]="isAllRowsSelected"
+                  [indeterminate]="isSelectionPartial"
+                  (click)="toggleAllRows($event)" />
+                <span></span>
+              </label>
+            </th>
+            @for (column of columns; track column.field ?? column.id ?? column.label) {
+              <th
+                [class.amount]="column.align === 'end' || column.type === 'currency'"
+                [class.sorted]="getColumnSortDirection(column)">
+                <button
+                  class="th-sort"
+                  [class.active]="column.primary || column.isPrimary"
+                  [class.numeric]="column.align === 'end' || column.type === 'currency'"
+                  type="button"
+                  (click)="toggleSort(column)">
+                  {{ column.label }}
+                  @if (getColumnSortDirection(column) === 'asc') {
+                    <i class="bi bi-arrow-up-short"></i>
+                  } @else if (getColumnSortDirection(column) === 'desc') {
+                    <i class="bi bi-arrow-down-short"></i>
+                  } @else {
+                    <i class="bi bi-filter"></i>
+                  }
+                </button>
+                <span
+                  class="column-resizer"
+                  role="separator"
+                  aria-orientation="vertical"
+                  title="Resize column"
+                  (pointerdown)="startColumnResize($event, column)">
+                </span>
+              </th>
+            }
+          </tr>
+        </thead>
+
+        <tbody>
+
+          @for (row of rows; track getRowKey(row)) {
+            <tr
+              (click)="selectRow(row)"
+              (dblclick)="openRow(row, $event)"
+              [class.selected]="getSelectedRowKey() === getRowKey(row)">
+              <td class="row-action-col">
+                <button class="row-action" type="button" title="Open record" (click)="openRow(row, $event)">
+                  <i [class]="getRowIcon(row)"></i>
+                </button>
+              </td>
+
+              <td class="select-col">
+                <label class="grid-check">
+                  <input
+                    type="checkbox"
+                    [checked]="isRowChecked(row)"
+                    (click)="toggleRow(row, $event)" />
+                  <span></span>
+                </label>
+              </td>
+
+              @for (column of columns; track column.field ?? column.id ?? column.label) {
+                <td
+                  [class.amount]="column.align === 'end' || column.type === 'currency'"
+                  [class.positive]="getTone(row) === 'positive' && column.type === 'currency'"
+                  [class.negative]="getTone(row) === 'negative' && column.type === 'currency'">
+                  @if (isPrimaryColumn(column)) {
+                    <button
+                      type="button"
+                      class="cell-link"
+                      (click)="openPrimary(row, $event)">
+                      {{ getCellValue(row, column) }}
+                    </button>
+                  } @else if (column.subtitleField) {
+                    <div class="cell-title">
+                      {{ getCellValue(row, column) }}
+                    </div>
+
+                    <div class="cell-sub">
+                      {{ getSubtitle(row, column) }}
+                    </div>
+                  } @else if (column.type === 'badge') {
+                    <span
+                      class="status"
+                      [class.active]="getTone(row) === 'positive'">
+                      {{ getCellValue(row, column) }}
+                    </span>
+                  } @else {
+                    {{ getCellValue(row, column) }}
+                  }
+                </td>
+              }
+            </tr>
+          }
+
+        </tbody>
+
+      </table>
+
+      </div>
+
+      @if (loading) {
+        <div class="list-loading-footer" aria-live="polite" aria-busy="true">
+          <div class="list-loading-card" role="status" aria-atomic="true">
+            <span class="list-loading-spinner" aria-hidden="true"></span>
+            <span>{{ loadingLabel }}</span>
+          </div>
+        </div>
+      }
+
+    </div>
+
+    @if (factboxOpen) {
+      <app-list-fact-box
+        [config]="config"
+        [selectedRow]="selectedRow"
+        (closeRequested)="factboxOpen = false">
+      </app-list-fact-box>
+    } @else {
+      <button
+        type="button"
+        class="factbox-open-tab"
+        title="Show factbox"
+        aria-label="Show factbox"
+        (click)="factboxOpen = true">
+        <span class="factbox-tab-mark">F</span>
+        <span>Factbox</span>
+      </button>
+    }
+
+  </section>
+
+</div>
