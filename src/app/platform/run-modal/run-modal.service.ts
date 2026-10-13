@@ -3,7 +3,7 @@
 // Future refactor should split loading, popup orchestration, line runtime,
 // autosave, and command handling into smaller services.
 // Do not change behavior during this cleanup.
-import { Inject, Injectable, Optional, inject } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { EntryAttachmentsConfig, DocumentWindowConfig } from '../models/document-window-config.model';
 import { LineColumnConfig } from '../models/line-config.model';
 import { PopupMode, PopupSize } from '../models/popup-config.model';
@@ -32,17 +32,8 @@ import { RunModalConfigAssemblerService } from './run-modal-config-assembler.ser
 import { RunModalHydrationResolverService } from './run-modal-hydration-resolver.service';
 import { RunModalOptionsResolverService } from './run-modal-options-resolver.service';
 import { RunModalPayloadBuilderService } from './run-modal-payload-builder.service';
-import {
-  RUN_MODAL_CONFIG_RESOLVER,
-  RunModalConfigModule,
-  RunModalConfigResolver,
-  RunModalContext,
-} from './run-modal-config.token';
-
-type RunModalPageDefinition = {
-  pageId: string;
-  module: RunModalConfigModule;
-};
+import { RunModalConfigModule, RunModalContext } from './run-modal-config.token';
+import { RunModalPageDefinition, RunModalPageDefinitionResolverService } from './run-modal-page-definition-resolver.service';
 
 type RunModalBinding = {
   pageId: string;
@@ -84,6 +75,7 @@ export class RunModalService {
   private readonly valueMapper = inject(RuntimeValueMapperService);
   private readonly bindingState = inject(RunModalBindingStateService);
   private readonly configAssembler = inject(RunModalConfigAssemblerService);
+  private readonly pageDefinitionResolver = inject(RunModalPageDefinitionResolverService);
   private readonly hydrationResolver = inject(RunModalHydrationResolverService);
   private readonly optionsResolver = inject(RunModalOptionsResolverService);
   private readonly payloadBuilder = inject(RunModalPayloadBuilderService);
@@ -116,8 +108,6 @@ export class RunModalService {
     private readonly lineMasters: LineMasterService,
     private readonly lineCalculation: LineCalculationService,
     private readonly runModalLoading: RunModalLoadingService,
-    @Inject(RUN_MODAL_CONFIG_RESOLVER)
-    private readonly configResolver: RunModalConfigResolver,
   ) {}
 
   async open(request: RunModalRequest): Promise<boolean> {
@@ -623,65 +613,7 @@ export class RunModalService {
   }
 
   private async resolvePageDefinition(pageId: string): Promise<RunModalPageDefinition | undefined> {
-    const normalized = pageId.trim().toLowerCase();
-    if (!normalized) {
-      return undefined;
-    }
-
-    const module = await this.loadRunModalConfigModule(normalized);
-    if (!module) {
-      return undefined;
-    }
-
-    if (!this.moduleDeclaresPageId(module, normalized)) {
-      return undefined;
-    }
-
-    return {
-      pageId: normalized,
-      module,
-    };
-  }
-
-  private async loadRunModalConfigModule(
-    pageId: string,
-  ): Promise<RunModalConfigModule | undefined> {
-    const normalized = pageId.trim().toLowerCase();
-    if (!normalized.length) {
-      return undefined;
-    }
-
-    try {
-      const resolved = await this.configResolver(normalized);
-      if (resolved && this.moduleDeclaresPageId(resolved, normalized)) {
-        return resolved;
-      }
-    } catch {
-      return undefined;
-    }
-
-    return undefined;
-  }
-
-  private moduleDeclaresPageId(module: RunModalConfigModule, normalizedPageId: string): boolean {
-    const bucket = this.toRecord(module);
-    if (!bucket) {
-      return false;
-    }
-
-    for (const exportedValue of Object.values(bucket)) {
-      const record = this.toRecord(exportedValue);
-      if (!record) {
-        continue;
-      }
-
-      const declaredPageId = this.toText(record['pageId']).trim().toLowerCase();
-      if (declaredPageId === normalizedPageId) {
-        return true;
-      }
-    }
-
-    return false;
+    return this.pageDefinitionResolver.resolve(pageId);
   }
 
   private buildGenericEntryDialogConfig(
