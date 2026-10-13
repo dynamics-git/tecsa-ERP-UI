@@ -226,7 +226,8 @@ export class RunModalHost {
       pageId,
       context,
       target,
-      allowNested: target !== 'list'
+      // A related list must stack above its calling document, preserving unsaved state.
+      allowNested: true
     });
 
     return true;
