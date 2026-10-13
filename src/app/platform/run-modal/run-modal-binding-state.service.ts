@@ -10,7 +10,20 @@ export class RunModalBindingStateService {
   readonly autosaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   lastOpenFailureReason = '';
 
-  constructor(private readonly popupStack: RunModalStackService) {}
+  constructor(private readonly popupStack: RunModalStackService) {
+    // The stack can discard windows without passing through RunModalHost.closePopup
+    // (closeAll, non-nested replacement and depth overflow). Release only the
+    // discarded windows; keep mounted parent bindings and pending saves intact.
+    this.popupStack.stack$.subscribe((stack) => {
+      const activeIds = new Set(stack.map((popup) => popup.id));
+      const trackedIds = new Set([...this.bindings.keys(), ...this.autosaveTimers.keys()]);
+      for (const popupId of trackedIds) {
+        if (!activeIds.has(popupId)) {
+          this.releasePopup(popupId);
+        }
+      }
+    });
+  }
 
   releasePopup(popupId: string): void {
     this.clearAutosave(popupId);
