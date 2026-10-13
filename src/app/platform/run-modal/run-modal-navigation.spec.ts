@@ -106,6 +106,47 @@ describe('RunModal navigation', () => {
     expect(parentWindow.entryMaximized).toBe(true);
   });
 
+  it('keeps unsaved document and maximize state when a document command opens a related list', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate');
+    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
+    await settle();
+    const parent = popups[0];
+    const config = data(parent).entryDialogConfig!;
+    config.headerData!['vendorOrderNumber'] = 'UNSAVED';
+    config.lineRows![0]['description'] = 'Unsaved line';
+    config.headerToolbarButtons = [
+      ...(config.headerToolbarButtons ?? []),
+      { label: 'Related purchase orders', actionKey: 'cmd:related-list',
+        runModalPageId: 'purchase-order', runModalTarget: 'list' },
+    ];
+
+    const fixture = TestBed.createComponent(RunModalHost);
+    fixture.detectChanges();
+    const host = fixture.componentInstance;
+    const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
+    parentWindow.toggleEntrySize();
+
+    host.onEntryDialogAction(parent, { actionKey: 'cmd:related-list' });
+    await vi.waitFor(() => expect(popups).toHaveLength(2));
+    await settle();
+    fixture.detectChanges();
+    const relatedList = popups[1];
+    expect(data(relatedList).runModalList).toBeDefined();
+    expect(popups[0]).toBe(parent);
+    expect(fixture.debugElement.queryAll(By.directive(DocumentWindow))).toHaveLength(1);
+
+    host.closePopup(relatedList);
+    fixture.detectChanges();
+    expect(popups).toEqual([parent]);
+    expect(data(parent).entryDialogConfig).toBe(config);
+    expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
+    expect(config.lineRows![0]['description']).toBe('Unsaved line');
+    expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
+    expect(parentWindow.entryMaximized).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it('opens global search over an existing document without replacing its parent', async () => {
     expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
     await settle();
