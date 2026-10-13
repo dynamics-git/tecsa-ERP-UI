@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { providePlatformGovernance } from '../../core/providers/platform-governance.provider';
 import { GlobalSearchPopupService } from '../../core/services/global-search-popup.service';
+import { DocumentPageCommandRoutingResolverService } from '../pages/document-page-command-routing-resolver.service';
 import { DATA_REST_SERVICE, DataRestService } from '../data/data-source.service';
 import { DocumentWindow } from '../document/document-window/document-window';
 import { RunModalHostData } from '../models/run-modal-host-data.model';
@@ -145,6 +146,44 @@ describe('RunModal navigation', () => {
     expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
     expect(parentWindow.entryMaximized).toBe(true);
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('preserves the edited parent when DocumentPage commands open a related list', async () => {
+    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
+    await settle();
+    const parent = popups[0];
+    const config = data(parent).entryDialogConfig!;
+    config.headerData!['vendorOrderNumber'] = 'UNSAVED';
+    config.lineRows![0]['description'] = 'Edited line';
+    const fixture = TestBed.createComponent(RunModalHost);
+    fixture.detectChanges();
+    const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
+    parentWindow.toggleEntrySize();
+
+    const request = TestBed.inject(DocumentPageCommandRoutingResolverService).buildEntryRunModalRequest({
+      pageId: 'purchase-order',
+      target: 'list',
+      headerData: config.headerData!,
+      lineRows: config.lineRows!,
+      payload: { origin: 'header' },
+      activeLine: config.lineRows![0],
+    });
+    expect(request).toMatchObject({ target: 'list', mode: 'modal', size: 'xl', allowNested: true });
+    expect(await runModal.open(request)).toBe(true);
+    await settle();
+    fixture.detectChanges();
+    expect(popups).toHaveLength(2);
+    expect(data(popups[1]).runModalList).toBeDefined();
+    expect(popups[0]).toBe(parent);
+
+    fixture.componentInstance.closePopup(popups[1]);
+    fixture.detectChanges();
+    expect(popups).toEqual([parent]);
+    expect(data(parent).entryDialogConfig).toBe(config);
+    expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
+    expect(config.lineRows![0]['description']).toBe('Edited line');
+    expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
+    expect(parentWindow.entryMaximized).toBe(true);
   });
 
   it('opens global search over an existing document without replacing its parent', async () => {

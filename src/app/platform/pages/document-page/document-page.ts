@@ -1807,32 +1807,18 @@ export class DocumentPage implements OnInit, OnDestroy {
       return false;
     }
 
-    const runModalTarget = button?.runModalTarget ?? button?.runModalView;
-
-    const headerData = this.activeEntryDialogConfig?.headerData ?? {};
-    const lineRows = this.activeEntryDialogConfig?.lineRows ?? [];
     const payloadRecord = this.isRecord(payload) ? payload : {};
-    const context: Record<string, unknown> = {
-      headerData,
-      lineRows,
+    const request = this.commandRoutingResolver.buildEntryRunModalRequest({
+      pageId,
+      target: button?.runModalTarget ?? button?.runModalView,
+      headerData: this.activeEntryDialogConfig?.headerData ?? {},
+      lineRows: this.activeEntryDialogConfig?.lineRows ?? [],
       payload: payloadRecord,
-    };
-
-    const activeLine = this.resolveRunModalActiveLine(payloadRecord);
-    if (activeLine) {
-      context['activeLine'] = activeLine;
-    }
+      activeLine: this.resolveRunModalActiveLine(payloadRecord),
+    });
 
     void this.runModal
-      .open({
-        pageId,
-        context,
-        mode: runModalTarget === 'list' ? 'modal' : undefined,
-        size: runModalTarget === 'list' ? 'xl' : undefined,
-        target: runModalTarget,
-        // Navigation-style list pages should replace the current popup instead of stacking over it.
-        allowNested: runModalTarget !== 'list',
-      })
+      .open(request)
       .then((opened) => {
         if (!opened) {
           const reason = this.runModal.getLastOpenFailureReason();

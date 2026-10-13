@@ -3,6 +3,8 @@ import { EntryCommandButtonConfig } from '../models/document-window-config.model
 import { CommandConfig } from '../models/command-config.model';
 import { ListCommandSelectionMode, ListCommandSelectionPolicyConfig } from '../models/page-config.model';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
+import type { RunModalRequest } from '../run-modal/run-modal.service';
+import type { RunModalContext } from '../run-modal/run-modal-config.token';
 
 @Injectable({
   providedIn: 'root',
@@ -99,6 +101,34 @@ export class DocumentPageCommandRoutingResolverService {
     }
 
     return undefined;
+  }
+
+  buildEntryRunModalRequest(params: {
+    pageId: string;
+    target?: 'entry' | 'list';
+    headerData: Record<string, unknown>;
+    lineRows: Record<string, unknown>[];
+    payload: Record<string, unknown>;
+    activeLine?: Record<string, unknown>;
+  }): RunModalRequest {
+    const context: RunModalContext = {
+      headerData: params.headerData,
+      lineRows: params.lineRows,
+      payload: params.payload,
+    };
+    if (params.activeLine) {
+      context['activeLine'] = params.activeLine;
+    }
+
+    return {
+      pageId: params.pageId,
+      context,
+      mode: params.target === 'list' ? 'modal' : undefined,
+      size: params.target === 'list' ? 'xl' : undefined,
+      target: params.target,
+      // Every related page must preserve the calling document and its unsaved state.
+      allowNested: true,
+    };
   }
 
   findEntryCommandButton(params: {
