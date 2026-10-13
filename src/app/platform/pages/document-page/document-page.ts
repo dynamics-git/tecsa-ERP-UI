@@ -49,6 +49,7 @@ import {
   DocumentPageResolvedLineDataSource,
 } from '../document-page-data-source-resolver.service';
 import { DocumentPageCommandRoutingResolverService } from '../document-page-command-routing-resolver.service';
+import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
 import { DocumentPageListLifecycleContext, DocumentPageListLifecycleService } from '../document-page-list-lifecycle.service';
 import { RuntimeValueMapperService } from '../../data/runtime-value-mapper.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
@@ -109,6 +110,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly timeoutPolicy = inject(RUNTIME_TIMEOUT_POLICY);
   private readonly dataSourceResolver = inject(DocumentPageDataSourceResolverService);
   private readonly commandRoutingResolver = inject(DocumentPageCommandRoutingResolverService);
+  private readonly popupCommandPermission = inject(DocumentPageCommandPermissionService);
   private readonly listLifecycle = inject(DocumentPageListLifecycleService);
   private readonly valueMapper = inject(RuntimeValueMapperService);
   private readonly sessionService = inject(SessionService);
@@ -1010,166 +1012,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private applyPopupCommandPermission(button: EntryCommandButtonConfig): EntryCommandButtonConfig {
-    if (button.hidden === true || this.sessionService.SuperAdmin) {
-      return button;
-    }
-
-    const permissions = this.resolvePagePermissionFlags();
-    const action = this.normalizePopupCommandKey(button.actionKey);
-
-    let allowed = true;
-    if (action === 'new' || action === 'line-new' || action === 'line-insert') {
-      allowed = permissions.canCreate;
-    } else if (action === 'save' || action === 'apply' || action === 'edit') {
-      allowed = permissions.canUpdate;
-    } else if (action === 'delete' || action === 'line-delete') {
-      allowed = permissions.canDelete;
-    } else if (this.isCustomExecutableCommand(action)) {
-      allowed = this.canExecutePopupCommand(button, permissions.canExecute);
-    }
-
-    if (allowed) {
-      return button;
-    }
-
-    return {
-      ...button,
-      disabled: true,
-      tooltip: button.tooltip ?? 'You do not have permission for this command.',
-    };
-  }
-
-  private isCustomExecutableCommand(action: string): boolean {
-    const standard = new Set([
-      'new',
-      'save',
-      'apply',
-      'edit',
-      'delete',
-      'refresh',
-      'close',
-      'line-new',
-      'line-insert',
-      'line-delete',
-      'line-refresh',
-    ]);
-    return !standard.has(action);
-  }
-
-  private canExecutePopupCommand(button: EntryCommandButtonConfig, fallbackCanExecute: boolean): boolean {
-    const permissionKey = this.toText(button.permissionKey).trim();
-    if (!permissionKey.length) {
-      return fallbackCanExecute;
-    }
-
-    const normalizedPermissionKey = this.normalizePermissionValue(permissionKey);
-    const matched = this.sessionService.Permissions.filter((permission) =>
-      this.matchesPermissionKey(permission, normalizedPermissionKey),
-    );
-    if (!matched.length) {
-      return false;
-    }
-
-    return matched.some((permission) =>
-      this.readPermissionFlag(permission, ['canExecute', 'CanExecute', 'PostPermission']),
-    );
-  }
-
-  private resolvePagePermissionFlags(): {
-    canCreate: boolean;
-    canUpdate: boolean;
-    canDelete: boolean;
-    canExecute: boolean;
-  } {
-    const targetPage = this.toText(this.listConfig.pageId || this.pageId).trim();
-    const matched = this.sessionService.Permissions.filter((permission) => this.matchesPage(permission, targetPage));
-    if (!matched.length) {
-      return { canCreate: false, canUpdate: false, canDelete: false, canExecute: false };
-    }
-
-    return {
-      canCreate: matched.some((permission) =>
-        this.readPermissionFlag(permission, ['canCreate', 'CanCreate', 'InsertPermission']),
-      ),
-      canUpdate: matched.some((permission) =>
-        this.readPermissionFlag(permission, ['canUpdate', 'CanUpdate', 'ModifyPermission']),
-      ),
-      canDelete: matched.some((permission) =>
-        this.readPermissionFlag(permission, ['canDelete', 'CanDelete', 'DeletePermission']),
-      ),
-      canExecute: matched.some((permission) =>
-        this.readPermissionFlag(permission, ['canExecute', 'CanExecute', 'PostPermission']),
-      ),
-    };
-  }
-
-  private matchesPage(permission: unknown, pageId: string): boolean {
-    const normalizedPageId = this.normalizePermissionValue(pageId);
-    if (!normalizedPageId.length) {
-      return false;
-    }
-
-    const declaredPageId = this.readPermissionValue(permission, ['pageId', 'PageId']);
-    const declaredPageName = this.readPermissionValue(permission, ['pageName', 'PageName']);
-    const declaredObjectName = this.readPermissionValue(permission, ['objectName', 'ObjectName']);
-
-    return this.normalizePermissionValue(declaredPageId) === normalizedPageId
-      || this.normalizePermissionValue(declaredPageName) === normalizedPageId
-      || this.normalizePermissionValue(declaredObjectName) === normalizedPageId;
-  }
-
-  private matchesPermissionKey(permission: unknown, normalizedPermissionKey: string): boolean {
-    const actionId = this.readPermissionValue(permission, ['actionId', 'ActionId']);
-    const actionCode = this.readPermissionValue(permission, ['actionCode', 'ActionCode']);
-    const pageName = this.readPermissionValue(permission, ['pageName', 'PageName']);
-    const objectName = this.readPermissionValue(permission, ['objectName', 'ObjectName']);
-
-    return this.normalizePermissionValue(actionId) === normalizedPermissionKey
-      || this.normalizePermissionValue(actionCode) === normalizedPermissionKey
-      || this.normalizePermissionValue(pageName) === normalizedPermissionKey
-      || this.normalizePermissionValue(objectName) === normalizedPermissionKey;
-  }
-
-  private readPermissionValue(permission: unknown, keys: string[]): string {
-    if (!this.isRecord(permission)) {
-      return '';
-    }
-
-    for (const key of keys) {
-      if (!(key in permission)) {
-        continue;
-      }
-
-      const value = permission[key];
-      if (value === undefined || value === null) {
-        continue;
-      }
-
-      return String(value);
-    }
-
-    return '';
-  }
-
-  private readPermissionFlag(permission: unknown, keys: string[]): boolean {
-    const value = this.readPermissionValue(permission, keys);
-    const normalized = value.trim().toLowerCase();
-    return normalized === 'true'
-      || normalized === '1'
-      || normalized === 'yes'
-      || normalized === 'full';
-  }
-
-  private normalizePermissionValue(value: unknown): string {
-    if (value === undefined || value === null) {
-      return '';
-    }
-
-    return String(value)
-      .trim()
-      .replace(/[_-]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .toUpperCase();
+    return this.popupCommandPermission.apply(button, this.listConfig.pageId || this.pageId);
   }
 
   private mergePopupDefaultCommands(
@@ -1199,8 +1042,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private normalizePopupCommandKey(actionKey: unknown): string {
-    const raw = this.toText(actionKey).trim().toLowerCase();
-    return raw.startsWith('cmd:') ? raw.slice('cmd:'.length) : raw;
+    return this.popupCommandPermission.normalizePopupCommandKey(actionKey);
   }
 
   private buildSubtitle(
