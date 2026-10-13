@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
-import { DataSourceConfig } from '../../shared/erp-core/models/data-source-config.model';
-import { FormSectionConfig } from '../../shared/erp-core/models/field-config.model';
-import { DataSourceService } from '../../shared/erp-core/services/data-source.service';
-import { EntryPayloadService } from '../../shared/erp-core/services/entry-payload.service';
-import { EntryRecordService } from '../../shared/erp-core/services/entry-record.service';
-import { EntrySavePort, EntrySaveRequest, EntrySaveResult } from '../../shared/erp-core/services/entry-save.port';
+import { DataSourceConfig } from '../../platform/models/data-source-config.model';
+import { FormSectionConfig } from '../../platform/models/field-config.model';
+import { DataSourceService } from '../../platform/data/data-source.service';
+import { EntryPayloadService } from '../../platform/data/entry-payload.service';
+import { EntryRecordService } from '../../platform/data/entry-record.service';
+import { EntrySavePort, EntrySaveRequest, EntrySaveResult } from '../../platform/data/entry-save.port';
 
 @Injectable({
   providedIn: 'root'

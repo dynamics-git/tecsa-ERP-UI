@@ -1,5 +1,5 @@
 import { Provider } from '@angular/core';
-import { DATA_REST_SERVICE, DataRestService } from '../../shared/erp-core/services/data-source.service';
+import { DATA_REST_SERVICE, DataRestService } from '../../platform/data/data-source.service';
 import { RestService } from '../services/rest.service';
 
 export const provideErpRest = (): Provider => ({

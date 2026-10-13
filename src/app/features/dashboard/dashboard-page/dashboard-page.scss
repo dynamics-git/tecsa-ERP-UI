@@ -111,7 +111,7 @@
         &.active {
           background: var(--ts-surface);
           color: var(--ts-text);
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          box-shadow: 0 1px 2px var(--ts-dashboard-shadow-xs);
         }
 
         &:hover:not(.active) {
@@ -163,7 +163,7 @@
     transition: all 0.2s;
 
     &:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 8px var(--ts-dashboard-shadow-sm);
       transform: translateY(-1px);
     }
 
@@ -177,7 +177,7 @@
 
     &.critical {
       border-left: 3px solid var(--ts-error);
-      background: rgba(255, 59, 48, 0.02);
+      background: var(--ts-dashboard-danger-tint-soft);
     }
 
     .activity-header {
@@ -328,8 +328,8 @@
 
     &.quick-access {
       padding: 16px;
-      background: linear-gradient(135deg, rgba(0, 122, 255, 0.03) 0%, rgba(88, 86, 214, 0.03) 100%);
-      border: 1px solid rgba(0, 122, 255, 0.1);
+      background: linear-gradient(135deg, var(--ts-dashboard-blue-tint) 0%, var(--ts-dashboard-violet-tint) 100%);
+      border: 1px solid var(--ts-dashboard-blue-border);
       border-radius: 6px;
       margin-bottom: 32px;
     }
@@ -377,7 +377,7 @@
         border-color: var(--ts-accent);
         background: var(--ts-accent-subtle);
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px var(--ts-dashboard-shadow-md);
       }
 
       &.starred::after {
@@ -658,13 +658,13 @@
       transition: all 0.2s;
 
       &.urgent {
-        background: rgba(255, 59, 48, 0.05);
+        background: var(--ts-dashboard-danger-tint);
         border: 1px solid var(--ts-error-subtle);
       }
 
       &:hover {
         transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        box-shadow: 0 2px 4px var(--ts-dashboard-shadow-xs);
       }
 
       span {

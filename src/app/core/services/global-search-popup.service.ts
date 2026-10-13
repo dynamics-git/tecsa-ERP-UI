@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { MenuSearchItem } from '../models/menu-item.model';
-import { ConfirmationService, RunModalService } from '../../shared/erp-core/public-api';
-import { RunModalContext } from '../../shared/erp-core/services/run-modal-config.token';
+import { ConfirmationService, RunModalService } from '../../platform/public-api';
+import { RunModalContext } from '../../platform/run-modal/run-modal-config.token';
 import {
 	getRegisteredRunModalPageIds,
 	loadRunModalConfigModule,

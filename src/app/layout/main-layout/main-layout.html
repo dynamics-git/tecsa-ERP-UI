@@ -1,12 +1,12 @@
 <app-header></app-header>
 @if (showCommandBar) {
-  <app-actions
+  <app-page-actions
     (newClick)="openNew()"
     (deleteClick)="dispatchAction('delete')"
     (refreshClick)="dispatchAction('refresh')"
     (filterClick)="dispatchAction('filter')"
     (exportClick)="dispatchAction('export')"
-  ></app-actions>
+  ></app-page-actions>
 }
 
 <main class="main-content">
@@ -14,3 +14,8 @@
 </main>
 
 <app-drawer-host></app-drawer-host>
+<!-- DocumentPage owns its host and document event handlers on the Purchase Order route.
+     The dashboard needs a host too so global search can open stacked windows there. -->
+@if (!showCommandBar) {
+  <app-run-modal-host></app-run-modal-host>
+}

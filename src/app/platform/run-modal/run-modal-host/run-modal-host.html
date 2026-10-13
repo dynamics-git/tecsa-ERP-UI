@@ -1,0 +1,86 @@
+@if (popupStack$ | async; as popups) {
+  @if (getRenderablePopups(popups).length) {
+  <div class="app-run-modal-host">
+    @for (popup of getRenderablePopups(popups); track popup.id; let index = $index; let isTop = $last) {
+      <div
+        class="popup-layer"
+        [class.top-layer]="isTop"
+        [class.list-popup-layer]="isTop && isListPopup(popup)"
+        [style.z-index]="900 + index">
+        @if (isTop) {
+          <div class="popup-backdrop" (click)="onBackdropClick(popup)"></div>
+        }
+
+        <section
+          class="popup-shell"
+          [class.full-page]="isFullPagePopup(popup)"
+          [class.list-page-popup]="isListPopup(popup)"
+          [class.maximized]="isListPopup(popup) && isListPopupMaximized(popup)">
+          @if (isDocumentPopup(popup)) {
+            <app-document-window
+              [overlayZIndex]="920 + (index * 4)"
+              [pageLabel]="getEntryDialogConfig(popup)?.pageLabel"
+              [title]="getEntryDialogConfig(popup)?.title"
+              [subtitle]="getEntryDialogConfig(popup)?.subtitle"
+              [popupHeaderCommandBar]="getEntryDialogConfig(popup)?.headerCommandBar"
+              [popupLineCommandBar]="getEntryDialogConfig(popup)?.lineCommandBar"
+              [popupLineCommandPolicy]="getEntryDialogConfig(popup)?.lineCommandPolicy"
+              [popupLinePlacement]="getEntryDialogConfig(popup)?.linePlacement"
+              [popupHeaderToolbarButtons]="getEntryDialogConfig(popup)?.headerToolbarButtons"
+              [popupLineToolbarButtons]="getEntryDialogConfig(popup)?.lineToolbarButtons"
+              [popupDetailToolbarButtons]="getEntryDialogConfig(popup)?.detailToolbarButtons"
+              [popupHeaderSections]="getEntryDialogConfig(popup)?.headerSections"
+              [popupHeaderData]="getEntryDialogConfig(popup)?.headerData"
+              [popupLineColumns]="getEntryDialogConfig(popup)?.lineColumns"
+              [popupLineRows]="getEntryDialogConfig(popup)?.lineRows"
+              [popupLineTotals]="getEntryDialogConfig(popup)?.lineTotals"
+              [popupFooterSections]="getEntryDialogConfig(popup)?.footerSections"
+              [popupAttachments]="getEntryDialogConfig(popup)?.attachments"
+              [popupFactPanelSections]="getEntryDialogConfig(popup)?.factPanelSections"
+              [popupStatusMessage]="getEntryDialogConfig(popup)?.statusMessage"
+              [popupInteractionLocked]="getEntryDialogConfig(popup)?.interactionLocked === true"
+              (action)="onEntryDialogAction(popup, $event)"
+              (closed)="closePopup(popup)">
+            </app-document-window>
+          }
+
+          @if (isListPopup(popup)) {
+            <div class="list-popup-window-actions" aria-label="List popup actions">
+              <button
+                type="button"
+                class="list-popup-action-btn"
+                [title]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
+                [attr.aria-label]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
+                (click)="toggleListPopupMaximize(popup)">
+                <i [class]="isListPopupMaximized(popup) ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen'"></i>
+              </button>
+              <button type="button" class="list-popup-action-btn" title="Close" aria-label="Close" (click)="closePopup(popup)">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            <app-list-page
+              [config]="getListPageConfig(popup)"
+              [data]="getListRows(popup)"
+              [hasMore]="false"
+              [loading]="isListLoading(popup)"
+              [errorMessage]="getListErrorMessage(popup)"
+              [showCommandBar]="true"
+              (rowSelected)="onListRowOpen(popup, $event)"
+              (primaryAction)="onListRowOpen(popup, $event)"
+              (command)="onListCommand(popup, $event)">
+            </app-list-page>
+          }
+
+          @if (isConfirmationPopup(popup)) {
+            <app-confirmation-dialog
+              [config]="getConfirmationDialogConfig(popup)"
+              (decided)="onConfirmationDecision(popup, $event)">
+            </app-confirmation-dialog>
+          }
+        </section>
+      </div>
+    }
+  </div>
+  }
+}

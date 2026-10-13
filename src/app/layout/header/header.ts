@@ -8,7 +8,7 @@ import { GlobalSearchPopupService } from '../../core/services/global-search-popu
 import { MenuService } from '../../core/services/menu.service';
 import { shouldOpenFromMenuAsRunModal } from '../../core/services/run-modal-config-registry';
 import { SessionService } from '../../core/services/session.service';
-import { CoreDrawerService } from '../../shared/erp-core/public-api';
+import { CoreDrawerService } from '../../platform/public-api';
 import { ModuleMenuPanel } from '../module-menu-panel/module-menu-panel';
 
 @Component({
