@@ -1,5 +1,6 @@
 import { provideRouter } from '@angular/router';
 import { providePlatformGovernance } from '../../core/providers/platform-governance.provider';
+import { SessionService } from '../../core/services/session.service';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { Header } from './header';
@@ -14,6 +15,10 @@ describe('Header', () => {
       providers: [provideRouter([]), ...providePlatformGovernance()],
     }).compileComponents();
 
+    // Global search now reads explicit backend-derived page permissions.
+    TestBed.inject(SessionService).Permissions = [{
+      PageId: 'purchase-order', PageName: 'Purchase Order', ObjectName: 'purchase_orders', ReadPermission: 'Yes',
+    }];
     fixture = TestBed.createComponent(Header);
     component = fixture.componentInstance;
     await fixture.whenStable();
@@ -32,4 +37,10 @@ describe('Header', () => {
     component.onGlobalSearchInput('purchase');
     expect(component.searchResults.map(item => item.pageId)).toEqual(['purchase-order']);
   });
+  it('hides unpermitted pages from global search', () => {
+    TestBed.inject(SessionService).Permissions = [];
+    component.onGlobalSearchInput('purchase');
+    expect(component.searchResults).toEqual([]);
+  });
+
 });
