@@ -1,0 +1,82 @@
+<main class="saas-site mk-onboard">
+  <header class="mk-onboard-head">
+    <a class="mk-onboard-wordmark" routerLink="/welcome" aria-label="TecSA ERP homepage"><strong>TecSA</strong><span>ERP</span></a>
+    <div class="mk-onboard-right"><span>Already have an account?</span><a routerLink="/auth/login">Sign in ↗</a></div>
+  </header>
+
+  <div class="mk-onboard-main">
+    <aside class="mk-onboard-story" aria-label="Introduction">
+      <span class="mk-onboard-eyebrow">YOUR BUSINESS. ONE CONNECTED PLACE.</span>
+      <h1>A better way<br>to work <em>starts here.</em></h1>
+      <p>Every great business begins with a first step. We'll make the next few feel effortless.</p>
+      <img src="/illustrations/connected-business.svg" alt="" width="840" height="720" loading="lazy">
+      <span class="mk-onboard-postscript">Made with purpose. Built for what comes next.</span>
+    </aside>
+
+    <section class="mk-onboard-panel" aria-labelledby="onboard-title">
+      <div class="mk-preview-note"><span class="mk-preview-dot"></span> Registration design preview — no accounts or trials are created yet</div>
+      <ol class="mk-onboard-progress" aria-label="Registration steps">
+        @for (stage of stages; track stage; let i = $index) {
+          <li [class.active]="step === i" [class.completed]="step > i" [attr.aria-current]="step === i ? 'step' : null"><span>{{ i + 1 }}</span></li>
+        }
+      </ol>
+
+      @if (!previewComplete) {
+        <p class="mk-onboard-overline">STEP {{ step + 1 }} OF 4</p>
+        <form [formGroup]="form" (ngSubmit)="step === 3 ? finishPreview() : next()" novalidate>
+          @if (step === 0) {
+            <h2 id="onboard-title">First, your email.</h2>
+            <p class="mk-onboard-detail">Your workspace journey starts here. Email verification will be connected to our secure registration service.</p>
+            <label for="trial-email">Work email</label>
+            <input id="trial-email" type="email" formControlName="email" autocomplete="email" placeholder="you@yourcompany.com" [attr.aria-invalid]="form.controls.email.touched && form.controls.email.invalid">
+            @if (form.controls.email.touched && form.controls.email.invalid) { <span class="mk-field-error">Enter a valid email address.</span> }
+          }
+          @if (step === 1) {
+            <h2 id="onboard-title">Nice to meet you.</h2>
+            <p class="mk-onboard-detail">Just a name for now. Password setup and email verification will be part of the secure live signup flow.</p>
+            <label for="trial-name">Your name</label>
+            <input id="trial-name" formControlName="name" autocomplete="name" placeholder="Your full name" [attr.aria-invalid]="form.controls.name.touched && form.controls.name.invalid">
+            @if (form.controls.name.touched && form.controls.name.invalid) { <span class="mk-field-error">Please enter your name.</span> }
+          }
+          @if (step === 2) {
+            <h2 id="onboard-title">Tell us about your business.</h2>
+            <p class="mk-onboard-detail">We'll eventually use these details to provision your private TecSA ERP workspace.</p>
+            <label for="trial-organization">Organization name</label>
+            <input id="trial-organization" formControlName="organization" autocomplete="organization" placeholder="Your organization" [attr.aria-invalid]="form.controls.organization.touched && form.controls.organization.invalid">
+            @if (form.controls.organization.touched && form.controls.organization.invalid) { <span class="mk-field-error">Organization name is required.</span> }
+            <label for="trial-company">First ERP company</label>
+            <input id="trial-company" formControlName="company" placeholder="Company name" [attr.aria-invalid]="form.controls.company.touched && form.controls.company.invalid">
+            @if (form.controls.company.touched && form.controls.company.invalid) { <span class="mk-field-error">Company name is required.</span> }
+            <label for="trial-country">Country</label>
+            <select id="trial-country" formControlName="country"><option value="Malaysia">Malaysia</option><option value="India">India</option><option value="Singapore">Singapore</option><option value="Other">Other</option></select>
+          }
+          @if (step === 3) {
+            <h2 id="onboard-title">This is your beginning.</h2>
+            <p class="mk-onboard-detail">Here is what your TecSA ERP setup would look like. This is a local preview only, not a registered account.</p>
+            <div class="mk-onboard-review">
+              <span>Email</span><strong>{{ form.controls.email.value }}</strong>
+              <span>Account owner</span><strong>{{ form.controls.name.value }}</strong>
+              <span>Organization</span><strong>{{ form.controls.organization.value }}</strong>
+              <span>First company</span><strong>{{ form.controls.company.value }}</strong>
+              <span>Country</span><strong>{{ form.controls.country.value }}</strong>
+            </div>
+            <p class="mk-onboard-disclaimer">No personal information is submitted or saved. Server-side email OTP, account creation and trial activation are the next development milestones.</p>
+          }
+          <div class="mk-onboard-buttons">
+            @if (step > 0) { <button type="button" class="mk-back-button" (click)="back()">← Back</button> }
+            <button type="submit" class="mk-next-button">{{ step === 3 ? 'Finish preview' : 'Continue' }} <span aria-hidden="true">↗</span></button>
+          </div>
+        </form>
+      } @else {
+        <div class="mk-preview-complete" role="status">
+          <span class="mk-complete-symbol">✓</span>
+          <h2 id="onboard-title">A little preview of what's ahead.</h2>
+          <p>The journey is designed. Your account has <strong>not</strong> been created, and no free trial has started. We'll connect secure verification and SaaS provisioning next.</p>
+          <a routerLink="/welcome" class="mk-next-button">Back to TecSA ERP ↗</a>
+        </div>
+      }
+
+      <p class="mk-onboard-privacy">A thoughtful beginning. Secure onboarding will be handled by Laravel when activated.</p>
+    </section>
+  </div>
+</main>

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 720" role="img" aria-labelledby="t d">
+<title id="t">Connected business operations</title><desc id="d">An expressive ribbon winding past an invoice, a warehouse, sales chart and people.</desc>
+<defs>
+ <linearGradient id="ribbon1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#78d7d5"/><stop offset=".55" stop-color="#087d8b"/><stop offset="1" stop-color="#0d3b53"/></linearGradient>
+ <linearGradient id="ribbon2" x1=".2" y1="0" x2=".9" y2="1"><stop stop-color="#ffa66d"/><stop offset=".6" stop-color="#ff6548"/><stop offset="1" stop-color="#d94836"/></linearGradient>
+ <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#e3ecea"/></linearGradient>
+ <linearGradient id="side" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#cde4e1"/><stop offset="1" stop-color="#8bbab8"/></linearGradient>
+ <filter id="shadow" x="-60%" y="-60%" width="220%" height="230%"><feGaussianBlur stdDeviation="18"/></filter>
+ <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feDropShadow dx="0" dy="13" stdDeviation="16" flood-color="#174653" flood-opacity=".16"/></filter>
+</defs>
+<ellipse cx="450" cy="617" rx="305" ry="55" fill="#75a8a5" opacity=".14" filter="url(#shadow)"/>
+<circle cx="510" cy="292" r="255" fill="#daf9ef" opacity=".65"/>
+<circle cx="677" cy="199" r="93" fill="#f6eee0" opacity=".8"/><circle cx="199" cy="417" r="96" fill="#eff8f3"/>
+<g filter="url(#soft)">
+  <path d="M137 485 C192 315 331 224 438 320 C570 440 681 415 719 250" fill="none" stroke="#164958" stroke-opacity=".10" stroke-width="90" stroke-linecap="round" transform="translate(10 25)"/>
+  <path d="M143 460 C201 291 330 199 449 295 C565 387 678 393 717 224" fill="none" stroke="url(#ribbon1)" stroke-width="72" stroke-linecap="round"/>
+  <path d="M144 460 C210 536 346 560 463 432 C556 334 659 308 692 340" fill="none" stroke="#11354f" stroke-opacity=".16" stroke-width="70" stroke-linecap="round" transform="translate(2 21)"/>
+  <path d="M145 443 C224 521 339 524 445 411 C556 294 656 293 704 331" fill="none" stroke="url(#ribbon2)" stroke-width="70" stroke-linecap="round"/>
+</g>
+<!-- Finance pedestal -->
+<g filter="url(#soft)"><ellipse cx="206" cy="480" rx="110" ry="32" fill="#0c5569"/><path d="M96 471v37c2 34 218 36 220 0v-37" fill="#126176"/><ellipse cx="206" cy="470" rx="110" ry="32" fill="#d9f4ef"/></g>
+<!-- Invoice sheets -->
+<g transform="translate(158 322) rotate(-10)" filter="url(#soft)">
+<rect x="8" y="9" width="89" height="121" rx="8" fill="#b9cfcb"/>
+<rect width="89" height="121" rx="8" fill="url(#paper)"/>
+<path d="M15 25h55M15 38h32M15 58h57M15 69h45M15 80h51" stroke="#9bbaad" stroke-width="5" stroke-linecap="round"/>
+<path d="M16 101h35" stroke="#ff6548" stroke-width="7" stroke-linecap="round"/>
+</g>
+<g transform="translate(244 422)">
+<ellipse cx="0" cy="30" rx="26" ry="7" fill="#c28031" />
+<path d="M-26 16v14c0 11 52 11 52 0V16" fill="#e9ad58"/>
+<ellipse cy="16" rx="26" ry="8" fill="#ffd27b"/>
+<path d="M-24 1v14c0 10 48 10 48 0V1" fill="#dc933e"/>
+<ellipse cy="1" rx="24" ry="8" fill="#fbd37c"/>
+</g>
+<!-- Employee centered -->
+<g transform="translate(409 168)" filter="url(#soft)">
+ <ellipse cx="53" cy="232" rx="87" ry="18" fill="#055666" opacity=".10"/>
+ <path d="M27 145q50-25 84 4l-10 55-74-4z" fill="#12334f"/>
+ <path d="M18 188l-15 36 19 7 28-33M88 195l43 22 18-9-48-45" fill="#183f57"/>
+ <path d="M-5 226q-2 17 25 16l20-10-21-12M132 212q15 12 29-4l-16-11-18 7" fill="#f7f5eb"/>
+ <path d="M29 95q-35 9-37 58l45 12 70-2-9-58q-24-25-69-10" fill="#ffffff"/>
+ <path d="M7 138l46 29 56-17" fill="none" stroke="#efc2a7" stroke-width="16" stroke-linecap="round"/>
+ <path d="M33 77v28q22 18 45-1V77" fill="#f4b58c"/>
+ <ellipse cx="57" cy="52" rx="42" ry="45" fill="#fac5a1"/>
+ <path d="M16 58Q-3-10 60 5q48-4 38 62l-14-29q-32 3-44-15-12 22-24 35" fill="#172a38"/>
+ <circle cx="43" cy="55" r="3" fill="#132d3a"/><circle cx="73" cy="55" r="3" fill="#132d3a"/>
+ <path d="M49 75q8 7 17-1" fill="none" stroke="#ae6552" stroke-width="2.5" stroke-linecap="round"/>
+ <rect x="13" y="142" width="93" height="58" rx="8" fill="#d8f2f0" transform="rotate(-7 60 171)"/>
+ <rect x="23" y="151" width="77" height="46" rx="4" fill="#184b5b" transform="rotate(-7 60 171)"/>
+ <circle cx="61" cy="175" r="5" fill="#ff8c66"/>
+</g>
+<!-- growth pedestal -->
+<g transform="translate(622 214)" filter="url(#soft)"><ellipse cx="0" cy="43" rx="96" ry="30" fill="#0e5965"/><path d="M-96 42v28c0 37 192 37 192 0V42" fill="#c9eae7"/><ellipse cy="42" rx="96" ry="30" fill="#fafff9"/></g>
+<g transform="translate(576 159)" filter="url(#soft)">
+<rect x="0" y="41" width="29" height="52" rx="5" fill="#3ba9b4"/><rect x="36" y="17" width="30" height="76" rx="5" fill="#0e6f82"/><rect x="74" y="-14" width="30" height="107" rx="5" fill="#ff744e"/>
+<path d="M-5 29L34-2 66 5 117-48" fill="none" stroke="#143c4e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M103-47h16v16" fill="none" stroke="#143c4e" stroke-width="7" stroke-linecap="round"/>
+</g>
+<!-- warehouse pedestal -->
+<g transform="translate(656 464)" filter="url(#soft)"><ellipse cx="0" cy="47" rx="128" ry="33" fill="#0a5569"/><path d="M-128 46v36c0 37 256 37 256 0V46" fill="#147389"/><ellipse cy="46" rx="128" ry="33" fill="#e0f5ef"/></g>
+<g transform="translate(591 332)" filter="url(#soft)">
+<path d="M0 34 68-7 135 34v112H0z" fill="#d9e9e6"/>
+<path d="M0 34 68-7 135 34v20L68 13 0 54z" fill="#fff7e9"/>
+<path d="M0 54 68 13v133H0" fill="#f1f8f3"/>
+<rect x="78" y="60" width="41" height="86" rx="3" fill="#779ea2"/>
+<path d="M89 74h19M89 87h19M89 100h19" stroke="#bde1db" stroke-width="4"/>
+<path d="M8 78h36v35H8z" fill="#a7d8d1"/>
+</g>
+<g transform="translate(545 466)"><path d="M0 0l26-13 31 14-28 15z" fill="#ffc68b"/><path d="M0 0v29l29 17V16z" fill="#eb9e4b"/><path d="M57 1v28L29 46V16z" fill="#bd713e"/><path d="M17-8l30 14" stroke="#fff0d6" stroke-width="5"/></g>
+<g transform="translate(723 474) scale(.75)"><path d="M0 0l26-13 31 14-28 15z" fill="#ffd39c"/><path d="M0 0v29l29 17V16z" fill="#e7a15b"/><path d="M57 1v28L29 46V16z" fill="#bb794c"/></g>
+<!-- decorative sparkles -->
+<g stroke="#f88a60" stroke-width="4" stroke-linecap="round"><path d="M250 198v-24M238 186h24M740 111v-21M730 100h21"/></g>
+<g fill="#106b7d"><circle cx="324" cy="142" r="5"/><circle cx="765" cy="316" r="6"/><circle cx="341" cy="600" r="4"/></g>
+</svg>
