@@ -1,92 +1,57 @@
+:host { display: block; }
 .app-login {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  background: var(--ts-bg);
-  padding: var(--ts-6);
+  min-height: 100vh; height: 100vh; overflow-y: auto; background: var(--mk-cream); color: var(--mk-ink);
+  font-family: 'Aptos', 'Segoe UI', system-ui, sans-serif;
 }
-
-.app-login-panel {
-  width: min(420px, 100%);
-  background: var(--ts-surface);
-  border: 1px solid var(--ts-border);
-  border-radius: var(--ts-radius-md);
-  padding: var(--ts-6);
-  box-shadow: var(--ts-shadow-panel);
+.app-login-top {
+  height: 94px; max-width: 1400px; padding: 0 5.5%; margin: auto;
+  display: flex; justify-content: space-between; align-items: center;
 }
-
-.app-login-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--ts-3);
-  margin-bottom: var(--ts-5);
-
-  .app-login-brand-copy {
-    display: grid;
-    gap: 2px;
-  }
-
-  h1 {
-    margin: 0;
-    font-size: var(--ts-text-22);
-    font-weight: 700;
-    color: var(--ts-text);
-  }
-
-  .app-login-brand-label {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ts-muted);
-  }
-
-  .app-login-brand-helper {
-    margin: 2px 0 0;
-    font-size: var(--ts-text-13);
-    color: var(--ts-muted);
-  }
+.app-login a { text-decoration: none; }
+.app-login-wordmark { color: var(--mk-ink); display: inline-flex; gap: 8px; align-items: baseline; font-size: 26px; letter-spacing: -.055em; }
+.app-login-wordmark strong { font-weight: 800; } .app-login-wordmark span { color: var(--mk-teal); font-weight: 400; }
+.app-login-back { color: var(--mk-teal); font-size: 13px; font-weight: 750; }
+.app-login-body { display: grid; grid-template-columns: 1fr .94fr; gap: 10%; align-items: center; max-width: 1400px; padding: 24px 5.5% 85px; margin: auto; }
+.app-login-story { background: var(--mk-mint); border-radius: 32px; min-height: 640px; padding: 54px; overflow: hidden; display: flex; flex-direction: column; }
+.app-login-eyebrow, .app-login-step { font-size: 11px; font-weight: 800; letter-spacing: .16em; color: var(--mk-teal); }
+.app-login-story h1 { font-size: clamp(44px, 4.8vw, 70px); letter-spacing: -.065em; line-height: 1.04; margin: 28px 0 22px; color: var(--mk-ink); }
+.app-login-story h1 em { font-style: normal; color: var(--mk-orange); }
+.app-login-story > p:not(.app-login-eyebrow) { max-width: 400px; font-size: 17px; line-height: 1.6; color: var(--mk-body); }
+.app-login-story img { width: 113%; align-self: center; height: auto; margin: auto 0 -72px; max-width: 710px; }
+.app-login-panel { width: 100%; max-width: 465px; padding: 25px 0 45px; }
+.app-login-panel h2 { color: var(--mk-ink); font-size: clamp(38px, 3.5vw, 53px); letter-spacing: -.055em; line-height: 1.1; margin: 18px 0; }
+.app-login-help { color: var(--mk-body); line-height: 1.6; font-size: 16px; margin: 0 0 37px; }
+.app-login-alert { padding: 14px 17px; border-radius: 12px; background: var(--mk-mint); color: var(--mk-teal); font-size: 13px; margin: 0 0 20px; }
+.app-login-form { display: flex; flex-direction: column; }
+.app-login-form label { color: var(--mk-ink); font-size: 13px; font-weight: 750; margin-bottom: 9px; }
+.app-login-form input { width: 100%; border: 1px solid var(--mk-line); background: var(--mk-white); border-radius: 12px; padding: 15px 17px; min-height: 56px; font-size: 15px; outline: none; margin-bottom: 24px; color: var(--mk-ink); }
+.app-login-form input:focus { border-color: var(--mk-teal); box-shadow: 0 0 0 3px var(--mk-pale-teal); }
+.app-login-form input[aria-invalid='true'] { border-color: var(--mk-orange); margin-bottom: 6px; }
+.app-login-field-error { font-size: 12px; color: var(--mk-orange-hover); margin-bottom: 17px; }
+.app-login-submit { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; border: 0; border-radius: 12px; min-height: 56px; background: var(--mk-orange); color: var(--mk-white); font-weight: 750; font-size: 15px; padding: 15px 20px; cursor: pointer; }
+.app-login-submit:hover { background: var(--mk-orange-hover); }
+.app-login-submit:disabled, .app-company-choice:disabled { opacity: .6; cursor: wait; }
+.app-login-bottom { border-top: 1px solid var(--mk-line); margin-top: 35px; padding-top: 20px; font-size: 13px; color: var(--mk-subtle); line-height: 1.6; }
+.app-login-bottom a { color: var(--mk-teal); font-weight: 750; }
+.app-login-footnote { color: var(--mk-subtle); font-size: 12px; margin-top: 10px; }
+.app-company-options { display: grid; gap: 12px; }
+.app-company-choice { width: 100%; min-height: 76px; display: flex; align-items: center; gap: 16px; padding: 12px 16px; border: 1px solid var(--mk-line); background: var(--mk-white); color: var(--mk-teal); border-radius: 13px; cursor: pointer; text-align: left; }
+.app-company-choice:hover { border-color: var(--mk-teal); background: var(--mk-mint); }
+.app-company-avatar { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--mk-pale-teal); font-weight: 800; }
+.app-company-details { display: grid; gap: 3px; flex: 1; }
+.app-company-details strong { color: var(--mk-ink); font-size: 15px; }
+.app-company-details small { color: var(--mk-subtle); font-size: 12px; }
+.app-login-switch { border: 0; background: transparent; color: var(--mk-teal); padding: 18px 0; cursor: pointer; font-weight: 700; }
+.app-login a:focus-visible, .app-login button:focus-visible { outline: 3px solid var(--mk-teal); outline-offset: 4px; }
+@media (max-width: 900px) {
+  .app-login-body { grid-template-columns: 1fr; gap: 55px; padding: 15px 6% 70px; }
+  .app-login-story { min-height: 270px; padding: 30px; }
+  .app-login-story img { display: none; }
+  .app-login-panel { max-width: 580px; margin: auto; padding: 0; }
 }
-
-.app-login-mark {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--ts-radius-md);
-  background: var(--ts-brand-900);
-  color: var(--ts-surface);
-  font-weight: 700;
-}
-
-.app-login-alert {
-  margin-bottom: var(--ts-4);
-  padding: 10px var(--ts-3);
-  border: 1px solid color-mix(in srgb, var(--ts-danger) 28%, var(--ts-border));
-  border-radius: var(--ts-radius-sm);
-  background: var(--ts-danger-bg);
-  color: var(--ts-danger);
-  font-size: var(--ts-text-13);
-}
-
-.app-login-form {
-  display: grid;
-  gap: var(--ts-4);
-
-  button {
-    min-height: 40px;
-    border: 0;
-    border-radius: var(--ts-radius-sm);
-    background: var(--ts-brand-900);
-    color: var(--ts-surface);
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  button:disabled,
-  select:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-  }
+@media (max-width: 540px) {
+  .app-login-top { height: 76px; padding: 0 6%; }
+  .app-login-story { border-radius: 22px; }
+  .app-login-story h1 { font-size: 45px; }
+  .app-login-panel h2 { font-size: 39px; }
 }

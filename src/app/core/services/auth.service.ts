@@ -3,7 +3,6 @@ import { Injectable } from '@angular/core';
 import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiAuthService } from './api-auth.service';
-import { CredentialService } from './credential.service';
 import { RestService } from './rest.service';
 import { SessionContext, SessionService } from './session.service';
 
@@ -14,9 +13,17 @@ export type LoginRequest = {
   password: string;
 };
 
+export type AuthorizedCompany = {
+  systemId: string;
+  name: string;
+  code: string;
+};
+
 export type LoginResult = {
   user: Record<string, unknown>;
-  session: SessionContext;
+  session?: SessionContext;
+  companies: AuthorizedCompany[];
+  requiresCompanySelection: boolean;
 };
 
 type BackendLoginResponse = Record<string, unknown>;
@@ -25,12 +32,12 @@ type BackendLoginResponse = Record<string, unknown>;
   providedIn: 'root'
 })
 export class AuthService {
+  private pendingLogin?: { token: string; user: Record<string, unknown>; companies: AuthorizedCompany[] };
   constructor(
     private readonly apiAuth: ApiAuthService,
     private readonly restService: RestService,
     private readonly sessionService: SessionService,
-    private readonly http: HttpClient,
-    private readonly credentialService: CredentialService
+    private readonly http: HttpClient
   ) {}
 
   authenticate(): Observable<string> {
@@ -85,34 +92,95 @@ export class AuthService {
   }
 
   getPermissionEngine(companyId: string): Observable<unknown> {
-    return this.restService.get(`/companies(${companyId})/permission-engine`);
+    return this.http.get(this.buildAuthUrl('/auth/context'), {
+      headers: this.createBearerHeaders(),
+      params: { companyId },
+    });
   }
 
   login(request: LoginRequest): Observable<LoginResult> {
+    // Never carry over another user's company and permissions.
+    this.pendingLogin = undefined;
+    this.sessionService.clearSessionData();
+
     return this.http.post<BackendLoginResponse>(this.buildAuthUrl('/auth/login'), {
       login: request.email.trim(),
       password: request.password,
-      deviceName: this.getDeviceName()
     }).pipe(
       switchMap((response) => {
-        const token = this.extractToken(response);
-
-        if (!token) {
-          return throwError(() => new Error('Login response did not include an access token.'));
+        const data = this.toRecord(this.readValue(response, 'data'));
+        const token = data ? this.readFirstString(data, ['token']) : '';
+        const user = data ? this.toRecord(this.readValue(data, 'user')) : undefined;
+        const companies = data ? this.extractAuthorizedCompanies(this.readValue(data, 'companies')) : [];
+        if (!token || !user) {
+          return throwError(() => new Error('Login response is missing verified account details.'));
+        }
+        if (!companies.length) {
+          return throwError(() => new Error('No active ERP company is assigned to this account. Contact your administrator.'));
         }
 
-        this.sessionService.AccessToken = token;
-        const responseUser = this.extractUser(response);
-
-        return this.getCurrentUser().pipe(
-          map((meUser) => responseUser ?? meUser),
-          switchMap((user) => this.resolveSessionContext(user, request))
+        this.pendingLogin = { token, user, companies };
+        const defaultCompany = this.toRecord(data?.['defaultCompany']);
+        const defaultId = defaultCompany ? this.readFirstString(defaultCompany, ['systemId']) : '';
+        const selected = companies.find((company) => company.systemId === defaultId)
+          ?? (companies.length === 1 ? companies[0] : undefined);
+        if (!selected) {
+          return of({ user, companies, requiresCompanySelection: true });
+        }
+        return this.selectCompany(selected.systemId).pipe(
+          map((session) => ({ user, session, companies, requiresCompanySelection: false }))
         );
       }),
-      tap(({ session }) => {
-        this.sessionService.applySessionContext(session);
-      })
+      catchError((error: unknown) => {
+        this.pendingLogin = undefined;
+        this.sessionService.clearSessionData();
+        return throwError(() => error);
+      }),
     );
+  }
+
+  selectCompany(companyId: string): Observable<SessionContext> {
+    const pending = this.pendingLogin;
+    const selected = pending?.companies.find((company) => company.systemId === companyId);
+    if (!pending || !selected) {
+      return throwError(() => new Error('Choose an authorized company.'));
+    }
+
+    this.sessionService.AccessToken = pending.token;
+    return this.getPermissionEngine(companyId).pipe(
+      map((response) => {
+        const data = this.toRecord(this.readValue(response, 'data'));
+        const verified = this.toRecord(data?.['company']);
+        if (!data || !verified || this.readFirstString(verified, ['systemId']) !== selected.systemId) {
+          throw new Error('Could not verify the selected company.');
+        }
+        const session = this.mapEngineToSessionContext(pending.user, {
+          email: this.readFirstString(pending.user, ['email']),
+          password: '',
+          companyId: selected.systemId,
+          companyName: selected.name,
+        }, data);
+        this.sessionService.applySessionContext(session);
+        this.pendingLogin = undefined;
+        return session;
+      }),
+      catchError((error: unknown) => {
+        this.sessionService.clearSessionData();
+        return throwError(() => error);
+      }),
+    );
+  }
+
+  private extractAuthorizedCompanies(value: unknown): AuthorizedCompany[] {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item): AuthorizedCompany[] => {
+      const company = this.toRecord(item);
+      if (!company || company['isActive'] === false) return [];
+      const systemId = this.readFirstString(company, ['systemId']);
+      const name = this.readFirstString(company, ['displayName', 'name']);
+      const code = this.readFirstString(company, ['code']);
+      return systemId && name ? [{ systemId, name, code }] : [];
+    });
   }
 
   getCurrentUser(): Observable<Record<string, unknown>> {
@@ -174,7 +242,7 @@ export class AuthService {
   }
 
   private buildAuthUrl(endpoint: string): string {
-    const baseUrl = environment.authApiBaseUrl || environment.apiBaseUrl.replace(/\/tecsa\/procure\/v1\.0\/?$/i, '');
+    const baseUrl = environment.authApiBaseUrl || environment.apiBaseUrl;
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${normalizedBase}${normalizedEndpoint}`;
@@ -256,32 +324,6 @@ export class AuthService {
     }
 
     return navigator.userAgent || 'Filaz ERP';
-  }
-
-  private resolveSessionContext(user: Record<string, unknown>, request: LoginRequest): Observable<LoginResult> {
-    const companyId = this.resolveCompanyId(user, request);
-    if (!companyId.length) {
-      return throwError(() => new Error('Company is not configured for the logged-in user.'));
-    }
-
-    return this.getPermissionEngine(companyId).pipe(
-      catchError(() => of(this.createPermissionEngineFallback(user))),
-      map((engineResponse) => {
-        const session = this.mapEngineToSessionContext(user, request, engineResponse);
-        return { user, session };
-      })
-    );
-  }
-
-  private createPermissionEngineFallback(user: Record<string, unknown>): Record<string, unknown> {
-    const roleId = this.readRoleId(user);
-
-    return {
-      roles: roleId.length ? [roleId] : [],
-      isSuperAdmin: this.isAdminUser(user),
-      accessCenters: [],
-      pages: []
-    };
   }
 
   private mapEngineToSessionContext(
@@ -429,21 +471,6 @@ export class AuthService {
 
   private resolveCompanyName(user: Record<string, unknown>, request: LoginRequest): string {
     return this.readFirstString(user, ['companyName', 'CompanyName']) || (request.companyName ?? '').trim();
-  }
-
-  private isPasswordValid(user: Record<string, unknown>, password: string): boolean {
-    const storedPassword = this.readFirstString(user, ['password', 'Password']);
-    const passwordHash = this.readFirstString(user, ['passwordHash', 'PasswordHash']);
-
-    if (storedPassword) {
-      return storedPassword === password;
-    }
-
-    return Boolean(passwordHash && this.credentialService.matchesPassword(passwordHash, password));
-  }
-
-  private isAdminUser(user: Record<string, unknown>): boolean {
-    return this.readFirstString(user, ['userName', 'UserName', 'email', 'Email']).toLowerCase() === 'admin@tecsa.com.my';
   }
 
   private firstRecord(response: unknown): Record<string, unknown> | undefined {

@@ -92,16 +92,16 @@ export class RestService {
 
   private buildUrl(endpoint: string): string {
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-
-    if (normalizedEndpoint.includes('/companies')) {
-      return `${environment.apiBaseUrl}${normalizedEndpoint}`;
+    const base = environment.apiBaseUrl.replace(/\/$/, '');
+    // The Laravel API scopes records by /companies/{companyId}/, not companies(id).
+    if (/^\/companies(?:\/|\?|$)/.test(normalizedEndpoint)) {
+      return `${base}${normalizedEndpoint}`;
     }
-
-    if (this.sessionService.Company) {
-      return `${environment.apiBaseUrl}/companies(${this.sessionService.Company})${normalizedEndpoint}`;
+    const companyId = this.sessionService.Company;
+    if (!companyId) {
+      throw new Error('Select an authorized company before accessing ERP data.');
     }
-
-    return `${environment.apiBaseUrl}${normalizedEndpoint}`;
+    return `${base}/companies/${encodeURIComponent(companyId)}${normalizedEndpoint}`;
   }
 
   private getAuthorizationToken(): Observable<string> {
@@ -114,11 +114,7 @@ export class RestService {
         return of(this.sessionService.AccessToken);
       }
 
-      return this.auth.getToken().pipe(
-        tap((token) => {
-          this.sessionService.AccessToken = token;
-        })
-      );
+      return throwError(() => new Error('Sign in to access TecSA ERP.'));
     }
 
     if (!environment.username || !environment.password) {

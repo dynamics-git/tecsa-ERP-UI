@@ -31,7 +31,7 @@ export type SessionContext = {
 export class SessionService {
   private readonly prefix = 'app-';
   private readonly sessionSchemaKey = `${this.prefix}session-schema`;
-  private readonly sessionSchemaVersion = 'strict-backend-auth-v1';
+  private readonly sessionSchemaVersion = 'laravel-company-context-v2';
   private readonly userDetailsKey = `${this.prefix}user-details`;
   private readonly companyKey = `${this.prefix}comapny`;
   private readonly companyNameKey = `${this.prefix}comapny-name`;
@@ -373,7 +373,7 @@ export class SessionService {
   }
 
   private buildAuthUrl(endpoint: string): string {
-    const baseUrl = environment.authApiBaseUrl || environment.apiBaseUrl.replace(/\/tecsa\/procure\/v1\.0\/?$/i, '');
+    const baseUrl = environment.authApiBaseUrl || environment.apiBaseUrl;
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${normalizedBase}${normalizedEndpoint}`;

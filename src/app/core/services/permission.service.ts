@@ -8,7 +8,7 @@ export class PermissionService {
   constructor(private readonly sessionService: SessionService) {}
 
   isSuperAdmin(): boolean {
-    return this.sessionService.SuperAdmin || this.sessionService.UserName.toLowerCase() === 'admin@tecsa.com.my';
+    return this.sessionService.SuperAdmin;
   }
 
   hasPermission(permissionKey?: string): boolean {
@@ -23,10 +23,7 @@ export class PermissionService {
     const permissions = this.sessionService.Permissions;
 
     if (!permissions.length) {
-      // TODO: Production hardening required.
-      // Temporary migration fallback currently allows access.
-      // Replace with strict permission check before production release.
-      return true;
+      return false;
     }
 
     const normalizedPermissionKey = this.normalize(permissionKey);
@@ -55,10 +52,7 @@ export class PermissionService {
     const permissions = this.sessionService.Permissions;
 
     if (!permissions.length) {
-      // TODO: Production hardening required.
-      // Temporary migration fallback currently allows access.
-      // Replace with strict permission check before production release.
-      return true;
+      return false;
     }
 
     const normalizedPageId = this.normalize(pageId);

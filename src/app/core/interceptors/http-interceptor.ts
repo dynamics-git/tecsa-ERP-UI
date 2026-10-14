@@ -2,6 +2,7 @@ import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/c
 import { Injectable } from '@angular/core';
 import { catchError, EMPTY, Observable, throwError } from 'rxjs';
 import { SessionService } from '../services/session.service';
+import { environment } from '../../../environments/environment';
 
 @Injectable()
 export class HttpInterceptorService implements HttpInterceptor {
@@ -9,8 +10,11 @@ export class HttpInterceptorService implements HttpInterceptor {
 
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     const token = this.sessionService.AccessToken;
+    const base = (environment.authApiBaseUrl || environment.apiBaseUrl).replace(/\/$/, '');
+    const isLogin = request.url === `${base}/auth/login`;
+    const isErpApi = request.url.startsWith(`${base}/`) || request.url.startsWith(`${environment.apiBaseUrl.replace(/\/$/, '')}/`);
     const hasAuthorizationHeader = request.headers.has('Authorization');
-    const requestWithToken = token && !hasAuthorizationHeader
+    const requestWithToken = token && isErpApi && !isLogin && !hasAuthorizationHeader
       ? request.clone({
         setHeaders: {
           Authorization: `Bearer ${token}`,
@@ -29,7 +33,7 @@ export class HttpInterceptorService implements HttpInterceptor {
 
     return next.handle(requestWithToken).pipe(
       catchError((error: unknown) => {
-        if (this.isUnauthorized(error)) {
+        if (!isLogin && this.isUnauthorized(error)) {
           this.sessionService.logout('unauthorized');
         }
 
