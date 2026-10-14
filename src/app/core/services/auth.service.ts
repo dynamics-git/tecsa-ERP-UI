@@ -149,7 +149,7 @@ export class AuthService {
     this.sessionService.AccessToken = pending.token;
     return this.getPermissionEngine(companyId).pipe(
       map((response) => {
-        const data = this.toRecord(this.readValue(response, 'data'));
+        const data = this.toRecord(this.readValue(this.toRecord(response) ?? {}, 'data'));
         const verified = this.toRecord(data?.['company']);
         if (!data || !verified || this.readFirstString(verified, ['systemId']) !== selected.systemId) {
           throw new Error('Could not verify the selected company.');
