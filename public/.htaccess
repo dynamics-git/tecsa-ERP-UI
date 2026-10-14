@@ -1,0 +1,9 @@
+# Angular SPA direct-route fallback for Apache FTP hosting.
+# Backend APIs and actual files/directories must not be rewritten.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^api(?:/|$) - [L,NC]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(welcome|start|auth/login|purchase-order)/?$ index.html [L,NC]
+</IfModule>
