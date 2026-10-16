@@ -327,10 +327,10 @@ export class ProcurementApiService {
   }
 
   private positiveDecimal(value: string): boolean {
-    return /^\\d{1,14}(?:\\.\\d{1,6})?$/.test(value) && Number(value) > 0;
+    return /^\d{1,14}(?:\.\d{1,6})?$/.test(value) && Number(value) > 0;
   }
 
   private nonnegativeDecimal(value: string): boolean {
-    return /^\\d{1,14}(?:\\.\\d{1,6})?$/.test(value);
+    return /^\d{1,14}(?:\.\d{1,6})?$/.test(value);
   }
 }
