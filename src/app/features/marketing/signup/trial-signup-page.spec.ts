@@ -42,8 +42,10 @@ describe('SaaS signup and verified account provisioning', () => {
   });
 
   it('creates an account only after OTP, password and company details', () => {
-    component.form.patchValue({ email: 'person@example.test', code: '123456' });
-    component.next(); component.next();
+    component.form.controls.email.setValue('person@example.test');
+    component.next();
+    component.form.controls.code.setValue('123456');
+    component.next();
     expect(component.step).toBe(1);
 
     component.form.patchValue({ name: 'Test Owner', password: 'strong-password-123', passwordConfirmation: 'wrong' });
