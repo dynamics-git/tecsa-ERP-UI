@@ -35,6 +35,7 @@ export class TrialSignupPage {
   codeRequestedFor = '';
   verifiedEmail = '';
   trialEndsAt = '';
+  platformPending = false;
 
   back(): void {
     if (this.busy || this.registrationComplete) return;
@@ -134,6 +135,7 @@ export class TrialSignupPage {
     }).pipe(finalize(() => this.busy = false)).subscribe({
       next: response => {
         this.trialEndsAt = response.data.subscription.trialEndsAt;
+        this.platformPending = response.data.platformStatus !== 'synced';
         this.registrationComplete = true;
         this.form.controls.password.reset();
         this.form.controls.passwordConfirmation.reset();
