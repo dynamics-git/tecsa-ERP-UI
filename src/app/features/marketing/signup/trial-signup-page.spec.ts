@@ -12,7 +12,7 @@ describe('SaaS signup and verified account provisioning', () => {
     verifyCode: vi.fn(() => of({ verified: true })),
     complete: vi.fn(() => of({
       data: { organizationId: 'org', companyId: 'company',
-        subscription: { status: 'trialing', trialEndsAt: '2026-11-16T00:00:00Z' } },
+        subscription: { status: 'trialing', trialEndsAt: '2026-11-16T00:00:00Z' }, platformStatus: 'synced' },
     })),
   };
 
