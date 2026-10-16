@@ -18,6 +18,7 @@ export interface SaasSignupResult {
     organizationId: string;
     companyId: string;
     subscription: { status: string; trialEndsAt: string };
+    platformStatus: 'synced' | 'pending';
   };
 }
 
