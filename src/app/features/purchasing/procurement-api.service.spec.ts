@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionService } from '../../core/services/session.service';
+import { environment } from '../../../environments/environment';
 import { ProcurementApiService } from './procurement-api.service';
 
 describe('Laravel procurement API contract', () => {
@@ -15,7 +16,7 @@ describe('Laravel procurement API contract', () => {
   const requisitionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const lineId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   const orderId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-  const base = `/api/v1/companies/${companyId}`;
+  const base = `${environment.apiBaseUrl.replace(/\/$/, '')}/companies/${companyId}`;
 
   beforeEach(() => {
     localStorage.clear();

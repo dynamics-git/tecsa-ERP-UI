@@ -3,7 +3,6 @@ import { Injectable } from '@angular/core';
 import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { UnicodeNormalizer } from '../utils/unicode-normalizer';
-import { ApiAuthService } from './api-auth.service';
 import { SessionService } from './session.service';
 
 export type RestRequestOptions = {
@@ -16,7 +15,6 @@ export type RestRequestOptions = {
 export class RestService {
   constructor(
     private readonly http: HttpClient,
-    private readonly auth: ApiAuthService,
     private readonly sessionService: SessionService
   ) {}
 
@@ -105,39 +103,15 @@ export class RestService {
   }
 
   private getAuthorizationToken(): Observable<string> {
-    if ((environment.authorizationType || '').toLowerCase() === 'none') {
-      return of('');
-    }
-
-    if (environment.authorizationType === 'Bearer') {
-      if (this.sessionService.AccessToken) {
-        return of(this.sessionService.AccessToken);
-      }
-
-      return throwError(() => new Error('Sign in to access TecSA ERP.'));
-    }
-
-    if (!environment.username || !environment.password) {
-      return throwError(() => new Error('Basic API auth configuration is missing: username, password'));
-    }
-
-    return of(btoa(`${environment.username}:${environment.password}`));
+    const token = this.sessionService.AccessToken;
+    return token ? of(token) : throwError(() => new Error('Sign in to access TecSA ERP.'));
   }
 
   private createHeaders(token: string): HttpHeaders {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    if ((environment.authorizationType || '').toLowerCase() !== 'none') {
-      const authorization = environment.authorizationType === 'Bearer'
-        ? `Bearer ${token}`
-        : `${environment.authorizationType} ${token}`;
-
-      headers['Authorization'] = authorization;
-    }
-
-    return new HttpHeaders(headers);
+    return new HttpHeaders({
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    });
   }
 
   private handleError(error: HttpErrorResponse, options?: RestRequestOptions): Observable<never> {

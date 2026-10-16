@@ -373,7 +373,7 @@ export class SessionService {
   }
 
   private buildAuthUrl(endpoint: string): string {
-    const baseUrl = environment.authApiBaseUrl || environment.apiBaseUrl;
+    const baseUrl = environment.apiBaseUrl;
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${normalizedBase}${normalizedEndpoint}`;

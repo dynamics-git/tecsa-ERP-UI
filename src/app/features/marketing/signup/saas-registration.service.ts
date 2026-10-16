@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../../../environments/environment';
 
 export interface SaasSignupRequest {
   email: string;
@@ -26,7 +27,7 @@ export interface SaasSignupResult {
 @Injectable({ providedIn: 'root' })
 export class SaasRegistrationService {
   private readonly http = inject(HttpClient);
-  private readonly base = '/api/v1/saas/registration';
+  private readonly base = `${environment.apiBaseUrl.replace(/\/$/, '')}/saas/registration`;
 
   requestCode(email: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(this.base + '/request-code', { email });

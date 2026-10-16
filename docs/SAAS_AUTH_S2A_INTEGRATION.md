@@ -20,7 +20,7 @@ Frontend permission hints are fail closed. Business route authorization remains 
 
 ## SaaS deployment requirement
 
-Angular uses **same-origin `/api/v1`** for the Laravel API. Configure the application gateway/web server so `/api/v1/*` is forwarded to the correct Laravel API and does not receive `index.html`. FTP upload of Angular static files by itself **does not deploy or configure Laravel**.
+Angular production uses the full HTTPS ERP Laravel API URL from the GitHub Actions repository variable `ERP_API_BASE_URL`, injected into `src/environments/environment.ts` before FTP deployment. The public URL must end in `/api/v1` (including any actual server prefix). Do **not** substitute the separate TecSA Platform API URL or guess an ERP hostname. Set Laravel's `CORS_ALLOWED_ORIGINS` for the ERP frontend HTTPS origin. FTP upload of Angular files alone does **not** deploy Laravel.
 
 Do not launch customer-facing login until the backend change is deployed and the actual origin, HTTPS, API proxy, authentication and company isolation are tested in a browser. The existing `.github/workflows/deploy-frontend-ftp.yml` has intentionally not been modified.
 

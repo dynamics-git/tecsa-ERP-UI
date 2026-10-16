@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
 import { PermissionService } from './permission.service';
 import { HttpInterceptorService } from '../interceptors/http-interceptor';
+import { environment } from '../../../environments/environment';
 
 describe('TecSA Laravel company-aware login', () => {
   let auth: AuthService;
@@ -17,8 +18,9 @@ describe('TecSA Laravel company-aware login', () => {
   const companyA = { systemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Company A', code: 'A', isActive: true };
   const companyB = { systemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'Company B', code: 'B', isActive: true };
   const user = { systemId: '11111111-1111-4111-8111-111111111111', userName: 'test-user', name: 'Test User', email: 'user@example.test' };
-  const url = '/api/v1/auth/login';
-  const contextUrl = (id: string) => `/api/v1/auth/context?companyId=${id}`;
+  const apiBase = environment.apiBaseUrl.replace(/\/$/, '');
+  const url = `${apiBase}/auth/login`;
+  const contextUrl = (id: string) => `${apiBase}/auth/context?companyId=${id}`;
   const context = (company = companyA, superAdmin = false, canRead = false) => ({
     data: {
       company,

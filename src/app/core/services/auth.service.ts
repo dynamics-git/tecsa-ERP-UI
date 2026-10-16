@@ -64,33 +64,6 @@ export class AuthService {
     return this.restService.get('/companies');
   }
 
-  getUserDetails(company: string, email: string): Observable<unknown> {
-    const filter = `?$filter=email eq '${this.escapeODataString(email)}'`;
-    return this.restService.get(`/companies(${company})/users${filter}`);
-  }
-
-  getUserDeatils(company: string, email: string): Observable<unknown> {
-    return this.getUserDetails(company, email);
-  }
-
-  getUserRoleDetails(roleId: string): Observable<unknown> {
-    return this.restService.get(`/userRoles?$filter=roleId eq '${this.escapeODataString(roleId)}'`);
-  }
-
-  getUserAccessCenterPermission(userId: string, companyId: string): Observable<unknown> {
-    const filter = `?$filter=userId eq '${this.escapeODataString(userId)}'`;
-    return this.restService.get(`/companies(${companyId})/accessCenterPermissions${filter}`);
-  }
-
-  getUserCompanyPermission(userId: string, companyId: string): Observable<unknown> {
-    const filter = `?$filter=userId eq '${this.escapeODataString(userId)}'`;
-    return this.restService.get(`/companies(${companyId})/companyAccessPermissions${filter}`);
-  }
-
-  getRolePermissions(roleId: string): Observable<unknown> {
-    return this.restService.get(`/accessPermissions?$filter=roleId eq '${this.escapeODataString(roleId)}'`);
-  }
-
   getPermissionEngine(companyId: string): Observable<unknown> {
     return this.http.get(this.buildAuthUrl('/auth/context'), {
       headers: this.createBearerHeaders(),
@@ -199,36 +172,6 @@ export class AuthService {
     );
   }
 
-  checkLoginPermission(userEmail: string, macId: string): Observable<unknown> {
-    if (!environment.licenseApi || !environment.licenseCheckToken) {
-      return of({ PassToLogin: true });
-    }
-
-    return this.http.post(environment.licenseApi, {
-      UserEmail: userEmail,
-      MacId: macId
-    }, {
-      headers: new HttpHeaders({
-        apiKey: environment.licenseCheckToken
-      })
-    });
-  }
-
-  transferLogin(userEmail: string, macId: string): Observable<unknown> {
-    if (!environment.lisenceApiCore || !environment.licenseCheckToken) {
-      return of({});
-    }
-
-    return this.http.post(`${environment.lisenceApiCore}TransferLogin`, {
-      UserEmail: userEmail,
-      MacId: macId
-    }, {
-      headers: new HttpHeaders({
-        apiKey: environment.licenseCheckToken
-      })
-    });
-  }
-
   isSuperAdmin(): boolean {
     return this.sessionService.SuperAdmin;
   }
@@ -242,7 +185,7 @@ export class AuthService {
   }
 
   private buildAuthUrl(endpoint: string): string {
-    const baseUrl = environment.authApiBaseUrl || environment.apiBaseUrl;
+    const baseUrl = environment.apiBaseUrl;
     const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${normalizedBase}${normalizedEndpoint}`;
@@ -527,10 +470,6 @@ export class AuthService {
     const normalized = key.toLowerCase();
     const matched = Object.keys(source).find((candidate) => candidate.toLowerCase() === normalized);
     return matched ? source[matched] : undefined;
-  }
-
-  private escapeODataString(value: string): string {
-    return value.replace(/'/g, "''");
   }
 
   private extractAccessCenterCode(value: unknown): string {

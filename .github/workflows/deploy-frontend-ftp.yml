@@ -28,6 +28,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Configure production ERP API URL
+        env:
+          ERP_API_BASE_URL: ${{ vars.ERP_API_BASE_URL }}
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const base = (process.env.ERP_API_BASE_URL || '').trim().replace(/\/$/, '');
+          let url;
+          try { url = new URL(base); } catch {
+            throw new Error('Set repository variable ERP_API_BASE_URL to the full HTTPS ERP Laravel API URL.');
+          }
+          if (url.protocol !== 'https:' || url.username || url.password || url.search ||
+              url.hash || !url.hostname || !url.pathname.endsWith('/api/v1')) {
+            throw new Error('ERP_API_BASE_URL must be an HTTPS API base ending in /api/v1, with no credentials or query.');
+          }
+          const path = 'src/environments/environment.ts';
+          const original = fs.readFileSync(path, 'utf8');
+          const token = "'__ERP_API_BASE_URL__'";
+          if (!original.includes(token)) throw new Error('ERP API URL placeholder missing.');
+          fs.writeFileSync(path, original.replace(token, JSON.stringify(base)));
+          NODE
+
       - name: Build Angular project
         run: npm run build
 
