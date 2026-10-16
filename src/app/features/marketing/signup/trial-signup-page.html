@@ -95,6 +95,7 @@
           <span class="mk-complete-symbol">✓</span>
           <h2 id="onboard-title">Your workspace is ready.</h2>
           <p>Your TecSA ERP account and 30-day trial have been created. Sign in with your verified email and new password.</p>
+          @if (platformPending) { <p class="mk-onboard-disclaimer">TecSA Platform customer registration is still synchronizing. Your ERP account has been created; central platform records will be completed when the connection is available.</p> }
           <a routerLink="/auth/login" class="mk-next-button">Sign in to TecSA ERP ↗</a>
         </div>
       }
