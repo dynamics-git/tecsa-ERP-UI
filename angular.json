@@ -38,9 +38,6 @@
           },
           "configurations": {
             "production": {
-              "allowedCommonJsDependencies": [
-                "crypto-js"
-              ],
               "budgets": [
                 {
                   "type": "initial",
