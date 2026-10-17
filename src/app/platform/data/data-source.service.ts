@@ -1,5 +1,5 @@
 import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of, throwError, map } from 'rxjs';
 import { finalize, shareReplay, tap } from 'rxjs/operators';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { EntityContractService } from './entity-contract.service';
@@ -66,6 +66,7 @@ export class DataSourceService {
     }
 
     const request$ = this.restService.get(endpoint).pipe(
+      map((response) => this.normalizeListResponse(config, response)),
       tap((response) => {
         this.listCache.set(endpoint, {
           response,
@@ -117,13 +118,16 @@ export class DataSourceService {
       return this.restServiceUnavailable();
     }
 
-    const recordEndpoint = `${endpoint}(${this.formatId(id)})`;
+    const recordEndpoint = config.transport === 'laravel'
+      ? `${endpoint}/${encodeURIComponent(String(id))}`
+      : `${endpoint}(${this.formatId(id)})`;
     const cachedRequest = this.inFlightRecords.get(recordEndpoint);
     if (cachedRequest) {
       return cachedRequest;
     }
 
     const request$ = this.restService.get(recordEndpoint).pipe(
+      map((response) => this.normalizeRecordResponse(config, response)),
       finalize(() => {
         this.inFlightRecords.delete(recordEndpoint);
       }),
@@ -144,13 +148,19 @@ export class DataSourceService {
       return this.restServiceUnavailable();
     }
 
+    if (config.transport === 'laravel' && config.supportsCreate === false) {
+      return throwError(() => new Error('This document must be created through its approved business workflow.'));
+    }
+
     const sanitizedPayload = this.contractService.sanitizePayload(config, 'create', payload);
     this.clearListCacheForEndpoint(endpoint);
     this.clearInFlightRecordRequestsForEndpoint(endpoint);
-    return this.restService.post(endpoint, sanitizedPayload);
+    return this.restService.post(endpoint, sanitizedPayload).pipe(
+      map((response) => this.normalizeRecordResponse(config, response)),
+    );
   }
 
-  update(config: DataSourceConfig, id: unknown, payload: unknown): Observable<unknown> {
+  update(config: DataSourceConfig, id: unknown, payload: unknown, rowVersion?: number): Observable<unknown> {
     const endpoint = this.getEndpoint(config);
     if (!endpoint) {
       return this.missingEndpoint();
@@ -162,6 +172,31 @@ export class DataSourceService {
 
     if (!this.restService) {
       return this.restServiceUnavailable();
+    }
+
+    if (config.transport === 'laravel') {
+      if (config.supportsUpdate === false) {
+        return throwError(() => new Error('Updates are not supported for this document.'));
+      }
+      if (!Number.isSafeInteger(rowVersion) || (rowVersion ?? 0) < 1) {
+        return throwError(() => new Error('Reload the document before saving: its row version is missing.'));
+      }
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return throwError(() => new Error('A valid document update is required.'));
+      }
+      const values = payload as Record<string, unknown>;
+      const permitted = config.updateFields ?? [];
+      const keys = Object.keys(values);
+      if (!keys.length || keys.some((key) => !permitted.includes(key))) {
+        return throwError(() => new Error('This field cannot be changed on the current document.'));
+      }
+      this.clearListCacheForEndpoint(endpoint);
+      this.clearInFlightRecordRequestsForEndpoint(endpoint);
+      return this.restService.patch(
+        `${endpoint}/${encodeURIComponent(String(id))}`,
+        values,
+        `"${rowVersion}"`,
+      ).pipe(map((response) => this.normalizeRecordResponse(config, response)));
     }
 
     const sanitizedPayload = this.contractService.sanitizePayload(config, 'update', payload);
@@ -184,6 +219,12 @@ export class DataSourceService {
       return this.restServiceUnavailable();
     }
 
+    if (config.transport === 'laravel') {
+      if (config.supportsDelete === false) {
+        return throwError(() => new Error('Deletion is not supported for this document.'));
+      }
+      return throwError(() => new Error('Laravel deletion requires an explicit document contract.'));
+    }
     this.clearListCacheForEndpoint(endpoint);
     this.clearInFlightRecordRequestsForEndpoint(endpoint);
     return this.restService.delete(`${endpoint}(${this.formatId(id)})`);
@@ -195,6 +236,20 @@ export class DataSourceService {
 
   private getListEndpoint(config: DataSourceConfig, options?: DataSourceLoadOptions): string {
     const endpoint = this.getEndpoint(config);
+    if (config.transport === 'laravel') {
+      const perPage = Math.min(200, Math.max(1, options?.top ?? config.pageSize ?? 20));
+      const page = Math.floor(Math.max(0, options?.skip ?? 0) / perPage) + 1;
+      const query = new URLSearchParams({ page: String(page), perPage: String(perPage) });
+      const filter = config.defaultFilter?.trim();
+      if (filter) {
+        const status = /^status\s+eq\s+'(open|released|cancelled)'$/i.exec(filter);
+        if (!status) {
+          throw new Error('Unsupported Laravel document filter. Use a supported status view.');
+        }
+        query.set('status', status[1].toLowerCase());
+      }
+      return `${endpoint}?${query.toString()}`;
+    }
     const queryParts: string[] = [];
 
     if (config.defaultFilter) {
@@ -221,6 +276,34 @@ export class DataSourceService {
     }
 
     return `${endpoint}${endpoint.includes('?') ? '&' : '?'}${queryParts.join('&')}`;
+  }
+
+  private normalizeListResponse(config: DataSourceConfig, response: unknown): unknown {
+    if (config.transport !== 'laravel') {
+      return response;
+    }
+    if (!response || typeof response !== 'object' || Array.isArray(response)) {
+      throw new Error('Unexpected Laravel list response.');
+    }
+    const data = (response as Record<string, unknown>)['data'];
+    if (!Array.isArray(data)) {
+      throw new Error('Unexpected Laravel list data. Expected a collection.');
+    }
+    return { value: data };
+  }
+
+  private normalizeRecordResponse(config: DataSourceConfig, response: unknown): unknown {
+    if (config.transport !== 'laravel') {
+      return response;
+    }
+    if (!response || typeof response !== 'object' || Array.isArray(response)) {
+      throw new Error('Unexpected Laravel document response.');
+    }
+    const data = (response as Record<string, unknown>)['data'];
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Unexpected Laravel document data. Expected a record.');
+    }
+    return data;
   }
 
   private formatId(id: unknown): string {
