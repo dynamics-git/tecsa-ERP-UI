@@ -108,7 +108,9 @@ export class DocumentPageDataSourceResolverService {
     return {
       dataSource: {
         ...baseDataSource,
-        endpoint: `${parentEndpoint}(${params.toODataId(parentId)})/${childCollection}`,
+        endpoint: relation.style === 'rest'
+          ? `${parentEndpoint}/${encodeURIComponent(String(parentId))}/${childCollection}`
+          : `${parentEndpoint}(${params.toODataId(parentId)})/${childCollection`,
       },
       lineContextReady: true,
     };
