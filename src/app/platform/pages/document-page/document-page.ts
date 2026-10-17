@@ -1374,6 +1374,19 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     const payload = this.entryConfigData.buildLineUpdatePayload(row, uniqueFields, this.lineConfig);
+    if (resolved.dataSource.transport === 'laravel') {
+      // Calculated/readonly columns (e.g. lineAmount) are server-owned.
+      // Save only the edited fields permitted by this document's Laravel contract.
+      const permitted = new Set(resolved.dataSource.updateFields ?? []);
+      for (const field of Object.keys(payload)) {
+        if (!permitted.has(field)) {
+          delete payload[field];
+        }
+      }
+      if (Object.keys(payload).length === 0) {
+        return;
+      }
+    }
     this.setEntryStatus({
       tone: 'info',
       title: 'Saving',
