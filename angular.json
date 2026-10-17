@@ -73,8 +73,7 @@
               "buildTarget": "filaz-erp:build:production"
             },
             "development": {
-              "buildTarget": "filaz-erp:build:development",
-              "proxyConfig": "proxy.conf.json"
+              "buildTarget": "filaz-erp:build:development"
             }
           },
           "defaultConfiguration": "development"
