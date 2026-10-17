@@ -1293,7 +1293,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.dataSource
-        .update(this.listConfig.dataSource, headerId, updatePayload)
+        .update(this.listConfig.dataSource, headerId, updatePayload, Number(headerData['systemRowVersion']))
         .pipe(
           catchError((error: unknown) => {
             const rolledBack = this.entryState.rollbackHeaderFieldChange(
@@ -1374,6 +1374,19 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     const payload = this.entryConfigData.buildLineUpdatePayload(row, uniqueFields, this.lineConfig);
+    if (resolved.dataSource.transport === 'laravel') {
+      // Calculated/readonly columns (e.g. lineAmount) are server-owned.
+      // Save only the edited fields permitted by this document's Laravel contract.
+      const permitted = new Set(resolved.dataSource.updateFields ?? []);
+      for (const field of Object.keys(payload)) {
+        if (!permitted.has(field)) {
+          delete payload[field];
+        }
+      }
+      if (Object.keys(payload).length === 0) {
+        return;
+      }
+    }
     this.setEntryStatus({
       tone: 'info',
       title: 'Saving',
@@ -1383,7 +1396,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.dataSource
-        .update(resolved.dataSource, rowId, payload)
+        .update(resolved.dataSource, rowId, payload, Number(row['systemRowVersion']))
         .pipe(
           catchError((error: unknown) => {
             this.setEntryStatus({
@@ -1397,9 +1410,10 @@ export class DocumentPage implements OnInit, OnDestroy {
         )
         .subscribe((updated) => {
           const updatedRecord = this.toCreatedRecord(updated);
-          if (updatedRecord) {
-            Object.assign(row, updatedRecord);
+          if (!updatedRecord) {
+            return; // Failed API updates must never display a false Saved notification.
           }
+          Object.assign(row, updatedRecord);
 
           this.recalculateActiveLineTotals();
           this.setEntryStatus({
@@ -1477,9 +1491,10 @@ export class DocumentPage implements OnInit, OnDestroy {
           this.lineCreateInProgress.delete(row);
 
           const createdRecord = this.toCreatedRecord(created);
-          if (createdRecord) {
-            Object.assign(row, createdRecord);
+          if (!createdRecord) {
+            return; // A rejected create must not be reported as an autosave success.
           }
+          Object.assign(row, createdRecord);
 
           const deferredFields = this.takeDeferredLineSaveFields(row);
           if (deferredFields.length) {

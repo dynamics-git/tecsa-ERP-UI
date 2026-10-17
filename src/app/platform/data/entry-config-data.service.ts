@@ -62,7 +62,11 @@ export class EntryConfigDataService {
   ): Record<string, unknown>[] {
     const records = lineSource.filter((line): line is Record<string, unknown> => this.isRecord(line));
     if (!records.length) {
-      return [this.createEmptyLineRow(lineConfig, headerData, registry, optionFieldMap)];
+      // Do not synthesize an editable line for Laravel documents that can only
+      // inherit lines from an approved source workflow.
+      return lineConfig.dataSource.supportsCreate === false
+        ? []
+        : [this.createEmptyLineRow(lineConfig, headerData, registry, optionFieldMap)];
     }
 
     return records.map((record) => {

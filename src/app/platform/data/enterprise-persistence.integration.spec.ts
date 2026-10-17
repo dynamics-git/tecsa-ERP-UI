@@ -3,7 +3,14 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SessionService } from '../../core/services/session.service';
 import { EntrySaveService } from '../../core/services/entry-save.service';
-import { purchaseOrderListConfig } from '../../features/purchasing/purchase-order/purchase-order.config';
+import { DataSourceConfig } from '../models/data-source-config.model';
+
+// Explicit BC transport fixture: the real Purchase Order page now uses Laravel REST.
+const bcReferenceDataSource: DataSourceConfig = {
+  endpoint: '/purchaseOrderHeaders',
+  contractProfileKey: 'purchaseOrderHeaders',
+  keyField: 'systemId',
+};
 import { DATA_REST_SERVICE, DataRestService } from './data-source.service';
 import { DraftCreateService } from './draft-create.service';
 import { DataSourceService } from './data-source.service';
@@ -85,7 +92,7 @@ describe('Enterprise persistence integration', () => {
 
     let actual: unknown;
     draftCreate
-      .createWithUnknownPropertyFallback(purchaseOrderListConfig.dataSource, {
+      .createWithUnknownPropertyFallback(bcReferenceDataSource, {
         CreatedBy: 'tester',
         CurrencyCode: 'MYR'
       })
@@ -108,7 +115,7 @@ describe('Enterprise persistence integration', () => {
 
     let actual: unknown;
     draftCreate
-      .createWithUnknownPropertyFallback(purchaseOrderListConfig.dataSource, {
+      .createWithUnknownPropertyFallback(bcReferenceDataSource, {
         UnknownField: 'value'
       })
       .subscribe((response) => {
@@ -131,7 +138,7 @@ describe('Enterprise persistence integration', () => {
     entrySave
       .save({
         scope: 'purchase-order-entry',
-        dataSourceConfig: purchaseOrderListConfig.dataSource,
+        dataSourceConfig: bcReferenceDataSource,
         headerSections: [{ id: 'header', fields: [{ key: 'VendorOrderNumber', label: 'Vendor Order Number', type: 'text' }] }],
         headerData: {
           Id: 'PO-ID-1',
@@ -152,7 +159,7 @@ describe('Enterprise persistence integration', () => {
 
   it('does not send an empty draft create request', () => {
     let actual: unknown;
-    draftCreate.createWithUnknownPropertyFallback(purchaseOrderListConfig.dataSource, {})
+    draftCreate.createWithUnknownPropertyFallback(bcReferenceDataSource, {})
       .subscribe(response => actual = response);
     expect(actual).toBeNull();
     expect(postCalls).toEqual([]);
@@ -171,7 +178,7 @@ describe('Enterprise persistence integration', () => {
 
     let actualErrorMessage = '';
 
-    dataSource.delete(purchaseOrderListConfig.dataSource, 'PO-ID-404').subscribe({
+    dataSource.delete(bcReferenceDataSource, 'PO-ID-404').subscribe({
       next: () => {
         throw new Error('Expected delete to fail');
       },
