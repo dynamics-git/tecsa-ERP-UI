@@ -8,6 +8,8 @@ export interface DataSourceConfig {
   parentFixedFields?: Record<string, unknown>;
   createFields?: string[];
   updateBlockedFields?: string[];
+  /** Explicit Laravel PATCH allowlist, enforced before sending a request. */
+  updateFields?: string[];
   documentNoField?: string;
   contextDocumentNoField?: string;
   lineNo?: boolean;
