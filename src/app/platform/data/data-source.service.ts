@@ -237,6 +237,10 @@ export class DataSourceService {
   private getListEndpoint(config: DataSourceConfig, options?: DataSourceLoadOptions): string {
     const endpoint = this.getEndpoint(config);
     if (config.transport === 'laravel') {
+      // Laravel child collections return all lines in one { data: [] } envelope.
+      if (config.navigation?.style === 'rest') {
+        return endpoint;
+      }
       const perPage = Math.min(200, Math.max(1, options?.top ?? config.pageSize ?? 20));
       const page = Math.floor(Math.max(0, options?.skip ?? 0) / perPage) + 1;
       const query = new URLSearchParams({ page: String(page), perPage: String(perPage) });
