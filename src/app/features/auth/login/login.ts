@@ -1,6 +1,6 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService, AuthorizedCompany } from '../../../core/services/auth.service';
 import { IdleSessionService } from '../../../core/services/idle-session.service';
@@ -11,12 +11,13 @@ import { ApiErrorService } from '../../../platform/public-api';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule],
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
 export class LoginPage implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
+  private readonly changes = inject(ChangeDetectorRef);
   loggingIn = false;
   errorMessage = '';
   availableCompanies: AuthorizedCompany[] = [];
@@ -48,7 +49,7 @@ export class LoginPage implements OnInit {
     this.loggingIn = true;
     const value = this.form.getRawValue();
     this.authService.login({ email: value.email.trim(), password: value.password }).pipe(
-      finalize(() => { this.loggingIn = false; }),
+      finalize(() => { this.loggingIn = false; this.changes.markForCheck(); }),
     ).subscribe({
       next: (result) => {
         if (result.requiresCompanySelection) {
@@ -68,7 +69,7 @@ export class LoginPage implements OnInit {
     this.errorMessage = '';
     this.loggingIn = true;
     this.authService.selectCompany(companyId).pipe(
-      finalize(() => { this.loggingIn = false; }),
+      finalize(() => { this.loggingIn = false; this.changes.markForCheck(); }),
     ).subscribe({
       next: () => this.finishLogin(),
       error: (error: unknown) => { this.errorMessage = this.getErrorMessage(error); },

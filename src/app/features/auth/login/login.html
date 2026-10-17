@@ -1,57 +1,37 @@
-<main class="saas-site app-login">
-  <header class="app-login-top">
-    <a class="app-login-wordmark" routerLink="/welcome" aria-label="TecSA ERP homepage"><strong>TecSA</strong><span>ERP</span></a>
-    <a class="app-login-back" routerLink="/welcome">← Back to website</a>
-  </header>
-
-  <div class="app-login-body">
-    <aside class="app-login-story">
-      <p class="app-login-eyebrow">ONE CONNECTED PLACE</p>
-      <h1>Your business,<br><em>back in sync.</em></h1>
-      <p>Orders, people, inventory and finances. Everything you need to keep your day flowing.</p>
-      <img src="/illustrations/connected-business.svg" alt="" width="840" height="720">
-    </aside>
-    <section class="app-login-panel" aria-labelledby="login-heading">
-      @if (choosingCompany) {
-        <p class="app-login-step">ONE LAST STEP</p>
-        <h2 id="login-heading">Choose your company.</h2>
-        <p class="app-login-help">Select the ERP company you want to work in. Only your authorized companies appear here.</p>
-      } @else {
-        <p class="app-login-step">WELCOME BACK</p>
-        <h2 id="login-heading">Good to see you again.</h2>
-        <p class="app-login-help">Sign in to your TecSA ERP workspace.</p>
-      }
-
-      @if (errorMessage) {
-        <div class="app-login-alert" role="alert">{{ errorMessage }}</div>
-      }
-
-      @if (choosingCompany) {
-        <div class="app-company-options" role="group" aria-label="Authorized companies">
-          @for (company of availableCompanies; track company.systemId) {
-            <button type="button" class="app-company-choice" [disabled]="loggingIn" (click)="chooseCompany(company.systemId)">
-              <span class="app-company-avatar" aria-hidden="true">{{ company.name.charAt(0).toUpperCase() }}</span>
-              <span class="app-company-details"><strong>{{ company.name }}</strong><small>{{ company.code }}</small></span>
-              <span aria-hidden="true">↗</span>
-            </button>
-          }
-        </div>
-        <button type="button" class="app-login-switch" (click)="restart()" [disabled]="loggingIn">← Use another account</button>
-      } @else {
-        <form class="app-login-form" [formGroup]="form" (ngSubmit)="login()" novalidate>
-          <label for="erp-login-email">Work email</label>
-          <input id="erp-login-email" type="email" formControlName="email" autocomplete="username" placeholder="you@company.com"
-            [readonly]="loggingIn" [attr.aria-invalid]="form.controls.email.touched && form.controls.email.invalid">
-          @if (form.controls.email.touched && form.controls.email.invalid) { <span class="app-login-field-error">Enter a valid email.</span> }
-          <label for="erp-login-password">Password</label>
-          <input id="erp-login-password" type="password" formControlName="password" autocomplete="current-password" placeholder="Your password"
-            [readonly]="loggingIn" [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid">
+<main class="app-login">
+  <section class="app-login-panel" aria-label="Sign in">
+    <div class="app-login-brand">
+      <span class="app-login-mark" aria-hidden="true">T</span>
+      <div class="app-login-brand-copy">
+        <h1>TecSA</h1>
+        <p class="app-login-brand-label">Enterprise ERP</p>
+        <p class="app-login-brand-helper">{{ choosingCompany ? 'Choose your company' : 'Sign in to continue' }}</p>
+      </div>
+    </div>
+    @if (errorMessage) { <div class="app-login-alert" role="alert">{{ errorMessage }}</div> }
+    @if (choosingCompany) {
+      <div class="app-company-options" role="group" aria-label="Authorized companies">
+        @for (company of availableCompanies; track company.systemId) {
+          <button class="app-company-choice" type="button" [disabled]="loggingIn" (click)="chooseCompany(company.systemId)">
+            <strong>{{ company.name }}</strong><small>{{ company.code }}</small>
+          </button>
+        }
+      </div>
+      <button class="app-login-switch" type="button" [disabled]="loggingIn" (click)="restart()">Use another account</button>
+    } @else {
+      <form class="app-login-form" [formGroup]="form" (ngSubmit)="login()" novalidate>
+        <label class="ts-field" for="erp-email">
+          <span class="ts-label">Email</span>
+          <input id="erp-email" class="ts-control" type="email" formControlName="email" autocomplete="username" [readonly]="loggingIn" [attr.aria-invalid]="form.controls.email.touched && form.controls.email.invalid" />
+          @if (form.controls.email.touched && form.controls.email.invalid) { <span class="app-login-field-error">Enter a valid email address.</span> }
+        </label>
+        <label class="ts-field" for="erp-password">
+          <span class="ts-label">Password</span>
+          <input id="erp-password" class="ts-control" type="password" formControlName="password" autocomplete="current-password" [readonly]="loggingIn" [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid" />
           @if (form.controls.password.touched && form.controls.password.invalid) { <span class="app-login-field-error">Password is required.</span> }
-          <button class="app-login-submit" type="submit" [disabled]="loggingIn">{{ loggingIn ? 'Signing in...' : 'Sign in to TecSA ERP' }} <span aria-hidden="true">↗</span></button>
-        </form>
-      }
-      <p class="app-login-bottom">New to TecSA ERP? <a routerLink="/start">Explore the registration walkthrough ↗</a></p>
-      <p class="app-login-footnote">Registration and trial activation are not live yet.</p>
-    </section>
-  </div>
+        </label>
+        <button type="submit" [disabled]="loggingIn">{{ loggingIn ? 'Signing in...' : 'Sign in' }}</button>
+      </form>
+    }
+  </section>
 </main>
