@@ -110,7 +110,7 @@ export class DocumentPageDataSourceResolverService {
         ...baseDataSource,
         endpoint: relation.style === 'rest'
           ? `${parentEndpoint}/${encodeURIComponent(String(parentId))}/${childCollection}`
-          : `${parentEndpoint}(${params.toODataId(parentId)})/${childCollection`,
+          : `${parentEndpoint}(${params.toODataId(parentId)})/${childCollection}`,
       },
       lineContextReady: true,
     };
