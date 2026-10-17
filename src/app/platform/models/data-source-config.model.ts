@@ -1,5 +1,7 @@
 export interface DataSourceConfig {
   endpoint: string;
+  /** Laravel uses REST paths, { data } envelopes and page/perPage pagination. */
+  transport?: 'odata' | 'laravel';
   contractProfileKey?: string;
   keyField?: string;
   parentKeyField?: string;
@@ -18,6 +20,7 @@ export interface DataSourceConfig {
   supportsUpdate?: boolean;
   supportsDelete?: boolean;
   navigation?: {
+    style?: 'odata' | 'rest';
     parentEndpoint: string;
     childCollection: string;
     parentIdFields?: string[];
