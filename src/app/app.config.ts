@@ -1,3 +1,5 @@
+import { APP_BASE_HREF } from '@angular/common';
+import { WorkspaceContext } from './core/services/workspace-context';
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
@@ -12,6 +14,7 @@ import { providePlatformGovernance } from './core/providers/platform-governance.
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    {provide:APP_BASE_HREF,useFactory:(workspace:WorkspaceContext)=>workspace.baseHref,deps:[WorkspaceContext]},
     provideHttpClient(withInterceptorsFromDi()),
     {
       provide: HTTP_INTERCEPTORS,
