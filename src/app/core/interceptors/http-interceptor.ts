@@ -2,11 +2,12 @@ import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/c
 import { Injectable } from '@angular/core';
 import { catchError, Observable, throwError } from 'rxjs';
 import { SessionService } from '../services/session.service';
+import { WorkspaceContext } from '../services/workspace-context';
 import { environment } from '../../../environments/environment';
 
 @Injectable()
 export class HttpInterceptorService implements HttpInterceptor {
-  constructor(private readonly sessionService: SessionService) {}
+  constructor(private readonly sessionService: SessionService, private readonly workspace: WorkspaceContext) {}
 
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     const token = this.sessionService.AccessToken;
@@ -23,7 +24,7 @@ export class HttpInterceptorService implements HttpInterceptor {
       })
       : request;
 
-    return next.handle(requestWithToken).pipe(
+    return next.handle(requestWithToken.clone({url:this.workspace.apiUrl(requestWithToken.url,base)})).pipe(
       catchError((error: unknown) => {
         if (!isLogin && this.isUnauthorized(error)) {
           this.sessionService.logout('unauthorized');

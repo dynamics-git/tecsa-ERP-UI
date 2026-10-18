@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { WorkspaceContext } from './workspace-context';
+import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -29,7 +30,8 @@ export type SessionContext = {
   providedIn: 'root'
 })
 export class SessionService {
-  private readonly prefix = 'app-';
+  private readonly workspace=inject(WorkspaceContext);
+  private readonly prefix = this.workspace.storageKey('app-');
   private readonly sessionSchemaKey = `${this.prefix}session-schema`;
   private readonly sessionSchemaVersion = 'laravel-company-context-v2';
   private readonly userDetailsKey = `${this.prefix}user-details`;
@@ -47,7 +49,7 @@ export class SessionService {
   private readonly licenseInfoKey = `${this.prefix}Lisence-details`;
   private readonly userLastLoginKey = `${this.prefix}user-last-login`;
   private readonly openedPopupIdKey = `${this.prefix}opened-popup-id`;
-  private readonly accessTokenKey = 'access-token';
+  private readonly accessTokenKey = this.workspace.storageKey('access-token');
 
   readonly permissionsLoaded$ = new BehaviorSubject<boolean>(false);
   readonly accessCenterChanged$ = new Subject<unknown>();
@@ -361,7 +363,7 @@ export class SessionService {
       return;
     }
 
-    void fetch(this.buildAuthUrl('/auth/logout'), {
+    void fetch(this.workspace.apiUrl(this.buildAuthUrl('/auth/logout'),environment.apiBaseUrl), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
