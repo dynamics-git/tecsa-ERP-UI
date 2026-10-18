@@ -7,6 +7,20 @@ import { isPageIdRegistered } from './run-modal-config-registry';
 export class MenuService {
   private readonly items: MenuItem[] = [
     {
+      pageId: 'setup', label: 'Setup', module: 'Setup', icon: 'bi bi-gear',
+      children: [
+        { pageId: 'number-series', label: 'No. Series', module: 'Setup',
+          route: '/number-series', icon: 'bi bi-123', group: 'Numbering',
+          permissionKey: 'number_series' },
+        { pageId: 'sales-receivables-setup', label: 'Sales & Receivables Setup',
+          module: 'Setup', route: '/sales-receivables-setup', openMode: 'route',
+          icon: 'bi bi-receipt', group: 'Sales', permissionKey: 'sales_receivables_setup' },
+        { pageId: 'purchases-payables-setup', label: 'Purchases & Payables Setup',
+          module: 'Setup', route: '/purchases-payables-setup', openMode: 'route',
+          icon: 'bi bi-wallet', group: 'Purchase', permissionKey: 'purchases_payables_setup' },
+      ],
+    },
+    {
       pageId: 'sales', label: 'Sales', module: 'Sales', icon: 'bi bi-people',
       children: [{
         pageId: 'customer', label: 'Customers', module: 'Sales',
@@ -87,7 +101,7 @@ export class MenuService {
 
   private filterItems(items: MenuItem[]): MenuItem[] {
     return items
-      .filter(item => isPageIdRegistered(item.pageId) &&
+      .filter(item => (item.openMode === 'route' || isPageIdRegistered(item.pageId)) &&
         this.permissionService.hasPermission(item.permissionKey))
       .map(item => ({ ...item, children: item.children ? this.filterItems(item.children) : undefined }));
   }

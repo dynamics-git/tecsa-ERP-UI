@@ -119,6 +119,9 @@ export class EntryConfigDataService {
       row[field] = '';
     }
 
+    for (const [field, value] of Object.entries(lineConfig.dataSource.createDefaults ?? {})) {
+      if (field in row) row[field] = value;
+    }
     this.applyParentFields(row, headerData, lineConfig);
     this.assignLineOptions(row, lineConfig, registry, optionFieldMap);
     return row;

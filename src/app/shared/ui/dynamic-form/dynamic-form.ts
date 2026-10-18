@@ -74,7 +74,7 @@ export class DynamicForm {
   }
 
   showEmptyOption(field: FieldConfig): boolean {
-    return this.getFieldValue(field).trim().length === 0;
+    return field.allowClear === true || this.getFieldValue(field).trim().length === 0;
   }
 
   isWide(field: FieldConfig): boolean {

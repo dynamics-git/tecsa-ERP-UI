@@ -316,7 +316,6 @@ export class DocumentPage implements OnInit, OnDestroy {
     const hasPersistedId = this.hasPersistedIdentity(row);
     this.pendingDraftCreateFromNew =
       !hasPersistedId &&
-      Boolean(this.listConfig.dataSource.autoGenerateNumber) &&
       Boolean(this.listConfig.dataSource.lazyCreateOnFirstInput);
     this.autosaveDeferredUntilDraftCreate = false;
     this.pendingListSyncRecord = undefined;
@@ -767,7 +766,6 @@ export class DocumentPage implements OnInit, OnDestroy {
   private openNewPreview(): void {
     this.startPopupLoading(`Preparing ${this.documentLabel.toLowerCase()}...`);
     this.pendingDraftCreateFromNew =
-      Boolean(this.listConfig.dataSource.autoGenerateNumber) &&
       Boolean(this.listConfig.dataSource.lazyCreateOnFirstInput);
     this.draftCreateInProgress = false;
     this.autosaveDeferredUntilDraftCreate = false;

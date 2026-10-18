@@ -7,6 +7,8 @@ export interface DataSourceConfig {
   requiredCreateFields?: string[];
   oneOfCreateFields?: string[];
   positiveCreateFields?: string[];
+  /** Only initial unsaved rows; backend remains authoritative. */
+  createDefaults?: Record<string, unknown>;
   /** Fields the Laravel resource accepts as equality filter parameters. */
   filterFields?: string[];
   maxPageSize?: number;

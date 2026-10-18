@@ -11,7 +11,7 @@ export interface CompanySetupDefinition {
 }
 
 const seriesField = (key: string, label: string): FieldConfig => ({
-  key, label, type: 'dropdown',
+  key, label, type: 'dropdown', allowClear: true,
   api: '/numberSeries?perPage=100',
   valueField: 'systemId',
   displayFormat: '[code] - [description]',

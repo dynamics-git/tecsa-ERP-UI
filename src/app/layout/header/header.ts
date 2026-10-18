@@ -196,6 +196,10 @@ export class Header {
 
   async onGlobalSearchSelect(item: MenuSearchItem): Promise<void> {
     this.activeModule = '';
+    if (item.openMode === 'route' && item.route?.trim()) {
+      if (await this.router.navigate([item.route.trim()])) this.closeGlobalSearch();
+      return;
+    }
 
     const opened = await this.globalSearchPopup.open(item);
     if (opened) {
