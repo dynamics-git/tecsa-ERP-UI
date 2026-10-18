@@ -38,9 +38,12 @@ export class EntrySaveService implements EntrySavePort {
       });
     }
 
-    const payload = this.entryPayload.buildHeaderUpdatePayload(request.headerData, headerSections);
-
-    return this.dataSource.update(dataSource, id, payload).pipe(
+    const fullPayload = this.entryPayload.buildHeaderUpdatePayload(request.headerData, headerSections);
+    const payload = dataSource.transport === 'laravel' && dataSource.updateFields
+      ? Object.fromEntries(Object.entries(fullPayload).filter(([key]) => dataSource.updateFields!.includes(key)))
+      : fullPayload;
+    if (dataSource.transport === 'laravel' && !Object.keys(payload).length) return of({ saved: true });
+    return this.dataSource.update(dataSource, id, payload, Number(request.headerData['systemRowVersion'])).pipe(
       switchMap((response) => this.persistLineRows(request).pipe(
         map((lineSaveResult) => {
           if (!lineSaveResult.saved) {

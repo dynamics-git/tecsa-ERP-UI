@@ -1,5 +1,5 @@
 import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of, throwError, map } from 'rxjs';
 import { finalize, shareReplay, tap } from 'rxjs/operators';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { EntityContractService } from './entity-contract.service';
@@ -66,6 +66,7 @@ export class DataSourceService {
     }
 
     const request$ = this.restService.get(endpoint).pipe(
+      map((response) => this.normalizeListResponse(config, response)),
       tap((response) => {
         this.listCache.set(endpoint, {
           response,
@@ -117,13 +118,16 @@ export class DataSourceService {
       return this.restServiceUnavailable();
     }
 
-    const recordEndpoint = `${endpoint}(${this.formatId(id)})`;
+    const recordEndpoint = config.transport === 'laravel'
+      ? `${endpoint}/${encodeURIComponent(String(id))}`
+      : `${endpoint}(${this.formatId(id)})`;
     const cachedRequest = this.inFlightRecords.get(recordEndpoint);
     if (cachedRequest) {
       return cachedRequest;
     }
 
     const request$ = this.restService.get(recordEndpoint).pipe(
+      map((response) => this.normalizeRecordResponse(config, response)),
       finalize(() => {
         this.inFlightRecords.delete(recordEndpoint);
       }),
@@ -144,13 +148,21 @@ export class DataSourceService {
       return this.restServiceUnavailable();
     }
 
-    const sanitizedPayload = this.contractService.sanitizePayload(config, 'create', payload);
+    if (config.supportsCreate === false) {
+      return throwError(() => new Error('Create is not supported by this business API.'));
+    }
+    const source = this.contractService.sanitizePayload(config, 'create', payload);
+    const sanitizedPayload = config.transport === 'laravel'
+      ? this.laravelPayload(source, config.createFields)
+      : source;
     this.clearListCacheForEndpoint(endpoint);
     this.clearInFlightRecordRequestsForEndpoint(endpoint);
-    return this.restService.post(endpoint, sanitizedPayload);
+    return this.restService.post(endpoint, sanitizedPayload).pipe(
+      map((response) => this.normalizeRecordResponse(config, response)),
+    );
   }
 
-  update(config: DataSourceConfig, id: unknown, payload: unknown): Observable<unknown> {
+  update(config: DataSourceConfig, id: unknown, payload: unknown, rowVersion?: number): Observable<unknown> {
     const endpoint = this.getEndpoint(config);
     if (!endpoint) {
       return this.missingEndpoint();
@@ -164,6 +176,25 @@ export class DataSourceService {
       return this.restServiceUnavailable();
     }
 
+    if (config.supportsUpdate === false) {
+      return throwError(() => new Error('Update is not supported by this business API.'));
+    }
+    if (config.transport === 'laravel') {
+      if (!Number.isSafeInteger(rowVersion) || (rowVersion ?? 0) < 1) {
+        return throwError(() => new Error('Reload this record before saving; its version is missing.'));
+      }
+      const values = this.laravelPayload(payload, config.updateFields, true);
+      if (!Object.keys(values).length) {
+        return throwError(() => new Error('No permitted changes were supplied.'));
+      }
+      this.clearListCacheForEndpoint(endpoint);
+      this.clearInFlightRecordRequestsForEndpoint(endpoint);
+      return this.restService.patch(
+        `${endpoint}/${encodeURIComponent(String(id))}`,
+        values,
+        `"${rowVersion}"`,
+      ).pipe(map((response) => this.normalizeRecordResponse(config, response)));
+    }
     const sanitizedPayload = this.contractService.sanitizePayload(config, 'update', payload);
     this.clearListCacheForEndpoint(endpoint);
     this.clearInFlightRecordRequestsForEndpoint(endpoint);
@@ -184,9 +215,15 @@ export class DataSourceService {
       return this.restServiceUnavailable();
     }
 
+    if (config.supportsDelete === false) {
+      return throwError(() => new Error('Delete is not supported by this business API.'));
+    }
     this.clearListCacheForEndpoint(endpoint);
     this.clearInFlightRecordRequestsForEndpoint(endpoint);
-    return this.restService.delete(`${endpoint}(${this.formatId(id)})`);
+    const url = config.transport === 'laravel'
+      ? `${endpoint}/${encodeURIComponent(String(id))}`
+      : `${endpoint}(${this.formatId(id)})`;
+    return this.restService.delete(url);
   }
 
   private getEndpoint(config: DataSourceConfig): string {
@@ -195,6 +232,23 @@ export class DataSourceService {
 
   private getListEndpoint(config: DataSourceConfig, options?: DataSourceLoadOptions): string {
     const endpoint = this.getEndpoint(config);
+    if (config.transport === 'laravel') {
+      if (config.navigation?.style === 'rest') {
+        return endpoint; // Nested Laravel collections return {data: []} without pagination.
+      }
+      const top = Math.min(config.maxPageSize ?? 200, Math.max(1, options?.top ?? config.pageSize ?? 20));
+      const page = Math.floor(Math.max(0, options?.skip ?? 0) / top) + 1;
+      const query = new URLSearchParams({ page: String(page), perPage: String(top) });
+      const filter = config.defaultFilter?.trim();
+      if (filter) {
+        const match = /^([a-zA-Z][a-zA-Z0-9_]*)\\s+eq\\s+'([^']+)'$/i.exec(filter);
+        if (!match || !(config.filterFields ?? []).includes(match[1])) {
+          throw new Error('This filter is not supported by the configured ERP API.');
+        }
+        query.set(match[1], match[2]);
+      }
+      return `${endpoint}${endpoint.includes('?') ? '&' : '?'}${query.toString()}`;
+    }
     const queryParts: string[] = [];
 
     if (config.defaultFilter) {
@@ -221,6 +275,37 @@ export class DataSourceService {
     }
 
     return `${endpoint}${endpoint.includes('?') ? '&' : '?'}${queryParts.join('&')}`;
+  }
+
+  private normalizeListResponse(config: DataSourceConfig, response: unknown): unknown {
+    if (config.transport !== 'laravel') return response;
+    if (!this.isObject(response) || !Array.isArray(response['data'])) {
+      throw new Error('Invalid ERP collection response: expected {data: []}.');
+    }
+    return { value: response['data'], meta: response['meta'] };
+  }
+
+  private normalizeRecordResponse(config: DataSourceConfig, response: unknown): unknown {
+    if (config.transport !== 'laravel') return response;
+    if (!this.isObject(response) || !this.isObject(response['data'])) {
+      throw new Error('Invalid ERP record response: expected {data: {...}}.');
+    }
+    return response['data'];
+  }
+
+  private laravelPayload(source: unknown, allow?: string[], includeEmpty = false): Record<string, unknown> {
+    if (!this.isObject(source)) return {};
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(source)) {
+      if (key.startsWith('__') || (allow && !allow.includes(key)) || value === undefined) continue;
+      if (!includeEmpty && (value === '' || value === null)) continue;
+      result[key] = value;
+    }
+    return result;
+  }
+
+  private isObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
 
   private formatId(id: unknown): string {
@@ -264,7 +349,7 @@ export class DataSourceService {
     }
 
     for (const key of this.inFlightRecords.keys()) {
-      if (key.startsWith(`${normalizedEndpoint}(`)) {
+      if (key.startsWith(`${normalizedEndpoint}(`) || key.startsWith(`${normalizedEndpoint}/`)) {
         this.inFlightRecords.delete(key);
       }
     }
