@@ -21,11 +21,14 @@ export class DocumentPageCommandPermissionService {
     const action = this.normalizePopupCommandKey(button.actionKey);
 
     let allowed = true;
-    if (action === 'new' || action === 'line-new' || action === 'line-insert') {
+    if (action === 'new') {
       allowed = permissions.canCreate;
-    } else if (action === 'save' || action === 'apply' || action === 'edit') {
+    } else if (action === 'line-new' || action === 'line-insert' ||
+      action === 'save' || action === 'apply' || action === 'edit' ||
+      action === 'line-delete') {
+      // Nested PR lines are modified under their owning document permission.
       allowed = permissions.canUpdate;
-    } else if (action === 'delete' || action === 'line-delete') {
+    } else if (action === 'delete') {
       allowed = permissions.canDelete;
     } else if (this.isCustomExecutableCommand(action)) {
       allowed = this.canExecutePopupCommand(button, permissions.canExecute);
