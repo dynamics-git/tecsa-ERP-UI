@@ -1,4 +1,4 @@
-import { EntryHeaderConfig, LineConfig, ListPageConfig } from '../../../platform/public-api';
+import { DataSourceConfig, EntryHeaderConfig, LineConfig, ListPageConfig } from '../../../platform/public-api';
 
 const boolOptions = [
   { label: 'Yes', value: true },
@@ -66,7 +66,7 @@ export const numberSeriesLineConfig: LineConfig = {
   ],
 };
 
-export const numberSeriesListConfig: ListPageConfig = {
+export const numberSeriesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   pageId: 'number-series',
   permissionResource: 'number_series',
   pageType: 'document',
