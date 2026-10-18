@@ -31,8 +31,17 @@ describe('RunModal navigation', () => {
     const rest: DataRestService = {
       get: endpoint => {
         requests.push(endpoint);
-        return of({ value: endpoint.startsWith('/purchaseOrderHeaders') ? [{ ...header }]
-          : endpoint.startsWith('/purchaseOrderLines') ? [{ ...line }] : [] });
+        // Laravel REST returns { data } for both nested line collections and records.
+        if (endpoint.startsWith('/purchaseOrders/') && endpoint.endsWith('/lines')) {
+          return of({ data: [{ ...line }] });
+        }
+        if (endpoint.startsWith('/purchaseOrders/')) {
+          return of({ data: { ...header } });
+        }
+        if (endpoint.startsWith('/purchaseOrders?')) {
+          return of({ data: [{ ...header }], meta: { currentPage: 1, perPage: 20, total: 1, lastPage: 1 } });
+        }
+        return of({ data: [] });
       },
       post: () => of({}), patch: () => of({}), delete: () => of({}),
     };
@@ -69,7 +78,7 @@ describe('RunModal navigation', () => {
     const child = popups[1];
     expect(data(child).entryDialogConfig!.headerData!['number']).toBe('PO-1');
     expect(data(child).entryDialogConfig!.lineRows![0]['description']).toBe('Fixture line');
-    expect(requests.some(endpoint => endpoint.startsWith('/purchaseOrderLines') && endpoint.includes('PO-1'))).toBe(true);
+    expect(requests.some(endpoint => endpoint === '/purchaseOrders/PO-1/lines')).toBe(true);
     fixture.componentInstance.closePopup(child);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);

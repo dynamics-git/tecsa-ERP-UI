@@ -115,7 +115,9 @@ export class EntryHydrationOrchestratorService {
 
       const effectiveDataSource: DataSourceConfig = {
         ...lineDataSource,
-        endpoint: `${parentEndpoint}(${this.toODataId(parentId)})/${childCollection}`,
+        endpoint: relation.style === 'rest'
+          ? `${parentEndpoint}/${encodeURIComponent(String(parentId))}/${childCollection}`
+          : `${parentEndpoint}(${this.toODataId(parentId)})/${childCollection}`,
       };
 
       const response = await firstValueFrom(
