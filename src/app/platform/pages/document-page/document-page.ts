@@ -923,21 +923,21 @@ export class DocumentPage implements OnInit, OnDestroy {
     return this.commandAssembler.resolveHeaderToolbarButtons({
       dataSource: this.listConfig.dataSource,
       toolbarButtons: this.headerConfig.toolbarButtons,
-      pageId: this.listConfig.pageId || this.pageId,
+      pageId: this.listConfig.permissionResource || this.listConfig.pageId || this.pageId,
     });
   }
 
   private resolvePopupLineToolbarButtons(): EntryCommandButtonConfig[] {
     return this.commandAssembler.resolveLineToolbarButtons({
       lineConfig: this.lineConfig,
-      pageId: this.listConfig.pageId || this.pageId,
+      pageId: this.listConfig.permissionResource || this.listConfig.pageId || this.pageId,
     });
   }
 
   private resolvePopupDetailToolbarButtons(): EntryCommandButtonConfig[] | undefined {
     return this.commandAssembler.resolveDetailToolbarButtons({
       toolbarButtons: this.headerConfig.detailToolbarButtons,
-      pageId: this.listConfig.pageId || this.pageId,
+      pageId: this.listConfig.permissionResource || this.listConfig.pageId || this.pageId,
     });
   }
 

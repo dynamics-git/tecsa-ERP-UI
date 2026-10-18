@@ -75,6 +75,7 @@ export const customerHeaderConfig: EntryHeaderConfig = {
 
 export const customerListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   pageId: 'customer',
+  permissionResource: 'customers',
   pageType: 'card',
   title: 'Customers',
   module: 'Sales',

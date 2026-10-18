@@ -1031,7 +1031,7 @@ export class RunModalService {
     }
 
     try {
-      const updated = await firstValueFrom(this.dataSource.update(dataSource, id, payload));
+      const updated = await firstValueFrom(this.dataSource.update(dataSource, id, payload, Number(source['systemRowVersion'])));
       this.mergeRecord(headerData, updated);
       this.recalculateLineTotals(binding.module, entryDialogConfig);
       if (showProgress) {

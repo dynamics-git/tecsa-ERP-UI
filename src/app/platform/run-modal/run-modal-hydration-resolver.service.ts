@@ -101,7 +101,9 @@ export class RunModalHydrationResolverService {
 
     return {
       ...baseDataSource,
-      endpoint: `${relation.parentEndpoint}(${this.toODataId(parentId)})/${relation.childCollection}`,
+      endpoint: relation.style === 'rest'
+        ? `${relation.parentEndpoint}/${encodeURIComponent(String(parentId))}/${relation.childCollection}`
+        : `${relation.parentEndpoint}(${this.toODataId(parentId)})/${relation.childCollection}`,
     };
   }
 

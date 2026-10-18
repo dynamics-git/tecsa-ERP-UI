@@ -19,9 +19,9 @@ export const routes: Routes = [
     canActivateChild: [authChildGuard],
     children: [
       { path: '', component: DashboardPage },
-      { path: 'customer', component: CustomerPage, data: { pageId: 'customer' } },
+      { path: 'customer', component: CustomerPage, data: { pageId: 'customer', permissionResource: 'customers' } },
       { path: 'purchase-requisition', component: PurchaseRequisitionPage,
-        data: { pageId: 'purchase-requisition' } },
+        data: { pageId: 'purchase-requisition', permissionResource: 'purchase_requisitions' } },
     ],
   },
   { path: '**', redirectTo: '' },

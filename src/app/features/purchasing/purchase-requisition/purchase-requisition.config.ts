@@ -85,6 +85,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
 
 export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   pageId: 'purchase-requisition',
+  permissionResource: 'purchase_requisitions',
   pageType: 'document',
   title: 'Purchase Requisitions',
   module: 'Purchase',

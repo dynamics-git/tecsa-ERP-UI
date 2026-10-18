@@ -10,7 +10,11 @@ const canActivate = (route: ActivatedRouteSnapshot, _state: RouterStateSnapshot)
 
   if (sessionService.isSessionValid()) {
     const pageId = route.data?.['pageId'];
-    if (typeof pageId === 'string' && pageId.trim().length && !permissionService.canView(pageId)) {
+    const resource = route.data?.['permissionResource'];
+    const allowed = typeof resource === 'string' && resource.trim().length
+      ? permissionService.hasPermission(resource)
+      : typeof pageId !== 'string' || !pageId.trim().length || permissionService.canView(pageId);
+    if (!allowed) {
       return router.createUrlTree(['/']);
     }
 
