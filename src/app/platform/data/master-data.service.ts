@@ -131,10 +131,11 @@ export class MasterDataService {
       return source.filter((record): record is Record<string, unknown> => this.isRecord(record));
     }
 
-    if (this.isRecord(source) && Array.isArray(source['value'])) {
-      return source['value'].filter((record): record is Record<string, unknown> =>
-        this.isRecord(record),
-      );
+    if (this.isRecord(source)) {
+      const collection = source['value'] ?? source['data'];
+      if (Array.isArray(collection)) {
+        return collection.filter((record): record is Record<string, unknown> => this.isRecord(record));
+      }
     }
 
     return [];

@@ -11,8 +11,8 @@ describe('DocumentPage command assembly', () => {
     apply: ReturnType<typeof vi.fn>;
     normalizePopupCommandKey: (action: unknown) => string;
   };
-  const pageId = 'purchase-order';
-  const source = { endpoint: '/purchaseOrderHeaders' } as DataSourceConfig;
+  const pageId = 'purchase-requisition';
+  const source = { endpoint: '/purchaseRequisitions' } as DataSourceConfig;
   const button = (actionKey: string, rest: Partial<EntryCommandButtonConfig> = {}): EntryCommandButtonConfig =>
     ({ actionKey, label: actionKey, ...rest });
 

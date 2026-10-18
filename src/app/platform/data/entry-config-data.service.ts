@@ -119,6 +119,9 @@ export class EntryConfigDataService {
       row[field] = '';
     }
 
+    for (const [field, value] of Object.entries(lineConfig.dataSource.createDefaults ?? {})) {
+      if (field in row) row[field] = value;
+    }
     this.applyParentFields(row, headerData, lineConfig);
     this.assignLineOptions(row, lineConfig, registry, optionFieldMap);
     return row;
@@ -143,6 +146,11 @@ export class EntryConfigDataService {
       return null;
     }
 
+    const requirements = lineConfig.dataSource;
+    if ((requirements.requiredCreateFields ?? []).some((field) => !this.hasValue(payload[field]))) return null;
+    if ((requirements.oneOfCreateFields ?? []).length &&
+        !(requirements.oneOfCreateFields ?? []).some((field) => this.hasValue(payload[field]))) return null;
+    if ((requirements.positiveCreateFields ?? []).some((field) => !(Number(payload[field]) > 0))) return null;
     const hasAnyValue = fields.some((field) => this.hasValue(payload[field]));
     if (!hasAnyValue) {
       return null;

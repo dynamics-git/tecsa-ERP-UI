@@ -9,7 +9,7 @@ describe('DocumentPage popup command permissions', () => {
   let policy: DocumentPageCommandPermissionService;
   const command = (actionKey: string, rest: Partial<EntryCommandButtonConfig> = {}): EntryCommandButtonConfig =>
     ({ label: actionKey, actionKey, ...rest });
-  const apply = (button: EntryCommandButtonConfig, pageId = 'purchase-order') => policy.apply(button, pageId);
+  const apply = (button: EntryCommandButtonConfig, pageId = 'purchase_requisitions') => policy.apply(button, pageId);
 
   beforeEach(() => {
     session = { SuperAdmin: false, Permissions: [] };
@@ -29,7 +29,7 @@ describe('DocumentPage popup command permissions', () => {
 
   it('accepts the existing BC-style permission aliases and normalizes page identifiers', () => {
     session.Permissions = [{
-      PageId: 'Purchase_Order', InsertPermission: 'Yes', ModifyPermission: '1',
+      PageId: 'purchase_requisitions', InsertPermission: 'Yes', ModifyPermission: '1',
       DeletePermission: 'Full', PostPermission: 'TRUE',
     }];
     for (const action of ['cmd:new', 'cmd:save', 'cmd:apply', 'cmd:edit', 'cmd:delete', 'cmd:line-delete', 'cmd:release']) {
@@ -38,13 +38,23 @@ describe('DocumentPage popup command permissions', () => {
     }
   });
 
+  it('uses modify for PR line create/delete, but header deletion still needs delete permission', () => {
+    session.Permissions = [{
+      PageId: 'purchase_requisitions', ReadPermission: 'Yes',
+      InsertPermission: 'Yes', ModifyPermission: 'Yes', DeletePermission: 'No',
+    }];
+    expect(apply(command('cmd:line-new')).disabled).toBeUndefined();
+    expect(apply(command('cmd:line-delete')).disabled).toBeUndefined();
+    expect(apply(command('cmd:delete')).disabled).toBe(true);
+  });
+
   it('uses custom action permission keys instead of falling back to page execute rights', () => {
-    session.Permissions = [{ PageName: 'purchase order', CanExecute: true }];
-    const custom = command('cmd:post', { permissionKey: 'POST_PURCHASE_ORDER' });
+    session.Permissions = [{ PageName: 'purchase requisitions', CanExecute: true }];
+    const custom = command('cmd:post', { permissionKey: 'SUBMIT_REQUISITION' });
     expect(apply(custom).disabled).toBe(true);
-    session.Permissions.push({ ActionCode: 'Post-Purchase-Order', PostPermission: 'Yes' });
+    session.Permissions.push({ ActionCode: 'Submit-Requisition', PostPermission: 'Yes' });
     expect(apply(custom)).toBe(custom);
-    session.Permissions[1] = { ActionCode: 'Post-Purchase-Order', PostPermission: 'No' };
+    session.Permissions[1] = { ActionCode: 'Submit-Requisition', PostPermission: 'No' };
     expect(apply(custom).disabled).toBe(true);
   });
 

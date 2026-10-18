@@ -370,6 +370,30 @@ export class AuthService {
       });
     });
 
+    // Generic backend resource rights: new pages do not need a backend page alias.
+    const resourceRows = this.readValue(engine, 'resources');
+    if (Array.isArray(resourceRows)) {
+      for (const item of resourceRows) {
+        const row = this.toRecord(item);
+        if (!row) continue;
+        const resource = this.readFirstString(row, ['resource']);
+        if (!resource) continue;
+        const canRead = this.readBoolean(row, 'canRead');
+        const canCreate = this.readBoolean(row, 'canCreate');
+        const canUpdate = this.readBoolean(row, 'canUpdate');
+        const canDelete = this.readBoolean(row, 'canDelete');
+        const canExecute = this.readBoolean(row, 'canExecute');
+        permissions.push({
+          PageId: resource, pageId: resource, PageName: resource, ObjectName: resource,
+          ReadPermission: canRead ? 'Yes' : 'No',
+          InsertPermission: canCreate ? 'Yes' : 'No',
+          ModifyPermission: canUpdate ? 'Yes' : 'No',
+          DeletePermission: canDelete ? 'Yes' : 'No',
+          PostPermission: canExecute ? 'Yes' : 'No',
+          canRead, canCreate, canUpdate, canDelete, canExecute,
+        });
+      }
+    }
     return permissions;
   }
 

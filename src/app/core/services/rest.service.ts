@@ -7,6 +7,8 @@ import { SessionService } from './session.service';
 
 export type RestRequestOptions = {
   suppressGlobalErrorDialog?: boolean;
+  /** Required by versioned company singleton PUT endpoints. */
+  ifMatch?: string;
 };
 
 @Injectable({
@@ -53,7 +55,9 @@ export class RestService {
 
     return this.getAuthorizationToken().pipe(
       switchMap((token) => this.http.put(this.buildUrl(endpoint), body, {
-        headers: this.createHeaders(token)
+        headers: options?.ifMatch
+          ? this.createHeaders(token).set('If-Match', options.ifMatch)
+          : this.createHeaders(token)
       })),
       map((response) => UnicodeNormalizer.normalize(response)),
       catchError((error: HttpErrorResponse) => this.handleError(error, options))

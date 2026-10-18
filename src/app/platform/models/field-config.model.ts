@@ -67,6 +67,8 @@ export interface FieldConfig {
   valueType?: FieldValueType;
   required?: boolean;
   readonly?: boolean;
+  /** Optional lookup may be cleared to null; preserves mandatory enum choices. */
+  allowClear?: boolean;
   disabled?: boolean;
   hidden?: boolean;
   placeholder?: string;

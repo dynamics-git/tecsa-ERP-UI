@@ -1031,7 +1031,7 @@ export class RunModalService {
     }
 
     try {
-      const updated = await firstValueFrom(this.dataSource.update(dataSource, id, payload));
+      const updated = await firstValueFrom(this.dataSource.update(dataSource, id, payload, Number(headerData['systemRowVersion'])));
       this.mergeRecord(headerData, updated);
       this.recalculateLineTotals(binding.module, entryDialogConfig);
       if (showProgress) {
@@ -1323,7 +1323,7 @@ export class RunModalService {
   ): Promise<void> {
     const id = this.entryRecord.resolvePersistedRecordId(source, dataSource);
     if (id !== null && id !== undefined && id !== '' && dataSource.supportsUpdate !== false) {
-      const updated = await firstValueFrom(this.dataSource.update(dataSource, id, payload));
+      const updated = await firstValueFrom(this.dataSource.update(dataSource, id, payload, Number(source['systemRowVersion'])));
       this.mergeRecord(source, updated);
       return;
     }

@@ -316,7 +316,6 @@ export class DocumentPage implements OnInit, OnDestroy {
     const hasPersistedId = this.hasPersistedIdentity(row);
     this.pendingDraftCreateFromNew =
       !hasPersistedId &&
-      Boolean(this.listConfig.dataSource.autoGenerateNumber) &&
       Boolean(this.listConfig.dataSource.lazyCreateOnFirstInput);
     this.autosaveDeferredUntilDraftCreate = false;
     this.pendingListSyncRecord = undefined;
@@ -767,7 +766,6 @@ export class DocumentPage implements OnInit, OnDestroy {
   private openNewPreview(): void {
     this.startPopupLoading(`Preparing ${this.documentLabel.toLowerCase()}...`);
     this.pendingDraftCreateFromNew =
-      Boolean(this.listConfig.dataSource.autoGenerateNumber) &&
       Boolean(this.listConfig.dataSource.lazyCreateOnFirstInput);
     this.draftCreateInProgress = false;
     this.autosaveDeferredUntilDraftCreate = false;
@@ -923,21 +921,21 @@ export class DocumentPage implements OnInit, OnDestroy {
     return this.commandAssembler.resolveHeaderToolbarButtons({
       dataSource: this.listConfig.dataSource,
       toolbarButtons: this.headerConfig.toolbarButtons,
-      pageId: this.listConfig.pageId || this.pageId,
+      pageId: this.listConfig.permissionResource || this.listConfig.pageId || this.pageId,
     });
   }
 
   private resolvePopupLineToolbarButtons(): EntryCommandButtonConfig[] {
     return this.commandAssembler.resolveLineToolbarButtons({
       lineConfig: this.lineConfig,
-      pageId: this.listConfig.pageId || this.pageId,
+      pageId: this.listConfig.permissionResource || this.listConfig.pageId || this.pageId,
     });
   }
 
   private resolvePopupDetailToolbarButtons(): EntryCommandButtonConfig[] | undefined {
     return this.commandAssembler.resolveDetailToolbarButtons({
       toolbarButtons: this.headerConfig.detailToolbarButtons,
-      pageId: this.listConfig.pageId || this.pageId,
+      pageId: this.listConfig.permissionResource || this.listConfig.pageId || this.pageId,
     });
   }
 
@@ -1293,7 +1291,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.dataSource
-        .update(this.listConfig.dataSource, headerId, updatePayload)
+        .update(this.listConfig.dataSource, headerId, updatePayload, Number(headerData['systemRowVersion']))
         .pipe(
           catchError((error: unknown) => {
             const rolledBack = this.entryState.rollbackHeaderFieldChange(
@@ -1383,7 +1381,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.dataSource
-        .update(resolved.dataSource, rowId, payload)
+        .update(resolved.dataSource, rowId, payload, Number(row['systemRowVersion']))
         .pipe(
           catchError((error: unknown) => {
             this.setEntryStatus({
@@ -1397,9 +1395,8 @@ export class DocumentPage implements OnInit, OnDestroy {
         )
         .subscribe((updated) => {
           const updatedRecord = this.toCreatedRecord(updated);
-          if (updatedRecord) {
-            Object.assign(row, updatedRecord);
-          }
+          if (!updatedRecord) return;
+          Object.assign(row, updatedRecord);
 
           this.recalculateActiveLineTotals();
           this.setEntryStatus({
@@ -1477,9 +1474,8 @@ export class DocumentPage implements OnInit, OnDestroy {
           this.lineCreateInProgress.delete(row);
 
           const createdRecord = this.toCreatedRecord(created);
-          if (createdRecord) {
-            Object.assign(row, createdRecord);
-          }
+          if (!createdRecord) return;
+          Object.assign(row, createdRecord);
 
           const deferredFields = this.takeDeferredLineSaveFields(row);
           if (deferredFields.length) {
@@ -1591,13 +1587,13 @@ export class DocumentPage implements OnInit, OnDestroy {
 
           this.changeDetector.detectChanges();
         },
-        error: () => {
+        error: (error: unknown) => {
           this.draftCreateInProgress = false;
           this.stopPopupLoading();
           this.setEntryStatus({
             tone: 'error',
             title: GENERIC_MESSAGES.createFailedTitle,
-            message: GENERIC_MESSAGES.createFailedMessage,
+            message: this.getErrorMessage(error) || GENERIC_MESSAGES.createFailedMessage,
           });
           this.changeDetector.detectChanges();
         },
@@ -1643,7 +1639,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       dataSourceConfig: this.listConfig.dataSource,
       headerSections: this.headerConfig.sections,
       lineRows: this.activeEntryDialogConfig?.lineRows,
-      lineDataSourceConfig: this.lineConfig?.dataSource,
+      lineDataSourceConfig: this.listConfig.dataSource.transport === 'laravel' ? undefined : this.lineConfig?.dataSource,
       meta: {
         page: this.pageId,
       },
@@ -2116,15 +2112,17 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private createDraftRecord(newRecord: Record<string, unknown>): Observable<Record<string, unknown> | null> {
-    return this.draftCreate
-      .createWithUnknownPropertyFallback(
-        this.listConfig.dataSource,
-        this.entryPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
-      )
-      .pipe(
-        map((response) => this.toCreatedRecord(response)),
-        catchError(() => of(null)),
-      );
+    const config = this.listConfig.dataSource;
+    if (config.transport === 'laravel') {
+      return this.dataSource.create(
+        config,
+        this.entryPayload.buildHeaderUpdatePayload(newRecord, this.headerConfig.sections),
+      ).pipe(map((response) => this.toCreatedRecord(response)));
+    }
+    return this.draftCreate.createWithUnknownPropertyFallback(
+      config,
+      this.entryPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
+    ).pipe(map((response) => this.toCreatedRecord(response)), catchError(() => of(null)));
   }
 
   private loadConfiguredHeaderDropdownOptions(): Observable<Record<string, Record<string, unknown>[]>> {

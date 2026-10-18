@@ -42,6 +42,8 @@ export interface ListCommandSelectionPolicyConfig {
 
 export interface BasePageConfig extends Record<string, unknown> {
   pageId?: string;
+  /** Laravel permission resource; not an API-page alias. */
+  permissionResource?: string;
   pageType?: PageType;
   title?: string;
   subtitle?: string;
