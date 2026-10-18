@@ -7,7 +7,7 @@ describe('DocumentPage related RunModal requests', () => {
   const header = { systemId: 'PO-1', vendorOrderNumber: 'UNSAVED' };
   const lines = [{ description: 'Unsaved line', quantity: 2 }];
   const payload = { command: 'open-related-list' };
-  const params = () => ({ pageId: 'purchase-order', headerData: header, lineRows: lines, payload });
+  const params = () => ({ pageId: 'purchase-requisition', headerData: header, lineRows: lines, payload });
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
@@ -16,7 +16,7 @@ describe('DocumentPage related RunModal requests', () => {
 
   it('stacks related lists without changing their modal layout', () => {
     const request = resolver.buildEntryRunModalRequest({ ...params(), target: 'list' });
-    expect(request).toMatchObject({ pageId: 'purchase-order', target: 'list', mode: 'modal', size: 'xl', allowNested: true });
+    expect(request).toMatchObject({ pageId: 'purchase-requisition', target: 'list', mode: 'modal', size: 'xl', allowNested: true });
     expect(request.context?.['headerData']).toBe(header);
     expect(request.context?.['lineRows']).toBe(lines);
     expect(request.context?.['payload']).toBe(payload);

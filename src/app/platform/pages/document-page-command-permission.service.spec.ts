@@ -50,11 +50,11 @@ describe('DocumentPage popup command permissions', () => {
 
   it('uses custom action permission keys instead of falling back to page execute rights', () => {
     session.Permissions = [{ PageName: 'purchase requisitions', CanExecute: true }];
-    const custom = command('cmd:post', { permissionKey: 'POST_PURCHASE_ORDER' });
+    const custom = command('cmd:post', { permissionKey: 'SUBMIT_REQUISITION' });
     expect(apply(custom).disabled).toBe(true);
-    session.Permissions.push({ ActionCode: 'Post-Purchase-Order', PostPermission: 'Yes' });
+    session.Permissions.push({ ActionCode: 'Submit-Requisition', PostPermission: 'Yes' });
     expect(apply(custom)).toBe(custom);
-    session.Permissions[1] = { ActionCode: 'Post-Purchase-Order', PostPermission: 'No' };
+    session.Permissions[1] = { ActionCode: 'Submit-Requisition', PostPermission: 'No' };
     expect(apply(custom).disabled).toBe(true);
   });
 
