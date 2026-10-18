@@ -11,20 +11,20 @@ describe('TecSA permission controls fail closed', () => {
     } as unknown as SessionService;
     const permissions = new PermissionService(session);
     expect(permissions.isSuperAdmin()).toBe(false);
-    expect(permissions.canView('purchase-order')).toBe(false);
-    expect(permissions.hasPermission('purchase_orders')).toBe(false);
+    expect(permissions.canView('customer')).toBe(false);
+    expect(permissions.hasPermission('customers')).toBe(false);
   });
 
   it('accepts explicit backend page read and refuses a different page', () => {
     const session = {
       SuperAdmin: false,
       UserName: 'ordinary',
-      Permissions: [{ PageId: 'purchase-order', PageName: 'Purchase Order', ObjectName: 'purchase_orders', ReadPermission: 'Yes' }],
+      Permissions: [{ PageId: 'customer', PageName: 'Customer', ObjectName: 'customers', ReadPermission: 'Yes' }],
     } as unknown as SessionService;
     const permissions = new PermissionService(session);
-    expect(permissions.canView('purchase-order')).toBe(true);
+    expect(permissions.canView('customer')).toBe(true);
     expect(permissions.canView('sales-order')).toBe(false);
-    expect(permissions.hasPermission('purchase_orders')).toBe(true);
+    expect(permissions.hasPermission('customers')).toBe(true);
     expect(permissions.hasPermission('sales_orders')).toBe(false);
   });
 });

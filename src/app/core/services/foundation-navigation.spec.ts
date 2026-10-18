@@ -4,28 +4,30 @@ import { MenuService } from './menu.service';
 import { PermissionService } from './permission.service';
 import { getRegisteredRunModalPageIds } from './run-modal-config-registry';
 
-describe('F1 navigation registrations', () => {
-  it('registers only the current document and keeps menu/search destinations consistent with routes', () => {
-    const permission = { canView: vi.fn(() => true), hasPermission: vi.fn(() => true) };
+describe('Configuration-driven ERP navigation', () => {
+  it('registers only the new backend-backed Customer and PR pages', () => {
+    const permission = { hasPermission: vi.fn(() => true), canView: vi.fn(() => true) };
     const menu = new MenuService(permission as unknown as PermissionService);
-    expect(getRegisteredRunModalPageIds()).toEqual(['purchase-order']);
+    expect(getRegisteredRunModalPageIds()).toEqual(['customer', 'purchase-requisition']);
     const shell = routes.find(route => route.path === '')!;
     expect(shell.canActivate).toHaveLength(1);
     expect(shell.canActivateChild).toHaveLength(1);
-    expect(shell.children!.map(route => route.path)).toEqual(['', 'purchase-order']);
+    expect(shell.children!.map(route => route.path)).toEqual(['', 'customer', 'purchase-requisition']);
     const items = menu.getModules().flatMap(module => module.children ?? []);
-    expect(items.map(item => item.pageId)).toEqual(['purchase-order']);
-    expect(items[0].route).toBe('/purchase-order');
-    expect(menu.search('purchase').map(item => item.pageId)).toEqual(['purchase-order']);
-    expect(menu.search('customer')).toEqual([]);
-    expect(menu.search('role')).toEqual([]);
-    expect(permission.canView).toHaveBeenCalledWith('purchase-order');
+    expect(items.map(item => item.pageId)).toEqual(['customer', 'purchase-requisition']);
+    expect(items.map(item => item.route)).toEqual(['/customer', '/purchase-requisition']);
+    expect(menu.search('purchase').map(item => item.pageId)).toEqual(['purchase-requisition']);
+    expect(menu.search('customer').map(item => item.pageId)).toEqual(['customer']);
+    expect(permission.hasPermission).toHaveBeenCalledWith('customers');
+    expect(permission.hasPermission).toHaveBeenCalledWith('purchase_requisitions');
   });
 
-  it('continues to enforce page visibility in menus and global search', () => {
-    const menu = new MenuService({ canView: () => false, hasPermission: () => true } as unknown as PermissionService);
+  it('filters menus using company-scoped backend resource permissions', () => {
+    const menu = new MenuService({
+      hasPermission: (resource: string) => resource === 'customers',
+    } as PermissionService);
     expect(menu.getModuleItems('purchase')).toEqual([]);
-    expect(menu.getModules()).toEqual([]);
-    expect(menu.search('purchase')).toEqual([]);
+    expect(menu.getModules().map(module => module.pageId)).toEqual(['sales']);
+    expect(menu.search('customer').map(item => item.pageId)).toEqual(['customer']);
   });
 });

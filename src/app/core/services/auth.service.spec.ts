@@ -26,13 +26,12 @@ describe('TecSA Laravel company-aware login', () => {
       company,
       isSuperAdmin: superAdmin,
       accessCenters: [],
-      pages: [{
-        pageId: 'purchase-order',
-        pageName: 'Purchase Order',
-        pageCode: 'purchase_orders',
+      pages: [],
+      resources: [{
+        resource: 'customers',
         canRead,
-        canCreate: false,
-        canUpdate: false,
+        canCreate: canRead,
+        canUpdate: canRead,
         canDelete: false,
         canExecute: false,
       }],
@@ -78,7 +77,7 @@ describe('TecSA Laravel company-aware login', () => {
     expect(session.Company).toBe(companyA.systemId);
     expect(session.CompanyName).toBe(companyA.name);
     expect(session.SuperAdmin).toBe(false);
-    expect(permissions.canView('purchase-order')).toBe(true);
+    expect(permissions.hasPermission('customers')).toBe(true);
     expect(session.Permissions).toHaveLength(1);
   });
 
@@ -90,7 +89,7 @@ describe('TecSA Laravel company-aware login', () => {
     expect(result.companies.map(company => company.systemId)).toEqual([companyA.systemId, companyB.systemId]);
     expect(session.isSessionValid()).toBe(false);
     expect(session.Company).toBe('');
-    expect(permissions.canView('purchase-order')).toBe(false);
+    expect(permissions.hasPermission('customers')).toBe(false);
 
     await expect(firstValueFrom(auth.selectCompany('unauthorized-id'))).rejects.toThrow('Choose an authorized company');
     const chosen = firstValueFrom(auth.selectCompany(companyB.systemId));
@@ -98,7 +97,7 @@ describe('TecSA Laravel company-aware login', () => {
     await chosen;
     expect(session.Company).toBe(companyB.systemId);
     expect(session.SuperAdmin).toBe(false);
-    expect(permissions.canView('purchase-order')).toBe(false);
+    expect(permissions.hasPermission('customers')).toBe(false);
   });
 
   it('rejects a mismatched company from the server before applying session data', async () => {
@@ -117,7 +116,7 @@ describe('TecSA Laravel company-aware login', () => {
     http.expectOne(contextUrl(companyA.systemId)).flush(context(companyA, false, false));
     await operation;
     expect(permissions.isSuperAdmin()).toBe(false);
-    expect(permissions.canView('purchase-order')).toBe(false);
+    expect(permissions.hasPermission('customers')).toBe(false);
   });
 
   it('rejects accounts without company membership and does not retain a bearer token', async () => {
