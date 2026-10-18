@@ -1,7 +1,8 @@
 import { Routes } from '@angular/router';
 import { MainLayout } from './layout/main-layout/main-layout';
 import { DashboardPage } from './features/dashboard/dashboard-page/dashboard-page';
-import { PurchaseOrderPage } from './features/purchasing/purchase-order/purchase-order';
+import { CustomerPage } from './features/sales/customer/customer';
+import { PurchaseRequisitionPage } from './features/purchasing/purchase-requisition/purchase-requisition';
 import { LoginPage } from './features/auth/login/login';
 import { SaasLandingPage } from './features/marketing/landing/saas-landing-page';
 import { TrialSignupPage } from './features/marketing/signup/trial-signup-page';
@@ -18,7 +19,9 @@ export const routes: Routes = [
     canActivateChild: [authChildGuard],
     children: [
       { path: '', component: DashboardPage },
-      { path: 'purchase-order', component: PurchaseOrderPage, data: { pageId: 'purchase-order' } },
+      { path: 'customer', component: CustomerPage, data: { pageId: 'customer' } },
+      { path: 'purchase-requisition', component: PurchaseRequisitionPage,
+        data: { pageId: 'purchase-requisition' } },
     ],
   },
   { path: '**', redirectTo: '' },
