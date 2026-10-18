@@ -25,7 +25,7 @@ describe('Configuration-driven ERP navigation', () => {
   it('filters menus using company-scoped backend resource permissions', () => {
     const menu = new MenuService({
       hasPermission: (resource: string) => resource === 'customers',
-    } as PermissionService);
+    } as unknown as PermissionService);
     expect(menu.getModuleItems('purchase')).toEqual([]);
     expect(menu.getModules().map(module => module.pageId)).toEqual(['sales']);
     expect(menu.search('customer').map(item => item.pageId)).toEqual(['customer']);
