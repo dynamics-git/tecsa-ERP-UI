@@ -1,7 +1,7 @@
 import { CommandConfig, StandardCommandConfig } from './command-config.model';
 import { DataSourceConfig } from './data-source-config.model';
 import { DataSurfaceColumnConfig, DataSurfaceConfig } from './data-surface-config.model';
-import { ListFactPanelConfig } from './list-page-factbox-config.model';
+import { ListFactBoxConfig } from './list-fact-box-config.model';
 import { ListFilterConfig } from './list-filter-config.model';
 import { PopupConfig } from './popup-config.model';
 
@@ -51,6 +51,7 @@ export interface BasePageConfig extends Record<string, unknown> {
   tools?: PageToolsConfig;
   filterConfig?: ListFilterConfig;
   commands?: CommandConfig[];
+  menu?: { module: string; group: string; icon: string; route: string };
   popup?: PopupConfig;
   dataSource?: DataSourceConfig;
 }
@@ -68,7 +69,7 @@ export interface ListPageConfig extends BasePageConfig {
   standardActions?: StandardCommandConfig;
   dataSurface?: DataSurfaceConfig;
   behavior?: ListPageBehaviorConfig;
-  factPanel?: ListFactPanelConfig;
+  factBox?: ListFactBoxConfig;
 }
 
 // Setup pages share the same shape today; this alias keeps naming explicit.

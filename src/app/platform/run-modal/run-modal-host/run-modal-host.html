@@ -16,30 +16,36 @@
           [class.full-page]="isFullPagePopup(popup)"
           [class.list-page-popup]="isListPopup(popup)"
           [class.maximized]="isListPopup(popup) && isListPopupMaximized(popup)">
+          @if (getRuntimePage(popup); as runtime) {
+            <app-document-page [pageId]="runtime.pageId" [listConfig]="getRuntimeList(popup)"
+              [headerConfig]="getRuntimeHeader(popup)" [lineConfig]="getRuntimeLines(popup)"
+              [documentOnly]="true" [initialRecord]="runtime.record" (closeRequested)="closePopup(popup)">
+            </app-document-page>
+          }
           @if (isDocumentPopup(popup)) {
             <app-document-window
               [overlayZIndex]="920 + (index * 4)"
-              [pageLabel]="getEntryDialogConfig(popup)?.pageLabel"
-              [title]="getEntryDialogConfig(popup)?.title"
-              [subtitle]="getEntryDialogConfig(popup)?.subtitle"
-              [popupHeaderCommandBar]="getEntryDialogConfig(popup)?.headerCommandBar"
-              [popupLineCommandBar]="getEntryDialogConfig(popup)?.lineCommandBar"
-              [popupLineCommandPolicy]="getEntryDialogConfig(popup)?.lineCommandPolicy"
-              [popupLinePlacement]="getEntryDialogConfig(popup)?.linePlacement"
-              [popupHeaderToolbarButtons]="getEntryDialogConfig(popup)?.headerToolbarButtons"
-              [popupLineToolbarButtons]="getEntryDialogConfig(popup)?.lineToolbarButtons"
-              [popupDetailToolbarButtons]="getEntryDialogConfig(popup)?.detailToolbarButtons"
-              [popupHeaderSections]="getEntryDialogConfig(popup)?.headerSections"
-              [popupHeaderData]="getEntryDialogConfig(popup)?.headerData"
-              [popupLineColumns]="getEntryDialogConfig(popup)?.lineColumns"
-              [popupLineRows]="getEntryDialogConfig(popup)?.lineRows"
-              [popupLineTotals]="getEntryDialogConfig(popup)?.lineTotals"
-              [popupFooterSections]="getEntryDialogConfig(popup)?.footerSections"
-              [popupAttachments]="getEntryDialogConfig(popup)?.attachments"
-              [popupFactPanelSections]="getEntryDialogConfig(popup)?.factPanelSections"
-              [popupStatusMessage]="getEntryDialogConfig(popup)?.statusMessage"
-              [popupInteractionLocked]="getEntryDialogConfig(popup)?.interactionLocked === true"
-              (action)="onEntryDialogAction(popup, $event)"
+              [pageLabel]="getDocumentWindowConfig(popup)?.pageLabel"
+              [title]="getDocumentWindowConfig(popup)?.title"
+              [subtitle]="getDocumentWindowConfig(popup)?.subtitle"
+              [headerCommandBar]="getDocumentWindowConfig(popup)?.headerCommandBar"
+              [lineCommandBar]="getDocumentWindowConfig(popup)?.lineCommandBar"
+              [lineCommandPolicy]="getDocumentWindowConfig(popup)?.lineCommandPolicy"
+              [linePlacement]="getDocumentWindowConfig(popup)?.linePlacement"
+              [headerToolbarButtons]="getDocumentWindowConfig(popup)?.headerToolbarButtons"
+              [lineToolbarButtons]="getDocumentWindowConfig(popup)?.lineToolbarButtons"
+              [detailToolbarButtons]="getDocumentWindowConfig(popup)?.detailToolbarButtons"
+              [headerSections]="getDocumentWindowConfig(popup)?.headerSections"
+              [headerData]="getDocumentWindowConfig(popup)?.headerData"
+              [lineColumns]="getDocumentWindowConfig(popup)?.lineColumns"
+              [lineRows]="getDocumentWindowConfig(popup)?.lineRows"
+              [lineTotals]="getDocumentWindowConfig(popup)?.lineTotals"
+              [footerSections]="getDocumentWindowConfig(popup)?.footerSections"
+              [attachments]="getDocumentWindowConfig(popup)?.attachments"
+              [factBoxSections]="getDocumentWindowConfig(popup)?.factBoxSections"
+              [statusMessage]="getDocumentWindowConfig(popup)?.statusMessage"
+              [interactionLocked]="getDocumentWindowConfig(popup)?.interactionLocked === true"
+              (action)="onDocumentWindowAction(popup, $event)"
               (closed)="closePopup(popup)">
             </app-document-window>
           }
@@ -62,13 +68,13 @@
             <app-list-page
               [config]="getListPageConfig(popup)"
               [data]="getListRows(popup)"
-              [hasMore]="false"
+              [hasMore]="listHasMore(popup)"
               [loading]="isListLoading(popup)"
               [errorMessage]="getListErrorMessage(popup)"
               [showCommandBar]="true"
               (rowSelected)="onListRowOpen(popup, $event)"
               (primaryAction)="onListRowOpen(popup, $event)"
-              (command)="onListCommand(popup, $event)">
+              (command)="onListCommand(popup, $event)" (loadMore)="onListLoadMore(popup)">
             </app-list-page>
           }
 

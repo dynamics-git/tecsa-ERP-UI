@@ -8,7 +8,7 @@ import { GlobalSearchPopupService } from '../../core/services/global-search-popu
 import { MenuService } from '../../core/services/menu.service';
 import { shouldOpenFromMenuAsRunModal } from '../../core/services/run-modal-config-registry';
 import { SessionService } from '../../core/services/session.service';
-import { CoreDrawerService } from '../../platform/public-api';
+import { DrawerService } from '../../platform/public-api';
 import { ModuleMenuPanel } from '../module-menu-panel/module-menu-panel';
 
 @Component({
@@ -38,7 +38,7 @@ export class Header {
     private readonly menuService: MenuService,
     private readonly globalSearchPopup: GlobalSearchPopupService,
     private readonly sessionService: SessionService,
-    private readonly drawerService: CoreDrawerService
+    private readonly drawerService: DrawerService
   ) {
     this.router.events
       .pipe(filter((event): event is NavigationStart => event instanceof NavigationStart))

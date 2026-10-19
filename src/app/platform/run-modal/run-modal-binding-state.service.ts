@@ -46,7 +46,7 @@ export class RunModalBindingStateService {
     return this.lastOpenFailureReason;
   }
 
-  setInteractionLock(entryDialogConfig: DocumentWindowConfig, locked: boolean): void {
-    entryDialogConfig.interactionLocked = locked;
+  setInteractionLock(documentWindowConfig: DocumentWindowConfig, locked: boolean): void {
+    documentWindowConfig.interactionLocked = locked;
   }
 }

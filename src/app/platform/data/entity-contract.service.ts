@@ -36,7 +36,8 @@ export class EntityContractService {
     }
 
     const profile = this.resolveProfile(config);
-    void operation;
+    const configured = operation === 'create' ? config.createFields : config.updateFields;
+    const allowed = configured ?? (operation === 'create' ? profile?.createAllowList : profile?.updateAllowList);
     const outboundFieldMap = this.buildOutboundFieldMap(profile);
     const omitted = this.buildOmittedFieldSet(profile);
     const sanitized: Record<string, unknown> = {};
@@ -47,6 +48,9 @@ export class EntityContractService {
       }
 
       const mappedKey = outboundFieldMap.get(this.normalizeToken(key)) ?? key;
+      if (config.omitEmptyFields?.includes(mappedKey) && (value === '' || value === null || value === undefined)) continue;
+      if (allowed?.length && !allowed.includes(mappedKey)) continue;
+      if (operation === 'update' && config.updateBlockedFields?.includes(mappedKey)) continue;
       if (omitted.has(this.normalizeToken(key)) || omitted.has(this.normalizeToken(mappedKey))) {
         continue;
       }

@@ -10,6 +10,7 @@ export interface PageAction {
 }
 
 export interface PageContext {
+  pageId?: string;
   title: string;
   module: string;
   company: string;

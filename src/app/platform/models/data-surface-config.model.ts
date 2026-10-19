@@ -1,4 +1,4 @@
-import { FieldFactPanelConfig } from './field-config.model';
+import { FieldFactBoxConfig } from './field-config.model';
 
 export type DataSurfaceMode = 'table';
 
@@ -15,7 +15,8 @@ export interface DataSurfaceColumnConfig {
   isPrimary?: boolean;
   currencyCode?: string;
   hidden?: boolean;
-  factPanel?: boolean | FieldFactPanelConfig;
+  sortable?: boolean;
+  factBox?: boolean | FieldFactBoxConfig;
 }
 
 export interface DataSurfaceConfig {

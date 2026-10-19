@@ -6,9 +6,13 @@
     [attr.aria-label]="dialog.title"
     tabindex="0"
     (keydown.escape)="cancel()"
-    (keydown.enter)="confirm()">
+    (keydown.enter)="$any($event.target).tagName !== 'TEXTAREA' && confirm()">
     <h3 class="ts-confirmation-modal__title">{{ dialog.title }}</h3>
     <p class="ts-confirmation-modal__message">{{ dialog.message }}</p>
+    @if (dialog.sections && dialog.values) {
+      <app-dynamic-form [sections]="dialog.sections" [data]="dialog.values"></app-dynamic-form>
+    }
+    @if (validationError) { <p role="alert">{{ validationError }}</p> }
 
     <footer class="ts-confirmation-modal__actions">
       <button

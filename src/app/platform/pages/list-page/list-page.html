@@ -126,6 +126,7 @@
                 [class.sorted]="getColumnSortDirection(column)">
                 <button
                   class="th-sort"
+                  [disabled]="column.sortable === false || config?.dataSurface?.sortable === false || config?.dataSource?.paging === 'cursor'"
                   [class.active]="column.primary || column.isPrimary"
                   [class.numeric]="column.align === 'end' || column.type === 'currency'"
                   type="button"

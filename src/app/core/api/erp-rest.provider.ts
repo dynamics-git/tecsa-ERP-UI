@@ -8,7 +8,8 @@ export const provideErpRest = (): Provider => ({
   useFactory: (restService: RestService): DataRestService => ({
     get: (endpoint: string) => restService.get(endpoint),
     post: (endpoint: string, payload: unknown) => restService.post(endpoint, payload),
+    put: (endpoint: string, payload: unknown, ifMatch?: string) => restService.put(endpoint, payload, { ifMatch }),
     patch: (endpoint: string, payload: unknown, ifMatch?: string) => restService.patch(endpoint, payload, ifMatch),
-    delete: (endpoint: string) => restService.delete(endpoint)
+    delete: (endpoint: string, ifMatch?: string) => restService.delete(endpoint, { ifMatch })
   })
 });

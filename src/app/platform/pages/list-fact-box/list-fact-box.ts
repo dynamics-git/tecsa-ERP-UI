@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { FieldFactPanelConfig } from '../../models/field-config.model';
+import { FieldFactBoxConfig } from '../../models/field-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
 
 type DisplayColumn = ListPageColumnConfig & {
@@ -8,7 +8,7 @@ type DisplayColumn = ListPageColumnConfig & {
   filterable?: boolean;
 };
 
-type FactPanelDisplayField = {
+type FactBoxDisplayField = {
   label: string;
   field?: string;
   type?: string;
@@ -32,14 +32,14 @@ export class ListFactBox {
   collapsed = false;
 
   get label(): string {
-    const factPanel = this.config?.factPanel;
-    const configured = this.toText(factPanel?.label).trim();
+    const factBox = this.config?.factBox;
+    const configured = this.toText(factBox?.label).trim();
     if (configured.length && !this.isGenericLabel(configured)) {
       return configured;
     }
 
-    const labelField = factPanel?.binding?.labelField;
-    const labelFallbackFields = factPanel?.binding?.labelFallbackFields ?? [];
+    const labelField = factBox?.binding?.labelField;
+    const labelFallbackFields = factBox?.binding?.labelFallbackFields ?? [];
 
     const rowLabel = this.toText(
       (labelField ? this.read(this.selectedRow, labelField) : undefined) ??
@@ -53,31 +53,31 @@ export class ListFactBox {
   }
 
   get title(): string {
-    const factPanel = this.config?.factPanel;
-    const titleField = factPanel?.binding?.titleField;
-    const fallbackFields = factPanel?.binding?.titleFallbackFields?.length
-      ? factPanel.binding.titleFallbackFields
+    const factBox = this.config?.factBox;
+    const titleField = factBox?.binding?.titleField;
+    const fallbackFields = factBox?.binding?.titleFallbackFields?.length
+      ? factBox.binding.titleFallbackFields
       : this.defaultTitleFields;
 
     return String(
       (titleField ? this.read(this.selectedRow, titleField) : undefined) ??
         this.readFirst(this.selectedRow, fallbackFields) ??
-        factPanel?.title ??
+        factBox?.title ??
         this.config?.title ??
         '',
     );
   }
 
   get subtitle(): string {
-    const factPanel = this.config?.factPanel;
-    const configured = this.toText(factPanel?.subtitle).trim();
+    const factBox = this.config?.factBox;
+    const configured = this.toText(factBox?.subtitle).trim();
     if (configured.length && !this.isGenericSubtitle(configured)) {
       return configured;
     }
 
-    const subtitleField = factPanel?.binding?.subtitleField;
+    const subtitleField = factBox?.binding?.subtitleField;
     const subtitleFallbackFields =
-      factPanel?.binding?.subtitleFallbackFields ?? this.defaultSubtitleFields;
+      factBox?.binding?.subtitleFallbackFields ?? this.defaultSubtitleFields;
 
     const rowSubtitle = this.toText(
       (subtitleField ? this.read(this.selectedRow, subtitleField) : undefined) ??
@@ -96,15 +96,15 @@ export class ListFactBox {
   }
 
   get summaryValue(): string {
-    const factPanel = this.config?.factPanel;
-    const summaryField = factPanel?.binding?.summaryField;
+    const factBox = this.config?.factBox;
+    const summaryField = factBox?.binding?.summaryField;
     if (!summaryField) {
       return '';
     }
 
     const summaryColumn = this.findColumnByField(summaryField);
-    const fallbackFields = factPanel?.binding?.summaryFallbackFields?.length
-      ? factPanel.binding.summaryFallbackFields
+    const fallbackFields = factBox?.binding?.summaryFallbackFields?.length
+      ? factBox.binding.summaryFallbackFields
       : [];
 
     const summaryValue =
@@ -115,14 +115,14 @@ export class ListFactBox {
     return this.formatValue(summaryValue, {
       id: 'summary',
       label: 'Summary',
-      type: factPanel?.binding?.summaryType ?? summaryColumn?.type,
+      type: factBox?.binding?.summaryType ?? summaryColumn?.type,
       currencyCode: summaryColumn?.currencyCode,
     });
   }
 
   get summaryLabel(): string {
-    const factPanel = this.config?.factPanel;
-    const summaryField = factPanel?.binding?.summaryField;
+    const factBox = this.config?.factBox;
+    const summaryField = factBox?.binding?.summaryField;
     const summaryColumn = summaryField ? this.findColumnByField(summaryField) : undefined;
     return summaryColumn?.label ?? 'Summary';
   }
@@ -135,10 +135,10 @@ export class ListFactBox {
     return this.status.trim().length > 0;
   }
 
-  get sections(): Array<{ title: string; fields: FactPanelDisplayField[] }> {
-    const factPanel = this.config?.factPanel;
-    if (factPanel?.sections?.length) {
-      return factPanel.sections.map((section) => ({
+  get sections(): Array<{ title: string; fields: FactBoxDisplayField[] }> {
+    const factBox = this.config?.factBox;
+    if (factBox?.sections?.length) {
+      return factBox.sections.map((section) => ({
         title: section.title,
         fields: (section.fields ?? []).map((field) => ({
           ...field,
@@ -148,11 +148,11 @@ export class ListFactBox {
       }));
     }
 
-    const sections = new Map<string, { title: string; fields: FactPanelDisplayField[] }>();
+    const sections = new Map<string, { title: string; fields: FactBoxDisplayField[] }>();
 
-    this.factPanelColumns.forEach((column, index) => {
-      const factPanelConfig = this.resolveColumnFactPanelConfig(column);
-      if (!factPanelConfig) {
+    this.factBoxColumns.forEach((column, index) => {
+      const factBoxConfig = this.resolveColumnFactBoxConfig(column);
+      if (!factBoxConfig) {
         return;
       }
 
@@ -161,16 +161,16 @@ export class ListFactBox {
         return;
       }
 
-      const sectionId = this.toText(factPanelConfig.sectionId).trim() || 'details';
-      const title = this.toText(factPanelConfig.sectionTitle).trim() || 'Details';
+      const sectionId = this.toText(factBoxConfig.sectionId).trim() || 'details';
+      const title = this.toText(factBoxConfig.sectionTitle).trim() || 'Details';
       const existing = sections.get(sectionId) ?? { title, fields: [] };
       existing.fields.push({
-        label: this.toText(factPanelConfig.label).trim() || column.label,
+        label: this.toText(factBoxConfig.label).trim() || column.label,
         field,
         type: column.type,
         currencyCode: column.currencyCode,
-        order: Number.isFinite(factPanelConfig.order) ? Number(factPanelConfig.order) : index,
-        fallback: factPanelConfig.fallback,
+        order: Number.isFinite(factBoxConfig.order) ? Number(factBoxConfig.order) : index,
+        fallback: factBoxConfig.fallback,
       });
       sections.set(sectionId, existing);
     });
@@ -189,7 +189,7 @@ export class ListFactBox {
     return this.columns.filter((column) => column.hidden !== true);
   }
 
-  private get factPanelColumns(): ListPageColumnConfig[] {
+  private get factBoxColumns(): ListPageColumnConfig[] {
     return this.columns;
   }
 
@@ -224,16 +224,16 @@ export class ListFactBox {
     return String(column.field ?? column.id ?? '').trim();
   }
 
-  private resolveColumnFactPanelConfig(
+  private resolveColumnFactBoxConfig(
     column: ListPageColumnConfig,
-  ): FieldFactPanelConfig | undefined {
-    if (column.factPanel === true) {
+  ): FieldFactBoxConfig | undefined {
+    if (column.factBox === true) {
       return {};
     }
 
-    if (this.isRecord(column.factPanel)) {
-      const factPanel = column.factPanel as FieldFactPanelConfig;
-      return factPanel.show === false ? undefined : factPanel;
+    if (this.isRecord(column.factBox)) {
+      const factBox = column.factBox as FieldFactBoxConfig;
+      return factBox.show === false ? undefined : factBox;
     }
 
     return undefined;
@@ -298,7 +298,7 @@ export class ListFactBox {
     this.closeRequested.emit();
   }
 
-  getFieldValue(field: FactPanelDisplayField): string {
+  getFieldValue(field: FactBoxDisplayField): string {
     if (field.field) {
       const formatted = this.formatValue(this.read(this.selectedRow, field.field), {
         id: field.field,
@@ -313,11 +313,11 @@ export class ListFactBox {
     return this.toText(field.fallback);
   }
 
-  hasFieldValue(field: FactPanelDisplayField): boolean {
+  hasFieldValue(field: FactBoxDisplayField): boolean {
     return this.getFieldValue(field).trim().length > 0;
   }
 
-  hasSectionFields(section: { fields: FactPanelDisplayField[] }): boolean {
+  hasSectionFields(section: { fields: FactBoxDisplayField[] }): boolean {
     return section.fields.some((field) => this.hasFieldValue(field));
   }
 

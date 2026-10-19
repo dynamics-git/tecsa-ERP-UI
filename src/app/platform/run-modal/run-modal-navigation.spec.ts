@@ -16,7 +16,7 @@ import { RunModalService } from './run-modal.service';
 import { RunModalBindingStateService } from './run-modal-binding-state.service';
 import { RunModalLoadingService } from './run-modal-loading.service';
 import { ConfirmationService } from '../../shared/ui/confirmation.service';
-import { CoreDrawerService } from '../../shared/ui/core-drawer.service';
+import { DrawerService } from '../../shared/ui/drawer.service';
 
 describe('RunModal navigation', () => {
   let popups: PopupConfig[];
@@ -67,8 +67,8 @@ describe('RunModal navigation', () => {
     expect(await runModal.openEntryFromList(parent.id, rows[0])).toBe(true);
     await settle();
     const child = popups[1];
-    expect(data(child).entryDialogConfig!.headerData!['number']).toBe('PO-1');
-    expect(data(child).entryDialogConfig!.lineRows![0]['description']).toBe('Fixture line');
+    expect(data(child).documentWindowConfig!.headerData!['number']).toBe('PO-1');
+    expect(data(child).documentWindowConfig!.lineRows![0]['description']).toBe('Fixture line');
     expect(requests.some(endpoint => endpoint.startsWith('/purchaseOrderLines') && endpoint.includes('PO-1'))).toBe(true);
     fixture.componentInstance.closePopup(child);
     fixture.detectChanges();
@@ -85,7 +85,7 @@ describe('RunModal navigation', () => {
     await settle();
     const fixture = TestBed.createComponent(RunModalHost);
     fixture.detectChanges();
-    const config = data(popups[0]).entryDialogConfig!;
+    const config = data(popups[0]).documentWindowConfig!;
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     config.lineRows![0]['description'] = 'Unsaved line';
     const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
@@ -100,11 +100,11 @@ describe('RunModal navigation', () => {
     fixture.componentInstance.closePopup(popups[1]);
     fixture.detectChanges();
     expect(popups.map(popup => popup.id)).toEqual(['parent']);
-    expect(data(popups[0]).entryDialogConfig).toBe(config);
+    expect(data(popups[0]).documentWindowConfig).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
     expect(config.lineRows![0]['description']).toBe('Unsaved line');
     expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
-    expect(parentWindow.entryMaximized).toBe(true);
+    expect(parentWindow.maximized).toBe(true);
   });
 
   it('keeps unsaved document and maximize state when a document command opens a related list', async () => {
@@ -113,7 +113,7 @@ describe('RunModal navigation', () => {
     expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
     await settle();
     const parent = popups[0];
-    const config = data(parent).entryDialogConfig!;
+    const config = data(parent).documentWindowConfig!;
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     config.lineRows![0]['description'] = 'Unsaved line';
     config.headerToolbarButtons = [
@@ -128,7 +128,7 @@ describe('RunModal navigation', () => {
     const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
     parentWindow.toggleEntrySize();
 
-    host.onEntryDialogAction(parent, { actionKey: 'cmd:related-list' });
+    host.onDocumentWindowAction(parent, { actionKey: 'cmd:related-list' });
     await vi.waitFor(() => expect(popups).toHaveLength(2));
     await settle();
     fixture.detectChanges();
@@ -140,11 +140,11 @@ describe('RunModal navigation', () => {
     host.closePopup(relatedList);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
-    expect(data(parent).entryDialogConfig).toBe(config);
+    expect(data(parent).documentWindowConfig).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
     expect(config.lineRows![0]['description']).toBe('Unsaved line');
     expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
-    expect(parentWindow.entryMaximized).toBe(true);
+    expect(parentWindow.maximized).toBe(true);
     expect(navigate).not.toHaveBeenCalled();
   });
 
@@ -152,7 +152,7 @@ describe('RunModal navigation', () => {
     expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
     await settle();
     const parent = popups[0];
-    const config = data(parent).entryDialogConfig!;
+    const config = data(parent).documentWindowConfig!;
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     config.lineRows![0]['description'] = 'Edited line';
     const fixture = TestBed.createComponent(RunModalHost);
@@ -179,17 +179,17 @@ describe('RunModal navigation', () => {
     fixture.componentInstance.closePopup(popups[1]);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
-    expect(data(parent).entryDialogConfig).toBe(config);
+    expect(data(parent).documentWindowConfig).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
     expect(config.lineRows![0]['description']).toBe('Edited line');
     expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
-    expect(parentWindow.entryMaximized).toBe(true);
+    expect(parentWindow.maximized).toBe(true);
   });
 
   it('opens global search over an existing document without replacing its parent', async () => {
     expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
     await settle();
-    const config = data(popups[0]).entryDialogConfig!;
+    const config = data(popups[0]).documentWindowConfig!;
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     expect(await TestBed.inject(GlobalSearchPopupService).openByPageId('purchase-order')).toBe(true);
     await settle();
@@ -197,7 +197,7 @@ describe('RunModal navigation', () => {
     expect(data(popups[1]).runModalList).toBeDefined();
     const host = TestBed.createComponent(RunModalHost).componentInstance;
     host.closePopup(popups[1]);
-    expect(data(popups[0]).entryDialogConfig).toBe(config);
+    expect(data(popups[0]).documentWindowConfig).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
   });
 
@@ -206,13 +206,13 @@ describe('RunModal navigation', () => {
     await settle();
     const parent = popups[0];
     const host = TestBed.createComponent(RunModalHost).componentInstance;
-    TestBed.inject(CoreDrawerService).open({ id: 'drawer', viewId: 'profile', allowNested: true });
+    TestBed.inject(DrawerService).open({ id: 'drawer', viewId: 'profile', allowNested: true });
     const decision = TestBed.inject(ConfirmationService).confirm({ message: 'Continue?' });
     expect(host.getRenderablePopups(popups).map(popup => popup.id)).toEqual(['parent', popups[2].id]);
     host.closePopup(popups[2]);
     expect(await decision).toBe(false);
     expect(popups.map(popup => popup.id)).toEqual(['parent', 'drawer']);
-    TestBed.inject(CoreDrawerService).close('drawer');
+    TestBed.inject(DrawerService).close('drawer');
     expect(popups).toEqual([parent]);
   });
 

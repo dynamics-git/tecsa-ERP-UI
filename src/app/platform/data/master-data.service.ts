@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { from, Observable, of } from 'rxjs';
 import { catchError, map, mergeMap, reduce } from 'rxjs/operators';
 import { DataSourceService } from './data-source.service';
+import { SessionService } from '../../core/services/session.service';
 
 export type MasterEndpointMap = Record<string, string[]>;
 
@@ -21,9 +22,12 @@ export class MasterDataService {
   private readonly endpointCache = new Map<string, CachedMasterList>();
   private readonly failedEndpoints = new Map<string, number>();
 
-  constructor(private readonly dataSource: DataSourceService) {}
+  private context = '';
+  constructor(private readonly dataSource: DataSourceService, private readonly session: SessionService) {}
 
   loadFirstAvailableList(endpoints: string[]): Observable<Record<string, unknown>[]> {
+    const context = `${this.session.Company}|${this.session.UserId}|${this.session.AccessToken}`;
+    if (context !== this.context) { this.invalidate(); this.context = context; }
     const normalized = endpoints
       .map((endpoint) => endpoint.trim())
       .filter((endpoint) => endpoint.length > 0);
@@ -53,6 +57,7 @@ export class MasterDataService {
 
     return this.dataSource.loadList({ endpoint: first }).pipe(
       map((response) => {
+        if (context !== this.context || context !== `${this.session.Company}|${this.session.UserId}|${this.session.AccessToken}`) return [];
         const records = this.toRecordList(response);
         this.endpointCache.set(first, {
           records,

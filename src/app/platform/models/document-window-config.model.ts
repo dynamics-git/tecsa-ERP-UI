@@ -2,29 +2,29 @@ import { FormSectionConfig } from './field-config.model';
 import type { LineColumnConfig } from './line-config.model';
 import { CommandConfig } from './command-config.model';
 
-export type EntryDialogType = 'header' | 'dimensions' | 'attachments' | 'line' | 'posting';
+export type DocumentDetailType = 'header' | 'dimensions' | 'attachments' | 'line' | 'posting';
 
-export interface EntryHeaderSectionConfig extends FormSectionConfig {
+export interface HeaderSectionConfig extends FormSectionConfig {
   metaText?: string;
   actionLabel?: string;
-  actionDialog?: EntryDialogType;
+  actionDialog?: DocumentDetailType;
 }
 
-export interface EntryLineTotalsConfig {
+export interface LineTotalsConfig {
   subtotal: string;
   sst: string;
   total: string;
   difference: string;
 }
 
-export type EntryFooterTotalKey = keyof EntryLineTotalsConfig;
-export type EntryFooterValueSource = 'total' | 'header' | 'literal';
+export type FooterTotalKey = keyof LineTotalsConfig;
+export type FooterValueSource = 'total' | 'header' | 'literal';
 
-export interface EntryFooterRowConfig {
+export interface FooterRowConfig {
   id: string;
   label: string;
-  source?: EntryFooterValueSource;
-  totalKey?: EntryFooterTotalKey;
+  source?: FooterValueSource;
+  totalKey?: FooterTotalKey;
   field?: string;
   value?: string;
   fallback?: string;
@@ -32,22 +32,22 @@ export interface EntryFooterRowConfig {
   order?: number;
 }
 
-export interface EntryFooterSectionConfig {
+export interface FooterSectionConfig {
   id: string;
   title?: string;
-  rows: EntryFooterRowConfig[];
+  rows: FooterRowConfig[];
 }
 
-export interface EntryAttachmentsConfig {
+export interface AttachmentsConfig {
   headerFilesCount: number;
   lineFilesCount: number;
   canUpload: boolean;
   primaryActionLabel: string;
   primaryActionKey: string;
-  context?: EntryAttachmentContextConfig;
+  context?: AttachmentContextConfig;
 }
 
-export interface EntryAttachmentContextConfig {
+export interface AttachmentContextConfig {
   documentNoField?: string;
   documentType?: string;
   documentStatusField?: string;
@@ -57,61 +57,50 @@ export interface EntryAttachmentContextConfig {
   relatedLineNoField?: string;
 }
 
-export type EntryCommandTone = 'primary' | 'normal' | 'danger';
-export type EntryRunModalTarget = 'entry' | 'list';
-
-export interface EntryCommandBarConfig {
+export interface CommandBarConfig {
   maxPrimaryActions?: number;
   maxVisibleGroups?: number;
 }
 
-export interface EntryLineCommandPolicyConfig {
+export interface LineCommandPolicyConfig {
   injectDefaultLineNew?: boolean;
   injectDefaultLineDelete?: boolean;
 }
 
-export type EntryLinePlacementMode = 'end' | 'after-section';
+export type LinePlacementMode = 'end' | 'after-section';
 
-export interface EntryLinePlacementConfig {
-  mode?: EntryLinePlacementMode;
+export interface LinePlacementConfig {
+  mode?: LinePlacementMode;
   afterSectionId?: string;
 }
 
-export type EntryCommandButtonConfig = CommandConfig;
-
-export interface EntryHeaderConfig {
+export interface HeaderConfig {
   dialogTitle: string;
-  commandBar?: EntryCommandBarConfig;
-  toolbarButtons: EntryCommandButtonConfig[];
-  detailToolbarButtons?: EntryCommandButtonConfig[];
-  sections: EntryHeaderSectionConfig[];
-  attachmentsDefault?: EntryAttachmentsConfig;
+  commandBar?: CommandBarConfig;
+  toolbarButtons: CommandConfig[];
+  detailToolbarButtons?: CommandConfig[];
+  sections: HeaderSectionConfig[];
+  attachmentsDefault?: AttachmentsConfig;
 }
 
-export interface FactPanelRowConfig {
+export interface FactBoxRowConfig {
   label: string;
   value: string;
 }
 
-export type FactPanelButtonConfig = CommandConfig;
-
-export interface FactPanelSectionConfig {
+export interface FactBoxSectionConfig {
   id: string;
   title: string;
-  rows?: FactPanelRowConfig[];
-  buttons?: FactPanelButtonConfig[];
+  rows?: FactBoxRowConfig[];
+  buttons?: CommandConfig[];
   customComponentKey?: string;
   customData?: Record<string, unknown>;
 }
 
-export type PopupFactPanelRowConfig = FactPanelRowConfig;
-export type PopupFactPanelButtonConfig = FactPanelButtonConfig;
-export type PopupFactPanelSectionConfig = FactPanelSectionConfig;
+export type DocumentStatusTone = 'info' | 'success' | 'warning' | 'error';
 
-export type EntryStatusTone = 'info' | 'success' | 'warning' | 'error';
-
-export interface EntryStatusMessage {
-  tone: EntryStatusTone;
+export interface DocumentStatusMessage {
+  tone: DocumentStatusTone;
   title?: string;
   message: string;
   blocking?: boolean;
@@ -121,21 +110,21 @@ export interface DocumentWindowConfig {
   pageLabel?: string;
   title?: string;
   subtitle?: string;
-  headerCommandBar?: EntryCommandBarConfig;
-  lineCommandBar?: EntryCommandBarConfig;
-  lineCommandPolicy?: EntryLineCommandPolicyConfig;
-  linePlacement?: EntryLinePlacementConfig;
-  headerToolbarButtons?: EntryCommandButtonConfig[];
-  lineToolbarButtons?: EntryCommandButtonConfig[];
-  detailToolbarButtons?: EntryCommandButtonConfig[];
-  headerSections?: EntryHeaderSectionConfig[];
+  headerCommandBar?: CommandBarConfig;
+  lineCommandBar?: CommandBarConfig;
+  lineCommandPolicy?: LineCommandPolicyConfig;
+  linePlacement?: LinePlacementConfig;
+  headerToolbarButtons?: CommandConfig[];
+  lineToolbarButtons?: CommandConfig[];
+  detailToolbarButtons?: CommandConfig[];
+  headerSections?: HeaderSectionConfig[];
   headerData?: Record<string, unknown>;
   lineColumns?: LineColumnConfig[];
   lineRows?: Record<string, unknown>[];
-  lineTotals?: EntryLineTotalsConfig;
-  footerSections?: EntryFooterSectionConfig[];
-  attachments?: EntryAttachmentsConfig;
-  factPanelSections?: FactPanelSectionConfig[];
-  statusMessage?: EntryStatusMessage;
+  lineTotals?: LineTotalsConfig;
+  footerSections?: FooterSectionConfig[];
+  attachments?: AttachmentsConfig;
+  factBoxSections?: FactBoxSectionConfig[];
+  statusMessage?: DocumentStatusMessage;
   interactionLocked?: boolean;
 }

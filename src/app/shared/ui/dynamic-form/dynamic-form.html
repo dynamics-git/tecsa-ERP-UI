@@ -6,18 +6,25 @@
           {{ field.label }}
 
           @if (field.type === 'select' || field.type === 'dropdown' || field.type === 'lookup') {
+            @if (field.lookup && !isFieldDisabled(field)) {
+              <input type="search" [attr.aria-label]="'Search ' + field.label" placeholder="Search..."
+                (input)="searchLookup(field, $any($event.target).value)" (focus)="searchLookup(field, $any($event.target).value)" />
+            }
             <select
               [value]="getFieldValue(field)"
               [disabled]="isFieldDisabled(field)"
               (focus)="notifyFieldInteracted(field); notifyDropdownOpened(field)"
               (change)="updateFieldValue(field, resolveSelectValue(field, $any($event.target).value))">
-              @if (showEmptyOption(field)) {
+              @if (!field.required || showEmptyOption(field)) {
                 <option value=""></option>
               }
               @for (option of getFieldOptions(field); track $index) {
                 <option [value]="option.value" [selected]="isOptionSelected(field, option.value)">{{ option.label }}</option>
               }
             </select>
+          } @else if (field.type === 'boolean') {
+            <input type="checkbox" [checked]="data[field.key] === true" [disabled]="isFieldDisabled(field)"
+              (change)="updateFieldValue(field, $any($event.target).checked)" />
           } @else if (field.type === 'textarea') {
             <textarea
               rows="3"
@@ -27,6 +34,7 @@
               (change)="updateFieldValue(field, coerceInputValue(field, $any($event.target).value))"></textarea>
           } @else {
             <input
+              [type]="field.type === 'date' ? 'date' : field.valueType === 'number' ? 'number' : 'text'" step="any"
               [value]="getFieldValue(field)"
               [readOnly]="isFieldDisabled(field)"
               (focus)="notifyFieldInteracted(field)"

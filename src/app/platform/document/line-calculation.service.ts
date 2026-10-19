@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { EntryLineTotalsConfig } from '../models/document-window-config.model';
+import { LineTotalsConfig } from '../models/document-window-config.model';
 import {
   CalculationConfig,
   CalculationRuleConfig,
@@ -15,7 +15,7 @@ export class LineCalculationService {
   private formulaTokens: string[] = [];
   private formulaTokenIndex = 0;
 
-  readonly emptyTotals: EntryLineTotalsConfig = {
+  readonly emptyTotals: LineTotalsConfig = {
     subtotal: '0.00',
     sst: '0.00',
     total: '0.00',
@@ -52,9 +52,9 @@ export class LineCalculationService {
     rows: Record<string, unknown>[],
     config: LineTotalsCalculationConfig,
     headerData?: Record<string, unknown>
-  ): EntryLineTotalsConfig {
+  ): LineTotalsConfig {
     const defaults = config.defaults;
-    const result: EntryLineTotalsConfig = { ...defaults };
+    const result: LineTotalsConfig = { ...defaults };
 
     for (const key of Object.keys(config.totals) as LineTotalKey[]) {
       const expression = config.totals[key];

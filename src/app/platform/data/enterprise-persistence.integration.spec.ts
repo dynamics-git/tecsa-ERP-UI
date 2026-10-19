@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SessionService } from '../../core/services/session.service';
-import { EntrySaveService } from '../../core/services/entry-save.service';
+import { DocumentSaveService } from '../../core/services/document-save.service';
 import { purchaseOrderListConfig } from '../../features/purchasing/purchase-order/purchase-order.config';
 import { DATA_REST_SERVICE, DataRestService } from './data-source.service';
 import { DraftCreateService } from './draft-create.service';
@@ -10,7 +10,7 @@ import { DataSourceService } from './data-source.service';
 
 describe('Enterprise persistence integration', () => {
   let draftCreate: DraftCreateService;
-  let entrySave: EntrySaveService;
+  let entrySave: DocumentSaveService;
   let dataSource: DataSourceService;
   let restMock: DataRestService;
   let postCalls: Array<[string, unknown]>;
@@ -49,7 +49,7 @@ describe('Enterprise persistence integration', () => {
     TestBed.configureTestingModule({
       providers: [
         DraftCreateService,
-        EntrySaveService,
+        DocumentSaveService,
         DataSourceService,
         {
           provide: DATA_REST_SERVICE,
@@ -68,7 +68,7 @@ describe('Enterprise persistence integration', () => {
     });
 
     draftCreate = TestBed.inject(DraftCreateService);
-    entrySave = TestBed.inject(EntrySaveService);
+    entrySave = TestBed.inject(DocumentSaveService);
     dataSource = TestBed.inject(DataSourceService);
   });
 

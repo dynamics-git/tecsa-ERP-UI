@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { PopupSize } from '../../platform/models/popup-config.model';
 import { RunModalStackService } from '../../platform/run-modal/run-modal-stack.service';
 
-export interface CoreDrawerRequest {
+export interface DrawerRequest {
   id?: string;
   title?: string;
   viewId: string;
@@ -15,10 +15,10 @@ export interface CoreDrawerRequest {
 @Injectable({
   providedIn: 'root'
 })
-export class CoreDrawerService {
+export class DrawerService {
   constructor(private readonly popupStack: RunModalStackService) {}
 
-  open(request: CoreDrawerRequest): boolean {
+  open(request: DrawerRequest): boolean {
     const popupId = request.id?.trim() || `drawer-${request.viewId}-${Date.now()}`;
 
     return this.popupStack.open({

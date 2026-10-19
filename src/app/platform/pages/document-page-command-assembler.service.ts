@@ -1,6 +1,7 @@
+import type { CommandConfig } from '../models/command-config.model';
 import { Injectable } from '@angular/core';
 import { DataSourceConfig } from '../models/data-source-config.model';
-import { EntryCommandButtonConfig } from '../models/document-window-config.model';
+
 import { LineConfig } from '../models/line-config.model';
 import { DocumentPageCommandPermissionService } from './document-page-command-permission.service';
 
@@ -10,11 +11,11 @@ import { DocumentPageCommandPermissionService } from './document-page-command-pe
 export class DocumentPageCommandAssemblerService {
   constructor(private readonly popupCommandPermission: DocumentPageCommandPermissionService) {}
 
-  resolveHeaderToolbarButtons(params: { dataSource: DataSourceConfig; toolbarButtons?: EntryCommandButtonConfig[]; pageId: string }): EntryCommandButtonConfig[] {
+  resolveHeaderToolbarButtons(params: { dataSource: DataSourceConfig; toolbarButtons?: CommandConfig[]; pageId: string }): CommandConfig[] {
     const supportsCreate = params.dataSource.supportsCreate !== false;
     const supportsDelete = params.dataSource.supportsDelete !== false;
 
-    const defaults: EntryCommandButtonConfig[] = [
+    const defaults: CommandConfig[] = [
       {
         label: 'New',
         actionKey: 'cmd:new',
@@ -49,7 +50,7 @@ export class DocumentPageCommandAssemblerService {
       .map((button) => this.applyPopupCommandPermission(button, params.pageId));
   }
 
-  resolveLineToolbarButtons(params: { lineConfig?: LineConfig; pageId: string }): EntryCommandButtonConfig[] {
+  resolveLineToolbarButtons(params: { lineConfig?: LineConfig; pageId: string }): CommandConfig[] {
     if (!params.lineConfig) {
       return [];
     }
@@ -57,7 +58,7 @@ export class DocumentPageCommandAssemblerService {
     const supportsCreate = params.lineConfig.dataSource.supportsCreate !== false;
     const supportsDelete = params.lineConfig.dataSource.supportsDelete !== false;
 
-    const defaults: EntryCommandButtonConfig[] = [
+    const defaults: CommandConfig[] = [
       {
         label: 'Line',
         actionKey: 'cmd:line-new',
@@ -89,10 +90,15 @@ export class DocumentPageCommandAssemblerService {
     const configured = (params.lineConfig.toolbarButtons ?? []).map((button) => ({ ...button }));
     return this
       .mergePopupDefaultCommands(defaults, configured)
-      .map((button) => this.applyPopupCommandPermission(button, params.pageId));
+      .map((button) => {
+        const action = this.normalizePopupCommandKey(button.actionKey);
+        const override = action === 'line-new' || action === 'line-insert' ? params.lineConfig?.dataSource.permissions?.create
+          : action === 'line-delete' ? params.lineConfig?.dataSource.permissions?.delete : undefined;
+        return override ? this.popupCommandPermission.applyOperation(button, params.pageId, override) : this.applyPopupCommandPermission(button, params.pageId);
+      });
   }
 
-  resolveDetailToolbarButtons(params: { toolbarButtons?: EntryCommandButtonConfig[]; pageId: string }): EntryCommandButtonConfig[] | undefined {
+  resolveDetailToolbarButtons(params: { toolbarButtons?: CommandConfig[]; pageId: string }): CommandConfig[] | undefined {
     if (!params.toolbarButtons?.length) {
       return params.toolbarButtons;
     }
@@ -102,20 +108,20 @@ export class DocumentPageCommandAssemblerService {
       .map((button) => this.applyPopupCommandPermission(button, params.pageId));
   }
 
-  private applyPopupCommandPermission(button: EntryCommandButtonConfig, pageId: string): EntryCommandButtonConfig {
+  private applyPopupCommandPermission(button: CommandConfig, pageId: string): CommandConfig {
     return this.popupCommandPermission.apply(button, pageId);
   }
 
   private mergePopupDefaultCommands(
-    defaults: EntryCommandButtonConfig[],
-    configured: EntryCommandButtonConfig[],
-  ): EntryCommandButtonConfig[] {
-    const configuredByAction = new Map<string, EntryCommandButtonConfig>();
+    defaults: CommandConfig[],
+    configured: CommandConfig[],
+  ): CommandConfig[] {
+    const configuredByAction = new Map<string, CommandConfig>();
     for (const button of configured) {
       configuredByAction.set(this.normalizePopupCommandKey(button.actionKey), button);
     }
 
-    const merged: EntryCommandButtonConfig[] = defaults.map((fallback) => {
+    const merged: CommandConfig[] = defaults.map((fallback) => {
       const configuredButton = configuredByAction.get(this.normalizePopupCommandKey(fallback.actionKey));
       return configuredButton ? { ...fallback, ...configuredButton } : fallback;
     });

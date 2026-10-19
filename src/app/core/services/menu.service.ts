@@ -2,18 +2,32 @@ import { Injectable } from '@angular/core';
 import { MenuItem, MenuSearchItem } from '../models/menu-item.model';
 import { PermissionService } from './permission.service';
 import { isPageIdRegistered } from './run-modal-config-registry';
+import { runModalPageModules } from '../../features/run-modal-page-modules';
+import { ListPageConfig } from '../../platform/models/page-config.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class MenuService {
-  private readonly items: MenuItem[] = [{
-    pageId: 'purchase', label: 'Purchase', module: 'Purchase', icon: 'bi bi-bag',
-    children: [{
-      pageId: 'purchase-order', label: 'Purchase Order', module: 'Purchase',
-      route: '/purchase-order', icon: 'bi bi-cart-check', group: 'Purchase', permissionKey: 'PO'
-    }]
-  }];
+  private readonly items: MenuItem[] = this.buildConfiguredMenu();
+
+  private buildConfiguredMenu(): MenuItem[] {
+    const modules = new Map<string, MenuItem>();
+    for (const bucket of runModalPageModules) {
+      for (const value of Object.values(bucket)) {
+        const page = value as ListPageConfig | undefined;
+        if (!page?.menu || !page.pageId) continue;
+        const menu = page.menu;
+        let module = modules.get(menu.module);
+        if (!module) {
+          module = { pageId: menu.module.toLowerCase(), label: menu.module, module: menu.module, icon: menu.icon, children: [] };
+          modules.set(menu.module, module);
+        }
+        module.children!.push({ pageId: page.pageId, label: page.title ?? page.pageId, module: menu.module, group: menu.group, route: menu.route, icon: menu.icon });
+      }
+    }
+    return [...modules.values()];
+  }
 
   constructor(private readonly permissionService: PermissionService) {}
 

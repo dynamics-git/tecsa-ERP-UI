@@ -5,7 +5,7 @@ import { FormSectionConfig } from '../models/field-config.model';
 @Injectable({
   providedIn: 'root'
 })
-export class EntryPayloadService {
+export class DocumentPayloadService {
   constructor(private readonly sessionService: SessionService) {}
 
   buildSessionCreatePayload(): Record<string, unknown> {
@@ -57,7 +57,8 @@ export class EntryPayloadService {
           continue;
         }
 
-        payload[field.key] = this.coerceFieldValue(headerData[field.key], field.valueType ?? field.type);
+        payload[field.key] = headerData[field.key] === '' && field.defaultValue === null
+          ? null : this.coerceFieldValue(headerData[field.key], field.valueType ?? field.type);
       }
     }
 

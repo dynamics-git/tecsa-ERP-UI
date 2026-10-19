@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 @Injectable({
   providedIn: 'root',
 })
-export class EntryResponseNormalizerService {
+export class DocumentResponseNormalizerService {
   normalizeSingleRecordResponse(
     response: unknown,
     fallback: Record<string, unknown>,
@@ -19,6 +19,7 @@ export class EntryResponseNormalizerService {
     };
 
     if (this.isRecord(response)) {
+      if (this.isRecord(response['data'])) return { ...fallback, ...response['data'] };
       if (this.isRecord(response['value'])) {
         return mergeWithFallback(response['value']);
       }

@@ -1,4 +1,6 @@
-export type CommandSurface = 'list' | 'header' | 'line' | 'detail' | 'factPanel';
+import type { FieldConfig } from './field-config.model';
+
+export type CommandSurface = 'list' | 'header' | 'line' | 'detail' | 'factBox';
 export type CommandTone = 'primary' | 'normal' | 'danger';
 export type CommandSelectionMode = 'single' | 'multiple';
 export type CommandRunModalTarget = 'list' | 'entry';
@@ -22,6 +24,7 @@ export interface StandardCommandConfig {
 }
 
 export interface CommandConfig {
+  apiAction?: { name: string; payload?: Record<string, unknown>; inputFields?: FieldConfig[]; states?: { field: string; values: unknown[] } };
   id?: string;
   label: string;
   actionKey: string;

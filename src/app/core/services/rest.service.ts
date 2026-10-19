@@ -1,12 +1,12 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
+import { catchError, Observable, of, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { UnicodeNormalizer } from '../utils/unicode-normalizer';
 import { SessionService } from './session.service';
 
 export type RestRequestOptions = {
   suppressGlobalErrorDialog?: boolean;
+  ifMatch?: string;
 };
 
 @Injectable({
@@ -27,7 +27,6 @@ export class RestService {
       switchMap((token) => this.http.get(this.buildUrl(endpoint), {
         headers: this.createHeaders(token)
       })),
-      map((response) => UnicodeNormalizer.normalize(response)),
       catchError((error: HttpErrorResponse) => this.handleError(error, options))
     );
   }
@@ -41,7 +40,6 @@ export class RestService {
       switchMap((token) => this.http.post(this.buildUrl(endpoint), body, {
         headers: this.createHeaders(token)
       })),
-      map((response) => UnicodeNormalizer.normalize(response)),
       catchError((error: HttpErrorResponse) => this.handleError(error, options))
     );
   }
@@ -53,23 +51,21 @@ export class RestService {
 
     return this.getAuthorizationToken().pipe(
       switchMap((token) => this.http.put(this.buildUrl(endpoint), body, {
-        headers: this.createHeaders(token)
+        headers: this.requestHeaders(token, options)
       })),
-      map((response) => UnicodeNormalizer.normalize(response)),
       catchError((error: HttpErrorResponse) => this.handleError(error, options))
     );
   }
 
-  patch(endpoint: string, body: unknown, ifMatchKey = '*', options?: RestRequestOptions): Observable<unknown> {
+  patch(endpoint: string, body: unknown, ifMatchKey?: string, options?: RestRequestOptions): Observable<unknown> {
     if (!environment.apiBaseUrl) {
       return throwError(() => new Error('API base URL is not configured'));
     }
 
     return this.getAuthorizationToken().pipe(
       switchMap((token) => this.http.patch(this.buildUrl(endpoint), body, {
-        headers: this.createHeaders(token).set('If-Match', ifMatchKey)
+        headers: this.requestHeaders(token, { ...options, ifMatch: ifMatchKey })
       })),
-      map((response) => UnicodeNormalizer.normalize(response)),
       catchError((error: HttpErrorResponse) => this.handleError(error, options))
     );
   }
@@ -81,9 +77,8 @@ export class RestService {
 
     return this.getAuthorizationToken().pipe(
       switchMap((token) => this.http.delete(this.buildUrl(endpoint), {
-        headers: this.createHeaders(token)
+        headers: this.requestHeaders(token, options)
       })),
-      map((response) => UnicodeNormalizer.normalize(response)),
       catchError((error: HttpErrorResponse) => this.handleError(error, options))
     );
   }
@@ -112,6 +107,11 @@ export class RestService {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     });
+  }
+
+  private requestHeaders(token: string, options?: RestRequestOptions): HttpHeaders {
+    const headers = this.createHeaders(token);
+    return options?.ifMatch ? headers.set('If-Match', options.ifMatch) : headers;
   }
 
   private handleError(error: HttpErrorResponse, options?: RestRequestOptions): Observable<never> {

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { EntryAttachmentsConfig, DocumentWindowConfig } from '../models/document-window-config.model';
+import { AttachmentsConfig, DocumentWindowConfig } from '../models/document-window-config.model';
 import { ListPageConfig } from '../models/page-config.model';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
@@ -11,7 +11,7 @@ import { RunModalConfigModule, RunModalContext } from './run-modal-config.token'
 export class RunModalConfigAssemblerService {
   private readonly valueMapper = inject(RuntimeValueMapperService);
 
-  buildGenericEntryDialogConfig(params: {
+  buildGenericDocumentWindowConfig(params: {
     module: RunModalConfigModule;
     pageId: string;
     context: RunModalContext;
@@ -52,7 +52,7 @@ export class RunModalConfigAssemblerService {
     const lineRows = this.buildLineRows({ context: params.context });
     const lineTotals = this.buildLineTotals({ source: lineTotalsDefault });
 
-    const entryDialogConfig: DocumentWindowConfig = {
+    const documentWindowConfig: DocumentWindowConfig = {
       pageLabel,
       title,
       headerCommandBar: headerCommandBar as DocumentWindowConfig['headerCommandBar'],
@@ -73,10 +73,10 @@ export class RunModalConfigAssemblerService {
       attachments: attachmentsDefault as DocumentWindowConfig['attachments'],
     };
 
-    return entryDialogConfig;
+    return documentWindowConfig;
   }
 
-  getDefaultAttachments(): EntryAttachmentsConfig {
+  getDefaultAttachments(): AttachmentsConfig {
     return {
       headerFilesCount: 0,
       lineFilesCount: 0,

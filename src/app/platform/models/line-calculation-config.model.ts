@@ -1,6 +1,6 @@
-import type { EntryLineTotalsConfig } from './document-window-config.model';
+import type { LineTotalsConfig } from './document-window-config.model';
 
-export type LineTotalKey = keyof EntryLineTotalsConfig;
+export type LineTotalKey = keyof LineTotalsConfig;
 
 export type LineTotalExpressionConfig =
   | { kind: 'sum'; field: string }
@@ -10,7 +10,7 @@ export type LineTotalExpressionConfig =
   | { formula: string; precision?: number };
 
 export interface LineTotalsCalculationConfig {
-  defaults: EntryLineTotalsConfig;
+  defaults: LineTotalsConfig;
   totals: Partial<Record<LineTotalKey, LineTotalExpressionConfig>>;
   format?: {
     type?: 'number' | 'currency';

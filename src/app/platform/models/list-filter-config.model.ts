@@ -1,6 +1,6 @@
 export type FilterOperator = 'contains' | 'startswith' | 'eq' | 'ge' | 'le';
 
-export interface FilterField {
+export interface ListFilterFieldConfig {
   field: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'dropdown';
@@ -16,5 +16,5 @@ export interface FilterField {
 export interface ListFilterConfig {
   enabled: boolean;
   storageKey?: string;
-  fields?: FilterField[];
+  fields?: ListFilterFieldConfig[];
 }

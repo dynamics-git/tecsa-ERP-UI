@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { LineColumnConfig, LineConfig } from '../models/line-config.model';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
+import { DataSourceService } from '../data/data-source.service';
 
 export type DocumentPageResolvedLineDataSource = {
   dataSource: DataSourceConfig;
@@ -16,6 +17,7 @@ export type DocumentPageLineValueType = 'text' | 'number' | 'boolean' | 'date';
 })
 export class DocumentPageDataSourceResolverService {
   private readonly valueMapper = inject(RuntimeValueMapperService);
+  private readonly data = inject(DataSourceService);
 
   buildLineFilter(params: {
     header: Record<string, unknown>;
@@ -108,7 +110,7 @@ export class DocumentPageDataSourceResolverService {
     return {
       dataSource: {
         ...baseDataSource,
-        endpoint: `${parentEndpoint}(${params.toODataId(parentId)})/${childCollection}`,
+        ...this.data.relation(baseDataSource, params.header),
       },
       lineContextReady: true,
     };

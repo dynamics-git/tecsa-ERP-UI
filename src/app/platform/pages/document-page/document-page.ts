@@ -3,19 +3,12 @@
 // Future refactor should split loading, popup orchestration, line runtime,
 // autosave, and command handling into smaller services.
 // Do not change behavior during this cleanup.
-import { ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
-import { Observable, Subscription, forkJoin, from, of } from 'rxjs';
+import { ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject, forwardRef } from '@angular/core';
+import { Observable, Subscription, forkJoin, from, of, firstValueFrom } from 'rxjs';
 import { catchError, map, timeout } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
-import {
-  EntryAttachmentsConfig,
-  EntryCommandButtonConfig,
-  DocumentWindowConfig,
-  EntryHeaderConfig,
-  EntryLineTotalsConfig,
-  EntryStatusMessage,
-} from '../../models/document-window-config.model';
+import { AttachmentsConfig, DocumentWindowConfig, HeaderConfig, LineTotalsConfig, DocumentStatusMessage } from '../../models/document-window-config.model';
 import { LineColumnConfig, LineConfig } from '../../models/line-config.model';
 import { CommandConfig } from '../../models/command-config.model';
 import { ListCommandSelectionMode, ListPageConfig } from '../../models/page-config.model';
@@ -29,12 +22,12 @@ import { ApiErrorService } from '../../data/api-error.service';
 import { ConfirmationService } from '../../../shared/ui/confirmation.service';
 import { DataSourceService } from '../../data/data-source.service';
 import { DraftCreateService } from '../../data/draft-create.service';
-import { EntryConfigDataService } from '../../data/entry-config-data.service';
-import { EntryPayloadService } from '../../data/entry-payload.service';
-import { EntryRecordService } from '../../data/entry-record.service';
-import { EntryHydrationOrchestratorService } from '../../data/entry-hydration-orchestrator.service';
-import { EntryResponseNormalizerService } from '../../data/entry-response-normalizer.service';
-import { EntryStateService } from '../../data/entry-state.service';
+import { DocumentConfigDataService } from '../../data/document-config-data.service';
+import { DocumentPayloadService } from '../../data/document-payload.service';
+import { DocumentRecordService } from '../../data/document-record.service';
+import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
+import { DocumentResponseNormalizerService } from '../../data/document-response-normalizer.service';
+import { DocumentStateService } from '../../data/document-state.service';
 import { FieldValidationService } from '../../document/field-validation.service';
 import { LineCommandService } from '../../document/line-command.service';
 import { LineMasterRegistry, LineMasterService } from '../../data/line-master.service';
@@ -54,6 +47,7 @@ import { DocumentPageListLifecycleContext, DocumentPageListLifecycleService } fr
 import { RuntimeValueMapperService } from '../../data/runtime-value-mapper.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
 import { RunModalService } from '../../run-modal/run-modal.service';
+import { DocumentWindow } from '../../document/document-window/document-window';
 
 type RequiredListConfig = ListPageConfig & { dataSource: DataSourceConfig };
 type SelectOption = { label: string; value: string };
@@ -82,7 +76,7 @@ export interface DocumentPageCommandEvent {
 @Component({
   selector: 'app-document-page',
   standalone: true,
-  imports: [ListPage, ListFilterPanel, RunModalHost],
+  imports: [ListPage, ListFilterPanel, forwardRef(() => RunModalHost), DocumentWindow],
   templateUrl: './document-page.html',
 })
 export class DocumentPage implements OnInit, OnDestroy {
@@ -90,12 +84,12 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly dataSource = inject(DataSourceService);
   private readonly draftCreate = inject(DraftCreateService);
-  private readonly entryConfigData = inject(EntryConfigDataService);
-  private readonly entryPayload = inject(EntryPayloadService);
-  private readonly entryRecord = inject(EntryRecordService);
-  private readonly entryHydration = inject(EntryHydrationOrchestratorService);
-  private readonly entryResponseNormalizer = inject(EntryResponseNormalizerService);
-  private readonly entryState = inject(EntryStateService);
+  private readonly documentConfigData = inject(DocumentConfigDataService);
+  private readonly documentPayload = inject(DocumentPayloadService);
+  private readonly documentRecord = inject(DocumentRecordService);
+  private readonly documentHydration = inject(DocumentHydrationOrchestratorService);
+  private readonly documentResponseNormalizer = inject(DocumentResponseNormalizerService);
+  private readonly documentState = inject(DocumentStateService);
   private readonly fieldValidation = inject(FieldValidationService);
   private readonly apiError = inject(ApiErrorService);
   private readonly lineMasters = inject(LineMasterService);
@@ -123,19 +117,25 @@ export class DocumentPage implements OnInit, OnDestroy {
   @Input({ required: true }) pageId = 'document';
   @Input() listConfig: RequiredListConfig = {} as RequiredListConfig;
   @Input() setupConfig?: RequiredListConfig;
-  @Input({ required: true }) headerConfig!: EntryHeaderConfig;
+  @Input({ required: true }) headerConfig!: HeaderConfig;
   @Input() lineConfig?: LineConfig;
+  @Input() documentOnly = false;
+  @Input() initialRecord?: Record<string, unknown>;
+  @Output() closeRequested = new EventEmitter<void>();
   @Output() businessCommand = new EventEmitter<DocumentPageCommandEvent>();
 
   error?: string;
   hasMore = true;
+  private nextCursor?: string;
   rows: unknown[] = [];
   selectedRow?: unknown;
 
   private listLoadSubscription?: Subscription;
   private filterReloadTimer?: ReturnType<typeof setTimeout>;
   private pendingFirstPageReload = false;
-  private activeEntryDialogConfig?: DocumentWindowConfig;
+  private savingEntry = false;
+  private dirty = false;
+  private activeDocumentWindowConfig?: DocumentWindowConfig;
   private optionFieldMap: Record<string, SelectOption[]> = {};
   private headerDropdownRecords: Record<string, Record<string, unknown>[]> = {};
   private lineMasterRecordsByType: Record<string, Record<string, unknown>[]> = {};
@@ -194,8 +194,13 @@ export class DocumentPage implements OnInit, OnDestroy {
       throw new Error('DocumentPage requires listConfig or setupConfig with dataSource.');
     }
 
+    if (this.documentOnly) {
+      this.openEntry();
+      return;
+    }
     this.actionDispatcher.setPageCommands(this.listConfig.commands ?? []);
     this.actionDispatcher.setPageContext({
+      pageId: this.pageId,
       title: this.listConfig.title,
       module: this.listConfig.module,
       company: this.listConfig.company,
@@ -210,26 +215,32 @@ export class DocumentPage implements OnInit, OnDestroy {
       this.listConfig,
       this.listConfig.dataSource.defaultFilter,
     );
-    this.loadFirstPage();
+    if (this.listConfig.dataSource.singleton) this.openEntry();
+    else this.loadFirstPage();
 
     this.subscriptions.add(
       this.actionDispatcher.action$.subscribe((event) => this.handleCommand(event)),
     );
+    this.subscriptions.add(this.runModal.entriesChanged$.subscribe(pageId => {
+      if (pageId === this.pageId && !this.listConfig.dataSource.singleton) this.loadFirstPage(true);
+    }));
   }
 
   ngOnDestroy(): void {
-    this.actionDispatcher.clearPageCommands();
-    this.actionDispatcher.clearPageContext();
+    if (!this.documentOnly) {
+      this.actionDispatcher.clearPageCommands();
+      this.actionDispatcher.clearPageContext();
+    }
     this.listLoadSubscription?.unsubscribe();
     this.stopListLoading();
     this.stopPopupLoading();
     this.clearFilterReloadTimer();
-    this.entryState.clearAutosave(this.pageId);
+    this.documentState.clearAutosave(this.pageId);
     this.subscriptions.unsubscribe();
   }
 
   handlePopupAction(event: { popupId: string; actionKey: string; payload?: unknown }): void {
-    this.entryState.handleEntryPopupAction(
+    this.documentState.handleEntryPopupAction(
       event,
       this.entryPopupId,
       {
@@ -248,26 +259,26 @@ export class DocumentPage implements OnInit, OnDestroy {
         },
       },
       {
-        entryDialogConfig: this.activeEntryDialogConfig,
+        documentWindowConfig: this.activeDocumentWindowConfig,
         lineConfig: this.lineConfig,
       },
     );
   }
 
-  handlePopupClosed(event: { popupId: string; entryDialogConfig?: DocumentWindowConfig }): void {
+  handlePopupClosed(event: { popupId: string; documentWindowConfig?: DocumentWindowConfig }): void {
     if (event.popupId !== this.entryPopupId) {
       return;
     }
 
-    if (this.isRecord(event.entryDialogConfig?.headerData) && !this.pendingListSyncRecord) {
-      this.pendingListSyncRecord = this.buildListSyncRecord(event.entryDialogConfig.headerData);
+    if (this.isRecord(event.documentWindowConfig?.headerData) && !this.pendingListSyncRecord) {
+      this.pendingListSyncRecord = this.buildListSyncRecord(event.documentWindowConfig.headerData);
     }
 
     this.applyDeferredListSync();
   }
 
-  get inlineEntryDialogConfig(): DocumentWindowConfig | undefined {
-    return this.activeEntryDialogConfig;
+  get inlineDocumentWindowConfig(): DocumentWindowConfig | undefined {
+    return this.activeDocumentWindowConfig;
   }
 
   get isInlineEntryPage(): boolean {
@@ -280,6 +291,15 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   handleCommand(event: { actionKey: string; payload?: unknown }): void {
+    if (this.listConfig.dataSource.singleton) {
+      if (event.actionKey === 'refresh') this.openEntry();
+      return;
+    }
+    if (event.actionKey === 'sortChanged' && this.isRecord(event.payload)) {
+      this.listConfig = { ...this.listConfig, dataSource: { ...this.listConfig.dataSource, defaultSort: String(event.payload['sort']) } };
+      this.loadFirstPage(true);
+      return;
+    }
     if (this.listFilterState.applyCommand(this.listFilterScope, event.actionKey, event.payload)) {
       if (event.actionKey === 'filterChanged') {
         this.scheduleFilterReload();
@@ -304,67 +324,35 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   openRecord(row: unknown, preserveLoader = false): void {
-    if (preserveLoader) {
-      this.runModalLoading.setMessage(
-        this.popupLoadingScope,
-        `Loading ${this.documentLabel.toLowerCase()}...`,
-      );
-    }
-
-    this.startPopupLoading(`Loading ${this.documentLabel.toLowerCase()}...`);
-
-    const hasPersistedId = this.hasPersistedIdentity(row);
-    this.pendingDraftCreateFromNew =
-      !hasPersistedId &&
-      Boolean(this.listConfig.dataSource.autoGenerateNumber) &&
-      Boolean(this.listConfig.dataSource.lazyCreateOnFirstInput);
-    this.autosaveDeferredUntilDraftCreate = false;
-    this.pendingListSyncRecord = undefined;
-
-    if (!this.isRecord(row)) {
-      this.openDocumentPopup(row, []);
+    if (!this.documentOnly && !this.listConfig.dataSource.singleton) {
+      void this.runModal.open({ pageId: this.pageId, target: 'entry', context: { headerData: this.isRecord(row) ? row : {} }, allowNested: true }).then(opened => {
+        if (!opened) { this.error = this.runModal.getLastOpenFailureReason(); this.changeDetector.detectChanges(); }
+      });
       this.stopPopupLoading();
       return;
     }
-
-    this.openDocumentPopup(row, []);
-    if (hasPersistedId && this.activeEntryDialogConfig) {
-      // Existing records must not render synthetic line placeholders before hydration completes.
-      const headerData = this.activeEntryDialogConfig.headerData ?? {};
-      this.activeEntryDialogConfig.lineRows = [];
-      this.activeEntryDialogConfig.lineTotals = this.buildLineTotals([], headerData);
-      this.changeDetector.detectChanges();
-    }
-    this.startCardLineLoading();
-
-    let lineHydrationStarted = false;
-    if (hasPersistedId && this.canHydrateOpenedDocumentLinesFromHeader(row)) {
-      lineHydrationStarted = true;
-      this.hydrateOpenedDocumentLines(row);
-    }
-
-    this.subscriptions.add(
-      this.loadHeaderRecord(row)
-        .pipe(
-          timeout(this.timeoutPolicy.hydrationTimeoutMs),
-        )
-        .subscribe({
-          next: (headerRecord) => {
-            const hydratedHeaderData = this.applyHydratedHeaderRecord(headerRecord);
-            if (!lineHydrationStarted) {
-              lineHydrationStarted = true;
-              this.hydrateOpenedDocumentLines(hydratedHeaderData);
-            }
-          },
-          error: () => {
-            if (!lineHydrationStarted) {
-              this.finishCardLineLoading(true);
-            }
-          },
-        }),
-    );
+    const record = this.isRecord(row) ? row : this.buildNewHeaderSeed();
+    const persisted = this.hasPersistedIdentity(record);
+    this.pendingDraftCreateFromNew = !persisted && !!this.listConfig.dataSource.autoGenerateNumber && !!this.listConfig.dataSource.lazyCreateOnFirstInput;
+    this.autosaveDeferredUntilDraftCreate = false;
+    this.pendingListSyncRecord = undefined;
+    this.openDocumentPopup(record, []);
+    if (!persisted) { this.stopPopupLoading(); return; }
+    if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.lineRows = [];
+    this.startPopupLoading('Loading document...');
+    this.subscriptions.add(this.loadHeaderRecord(record).pipe(timeout(this.timeoutPolicy.hydrationTimeoutMs)).subscribe({
+      next: header => {
+        const hydrated = this.applyHydratedHeaderRecord(header);
+        this.hydrateOpenedDocumentLines(hydrated);
+      },
+      error: error => {
+        this.stopPopupLoading();
+        if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.interactionLocked = true;
+        this.setEntryStatus({ tone: 'error', title: 'Load failed', message: this.getErrorMessage(error) });
+        this.changeDetector.detectChanges();
+      },
+    }));
   }
-
   private canHydrateOpenedDocumentLinesFromHeader(header: Record<string, unknown>): boolean {
     if (!this.lineConfig) {
       return false;
@@ -375,7 +363,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private applyHydratedHeaderRecord(headerRecord: Record<string, unknown>): Record<string, unknown> {
-    const currentConfig = this.activeEntryDialogConfig;
+    const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig) {
       return this.buildHeaderData(headerRecord);
     }
@@ -384,6 +372,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     currentConfig.headerData = nextHeaderData;
     currentConfig.subtitle = this.buildSubtitle(nextHeaderData, headerRecord);
     currentConfig.title = this.getDocumentTitle(headerRecord);
+    this.refreshEntryPolicy();
     this.changeDetector.detectChanges();
     return nextHeaderData;
   }
@@ -410,7 +399,7 @@ export class DocumentPage implements OnInit, OnDestroy {
         .subscribe({
           next: (response) => {
             const records = this.toRecords(response);
-            const currentConfig = this.activeEntryDialogConfig;
+            const currentConfig = this.activeDocumentWindowConfig;
             if (!currentConfig?.headerData || !this.lineConfig) {
               return;
             }
@@ -423,11 +412,11 @@ export class DocumentPage implements OnInit, OnDestroy {
             this.applyLineOptions(currentConfig.lineRows);
             this.changeDetector.detectChanges();
 
-            this.expandLineRowsInBackground(headerData, records.length);
+
             finishLineLoad(false);
           },
           error: () => {
-            this.expandLineRowsInBackground(headerData, 0);
+
             finishLineLoad(true);
           },
           complete: () => {
@@ -438,7 +427,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private startCardLineLoading(): void {
-    const currentConfig = this.activeEntryDialogConfig;
+    const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig || !this.lineConfig) {
       return;
     }
@@ -447,7 +436,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private finishCardLineLoading(failed = false): void {
-    const currentConfig = this.activeEntryDialogConfig;
+    const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig) {
       this.stopPopupLoading();
       return;
@@ -455,6 +444,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     this.stopPopupLoading();
 
+    currentConfig.interactionLocked = failed;
     currentConfig.statusMessage = failed
       ? {
           tone: 'warning',
@@ -471,8 +461,8 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private hydrateOpenEntryOptions(): void {
-    const entryDialogConfig = this.activeEntryDialogConfig;
-    if (!entryDialogConfig) {
+    const documentWindowConfig = this.activeDocumentWindowConfig;
+    if (!documentWindowConfig) {
       return;
     }
 
@@ -491,8 +481,8 @@ export class DocumentPage implements OnInit, OnDestroy {
             this.lineMasterOptionsByType = masters.lineMasterOptionsByType;
             this.optionFieldMap = masters.optionFieldMap;
             this.setHeaderDropdownRecords(headerDropdownOptions);
-            this.applyHeaderDropdownOptions(entryDialogConfig);
-            this.applyLineOptions(entryDialogConfig.lineRows ?? []);
+            this.applyHeaderDropdownOptions(documentWindowConfig);
+            this.applyLineOptions(documentWindowConfig.lineRows ?? []);
             this.changeDetector.detectChanges();
           },
           error: () => {},
@@ -511,7 +501,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return of(row);
     }
 
-    return from(this.entryHydration.loadHeaderById(
+    return from(this.documentHydration.loadHeaderById(
       this.listConfig.dataSource,
       recordId,
       row,
@@ -525,7 +515,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     response: unknown,
     fallback: Record<string, unknown>,
   ): Record<string, unknown> {
-    return this.entryResponseNormalizer.normalizeSingleRecordResponse(response, fallback);
+    return this.documentResponseNormalizer.normalizeSingleRecordResponse(response, fallback);
   }
 
   loadNextPage(): void {
@@ -540,19 +530,115 @@ export class DocumentPage implements OnInit, OnDestroy {
     return `${this.pageId}-entry`;
   }
 
+  private openEntry(): void {
+    if (!this.listConfig.dataSource.singleton) {
+      this.openRecord(this.initialRecord ?? this.buildNewHeaderSeed());
+      return;
+    }
+    this.openDocumentPopup(this.buildNewHeaderSeed(), []);
+    this.startPopupLoading('Loading setup...');
+    this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource).subscribe({
+      next: record => {
+        this.applyHydratedHeaderRecord(this.isRecord(record) ? record : {});
+        this.stopPopupLoading();
+      },
+      error: error => {
+        this.stopPopupLoading();
+        if (error?.status !== 404) this.setEntryStatus({ tone: 'error', title: 'Load failed', message: this.getErrorMessage(error) });
+        this.changeDetector.detectChanges();
+      },
+    }));
+  }
+
+  handleInlineAction(event: { actionKey: string; payload?: unknown }): void {
+    this.handlePopupAction({ ...event, popupId: this.entryPopupId });
+  }
+
+  async requestClose(): Promise<void> {
+    if (this.savingEntry || this.popupLoading) return;
+    if (this.dirty) {
+      const confirmed = await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and close this page?' });
+      if (!confirmed) return;
+    }
+    this.closeRequested.emit();
+  }
+
+  private async saveEntry(): Promise<boolean> {
+    const config = this.activeDocumentWindowConfig;
+    if (!config?.headerData || this.savingEntry) return false;
+    const header = config.headerData;
+    const source = this.listConfig.dataSource;
+    if (!this.canModifyPage() || !this.dataSource.canWrite(source, header)) return false;
+    for (const section of this.headerConfig.sections) {
+      for (const field of section.fields) {
+        if (field.readonly || field.disabled) continue;
+        const validation = this.fieldValidation.validateField(field, header[field.key]);
+        if (!validation.valid) {
+          this.setEntryStatus({ tone: 'error', title: 'Check required fields', message: validation.errors.join(' ') });
+          this.changeDetector.detectChanges();
+          return false;
+        }
+      }
+    }
+    this.savingEntry = true;
+    this.startPopupLoading('Saving changes...');
+    try {
+      const id = this.resolvePersistedRecordId(header, source);
+      const payload = id || source.singleton
+        ? this.documentPayload.buildHeaderUpdatePayload(header, this.headerConfig.sections)
+        : this.documentPayload.buildHeaderCreatePayload(header, this.headerConfig.sections);
+      const saved = await firstValueFrom(id || source.singleton ? this.dataSource.update(source, id, payload, header['systemRowVersion']) : this.dataSource.create(source, payload));
+      if (this.isRecord(saved)) Object.assign(header, saved);
+      if (this.lineConfig) {
+        const lineSource = this.dataSource.relation(this.lineConfig.dataSource, header);
+        for (const row of config.lineRows ?? []) {
+          const lineId = this.resolvePersistedRecordId(row, lineSource);
+          if (!this.hasValue(lineId) && this.isLineRowMeaningfullyEmpty(row)) continue;
+          const required = lineSource.requiredCreateFields ?? [];
+          if (!lineId && required.some(field => !this.hasValue(row[field]))) throw new Error('Complete the required line fields before saving.');
+          const linePayload = lineId
+            ? this.documentConfigData.buildLineUpdatePayload(row, lineSource.updateFields ?? this.lineConfig.columns.filter(column => !column.readonly).map(column => column.field ?? column.id), this.lineConfig)
+            : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
+          if (!linePayload) throw new Error('Complete the required line fields before saving.');
+          const line = await firstValueFrom(lineId ? this.dataSource.update(lineSource, lineId, linePayload, row['systemRowVersion']) : this.dataSource.create(lineSource, linePayload));
+          if (this.isRecord(line)) Object.assign(row, line);
+        }
+      }
+      this.pendingDraftCreateFromNew = false;
+      this.refreshEntryPolicy();
+      this.dirty = false;
+      if (!source.singleton) {
+        const fresh = await firstValueFrom(this.loadHeaderRecord(header));
+        Object.assign(header, fresh);
+        this.refreshEntryPolicy();
+      }
+      this.stageListSyncFromActiveHeader();
+      this.stopPopupLoading();
+      this.setEntryStatus({ tone: 'success', title: 'Saved', message: 'Changes saved.' });
+      this.ensureTrailingEmptyRows();
+      this.changeDetector.detectChanges();
+      return true;
+    } catch (error) {
+      this.stopPopupLoading();
+      this.setEntryStatus({ tone: 'error', title: 'Save failed', message: this.getErrorMessage(error) });
+      this.changeDetector.detectChanges();
+      return false;
+    } finally { this.savingEntry = false; }
+  }
+
   private get documentLabel(): string {
     return this.headerConfig.dialogTitle || this.listConfig.title || 'Document';
   }
 
   private get headerFieldValueTypeMap() {
-    return this.entryState.buildFieldValueTypeMap(this.headerConfig.sections);
+    return this.documentState.buildFieldValueTypeMap(this.headerConfig.sections);
   }
 
   private get headerFieldConfigMap() {
-    return this.entryState.buildFieldConfigMap(this.headerConfig.sections);
+    return this.documentState.buildFieldConfigMap(this.headerConfig.sections);
   }
 
-  private get defaultAttachments(): EntryAttachmentsConfig {
+  private get defaultAttachments(): AttachmentsConfig {
     return this.headerConfig.attachmentsDefault ?? {
       headerFilesCount: 0,
       lineFilesCount: 0,
@@ -563,11 +649,16 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private openDocumentPopup(row: unknown, lineRows: unknown[]): void {
-    const entryDialogConfig = this.buildEntryDialogConfig(row, lineRows);
-    this.activeEntryDialogConfig = entryDialogConfig;
+    const documentWindowConfig = this.buildDocumentWindowConfig(row, lineRows);
+    this.activeDocumentWindowConfig = documentWindowConfig;
+    this.refreshEntryPolicy();
     this.activeLineRow = undefined;
     this.selectedLineIndexes = [];
 
+    if (this.documentOnly || this.listConfig.dataSource.singleton) {
+      this.ensureTrailingEmptyRows();
+      return;
+    }
     this.popupStack.open({
       id: this.entryPopupId,
       title: this.getDocumentTitle(row),
@@ -576,7 +667,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       allowNested: true,
       closeOnBackdrop: !this.isSetupPage,
       data: {
-        entryDialogConfig,
+        documentWindowConfig,
       },
     });
 
@@ -678,12 +769,12 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private applyHeaderDropdownOptionsToActiveEntry(): void {
-    const entryDialogConfig = this.activeEntryDialogConfig;
-    if (!entryDialogConfig) {
+    const documentWindowConfig = this.activeDocumentWindowConfig;
+    if (!documentWindowConfig) {
       return;
     }
 
-    this.applyHeaderDropdownOptions(entryDialogConfig);
+    this.applyHeaderDropdownOptions(documentWindowConfig);
     this.changeDetector.detectChanges();
   }
 
@@ -738,7 +829,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private applyLineOptionsToActiveRows(row?: Record<string, unknown>): void {
-    const currentConfig = this.activeEntryDialogConfig;
+    const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig?.lineRows) {
       return;
     }
@@ -806,8 +897,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     const initialTop = this.resolveInitialLineFetchTop(resolved.dataSource);
-    return from(this.entryHydration.loadLineRowsForHeader(
-      resolved.dataSource,
+    return from(this.documentHydration.loadLineRowsForHeader(
+      this.lineConfig.dataSource,
       header,
       {
         timeoutMs: this.timeoutPolicy.hydrationTimeoutMs,
@@ -822,7 +913,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     header: Record<string, unknown>,
     initialCount: number,
   ): void {
-    if (!this.lineConfig || !this.activeEntryDialogConfig?.headerData) {
+    if (!this.lineConfig || !this.activeDocumentWindowConfig?.headerData) {
       return;
     }
 
@@ -839,9 +930,9 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     const pageType = this.toText(this.listConfig.pageType).trim().toLowerCase();
 
-    const baselineCount = this.activeEntryDialogConfig.lineRows?.length ?? 0;
+    const baselineCount = this.activeDocumentWindowConfig.lineRows?.length ?? 0;
     this.subscriptions.add(
-      from(this.entryHydration.loadLineRowsForHeader(
+      from(this.documentHydration.loadLineRowsForHeader(
         resolved.dataSource,
         header,
         {
@@ -853,7 +944,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       ))
         .pipe(catchError(() => of([])))
         .subscribe((response) => {
-          const currentConfig = this.activeEntryDialogConfig;
+          const currentConfig = this.activeDocumentWindowConfig;
           if (!currentConfig?.headerData) {
             return;
           }
@@ -887,7 +978,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     return Math.max(this.resolveInitialLineFetchTop(dataSource), 200);
   }
 
-  private buildEntryDialogConfig(row?: unknown, lineSource?: unknown[]): DocumentWindowConfig {
+  private buildDocumentWindowConfig(row?: unknown, lineSource?: unknown[]): DocumentWindowConfig {
     const record = this.isRecord(row) ? row : {};
     const documentNoField = this.listConfig.dataSource.documentNoField;
     const orderNumber = documentNoField ? this.toText(record[documentNoField]) || 'New' : 'New';
@@ -919,7 +1010,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     };
   }
 
-  private resolvePopupHeaderToolbarButtons(): EntryCommandButtonConfig[] {
+  private resolvePopupHeaderToolbarButtons(): CommandConfig[] {
     return this.commandAssembler.resolveHeaderToolbarButtons({
       dataSource: this.listConfig.dataSource,
       toolbarButtons: this.headerConfig.toolbarButtons,
@@ -927,14 +1018,65 @@ export class DocumentPage implements OnInit, OnDestroy {
     });
   }
 
-  private resolvePopupLineToolbarButtons(): EntryCommandButtonConfig[] {
+  private canModifyPage(): boolean {
+    const creating = !this.listConfig.dataSource.singleton && !this.hasPersistedIdentity(this.activeDocumentWindowConfig?.headerData);
+    return this.sessionService.SuperAdmin || this.sessionService.Permissions.some(value => {
+      const grant = value as Record<string, unknown>;
+      return grant?.['pageId'] === this.pageId && grant[creating ? 'canCreate' : 'canUpdate'] === true;
+    });
+  }
+
+  private refreshEntryPolicy(): void {
+    const entry = this.activeDocumentWindowConfig;
+    if (!entry) return;
+    const persisted = this.hasPersistedIdentity(entry.headerData);
+    const supported = persisted || this.listConfig.dataSource.singleton ? this.listConfig.dataSource.supportsUpdate !== false : this.listConfig.dataSource.supportsCreate !== false;
+    const editable = supported && this.canModifyPage() && this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {});
+    entry.headerSections = this.headerConfig.sections.map(section => ({ ...section, fields: section.fields.map(field => ({ ...field, readonly: field.readonly || !editable || (!!field.readonlyAfterCreate && this.hasPersistedIdentity(entry.headerData)) })) }));
+    entry.lineColumns = this.lineConfig?.columns.map(column => ({ ...column, readonly: column.readonly || !editable })) ?? [];
+    entry.headerToolbarButtons = this.resolvePopupHeaderToolbarButtons().map(button => ({ ...button,
+      hidden: button.hidden || (this.listConfig.dataSource.singleton && ['cmd:new', 'cmd:delete'].includes(button.actionKey)),
+      disabled: button.disabled || (['cmd:save', 'cmd:apply'].includes(button.actionKey) && !editable) ||
+        (!!button.apiAction && !persisted) ||
+        (!!button.apiAction?.states && !button.apiAction.states.values.includes(entry.headerData?.[button.apiAction.states.field])),
+    }));
+    entry.lineToolbarButtons = this.resolvePopupLineToolbarButtons().map(button => ({ ...button, disabled: button.disabled || !editable }));
+  }
+
+  private async executeConfiguredAction(button: CommandConfig): Promise<void> {
+    const action = button.apiAction;
+    const header = this.activeDocumentWindowConfig?.headerData;
+    if (!action || !header || button.disabled) return;
+    if (this.dirty) {
+      this.setEntryStatus({ tone: 'warning', title: 'Save changes', message: 'Save your changes before running this action.' });
+      this.changeDetector.detectChanges();
+      return;
+    }
+    const input = action.inputFields?.length ? await this.confirmation.prompt(button.label, action.inputFields) : {};
+    if (!input) return;
+    this.startPopupLoading('Processing...');
+    try {
+      const record = await firstValueFrom(this.dataSource.execute(this.listConfig.dataSource, this.resolvePersistedRecordId(header, this.listConfig.dataSource), action.name, { ...action.payload, ...input }));
+      if (this.isRecord(record)) this.applyHydratedHeaderRecord(record);
+      this.stopPopupLoading();
+      this.stageListSyncFromActiveHeader();
+      this.refreshEntryPolicy();
+      this.setEntryStatus({ tone: 'success', title: 'Completed', message: `${button.label} completed.` });
+    } catch (error) {
+      this.stopPopupLoading();
+      this.setEntryStatus({ tone: 'error', title: 'Action failed', message: this.getErrorMessage(error) });
+    }
+    this.changeDetector.detectChanges();
+  }
+
+  private resolvePopupLineToolbarButtons(): CommandConfig[] {
     return this.commandAssembler.resolveLineToolbarButtons({
       lineConfig: this.lineConfig,
       pageId: this.listConfig.pageId || this.pageId,
     });
   }
 
-  private resolvePopupDetailToolbarButtons(): EntryCommandButtonConfig[] | undefined {
+  private resolvePopupDetailToolbarButtons(): CommandConfig[] | undefined {
     return this.commandAssembler.resolveDetailToolbarButtons({
       toolbarButtons: this.headerConfig.detailToolbarButtons,
       pageId: this.listConfig.pageId || this.pageId,
@@ -982,7 +1124,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private buildHeaderData(record: Record<string, unknown>): Record<string, unknown> {
-    return this.entryConfigData.buildHeaderData(
+    return this.documentConfigData.buildHeaderData(
       record,
       this.headerConfig.sections,
       this.headerDropdownRecords,
@@ -997,7 +1139,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return [];
     }
 
-    return this.entryConfigData.buildLineRows(
+    return this.documentConfigData.buildLineRows(
       this.lineConfig,
       headerData,
       lines,
@@ -1009,15 +1151,15 @@ export class DocumentPage implements OnInit, OnDestroy {
   private buildLineTotals(
     lineRows: Record<string, unknown>[],
     headerData: Record<string, unknown>,
-  ): EntryLineTotalsConfig {
+  ): LineTotalsConfig {
     if (!this.lineConfig) {
       return this.emptyTotals();
     }
 
-    return this.entryState.calculateLineTotals(lineRows, headerData, this.lineConfig);
+    return this.documentState.calculateLineTotals(lineRows, headerData, this.lineConfig);
   }
 
-  private emptyTotals(): EntryLineTotalsConfig {
+  private emptyTotals(): LineTotalsConfig {
     return {
       subtotal: '0.00',
       sst: '0.00',
@@ -1153,11 +1295,12 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleLineChanged(payload: unknown): void {
+    this.dirty = true;
     if (!this.lineConfig) {
       return;
     }
 
-    const change = this.entryState.resolveLineChange(payload);
+    const change = this.documentState.resolveLineChange(payload);
     if (!change) {
       return;
     }
@@ -1206,14 +1349,15 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     this.selectedLineIndexes = this.lineCommands.planDeleteRequest({
-      lineRows: this.activeEntryDialogConfig?.lineRows ?? [],
+      lineRows: this.activeDocumentWindowConfig?.lineRows ?? [],
       payload,
       selectedIndexes: this.selectedLineIndexes,
     }).selectedIndexes;
   }
 
   private handleHeaderChanged(payload: unknown): void {
-    if (!this.isRecord(payload) || !this.activeEntryDialogConfig?.headerData) {
+    this.dirty = true;
+    if (!this.isRecord(payload) || !this.activeDocumentWindowConfig?.headerData) {
       return;
     }
 
@@ -1221,8 +1365,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     const fieldConfig = this.headerFieldConfigMap[fieldKey];
     const validation = this.fieldValidation.validateField(fieldConfig, payload['value']);
     if (!validation.valid) {
-      const rolledBack = this.entryState.rollbackHeaderFieldChange(
-        this.activeEntryDialogConfig.headerData,
+      const rolledBack = this.documentState.rollbackHeaderFieldChange(
+        this.activeDocumentWindowConfig.headerData,
         payload,
         this.headerFieldValueTypeMap,
       );
@@ -1239,8 +1383,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     this.clearEntryStatus();
-    const changed = this.entryState.applyHeaderFieldChange(
-      this.activeEntryDialogConfig.headerData,
+    const changed = this.documentState.applyHeaderFieldChange(
+      this.activeDocumentWindowConfig.headerData,
       payload,
       this.headerFieldValueTypeMap,
     );
@@ -1254,7 +1398,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private saveHeaderFields(payload: Record<string, unknown>): void {
-    const headerData = this.activeEntryDialogConfig?.headerData;
+    const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!headerData) {
       return;
     }
@@ -1293,11 +1437,11 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.dataSource
-        .update(this.listConfig.dataSource, headerId, updatePayload)
+        .update(this.listConfig.dataSource, headerId, updatePayload, headerData['systemRowVersion'])
         .pipe(
           catchError((error: unknown) => {
-            const rolledBack = this.entryState.rollbackHeaderFieldChange(
-              this.activeEntryDialogConfig?.headerData ?? {},
+            const rolledBack = this.documentState.rollbackHeaderFieldChange(
+              this.activeDocumentWindowConfig?.headerData ?? {},
               payload,
               this.headerFieldValueTypeMap,
             );
@@ -1315,11 +1459,11 @@ export class DocumentPage implements OnInit, OnDestroy {
           }),
         )
         .subscribe((updated) => {
-          if (!this.isRecord(updated) || !this.activeEntryDialogConfig?.headerData) {
+          if (!this.isRecord(updated) || !this.activeDocumentWindowConfig?.headerData) {
             return;
           }
 
-          Object.assign(this.activeEntryDialogConfig.headerData, updated);
+          Object.assign(this.activeDocumentWindowConfig.headerData, updated);
           this.stageListSyncFromActiveHeader();
           this.setEntryStatus({
             tone: 'success',
@@ -1332,14 +1476,14 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private saveLineFields(row: Record<string, unknown>, fields: string[]): void {
-    if (!this.lineConfig || !this.activeEntryDialogConfig?.headerData) {
+    if (!this.lineConfig || !this.activeDocumentWindowConfig?.headerData) {
       return;
     }
 
     if (
       this.pendingDraftCreateFromNew ||
       this.draftCreateInProgress ||
-      !this.hasPersistedIdentity(this.activeEntryDialogConfig.headerData)
+      !this.hasPersistedIdentity(this.activeDocumentWindowConfig.headerData)
     ) {
       this.autosaveDeferredUntilDraftCreate = true;
       return;
@@ -1356,7 +1500,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     this.applyParentFieldsToLine(row);
-    const resolved = this.resolveLineDataSourceForHeader(this.activeEntryDialogConfig.headerData);
+    const resolved = this.resolveLineDataSourceForHeader(this.activeDocumentWindowConfig.headerData);
     if (!resolved.lineContextReady) {
       this.setEntryStatus({
         tone: 'error',
@@ -1373,7 +1517,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    const payload = this.entryConfigData.buildLineUpdatePayload(row, uniqueFields, this.lineConfig);
+    const payload = this.documentConfigData.buildLineUpdatePayload(row, uniqueFields, this.lineConfig);
     this.setEntryStatus({
       tone: 'info',
       title: 'Saving',
@@ -1383,7 +1527,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.dataSource
-        .update(resolved.dataSource, rowId, payload)
+        .update(resolved.dataSource, rowId, payload, row['systemRowVersion'])
         .pipe(
           catchError((error: unknown) => {
             this.setEntryStatus({
@@ -1396,6 +1540,7 @@ export class DocumentPage implements OnInit, OnDestroy {
           }),
         )
         .subscribe((updated) => {
+          if (!updated) return;
           const updatedRecord = this.toCreatedRecord(updated);
           if (updatedRecord) {
             Object.assign(row, updatedRecord);
@@ -1440,7 +1585,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       row[lineNoField] = this.resolveNextLineNo(row, lineNoField);
     }
 
-    const payload = this.entryConfigData.buildLineCreatePayload(row, this.lineConfig);
+    const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
     if (!payload) {
       this.setEntryStatus({
         tone: 'error',
@@ -1476,6 +1621,7 @@ export class DocumentPage implements OnInit, OnDestroy {
         .subscribe((created) => {
           this.lineCreateInProgress.delete(row);
 
+          if (!created) return;
           const createdRecord = this.toCreatedRecord(created);
           if (createdRecord) {
             Object.assign(row, createdRecord);
@@ -1525,22 +1671,22 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     if (
-      !this.activeEntryDialogConfig?.headerData ||
-      this.hasPersistedIdentity(this.activeEntryDialogConfig.headerData)
+      !this.activeDocumentWindowConfig?.headerData ||
+      this.hasPersistedIdentity(this.activeDocumentWindowConfig.headerData)
     ) {
       this.pendingDraftCreateFromNew = false;
       return;
     }
 
-    if (!this.canCreateDraft(this.activeEntryDialogConfig.headerData)) {
+    if (!this.canCreateDraft(this.activeDocumentWindowConfig.headerData)) {
       return;
     }
 
-    this.startDraftCreate(this.activeEntryDialogConfig.headerData);
+    this.startDraftCreate(this.activeDocumentWindowConfig.headerData);
   }
 
   private triggerDraftCreateIfReady(): void {
-    const headerData = this.activeEntryDialogConfig?.headerData;
+    const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!headerData || !this.pendingDraftCreateFromNew || this.draftCreateInProgress) {
       return;
     }
@@ -1567,7 +1713,7 @@ export class DocumentPage implements OnInit, OnDestroy {
           this.draftCreateInProgress = false;
           this.stopPopupLoading();
 
-          if (!createdRecord || !this.activeEntryDialogConfig?.headerData) {
+          if (!createdRecord || !this.activeDocumentWindowConfig?.headerData) {
             this.setEntryStatus({
               tone: 'error',
               title: GENERIC_MESSAGES.createFailedTitle,
@@ -1577,10 +1723,10 @@ export class DocumentPage implements OnInit, OnDestroy {
             return;
           }
 
-          const localEdits = { ...this.activeEntryDialogConfig.headerData };
+          const localEdits = { ...this.activeDocumentWindowConfig.headerData };
           const createdHeader = this.buildHeaderData(createdRecord);
-          Object.assign(this.activeEntryDialogConfig.headerData, createdHeader);
-          this.restoreEditableLocalEdits(localEdits, this.activeEntryDialogConfig.headerData);
+          Object.assign(this.activeDocumentWindowConfig.headerData, createdHeader);
+          this.restoreEditableLocalEdits(localEdits, this.activeDocumentWindowConfig.headerData);
           this.pendingListSyncRecord = this.buildListSyncRecord(createdRecord);
           this.pendingDraftCreateFromNew = false;
 
@@ -1622,7 +1768,11 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private queueLocalAutosave(): void {
-    const headerData = this.activeEntryDialogConfig?.headerData;
+    if (this.usesManualSaveMode() || this.listConfig.dataSource.singleton) {
+      void this.saveEntry();
+      return;
+    }
+    const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!headerData) {
       return;
     }
@@ -1639,16 +1789,16 @@ export class DocumentPage implements OnInit, OnDestroy {
       title: 'Saving',
       message: this.usesManualSaveMode() ? 'Saving changes...' : 'Autosaving changes...',
     });
-    this.entryState.scheduleHeaderAutosave(this.pageId, headerData, {
+    this.documentState.scheduleHeaderAutosave(this.pageId, headerData, {
       dataSourceConfig: this.listConfig.dataSource,
       headerSections: this.headerConfig.sections,
-      lineRows: this.activeEntryDialogConfig?.lineRows,
+      lineRows: this.activeDocumentWindowConfig?.lineRows,
       lineDataSourceConfig: this.lineConfig?.dataSource,
       meta: {
         page: this.pageId,
       },
       onFailed: (result) => {
-        Object.assign(this.activeEntryDialogConfig?.headerData ?? {}, previousSnapshot);
+        Object.assign(this.activeDocumentWindowConfig?.headerData ?? {}, previousSnapshot);
         this.setEntryStatus({
           tone: 'error',
           title: 'Save failed',
@@ -1669,11 +1819,11 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private usesManualSaveMode(): boolean {
-    return this.hasManualSaveCommand(this.activeEntryDialogConfig?.headerToolbarButtons)
+    return this.hasManualSaveCommand(this.activeDocumentWindowConfig?.headerToolbarButtons)
       || this.hasManualSaveCommand(this.headerConfig.toolbarButtons);
   }
 
-  private hasManualSaveCommand(buttons: EntryCommandButtonConfig[] | undefined): boolean {
+  private hasManualSaveCommand(buttons: CommandConfig[] | undefined): boolean {
     return (buttons ?? []).some((button) => {
       const actionKey = this.toText(button.actionKey).trim().toLowerCase();
       return actionKey === 'save' || actionKey === 'apply' || actionKey === 'cmd:save' || actionKey === 'cmd:apply';
@@ -1681,6 +1831,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleEntryCommand(command: string, payload: unknown): void {
+    if (command === 'retry-hydrate') { this.refreshActiveEntry(); return; }
     if (this.tryOpenEntryRunModal(command, payload)) {
       return;
     }
@@ -1691,12 +1842,13 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     if (command === 'close') {
+      if (this.documentOnly) { void this.requestClose(); return; }
       this.popupStack.close(this.entryPopupId);
       return;
     }
 
     if (command === 'new') {
-      this.openNewPreview();
+      void this.openNewEntrySafely();
       return;
     }
 
@@ -1706,7 +1858,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     if (command === 'refresh') {
-      this.refreshActiveEntry();
+      void this.refreshEntrySafely();
       return;
     }
 
@@ -1716,15 +1868,38 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     if (command === 'line-refresh') {
-      this.refreshActiveLines();
+      void this.refreshLinesSafely();
       return;
     }
 
+    const button = this.findEntryCommandButton(command);
+    if (button?.apiAction) {
+      void this.executeConfiguredAction(button);
+      return;
+    }
     this.emitBusinessCommand(command, payload);
   }
 
+  private async openNewEntrySafely(): Promise<void> {
+    if (this.dirty && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and start a new record?' })) return;
+    this.dirty = false;
+    this.openNewPreview();
+  }
+
+  private async refreshEntrySafely(): Promise<void> {
+    if (this.dirty && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and reload this record?' })) return;
+    this.dirty = false;
+    this.refreshActiveEntry();
+  }
+
+  private async refreshLinesSafely(): Promise<void> {
+    if (this.dirty && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved line edits and reload lines?' })) return;
+    this.refreshActiveLines();
+  }
+
   private refreshActiveEntry(): void {
-    const headerData = this.activeEntryDialogConfig?.headerData;
+    if (this.listConfig.dataSource.singleton) { this.openEntry(); return; }
+    const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!this.isRecord(headerData)) {
       return;
     }
@@ -1755,7 +1930,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    const headerData = this.activeEntryDialogConfig?.headerData;
+    const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!this.isRecord(headerData)) {
       return;
     }
@@ -1766,7 +1941,7 @@ export class DocumentPage implements OnInit, OnDestroy {
         .pipe(timeout(this.timeoutPolicy.hydrationTimeoutMs))
         .subscribe({
           next: (response) => {
-            const currentConfig = this.activeEntryDialogConfig;
+            const currentConfig = this.activeDocumentWindowConfig;
             if (!currentConfig?.headerData) {
               this.finishCardLineLoading(true);
               return;
@@ -1811,8 +1986,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     const request = this.commandRoutingResolver.buildEntryRunModalRequest({
       pageId,
       target: button?.runModalTarget ?? button?.runModalView,
-      headerData: this.activeEntryDialogConfig?.headerData ?? {},
-      lineRows: this.activeEntryDialogConfig?.lineRows ?? [],
+      headerData: this.activeDocumentWindowConfig?.headerData ?? {},
+      lineRows: this.activeDocumentWindowConfig?.lineRows ?? [],
       payload: payloadRecord,
       activeLine: this.resolveRunModalActiveLine(payloadRecord),
     });
@@ -1830,12 +2005,12 @@ export class DocumentPage implements OnInit, OnDestroy {
     return true;
   }
 
-  private findEntryCommandButton(command: string): EntryCommandButtonConfig | undefined {
+  private findEntryCommandButton(command: string): CommandConfig | undefined {
     return this.commandRoutingResolver.findEntryCommandButton({
       command,
-      headerToolbarButtons: this.activeEntryDialogConfig?.headerToolbarButtons,
-      lineToolbarButtons: this.activeEntryDialogConfig?.lineToolbarButtons,
-      detailToolbarButtons: this.activeEntryDialogConfig?.detailToolbarButtons,
+      headerToolbarButtons: this.activeDocumentWindowConfig?.headerToolbarButtons,
+      lineToolbarButtons: this.activeDocumentWindowConfig?.lineToolbarButtons,
+      detailToolbarButtons: this.activeDocumentWindowConfig?.detailToolbarButtons,
     });
   }
 
@@ -1846,10 +2021,10 @@ export class DocumentPage implements OnInit, OnDestroy {
   private resolveRunModalActiveLine(payload: Record<string, unknown>): Record<string, unknown> | undefined {
     return this.commandRoutingResolver.resolveRunModalActiveLine({
       payload,
-      lineRows: this.activeEntryDialogConfig?.lineRows ?? [],
+      lineRows: this.activeDocumentWindowConfig?.lineRows ?? [],
       selectedLineIndexes: this.selectedLineIndexes,
       activeLineRow: this.activeLineRow,
-      headerData: this.activeEntryDialogConfig?.headerData,
+      headerData: this.activeDocumentWindowConfig?.headerData,
       isRecord: (value): value is Record<string, unknown> => this.isRecord(value),
     });
   }
@@ -1862,8 +2037,8 @@ export class DocumentPage implements OnInit, OnDestroy {
         pageId: this.pageId,
         selectedRow: this.selectedRow,
         checkedRowKeys: [...this.checkedRowKeys],
-        headerData: this.activeEntryDialogConfig?.headerData,
-        lineRows: this.activeEntryDialogConfig?.lineRows,
+        headerData: this.activeDocumentWindowConfig?.headerData,
+        lineRows: this.activeDocumentWindowConfig?.lineRows,
       },
     });
   }
@@ -1901,6 +2076,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private async deleteSelectedRows(): Promise<void> {
+    if (this.listConfig.dataSource.supportsDelete === false) return;
     const targets = this.resolveDeleteTargets();
     if (!targets.length) {
       return;
@@ -1920,7 +2096,7 @@ export class DocumentPage implements OnInit, OnDestroy {
         return of({ key: target.key, success: true, error: undefined as unknown });
       }
 
-      return this.dataSource.delete(this.listConfig.dataSource, target.id).pipe(
+      return this.dataSource.delete(this.listConfig.dataSource, target.id, target.rowVersion).pipe(
         map(() => ({ key: target.key, success: true, error: undefined as unknown })),
         catchError((error: unknown) => of({ key: target.key, success: false, error })),
       );
@@ -1951,7 +2127,8 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private async deleteActiveHeaderFromPopup(): Promise<void> {
-    const headerData = this.activeEntryDialogConfig?.headerData;
+    if (this.listConfig.dataSource.supportsDelete === false) return;
+    const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!this.isRecord(headerData)) {
       return;
     }
@@ -1978,7 +2155,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     this.subscriptions.add(
-      this.dataSource.delete(this.listConfig.dataSource, id)
+      this.dataSource.delete(this.listConfig.dataSource, id, headerData['systemRowVersion'])
         .pipe(
           map(() => ({ success: true, error: undefined as unknown })),
           catchError((error: unknown) => of({ success: false, error })),
@@ -1999,7 +2176,7 @@ export class DocumentPage implements OnInit, OnDestroy {
             return;
           }
 
-          this.activeEntryDialogConfig = undefined;
+          this.activeDocumentWindowConfig = undefined;
           this.popupStack.close(this.entryPopupId);
           this.loadFirstPage(true);
           this.changeDetector.detectChanges();
@@ -2008,16 +2185,17 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private async deleteLine(payload: unknown): Promise<void> {
-    if (!this.activeEntryDialogConfig || !this.lineConfig) {
+    if (this.lineConfig?.dataSource.supportsDelete === false || !this.dataSource.canWrite(this.listConfig.dataSource, this.activeDocumentWindowConfig?.headerData ?? {})) return;
+    if (!this.activeDocumentWindowConfig || !this.lineConfig) {
       return;
     }
 
-    const lineRows = this.activeEntryDialogConfig.lineRows ?? [];
+    const lineRows = this.activeDocumentWindowConfig.lineRows ?? [];
     if (!lineRows.length) {
       return;
     }
 
-    const resolved = this.resolveLineDataSourceForHeader(this.activeEntryDialogConfig.headerData ?? {});
+    const resolved = this.resolveLineDataSourceForHeader(this.activeDocumentWindowConfig.headerData ?? {});
     if (!resolved.lineContextReady) {
       this.setEntryStatus({
         tone: 'error',
@@ -2034,8 +2212,8 @@ export class DocumentPage implements OnInit, OnDestroy {
         payload,
         activeRow: this.activeLineRow,
         selectedIndexes: this.selectedLineIndexes,
-        resolveId: (row) => this.entryRecord.resolvePersistedRecordId(row, resolved.dataSource),
-        deleteById: (id) => this.dataSource.delete(resolved.dataSource, id),
+        resolveId: (row) => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource),
+        deleteById: (id) => this.dataSource.delete(resolved.dataSource, id, lineRows.find(row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource) === id)?.['systemRowVersion']),
         confirmDelete: (count) =>
           this.confirmation.confirmIntent({
             intent: 'delete',
@@ -2048,7 +2226,7 @@ export class DocumentPage implements OnInit, OnDestroy {
         return;
       }
 
-      const latestRows = this.activeEntryDialogConfig?.lineRows ?? [];
+      const latestRows = this.activeDocumentWindowConfig?.lineRows ?? [];
       this.applyLineDeletionResult(latestRows.filter((row) => !result.targetRows.includes(row)));
     } catch (error: unknown) {
       this.setEntryStatus({
@@ -2061,19 +2239,21 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private appendNewLine(mode: 'append' | 'prepend'): void {
-    if (!this.activeEntryDialogConfig || !this.lineConfig) {
+    if (this.lineConfig?.dataSource.supportsCreate === false || !this.dataSource.canWrite(this.listConfig.dataSource, this.activeDocumentWindowConfig?.headerData ?? {})) return;
+    if (!this.activeDocumentWindowConfig || !this.lineConfig) {
       return;
     }
 
-    const lineRows = this.activeEntryDialogConfig.lineRows ?? [];
-    const newRow = this.entryConfigData.createEmptyLineRow(
+    const lineRows = this.activeDocumentWindowConfig.lineRows ?? [];
+    this.dirty = true;
+    const newRow = this.documentConfigData.createEmptyLineRow(
       this.lineConfig,
-      this.activeEntryDialogConfig.headerData ?? {},
+      this.activeDocumentWindowConfig.headerData ?? {},
       this.getLineMasterRegistry(),
       this.optionFieldMap,
     );
 
-    this.activeEntryDialogConfig.lineRows =
+    this.activeDocumentWindowConfig.lineRows =
       mode === 'prepend' ? [newRow, ...lineRows] : [...lineRows, newRow];
     this.recalculateActiveLineTotals();
     this.clearEntryStatus();
@@ -2081,22 +2261,22 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private applyLineDeletionResult(nextRows: Record<string, unknown>[]): void {
-    if (!this.activeEntryDialogConfig || !this.lineConfig) {
+    if (!this.activeDocumentWindowConfig || !this.lineConfig) {
       return;
     }
 
     if (!nextRows.length) {
       nextRows.push(
-        this.entryConfigData.createEmptyLineRow(
+        this.documentConfigData.createEmptyLineRow(
           this.lineConfig,
-          this.activeEntryDialogConfig.headerData ?? {},
+          this.activeDocumentWindowConfig.headerData ?? {},
           this.getLineMasterRegistry(),
           this.optionFieldMap,
         ),
       );
     }
 
-    this.activeEntryDialogConfig.lineRows = nextRows;
+    this.activeDocumentWindowConfig.lineRows = nextRows;
     this.activeLineRow = nextRows[nextRows.length - 1];
     this.selectedLineIndexes = [];
     this.recalculateActiveLineTotals();
@@ -2105,13 +2285,13 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private recalculateActiveLineTotals(): void {
-    if (!this.activeEntryDialogConfig?.lineRows || !this.lineConfig) {
+    if (!this.activeDocumentWindowConfig?.lineRows || !this.lineConfig) {
       return;
     }
 
-    this.activeEntryDialogConfig.lineTotals = this.buildLineTotals(
-      this.activeEntryDialogConfig.lineRows,
-      this.activeEntryDialogConfig.headerData ?? {},
+    this.activeDocumentWindowConfig.lineTotals = this.buildLineTotals(
+      this.activeDocumentWindowConfig.lineRows,
+      this.activeDocumentWindowConfig.headerData ?? {},
     );
   }
 
@@ -2119,7 +2299,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     return this.draftCreate
       .createWithUnknownPropertyFallback(
         this.listConfig.dataSource,
-        this.entryPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
+        this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
       )
       .pipe(
         map((response) => this.toCreatedRecord(response)),
@@ -2179,8 +2359,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     this.headerDropdownRecords = next;
   }
 
-  private applyHeaderDropdownOptions(entryDialogConfig: DocumentWindowConfig): void {
-    const headerData = entryDialogConfig.headerData;
+  private applyHeaderDropdownOptions(documentWindowConfig: DocumentWindowConfig): void {
+    const headerData = documentWindowConfig.headerData;
     if (!headerData) {
       return;
     }
@@ -2227,9 +2407,9 @@ export class DocumentPage implements OnInit, OnDestroy {
 
   private buildNewHeaderSeed(): Record<string, unknown> {
     const documentNoField = this.listConfig.dataSource.documentNoField;
-    return this.entryConfigData.buildHeaderSeed(
+    return this.documentConfigData.buildHeaderSeed(
       this.headerConfig.sections,
-      documentNoField ? { [documentNoField]: '' } : {},
+      { ...(documentNoField ? { [documentNoField]: '' } : {}), ...this.listConfig.dataSource.newRecordDefaults },
     );
   }
 
@@ -2267,7 +2447,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private applyParentFieldsToLine(row: Record<string, unknown>): void {
-    if (!this.lineConfig || !this.activeEntryDialogConfig?.headerData) {
+    if (!this.lineConfig || !this.activeDocumentWindowConfig?.headerData) {
       return;
     }
 
@@ -2276,8 +2456,8 @@ export class DocumentPage implements OnInit, OnDestroy {
       this.lineConfig.dataSource.documentNoField ?? this.listConfig.dataSource.documentNoField;
     if (parentKeyField && !this.hasValue(row[parentKeyField])) {
       row[parentKeyField] =
-        (documentNoField ? this.activeEntryDialogConfig.headerData[documentNoField] : undefined) ??
-        this.activeEntryDialogConfig.headerData[parentKeyField];
+        (documentNoField ? this.activeDocumentWindowConfig.headerData[documentNoField] : undefined) ??
+        this.activeDocumentWindowConfig.headerData[parentKeyField];
     }
 
     for (const [field, value] of Object.entries(this.lineConfig.dataSource.parentFixedFields ?? {})) {
@@ -2289,13 +2469,13 @@ export class DocumentPage implements OnInit, OnDestroy {
 
   private stageListSyncFromActiveHeader(): void {
     if (
-      !this.activeEntryDialogConfig?.headerData ||
-      !this.hasPersistedIdentity(this.activeEntryDialogConfig.headerData)
+      !this.activeDocumentWindowConfig?.headerData ||
+      !this.hasPersistedIdentity(this.activeDocumentWindowConfig.headerData)
     ) {
       return;
     }
 
-    this.pendingListSyncRecord = this.buildListSyncRecord(this.activeEntryDialogConfig.headerData);
+    this.pendingListSyncRecord = this.buildListSyncRecord(this.activeDocumentWindowConfig.headerData);
     this.applyDeferredListSync();
   }
 
@@ -2327,20 +2507,21 @@ export class DocumentPage implements OnInit, OnDestroy {
   private buildListSyncRecord(source: Record<string, unknown>): Record<string, unknown> {
     const key = this.getRowKey(source);
     const existing = this.rows.find((row) => this.getRowKey(row) === key);
-    return this.entryConfigData.mergeListRecord(
+    return this.documentConfigData.mergeListRecord(
       source,
       this.isRecord(existing) ? existing : undefined,
       this.isRecord(this.selectedRow) ? this.selectedRow : undefined,
     );
   }
 
-  private resolveDeleteTargets(): Array<{ key: string; id: unknown }> {
+  private resolveDeleteTargets(): Array<{ key: string; id: unknown; rowVersion?: unknown }> {
     const selectedTargets = this.rows
       .filter((row) => this.checkedRowKeys.has(this.getRowKey(row)))
       .filter((row): row is Record<string, unknown> => this.isRecord(row))
       .map((row) => ({
         key: this.getRowKey(row),
-        id: this.entryRecord.resolveRecordId(row, this.listConfig.dataSource),
+        id: this.documentRecord.resolveRecordId(row, this.listConfig.dataSource),
+        rowVersion: row['systemRowVersion'],
       }))
       .filter((target) => target.key.length > 0);
 
@@ -2354,7 +2535,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     const key = this.getRowKey(this.selectedRow);
     return key
-      ? [{ key, id: this.entryRecord.resolveRecordId(this.selectedRow, this.listConfig.dataSource) }]
+      ? [{ key, id: this.documentRecord.resolveRecordId(this.selectedRow, this.listConfig.dataSource), rowVersion: this.selectedRow['systemRowVersion'] }]
       : [];
   }
 
@@ -2366,7 +2547,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     this.selectedRow = this.rows[0];
-    this.activeEntryDialogConfig = undefined;
+    this.activeDocumentWindowConfig = undefined;
     this.popupStack.close(this.entryPopupId);
     this.changeDetector.detectChanges();
   }
@@ -2390,11 +2571,11 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private resolveRecordId(record: Record<string, unknown>, config?: DataSourceConfig): unknown {
-    return this.entryRecord.resolveRecordId(record, config);
+    return this.documentRecord.resolveRecordId(record, config);
   }
 
   private resolvePersistedRecordId(record: Record<string, unknown>, config?: DataSourceConfig): unknown {
-    return this.entryRecord.resolvePersistedRecordId(record, config);
+    return this.documentRecord.resolvePersistedRecordId(record, config);
   }
 
   private hasPersistedIdentity(record: unknown): boolean {
@@ -2472,7 +2653,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private resolveNextLineNo(targetRow: Record<string, unknown>, lineNoField: string): number {
-    const lineRows = this.activeEntryDialogConfig?.lineRows ?? [];
+    const lineRows = this.activeDocumentWindowConfig?.lineRows ?? [];
     const existingLineNos = new Set<number>();
     let maxLineNo = 0;
 
@@ -2502,7 +2683,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private ensureTrailingEmptyRows(minEmptyRows = 1): void {
-    if (!this.lineConfig || !this.activeEntryDialogConfig) {
+    if (!this.lineConfig || !this.activeDocumentWindowConfig) {
       return;
     }
 
@@ -2510,7 +2691,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    const lineRows = this.activeEntryDialogConfig.lineRows ?? [];
+    const lineRows = this.activeDocumentWindowConfig.lineRows ?? [];
     const emptyRows = lineRows.filter((row) => !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig?.dataSource)));
     const missing = Math.max(0, minEmptyRows - emptyRows.length);
     if (missing <= 0) {
@@ -2519,19 +2700,21 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     const additions: Record<string, unknown>[] = [];
     for (let index = 0; index < missing; index += 1) {
-      additions.push(this.entryConfigData.createEmptyLineRow(
+      additions.push(this.documentConfigData.createEmptyLineRow(
         this.lineConfig,
-        this.activeEntryDialogConfig.headerData ?? {},
+        this.activeDocumentWindowConfig.headerData ?? {},
         this.getLineMasterRegistry(),
         this.optionFieldMap,
       ));
     }
 
-    this.activeEntryDialogConfig.lineRows = [...lineRows, ...additions];
+    this.activeDocumentWindowConfig.lineRows = [...lineRows, ...additions];
     this.changeDetector.detectChanges();
   }
 
   private isLineRowMeaningfullyEmpty(row: Record<string, unknown>): boolean {
+    const fields = this.lineConfig?.dataSource.meaningfulFields;
+    if (fields?.length) return !fields.some(field => this.hasValue(row[field]) && row[field] !== 0 && row[field] !== false);
     if (!this.lineConfig) {
       return true;
     }
@@ -2624,7 +2807,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private syncEntryPopupLoadingState(): void {
-    const currentConfig = this.activeEntryDialogConfig;
+    const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig) {
       return;
     }
@@ -2663,6 +2846,8 @@ export class DocumentPage implements OnInit, OnDestroy {
       listLoadingScope: this.listLoadingScope,
       listFilterScope: this.listFilterScope,
       listTitle: this.listConfig.title,
+      get cursor() { return thisHost.nextCursor; },
+      set cursor(value) { thisHost.nextCursor = value; },
       hydrationTimeoutMs: this.timeoutPolicy.hydrationTimeoutMs,
       loading: this.loading,
 
@@ -2708,11 +2893,11 @@ export class DocumentPage implements OnInit, OnDestroy {
       set listLoadSubscription(value) {
         thisHost.listLoadSubscription = value;
       },
-      get activeEntryDialogConfig() {
-        return thisHost.activeEntryDialogConfig;
+      get activeDocumentWindowConfig() {
+        return thisHost.activeDocumentWindowConfig;
       },
-      set activeEntryDialogConfig(value) {
-        thisHost.activeEntryDialogConfig = value;
+      set activeDocumentWindowConfig(value) {
+        thisHost.activeDocumentWindowConfig = value;
       },
       get checkedRowKeys() {
         return thisHost.checkedRowKeys;
@@ -2732,8 +2917,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     };
   }
 
-  private setEntryStatus(message: EntryStatusMessage): void {
-    if (!this.activeEntryDialogConfig) {
+  private setEntryStatus(message: DocumentStatusMessage): void {
+    if (!this.activeDocumentWindowConfig) {
       return;
     }
 
@@ -2743,11 +2928,11 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    this.activeEntryDialogConfig.statusMessage = message;
+    this.activeDocumentWindowConfig.statusMessage = message;
   }
 
   private clearEntryStatus(): void {
-    if (!this.activeEntryDialogConfig) {
+    if (!this.activeDocumentWindowConfig) {
       return;
     }
 
@@ -2757,7 +2942,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    this.activeEntryDialogConfig.statusMessage = undefined;
+    this.activeDocumentWindowConfig.statusMessage = undefined;
   }
 
   private stripIdentityFields(payload: Record<string, unknown>): void {

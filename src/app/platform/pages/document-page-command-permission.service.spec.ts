@@ -1,15 +1,16 @@
+import type { CommandConfig } from '../models/command-config.model';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SessionService } from '../../core/services/session.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
-import { EntryCommandButtonConfig } from '../models/document-window-config.model';
+
 import { DocumentPageCommandPermissionService } from './document-page-command-permission.service';
 
 describe('DocumentPage popup command permissions', () => {
   let session: { SuperAdmin: boolean; Permissions: unknown[] };
   let policy: DocumentPageCommandPermissionService;
-  const command = (actionKey: string, rest: Partial<EntryCommandButtonConfig> = {}): EntryCommandButtonConfig =>
+  const command = (actionKey: string, rest: Partial<CommandConfig> = {}): CommandConfig =>
     ({ label: actionKey, actionKey, ...rest });
-  const apply = (button: EntryCommandButtonConfig, pageId = 'purchase-order') => policy.apply(button, pageId);
+  const apply = (button: CommandConfig, pageId = 'purchase-order') => policy.apply(button, pageId);
 
   beforeEach(() => {
     session = { SuperAdmin: false, Permissions: [] };

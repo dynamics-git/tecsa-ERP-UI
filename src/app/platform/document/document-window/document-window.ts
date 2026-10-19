@@ -1,33 +1,20 @@
+import type { CommandConfig } from '../../models/command-config.model';
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, inject } from '@angular/core';
 import { DynamicForm } from '../../../shared/ui/dynamic-form/dynamic-form';
 import { FactBox } from '../../../shared/ui/fact-box/fact-box';
 import { DocumentLines } from '../document-lines/document-lines';
-import { FieldConfig, FieldFactPanelConfig } from '../../models/field-config.model';
+import { FieldConfig, FieldFactBoxConfig } from '../../models/field-config.model';
 import { LineColumnConfig } from '../../models/line-config.model';
-import {
-  EntryAttachmentsConfig,
-  EntryCommandBarConfig,
-  EntryCommandButtonConfig,
-  EntryFooterRowConfig,
-  EntryFooterSectionConfig,
-  EntryLineCommandPolicyConfig,
-  EntryLinePlacementConfig,
-  EntryDialogType,
-  EntryHeaderSectionConfig,
-  EntryLineTotalsConfig,
-  EntryStatusMessage,
-  FactPanelSectionConfig
-} from '../../models/document-window-config.model';
+import { AttachmentsConfig, CommandBarConfig, FooterRowConfig, FooterSectionConfig, LineCommandPolicyConfig, LinePlacementConfig, DocumentDetailType, HeaderSectionConfig, LineTotalsConfig, DocumentStatusMessage, FactBoxSectionConfig } from '../../models/document-window-config.model';
 import { ApiErrorService } from '../../data/api-error.service';
 
-export type EntryDialog = EntryDialogType;
 export type DocumentWindowActionEvent = { actionKey: string; payload?: unknown };
-type EntryCommandGroup = { name: string; buttons: EntryCommandButtonConfig[] };
-type FactPanelDraftSection = {
+type CommandGroup = { name: string; buttons: CommandConfig[] };
+type FactBoxDraftSection = {
   id: string;
   title: string;
-  buttons?: FactPanelSectionConfig['buttons'];
+  buttons?: FactBoxSectionConfig['buttons'];
   order: number;
   rows: Array<{ label: string; value: string; order: number }>;
 };
@@ -49,32 +36,32 @@ export class DocumentWindow {
   @Input() pageLabel?: string;
   @Input() title?: string;
   @Input() subtitle?: string;
-  @Input() popupHeaderCommandBar?: EntryCommandBarConfig;
-  @Input() popupLineCommandBar?: EntryCommandBarConfig;
-  @Input() popupLineCommandPolicy?: EntryLineCommandPolicyConfig;
-  @Input() popupLinePlacement?: EntryLinePlacementConfig;
-  @Input() popupHeaderToolbarButtons?: EntryCommandButtonConfig[];
-  @Input() popupLineToolbarButtons?: EntryCommandButtonConfig[];
-  @Input() popupDetailToolbarButtons?: EntryCommandButtonConfig[];
-  @Input() popupHeaderSections?: EntryHeaderSectionConfig[];
-  @Input() popupHeaderData?: Record<string, unknown>;
-  @Input() popupLineColumns?: LineColumnConfig[];
-  @Input() popupLineRows?: Record<string, unknown>[];
-  @Input() popupLineTotals?: EntryLineTotalsConfig;
-  @Input() popupFooterSections?: EntryFooterSectionConfig[];
-  @Input() popupAttachments?: EntryAttachmentsConfig;
-  @Input() popupFactPanelSections?: FactPanelSectionConfig[];
-  @Input() popupStatusMessage?: EntryStatusMessage;
-  @Input() popupInteractionLocked = false;
+  @Input() headerCommandBar?: CommandBarConfig;
+  @Input() lineCommandBar?: CommandBarConfig;
+  @Input() lineCommandPolicy?: LineCommandPolicyConfig;
+  @Input() linePlacement?: LinePlacementConfig;
+  @Input() headerToolbarButtons?: CommandConfig[];
+  @Input() lineToolbarButtons?: CommandConfig[];
+  @Input() detailToolbarButtons?: CommandConfig[];
+  @Input() headerSections?: HeaderSectionConfig[];
+  @Input() headerData?: Record<string, unknown>;
+  @Input() lineColumns?: LineColumnConfig[];
+  @Input() lineRows?: Record<string, unknown>[];
+  @Input() lineTotals?: LineTotalsConfig;
+  @Input() footerSections?: FooterSectionConfig[];
+  @Input() attachments?: AttachmentsConfig;
+  @Input() factBoxSections?: FactBoxSectionConfig[];
+  @Input() statusMessage?: DocumentStatusMessage;
+  @Input() interactionLocked = false;
   @Output() closed = new EventEmitter<void>();
   @Output() action = new EventEmitter<DocumentWindowActionEvent>();
 
-  entryMaximized = false;
-  activeEntryDialog: EntryDialog | null = null;
+  maximized = false;
+  activeDocumentDetail: DocumentDetailType | null = null;
   private selectedLineIndexes: number[] = [];
   private activeLineRow?: Record<string, unknown>;
 
-  private readonly emptyAttachments: EntryAttachmentsConfig = {
+  private readonly emptyAttachments: AttachmentsConfig = {
     headerFilesCount: 0,
     lineFilesCount: 0,
     canUpload: false,
@@ -82,29 +69,29 @@ export class DocumentWindow {
     primaryActionKey: ''
   };
 
-  private readonly emptyLineTotals: EntryLineTotalsConfig = {
+  private readonly emptyLineTotals: LineTotalsConfig = {
     subtotal: '',
     sst: '',
     total: '',
     difference: ''
   };
 
-  get resolvedHeaderSections(): EntryHeaderSectionConfig[] {
-    return this.popupHeaderSections ?? [];
+  get resolvedHeaderSections(): HeaderSectionConfig[] {
+    return this.headerSections ?? [];
   }
 
-  get resolvedHeaderToolbarButtons(): EntryCommandButtonConfig[] {
-    return (this.popupHeaderToolbarButtons ?? []).filter((button) => button.hidden !== true);
+  get resolvedHeaderToolbarButtons(): CommandConfig[] {
+    return (this.headerToolbarButtons ?? []).filter((button) => button.hidden !== true);
   }
 
-  get resolvedPrimaryHeaderToolbarButtons(): EntryCommandButtonConfig[] {
+  get resolvedPrimaryHeaderToolbarButtons(): CommandConfig[] {
     const sorted = this.getSortedHeaderToolbarButtons();
     const primary = sorted.filter((button) => button.isPrimary === true);
     const limit = this.resolvePrimaryActionsLimit(primary.length);
     return primary.slice(0, limit);
   }
 
-  get resolvedGroupedHeaderToolbarButtons(): EntryCommandGroup[] {
+  get resolvedGroupedHeaderToolbarButtons(): CommandGroup[] {
     const sorted = this.getSortedHeaderToolbarButtons();
     const primaryKeys = new Set(this.resolvedPrimaryHeaderToolbarButtons.map((button) => this.toButtonKey(button)));
     const menuButtons = sorted.filter((button) => !primaryKeys.has(this.toButtonKey(button)));
@@ -112,7 +99,7 @@ export class DocumentWindow {
       return [];
     }
 
-    const grouped = new Map<string, EntryCommandButtonConfig[]>();
+    const grouped = new Map<string, CommandConfig[]>();
     const order: string[] = [];
 
     for (const button of menuButtons) {
@@ -128,7 +115,7 @@ export class DocumentWindow {
     const visibleGroups = this.resolveVisibleGroupLimit(order.length);
     const visibleNames = order.slice(0, visibleGroups);
     const hiddenNames = order.slice(visibleGroups);
-    const result: EntryCommandGroup[] = visibleNames.map((name) => ({
+    const result: CommandGroup[] = visibleNames.map((name) => ({
       name,
       buttons: grouped.get(name) ?? []
     }));
@@ -149,10 +136,10 @@ export class DocumentWindow {
     return result;
   }
 
-  get resolvedLineToolbarButtons(): EntryCommandButtonConfig[] {
-    const configured = [...(this.popupLineToolbarButtons ?? [])].filter((button) => button.hidden !== true);
-    const injectLineNew = this.popupLineCommandPolicy?.injectDefaultLineNew === true;
-    const injectLineDelete = this.popupLineCommandPolicy?.injectDefaultLineDelete === true;
+  get resolvedLineToolbarButtons(): CommandConfig[] {
+    const configured = [...(this.lineToolbarButtons ?? [])].filter((button) => button.hidden !== true);
+    const injectLineNew = this.lineCommandPolicy?.injectDefaultLineNew === true;
+    const injectLineDelete = this.lineCommandPolicy?.injectDefaultLineDelete === true;
 
     if (injectLineNew && !configured.some((button) => this.isLineNewCommand(button.actionKey))) {
       configured.unshift({
@@ -179,7 +166,7 @@ export class DocumentWindow {
     return configured;
   }
 
-  get resolvedPrimaryLineToolbarButtons(): EntryCommandButtonConfig[] {
+  get resolvedPrimaryLineToolbarButtons(): CommandConfig[] {
     const sorted = this.getSortedLineToolbarButtons();
     const primary = sorted.filter((button) => button.isPrimary === true || this.isGlobalLinePrimaryCommand(button.actionKey));
     const globalPrimaryCount = primary.filter((button) => this.isGlobalLinePrimaryCommand(button.actionKey)).length;
@@ -187,7 +174,7 @@ export class DocumentWindow {
     return primary.slice(0, limit);
   }
 
-  get resolvedGroupedLineToolbarButtons(): EntryCommandGroup[] {
+  get resolvedGroupedLineToolbarButtons(): CommandGroup[] {
     const sorted = this.getSortedLineToolbarButtons();
     const primaryKeys = new Set(this.resolvedPrimaryLineToolbarButtons.map((button) => this.toButtonKey(button)));
     const menuButtons = sorted.filter((button) => !primaryKeys.has(this.toButtonKey(button)));
@@ -195,7 +182,7 @@ export class DocumentWindow {
       return [];
     }
 
-    const grouped = new Map<string, EntryCommandButtonConfig[]>();
+    const grouped = new Map<string, CommandConfig[]>();
     const order: string[] = [];
 
     for (const button of menuButtons) {
@@ -211,7 +198,7 @@ export class DocumentWindow {
     const visibleGroups = this.resolveLineVisibleGroupLimit(order.length);
     const visibleNames = order.slice(0, visibleGroups);
     const hiddenNames = order.slice(visibleGroups);
-    const result: EntryCommandGroup[] = visibleNames.map((name) => ({ name, buttons: grouped.get(name) ?? [] }));
+    const result: CommandGroup[] = visibleNames.map((name) => ({ name, buttons: grouped.get(name) ?? [] }));
 
     if (hiddenNames.length) {
       const hiddenButtons = hiddenNames.flatMap((name) => grouped.get(name) ?? []);
@@ -229,35 +216,35 @@ export class DocumentWindow {
     return result;
   }
 
-  get resolvedDetailToolbarButtons(): EntryCommandButtonConfig[] {
-    return (this.popupDetailToolbarButtons ?? []).filter((button) => button.hidden !== true);
+  get resolvedDetailToolbarButtons(): CommandConfig[] {
+    return (this.detailToolbarButtons ?? []).filter((button) => button.hidden !== true);
   }
 
   get resolvedHeaderData(): Record<string, unknown> {
-    return this.popupHeaderData ?? {};
+    return this.headerData ?? {};
   }
 
   get resolvedLineColumns(): LineColumnConfig[] {
-    return this.popupLineColumns ?? [];
+    return this.lineColumns ?? [];
   }
 
   get resolvedLineRows(): Record<string, unknown>[] {
-    return this.popupLineRows ?? [];
+    return this.lineRows ?? [];
   }
 
-  get resolvedLineTotals(): EntryLineTotalsConfig {
-    return this.popupLineTotals ?? this.emptyLineTotals;
+  get resolvedLineTotals(): LineTotalsConfig {
+    return this.lineTotals ?? this.emptyLineTotals;
   }
 
-  get resolvedFooterSections(): EntryFooterSectionConfig[] {
-    return this.popupFooterSections ?? [];
+  get resolvedFooterSections(): FooterSectionConfig[] {
+    return this.footerSections ?? [];
   }
 
-  resolveFooterRows(section: EntryFooterSectionConfig): EntryFooterRowConfig[] {
+  resolveFooterRows(section: FooterSectionConfig): FooterRowConfig[] {
     return [...section.rows].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
 
-  resolveFooterValue(row: EntryFooterRowConfig): string {
+  resolveFooterValue(row: FooterRowConfig): string {
     const source = row.source ?? (row.totalKey ? 'total' : row.field ? 'header' : 'literal');
     const fallback = this.toText(row.fallback ?? '');
 
@@ -273,20 +260,20 @@ export class DocumentWindow {
     return this.toText(row.value ?? fallback);
   }
 
-  get resolvedAttachments(): EntryAttachmentsConfig {
-    return this.popupAttachments ?? this.emptyAttachments;
+  get resolvedAttachments(): AttachmentsConfig {
+    return this.attachments ?? this.emptyAttachments;
   }
 
-  get resolvedFactPanelSections(): FactPanelSectionConfig[] {
-    if (this.popupFactPanelSections?.length) {
-      return this.popupFactPanelSections;
+  get resolvedFactBoxSections(): FactBoxSectionConfig[] {
+    if (this.factBoxSections?.length) {
+      return this.factBoxSections;
     }
 
-    return this.buildFactPanelSectionsFromEntryConfig();
+    return this.buildFactBoxSectionsFromDocumentConfig();
   }
 
-  get resolvedStatusMessage(): EntryStatusMessage | undefined {
-    return this.popupStatusMessage;
+  get resolvedStatusMessage(): DocumentStatusMessage | undefined {
+    return this.statusMessage;
   }
 
   get resolvedStatusLabel(): string {
@@ -298,15 +285,15 @@ export class DocumentWindow {
     return this.apiError.toMessage(this.resolvedStatusMessage?.title ?? '', '');
   }
 
-  get isEntryBusy(): boolean {
+  get isDocumentBusy(): boolean {
     return this.resolvedStatusMessage?.blocking === true;
   }
 
   get isInteractionLocked(): boolean {
-    return this.popupInteractionLocked;
+    return this.interactionLocked;
   }
 
-  shouldRenderLinesAfter(section: EntryHeaderSectionConfig): boolean {
+  shouldRenderLinesAfter(section: HeaderSectionConfig): boolean {
     if (!this.resolvedLineColumns.length) {
       return false;
     }
@@ -339,35 +326,35 @@ export class DocumentWindow {
     return !this.resolvedHeaderSections.some((section) => this.toText(section.id).trim().toLowerCase() === targetSectionId);
   }
 
-  private get resolvedLinePlacement(): EntryLinePlacementConfig {
-    return this.popupLinePlacement ?? { mode: 'end' };
+  private get resolvedLinePlacement(): LinePlacementConfig {
+    return this.linePlacement ?? { mode: 'end' };
   }
 
-  private buildFactPanelSectionsFromEntryConfig(): FactPanelSectionConfig[] {
-    const sectionMap = new Map<string, FactPanelDraftSection>();
+  private buildFactBoxSectionsFromDocumentConfig(): FactBoxSectionConfig[] {
+    const sectionMap = new Map<string, FactBoxDraftSection>();
 
     for (const [sectionIndex, section] of this.resolvedHeaderSections.entries()) {
       for (const [fieldIndex, field] of section.fields.entries()) {
-        const factPanel = this.resolveFieldFactPanelConfig(field);
-        if (!factPanel) {
+        const factBox = this.resolveFieldFactBoxConfig(field);
+        if (!factBox) {
           continue;
         }
 
-        const sectionId = this.toText(factPanel.sectionId).trim() || section.id || 'details';
-        const sectionTitle = this.toText(factPanel.sectionTitle).trim() || section.title || 'Details';
-        const rowOrder = Number.isFinite(factPanel.order) ? Number(factPanel.order) : fieldIndex;
-        const draft = this.ensureFactPanelSection(sectionMap, sectionId, sectionTitle, sectionIndex);
-        this.appendFactPanelButtons(draft, factPanel.buttons);
+        const sectionId = this.toText(factBox.sectionId).trim() || section.id || 'details';
+        const sectionTitle = this.toText(factBox.sectionTitle).trim() || section.title || 'Details';
+        const rowOrder = Number.isFinite(factBox.order) ? Number(factBox.order) : fieldIndex;
+        const draft = this.ensureFactBoxSection(sectionMap, sectionId, sectionTitle, sectionIndex);
+        this.appendFactBoxButtons(draft, factBox.buttons);
         draft.rows.push({
-          label: this.toText(factPanel.label).trim() || field.label,
-          value: this.resolveFactPanelFieldValue(field, factPanel),
+          label: this.toText(factBox.label).trim() || field.label,
+          value: this.resolveFactBoxFieldValue(field, factBox),
           order: rowOrder
         });
       }
     }
 
-    this.appendLineFactPanelSections(sectionMap);
-    this.appendAttachmentsFactPanelSection(sectionMap);
+    this.appendLineFactBoxSections(sectionMap);
+    this.appendAttachmentsFactBoxSection(sectionMap);
 
     return [...sectionMap.values()]
       .sort((a, b) => a.order - b.order)
@@ -381,70 +368,70 @@ export class DocumentWindow {
       }));
   }
 
-  private resolveFieldFactPanelConfig(field: FieldConfig): FieldFactPanelConfig | undefined {
-    if (field.factPanel === true) {
+  private resolveFieldFactBoxConfig(field: FieldConfig): FieldFactBoxConfig | undefined {
+    if (field.factBox === true) {
       return { show: true };
     }
 
-    if (this.isRecord(field.factPanel)) {
-      const factPanel = field.factPanel as FieldFactPanelConfig;
-      return factPanel.show === false ? undefined : factPanel;
+    if (this.isRecord(field.factBox)) {
+      const factBox = field.factBox as FieldFactBoxConfig;
+      return factBox.show === false ? undefined : factBox;
     }
 
     return undefined;
   }
 
-  private appendLineFactPanelSections(sectionMap: Map<string, FactPanelDraftSection>): void {
+  private appendLineFactBoxSections(sectionMap: Map<string, FactBoxDraftSection>): void {
     const activeLine = this.activeLineRow ?? this.resolvedLineRows[0];
     if (!activeLine) {
       return;
     }
 
     for (const [columnIndex, column] of this.resolvedLineColumns.entries()) {
-      const factPanel = this.resolveLineFactPanelConfig(column);
-      if (!factPanel) {
+      const factBox = this.resolveLineFactBoxConfig(column);
+      if (!factBox) {
         continue;
       }
 
-      const sectionId = this.toText(factPanel.sectionId).trim() || 'line';
-      const sectionTitle = this.toText(factPanel.sectionTitle).trim() || 'Line';
-      const rowOrder = Number.isFinite(factPanel.order) ? Number(factPanel.order) : columnIndex;
+      const sectionId = this.toText(factBox.sectionId).trim() || 'line';
+      const sectionTitle = this.toText(factBox.sectionTitle).trim() || 'Line';
+      const rowOrder = Number.isFinite(factBox.order) ? Number(factBox.order) : columnIndex;
       const sectionOrder = sectionId === 'line' ? 500 : 500 + columnIndex;
-      const draft = this.ensureFactPanelSection(sectionMap, sectionId, sectionTitle, sectionOrder);
-      this.appendFactPanelButtons(draft, factPanel.buttons);
+      const draft = this.ensureFactBoxSection(sectionMap, sectionId, sectionTitle, sectionOrder);
+      this.appendFactBoxButtons(draft, factBox.buttons);
       draft.rows.push({
-        label: this.toText(factPanel.label).trim() || column.label,
-        value: this.resolveFactPanelLineValue(column, activeLine, factPanel),
+        label: this.toText(factBox.label).trim() || column.label,
+        value: this.resolveFactBoxLineValue(column, activeLine, factBox),
         order: rowOrder
       });
     }
   }
 
-  private resolveLineFactPanelConfig(column: LineColumnConfig): FieldFactPanelConfig | undefined {
-    if (column.factPanel === true) {
+  private resolveLineFactBoxConfig(column: LineColumnConfig): FieldFactBoxConfig | undefined {
+    if (column.factBox === true) {
       return { show: true };
     }
 
-    if (this.isRecord(column.factPanel)) {
-      const factPanel = column.factPanel as FieldFactPanelConfig;
-      return factPanel.show === false ? undefined : factPanel;
+    if (this.isRecord(column.factBox)) {
+      const factBox = column.factBox as FieldFactBoxConfig;
+      return factBox.show === false ? undefined : factBox;
     }
 
     return undefined;
   }
 
-  private ensureFactPanelSection(
-    sectionMap: Map<string, FactPanelDraftSection>,
+  private ensureFactBoxSection(
+    sectionMap: Map<string, FactBoxDraftSection>,
     id: string,
     title: string,
     order: number
-  ): FactPanelDraftSection {
+  ): FactBoxDraftSection {
     const existing = sectionMap.get(id);
     if (existing) {
       return existing;
     }
 
-    const next: FactPanelDraftSection = {
+    const next: FactBoxDraftSection = {
       id,
       title,
       order,
@@ -454,9 +441,9 @@ export class DocumentWindow {
     return next;
   }
 
-  private appendFactPanelButtons(
-    section: FactPanelDraftSection,
-    buttons: FactPanelSectionConfig['buttons'] | undefined
+  private appendFactBoxButtons(
+    section: FactBoxDraftSection,
+    buttons: FactBoxSectionConfig['buttons'] | undefined
   ): void {
     if (!buttons?.length) {
       return;
@@ -475,7 +462,7 @@ export class DocumentWindow {
     }
   }
 
-  private resolveFactPanelFieldValue(field: FieldConfig, config: FieldFactPanelConfig): string {
+  private resolveFactBoxFieldValue(field: FieldConfig, config: FieldFactBoxConfig): string {
     const rawValue = this.resolvedHeaderData[field.key] ?? field.defaultValue;
     const fallback = this.toText(config.fallback ?? field.defaultValue ?? '-');
     if (rawValue === null || rawValue === undefined || rawValue === '') {
@@ -485,10 +472,10 @@ export class DocumentWindow {
     return this.toText(rawValue);
   }
 
-  private resolveFactPanelLineValue(
+  private resolveFactBoxLineValue(
     column: LineColumnConfig,
     line: Record<string, unknown>,
-    config: FieldFactPanelConfig
+    config: FieldFactBoxConfig
   ): string {
     const key = this.toText(column.field ?? column.id).trim();
     const rawValue = key ? line[key] : undefined;
@@ -500,13 +487,13 @@ export class DocumentWindow {
     return this.toText(rawValue);
   }
 
-  private appendAttachmentsFactPanelSection(sectionMap: Map<string, FactPanelDraftSection>): void {
-    const attachments = this.popupAttachments;
+  private appendAttachmentsFactBoxSection(sectionMap: Map<string, FactBoxDraftSection>): void {
+    const attachments = this.attachments;
     if (!attachments) {
       return;
     }
 
-    const section = this.ensureFactPanelSection(sectionMap, 'attachments', 'Attachments', Number.MAX_SAFE_INTEGER);
+    const section = this.ensureFactBoxSection(sectionMap, 'attachments', 'Attachments', Number.MAX_SAFE_INTEGER);
     section.buttons = attachments.primaryActionKey ? [
       {
         label: attachments.primaryActionLabel,
@@ -522,11 +509,11 @@ export class DocumentWindow {
   }
 
   toggleEntrySize(): void {
-    this.entryMaximized = !this.entryMaximized;
+    this.maximized = !this.maximized;
   }
 
-  openEntryDialog(dialog: EntryDialog): void {
-    this.activeEntryDialog = dialog;
+  openDocumentDetail(dialog: DocumentDetailType): void {
+    this.activeDocumentDetail = dialog;
   }
 
   handleLineAction(event: { actionKey: string; row?: Record<string, unknown>; payload?: unknown }): void {
@@ -570,7 +557,7 @@ export class DocumentWindow {
     this.action.emit({ actionKey: 'line:dropdown-opened', payload: event });
   }
 
-  handleFactPanelAction(actionKey: string): void {
+  handleFactBoxAction(actionKey: string): void {
     this.routeAction(actionKey);
   }
 
@@ -637,12 +624,12 @@ export class DocumentWindow {
     this.closeAllGroupMenus();
   }
 
-  closeEntryDialog(): void {
-    this.activeEntryDialog = null;
+  closeDocumentDetail(): void {
+    this.activeDocumentDetail = null;
   }
 
   get detailTitle(): string {
-    switch (this.activeEntryDialog) {
+    switch (this.activeDocumentDetail) {
       case 'header':
         return 'Header details';
       case 'dimensions':
@@ -659,7 +646,7 @@ export class DocumentWindow {
   }
 
   get detailMessage(): string {
-    switch (this.activeEntryDialog) {
+    switch (this.activeDocumentDetail) {
       case 'header':
         return 'Header detail content is owned by the page configuration.';
       case 'dimensions':
@@ -695,13 +682,13 @@ export class DocumentWindow {
 
   private handleDialogAction(dialog: string): void {
     if (dialog === 'header' || dialog === 'dimensions' || dialog === 'attachments' || dialog === 'line' || dialog === 'posting') {
-      this.openEntryDialog(dialog);
+      this.openDocumentDetail(dialog);
     }
   }
 
   private handleCommandAction(command: string, payload?: unknown): void {
     if (command === 'close') {
-      this.closeEntryDialog();
+      this.closeDocumentDetail();
       return;
     }
 
@@ -741,7 +728,7 @@ export class DocumentWindow {
     return value === null || value === undefined ? '' : String(value);
   }
 
-  private getSortedHeaderToolbarButtons(): EntryCommandButtonConfig[] {
+  private getSortedHeaderToolbarButtons(): CommandConfig[] {
     return [...this.resolvedHeaderToolbarButtons]
       .map((button, index) => ({ button, index }))
       .sort((a, b) => {
@@ -756,7 +743,7 @@ export class DocumentWindow {
       .map((entry) => entry.button);
   }
 
-  private getSortedLineToolbarButtons(): EntryCommandButtonConfig[] {
+  private getSortedLineToolbarButtons(): CommandConfig[] {
     return [...this.resolvedLineToolbarButtons]
       .map((button, index) => ({ button, index }))
       .sort((a, b) => {
@@ -772,7 +759,7 @@ export class DocumentWindow {
   }
 
   private resolvePrimaryActionsLimit(fallback: number): number {
-    const configured = this.popupHeaderCommandBar?.maxPrimaryActions;
+    const configured = this.headerCommandBar?.maxPrimaryActions;
     if (typeof configured !== 'number' || configured <= 0) {
       return fallback;
     }
@@ -781,7 +768,7 @@ export class DocumentWindow {
   }
 
   private resolveVisibleGroupLimit(fallback: number): number {
-    const configured = this.popupHeaderCommandBar?.maxVisibleGroups;
+    const configured = this.headerCommandBar?.maxVisibleGroups;
     if (typeof configured !== 'number' || configured <= 0) {
       return fallback;
     }
@@ -790,7 +777,7 @@ export class DocumentWindow {
   }
 
   private resolveLinePrimaryActionsLimit(fallback: number): number {
-    const configured = this.popupLineCommandBar?.maxPrimaryActions;
+    const configured = this.lineCommandBar?.maxPrimaryActions;
     if (typeof configured !== 'number' || configured <= 0) {
       return fallback;
     }
@@ -799,7 +786,7 @@ export class DocumentWindow {
   }
 
   private resolveLineVisibleGroupLimit(fallback: number): number {
-    const configured = this.popupLineCommandBar?.maxVisibleGroups;
+    const configured = this.lineCommandBar?.maxVisibleGroups;
     if (typeof configured !== 'number' || configured <= 0) {
       return fallback;
     }
@@ -807,7 +794,7 @@ export class DocumentWindow {
     return configured;
   }
 
-  private toButtonKey(button: EntryCommandButtonConfig): string {
+  private toButtonKey(button: CommandConfig): string {
     return `${button.actionKey}::${button.label}`;
   }
 

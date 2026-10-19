@@ -1,4 +1,4 @@
-<section class="entry-pane" [class.maximized]="entryMaximized" [class.embedded]="embedded" [class.interaction-locked]="isInteractionLocked" [style.z-index]="overlayZIndex" aria-label="New account journal">
+<section class="entry-pane" [class.maximized]="maximized" [class.embedded]="embedded" [class.interaction-locked]="isInteractionLocked" [style.z-index]="overlayZIndex" [attr.aria-label]="title || pageLabel || 'Document'">
   <header class="entry-header">
     <div>
       <span>{{ pageLabel }}</span>
@@ -39,10 +39,10 @@
       @if (!embedded) {
         <button
           type="button"
-          [title]="entryMaximized ? 'Restore' : 'Maximize'"
+          [title]="maximized ? 'Restore' : 'Maximize'"
           (click)="toggleEntrySize()"
         >
-          <i [class]="entryMaximized ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen'"></i>
+          <i [class]="maximized ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen'"></i>
         </button>
         <button type="button" title="Close" (click)="closed.emit()">
           <i class="bi bi-x-lg"></i>
@@ -122,7 +122,7 @@
               <h3>{{ headerSection.title ?? 'Section' }}</h3>
 
               @if (headerSection.actionLabel && headerSection.actionDialog) {
-                <button type="button" [disabled]="isInteractionLocked" (click)="openEntryDialog(headerSection.actionDialog)">{{ headerSection.actionLabel }}</button>
+                <button type="button" [disabled]="isInteractionLocked" (click)="openDocumentDetail(headerSection.actionDialog)">{{ headerSection.actionLabel }}</button>
               } @else if (headerSection.metaText) {
                 <span>{{ headerSection.metaText }}</span>
               }
@@ -149,11 +149,11 @@
 
     </div>
 
-    @if (resolvedFactPanelSections.length) {
+    @if (resolvedFactBoxSections.length) {
       <aside class="entry-info">
         <app-fact-box
-          [sections]="resolvedFactPanelSections"
-          (action)="handleFactPanelAction($event)">
+          [sections]="resolvedFactBoxSections"
+          (action)="handleFactBoxAction($event)">
         </app-fact-box>
       </aside>
     }
@@ -255,8 +255,8 @@
     }
   </ng-template>
 
-  @if (activeEntryDialog) {
-    <div class="nested-backdrop" (click)="closeEntryDialog()"></div>
+  @if (activeDocumentDetail) {
+    <div class="nested-backdrop" (click)="closeDocumentDetail()"></div>
 
     <section class="nested-modal" aria-label="Entry detail dialog">
       <header class="nested-header">
@@ -264,7 +264,7 @@
           <span>{{ title }}</span>
           <h3>{{ detailTitle }}</h3>
         </div>
-        <button type="button" title="Close" (click)="closeEntryDialog()">
+        <button type="button" title="Close" (click)="closeDocumentDetail()">
           <i class="bi bi-x-lg"></i>
         </button>
       </header>

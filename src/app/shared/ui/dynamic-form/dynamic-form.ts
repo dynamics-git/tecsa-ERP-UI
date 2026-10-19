@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectorRef } from '@angular/core';
 import { FieldConfig, FormSectionConfig } from '../../../platform/models/field-config.model';
+import { DataSourceService } from '../../../platform/data/data-source.service';
+import { Subscription, timer, switchMap } from 'rxjs';
 
 type FieldChangeEvent = {
   fieldKey: string;
@@ -26,6 +28,35 @@ type FieldDropdownOpenEvent = {
   styleUrl: './dynamic-form.scss',
 })
 export class DynamicForm {
+  constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef) {}
+  private readonly lookups = new Map<string, Subscription>();
+  private readonly selectedLookups = new Set<string>();
+  ngOnChanges(): void {
+    for (const section of this.sections) for (const field of section.fields) {
+      const id = this.data[field.key];
+      const bucket = field.optionsDataKey ?? `__options_${field.key}`;
+      if (!field.lookup || !id || (Array.isArray(this.data[bucket]) && (this.data[bucket] as unknown[]).length)) continue;
+      const selectedKey = `${field.key}:${id}`;
+      if (this.selectedLookups.has(selectedKey)) continue;
+      this.selectedLookups.add(selectedKey);
+      this.lookups.get(field.key)?.unsubscribe();
+      this.lookups.set(field.key, this.source.loadById({ endpoint: field.lookup.endpoint }, id).subscribe({
+        next: record => { this.data[bucket] = [record]; this.changes.markForCheck(); }, error: () => {},
+      }));
+    }
+  }
+  searchLookup(field: FieldConfig, text: string): void {
+    if (!field.lookup) return;
+    this.lookups.get(field.key)?.unsubscribe();
+    const escaped = text.trim().replace(/'/g, "''");
+    const fields = field.lookup.searchFields ?? [field.lookup.displayField];
+    const filter = escaped ? fields.map(key => `contains(${key}, '${escaped}')`).join(' or ') : undefined;
+    this.lookups.set(field.key, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: field.lookup!.endpoint, defaultFilter: filter, pageSize: 20 }))).subscribe({
+      next: response => { this.data[field.optionsDataKey ?? `__options_${field.key}`] = (response as { value: unknown[] }).value; this.changes.markForCheck(); },
+      error: () => { /* Keep the existing selection if a lookup is denied or unavailable. */ },
+    }));
+  }
+  ngOnDestroy(): void { this.lookups.forEach(subscription => subscription.unsubscribe()); }
   @Input() sections: FormSectionConfig[] = [];
   @Input() data: Record<string, unknown> = {};
   @Output() fieldChanged = new EventEmitter<FieldChangeEvent>();
@@ -55,13 +86,16 @@ export class DynamicForm {
     if (sourceKey) {
       const source = this.data[sourceKey];
       if (Array.isArray(source)) {
-        return source
+        const options = source
           .filter((item): item is Record<string, unknown> => this.isRecord(item))
           .map((item) => ({
             label: this.resolveOptionLabel(field, item),
             value: this.resolveOptionValue(field, item),
           }))
           .filter((option) => String(option.value).length > 0);
+        const selected = this.getFieldValue(field);
+        if (selected && !options.some(option => String(option.value) === selected)) options.unshift({ label: selected, value: selected });
+        return options;
       }
     }
 
@@ -124,7 +158,7 @@ export class DynamicForm {
   }
 
   private resolveOptionValue(field: FieldConfig, item: Record<string, unknown>): unknown {
-    const valueFields = this.resolveFieldCandidates(field.valueField ?? field.bindValue);
+    const valueFields = this.resolveFieldCandidates(field.valueField ?? field.bindValue ?? field.lookup?.valueField);
     for (const valueField of valueFields) {
       if (valueField in item) {
         return item[valueField];
@@ -141,7 +175,7 @@ export class DynamicForm {
       );
     }
 
-    const labelFields = this.resolveFieldCandidates(field.labelField ?? field.bindLabel);
+    const labelFields = this.resolveFieldCandidates(field.labelField ?? field.bindLabel ?? field.lookup?.displayField);
     for (const labelField of labelFields) {
       if (labelField in item) {
         return this.toText(item[labelField]);

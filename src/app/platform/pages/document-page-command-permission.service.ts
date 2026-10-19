@@ -1,7 +1,8 @@
+import type { CommandConfig } from '../models/command-config.model';
 import { Injectable } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
-import { EntryCommandButtonConfig } from '../models/document-window-config.model';
+
 
 // Extracted without changing the authorization rules or permission aliases.
 // This governs the visual availability of document commands, not API authorization.
@@ -12,7 +13,7 @@ export class DocumentPageCommandPermissionService {
     private readonly valueMapper: RuntimeValueMapperService,
   ) {}
 
-  apply(button: EntryCommandButtonConfig, pageId: string): EntryCommandButtonConfig {
+  apply(button: CommandConfig, pageId: string): CommandConfig {
     if (button.hidden === true || this.sessionService.SuperAdmin) {
       return button;
     }
@@ -42,6 +43,13 @@ export class DocumentPageCommandPermissionService {
     };
   }
 
+  applyOperation(button: CommandConfig, pageId: string, operation: 'create' | 'modify' | 'delete'): CommandConfig {
+    if (button.hidden || this.sessionService.SuperAdmin) return button;
+    const flags = this.resolvePagePermissionFlags(pageId);
+    const allowed = operation === 'create' ? flags.canCreate : operation === 'modify' ? flags.canUpdate : flags.canDelete;
+    return allowed ? button : { ...button, disabled: true, tooltip: 'You do not have permission for this operation.' };
+  }
+
   private isCustomExecutableCommand(action: string): boolean {
     const standard = new Set([
       'new',
@@ -59,7 +67,7 @@ export class DocumentPageCommandPermissionService {
     return !standard.has(action);
   }
 
-  private canExecutePopupCommand(button: EntryCommandButtonConfig, fallbackCanExecute: boolean): boolean {
+  private canExecutePopupCommand(button: CommandConfig, fallbackCanExecute: boolean): boolean {
     const permissionKey = this.valueMapper.toText(button.permissionKey).trim();
     if (!permissionKey.length) {
       return fallbackCanExecute;

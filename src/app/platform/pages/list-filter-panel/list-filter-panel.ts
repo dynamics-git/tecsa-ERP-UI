@@ -1,9 +1,9 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { RestService } from '../../../core/services/rest.service';
+import { DataSourceService } from '../../data/data-source.service';
 import { ActionDispatcherService } from '../../../shared/ui/action-dispatcher.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
-import { FilterField } from '../../models/list-filter-config.model';
+import { ListFilterFieldConfig } from '../../models/list-filter-config.model';
 
 type FilterRow = {
   id: string;
@@ -27,7 +27,7 @@ type FilterBookmark = {
 export class ListFilterPanel implements OnInit, OnDestroy {
   @Input() enabled = false;
   @Input() columns: Array<{ id?: string; label?: string; field?: string; type?: string }> = [];
-  @Input() filterOptions: FilterField[] = [];
+  @Input() filterOptions: ListFilterFieldConfig[] = [];
   @Input() storageKey = '';
   @Output() command = new EventEmitter<{ actionKey: string; payload?: unknown }>();
 
@@ -46,11 +46,11 @@ export class ListFilterPanel implements OnInit, OnDestroy {
 
   constructor(
     private readonly actionDispatcher: ActionDispatcherService,
-    private readonly rest: RestService,
+    private readonly dataSource: DataSourceService,
     private readonly loading: RunModalLoadingService,
   ) {}
 
-  get resolvedFilterOptions(): FilterField[] {
+  get resolvedFilterOptions(): ListFilterFieldConfig[] {
     if (this.filterOptions.length > 0) {
       return this.filterOptions;
     }
@@ -67,10 +67,11 @@ export class ListFilterPanel implements OnInit, OnDestroy {
         return {
           field,
           label,
-          type
-        } as FilterField;
+          type,
+          options: column.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : undefined,
+        } as ListFilterFieldConfig;
       })
-      .filter((option): option is FilterField => Boolean(option));
+      .filter((option): option is ListFilterFieldConfig => Boolean(option));
   }
 
   get canAddMoreFilters(): boolean {
@@ -119,7 +120,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     }];
   }
 
-  getAvailableFilterOptions(currentIndex: number): FilterField[] {
+  getAvailableFilterOptions(currentIndex: number): ListFilterFieldConfig[] {
     const selected = new Set(
       this.filters
         .filter((_, index) => index !== currentIndex)
@@ -383,8 +384,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     this.dropdownLoading[row.id] = true;
     const scope = this.buildFilterLoadScope(config.field);
     this.loading.begin(scope, `Loading ${config.label} options...`);
-    const endpoint = `${config.apiUrl}${config.apiUrl.includes('?') ? '&' : '?'}$top=50`;
-    this.rest.get(endpoint, { suppressGlobalErrorDialog: true }).subscribe({
+    this.dataSource.loadList({ endpoint: config.apiUrl, pageSize: 50 }).subscribe({
       next: (data) => {
         const rows = this.toRecords(data);
         const valueField = config.valueField ?? 'value';
@@ -455,7 +455,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     this.command.emit({ actionKey: 'advancedFilterChanged', payload: { filters } });
   }
 
-  private getFieldConfig(field: string): FilterField | undefined {
+  private getFieldConfig(field: string): ListFilterFieldConfig | undefined {
     return this.resolvedFilterOptions.find((option) => option.field === field);
   }
 
@@ -477,7 +477,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     return this.getFieldConfig(field)?.type ?? 'text';
   }
 
-  private mapColumnTypeToFilterType(type: unknown): FilterField['type'] {
+  private mapColumnTypeToFilterType(type: unknown): ListFilterFieldConfig['type'] {
     const normalized = String(type ?? '').trim().toLowerCase();
     if (normalized === 'date') {
       return 'date';
@@ -487,7 +487,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
       return 'number';
     }
 
-    if (normalized === 'lookup' || normalized === 'badge') {
+    if (normalized === 'lookup' || normalized === 'badge' || normalized === 'boolean') {
       return 'select';
     }
 

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
 import { DataSourceConfig } from '../models/data-source-config.model';
-import { EntryRecordService } from '../data/entry-record.service';
+import { DocumentRecordService } from '../data/document-record.service';
 import { RunModalConfigModule } from './run-modal-config.token';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
@@ -13,7 +13,7 @@ export type RunModalPayloadBindingContext = {
   providedIn: 'root',
 })
 export class RunModalPayloadBuilderService {
-  private readonly entryRecord = inject(EntryRecordService);
+  private readonly documentRecord = inject(DocumentRecordService);
   private readonly valueMapper = inject(RuntimeValueMapperService);
 
   buildHeaderPayload(params: {
@@ -49,7 +49,7 @@ export class RunModalPayloadBuilderService {
   buildLineSavePayload(params: {
     binding: RunModalPayloadBindingContext;
     row: Record<string, unknown>;
-    entryDialogConfig: DocumentWindowConfig;
+    documentWindowConfig: DocumentWindowConfig;
     dataSource: DataSourceConfig;
     changePayload?: unknown;
     pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
@@ -68,7 +68,7 @@ export class RunModalPayloadBuilderService {
     return this.buildLineCreatePayload({
       binding: params.binding,
       row: params.row,
-      entryDialogConfig: params.entryDialogConfig,
+      documentWindowConfig: params.documentWindowConfig,
       dataSource: params.dataSource,
       pickObjectFromModule: params.pickObjectFromModule,
       firstPresentValue: params.firstPresentValue,
@@ -94,21 +94,21 @@ export class RunModalPayloadBuilderService {
   buildLineCreatePayload(params: {
     binding: RunModalPayloadBindingContext;
     row: Record<string, unknown>;
-    entryDialogConfig: DocumentWindowConfig;
+    documentWindowConfig: DocumentWindowConfig;
     dataSource: DataSourceConfig;
     pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
     firstPresentValue: (values: unknown[]) => unknown;
   }): Record<string, unknown> {
     this.ensureLineParentFields({
       row: params.row,
-      entryDialogConfig: params.entryDialogConfig,
+      documentWindowConfig: params.documentWindowConfig,
       dataSource: params.dataSource,
       firstPresentValue: params.firstPresentValue,
     });
     this.ensureLineNo({
       binding: params.binding,
       row: params.row,
-      entryDialogConfig: params.entryDialogConfig,
+      documentWindowConfig: params.documentWindowConfig,
       pickObjectFromModule: params.pickObjectFromModule,
     });
 
@@ -126,7 +126,7 @@ export class RunModalPayloadBuilderService {
         payload[field] = value;
       }
     } else {
-      for (const column of params.entryDialogConfig.lineColumns ?? []) {
+      for (const column of params.documentWindowConfig.lineColumns ?? []) {
         const field = this.toText(column.field ?? column.id).trim();
         if (!field || !(field in source)) {
           continue;
@@ -188,11 +188,11 @@ export class RunModalPayloadBuilderService {
 
   ensureLineParentFields(params: {
     row: Record<string, unknown>;
-    entryDialogConfig: DocumentWindowConfig;
+    documentWindowConfig: DocumentWindowConfig;
     dataSource: DataSourceConfig;
     firstPresentValue: (values: unknown[]) => unknown;
   }): void {
-    const headerData = params.entryDialogConfig.headerData ?? {};
+    const headerData = params.documentWindowConfig.headerData ?? {};
     const parentKeyField = this.toText(params.dataSource.parentKeyField).trim();
     if (parentKeyField.length && !this.hasMeaningfulPayloadValue(params.row[parentKeyField])) {
       const documentNoField = this.toText(params.dataSource.documentNoField).trim();
@@ -214,7 +214,7 @@ export class RunModalPayloadBuilderService {
   ensureLineNo(params: {
     binding: RunModalPayloadBindingContext;
     row: Record<string, unknown>;
-    entryDialogConfig: DocumentWindowConfig;
+    documentWindowConfig: DocumentWindowConfig;
     pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
   }): void {
     const lineKeyField = this.resolveLineKeyField({
@@ -227,7 +227,7 @@ export class RunModalPayloadBuilderService {
     }
 
     params.row[lineKeyField] = this.resolveNextLineNo({
-      rows: params.entryDialogConfig.lineRows ?? [],
+      rows: params.documentWindowConfig.lineRows ?? [],
       targetRow: params.row,
       lineKeyField,
     });
@@ -250,7 +250,7 @@ export class RunModalPayloadBuilderService {
     row: Record<string, unknown>,
     dataSource: DataSourceConfig,
   ): boolean {
-    const id = this.entryRecord.resolvePersistedRecordId(row, dataSource);
+    const id = this.documentRecord.resolvePersistedRecordId(row, dataSource);
     return id !== null && id !== undefined && String(id).trim().length > 0;
   }
 

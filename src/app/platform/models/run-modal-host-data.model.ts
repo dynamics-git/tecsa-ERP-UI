@@ -2,29 +2,32 @@ import type { ConfirmationDialogConfig } from './confirmation-dialog-config.mode
 import type { DocumentWindowConfig } from './document-window-config.model';
 import type { ListPageConfig } from './page-config.model';
 import type { PopupConfig } from './popup-config.model';
+import type { RunModalConfigModule } from '../run-modal/run-modal-config.token';
 
-export type PopupLayoutMode = 'header-line' | 'header-only' | 'line-only';
+export type DocumentLayoutMode = 'header-line' | 'header-only' | 'line-only';
 
-export interface NestedPopupBehavior {
+export interface NestedPopupConfig {
   mode?: PopupConfig['mode'];
   size?: PopupConfig['size'];
   closeOnBackdrop?: boolean;
   allowNested?: boolean;
-  layout?: PopupLayoutMode;
+  layout?: DocumentLayoutMode;
 }
 
-export interface RunModalListPopupState {
+export interface RunModalListState {
   pageId: string;
   config: ListPageConfig;
   rows: unknown[];
   loading: boolean;
   errorMessage?: string;
+  hasMore?: boolean;
 }
 
 export interface RunModalHostData {
-  entryDialogConfig?: DocumentWindowConfig;
-  runModalList?: RunModalListPopupState;
+  runtimePage?: { pageId: string; module: RunModalConfigModule; record: Record<string, unknown> };
+  documentWindowConfig?: DocumentWindowConfig;
+  runModalList?: RunModalListState;
   confirmationDialogConfig?: ConfirmationDialogConfig;
-  nestedEntryDialogConfigs?: Record<string, DocumentWindowConfig>;
-  nestedPopupBehaviors?: Record<string, NestedPopupBehavior>;
+  nestedDocumentWindowConfigs?: Record<string, DocumentWindowConfig>;
+  nestedPopupConfigs?: Record<string, NestedPopupConfig>;
 }

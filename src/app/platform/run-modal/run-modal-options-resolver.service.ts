@@ -24,9 +24,9 @@ export class RunModalOptionsResolverService {
   }
 
   buildLineTypeMasterEndpointMap(
-    entryDialogConfig: DocumentWindowConfig,
+    documentWindowConfig: DocumentWindowConfig,
   ): Record<string, string[]> {
-    const typeColumn = this.resolveLineTypeColumn(entryDialogConfig);
+    const typeColumn = this.resolveLineTypeColumn(documentWindowConfig);
     const endpointMap: Record<string, string[]> = {};
 
     for (const option of typeColumn?.options ?? []) {
@@ -42,11 +42,11 @@ export class RunModalOptionsResolverService {
 
   buildLineMasterRegistry(
     masters: Record<string, Record<string, unknown>[]>,
-    entryDialogConfig?: DocumentWindowConfig,
+    documentWindowConfig?: DocumentWindowConfig,
   ): LineMasterRegistry {
     const dynamicRegistry = this.buildDynamicLineMasterRegistry(
       masters,
-      entryDialogConfig,
+      documentWindowConfig,
     );
     if (dynamicRegistry) {
       return dynamicRegistry;
@@ -61,9 +61,9 @@ export class RunModalOptionsResolverService {
 
   buildDynamicLineMasterRegistry(
     masters: Record<string, Record<string, unknown>[]>,
-    entryDialogConfig: DocumentWindowConfig | undefined,
+    documentWindowConfig: DocumentWindowConfig | undefined,
   ): LineMasterRegistry | undefined {
-    const typeColumn = entryDialogConfig ? this.resolveLineTypeColumn(entryDialogConfig) : undefined;
+    const typeColumn = documentWindowConfig ? this.resolveLineTypeColumn(documentWindowConfig) : undefined;
     const typeOptions = typeColumn?.options ?? [];
     const byType: LineMasterRegistry['byType'] = {};
 
@@ -76,7 +76,7 @@ export class RunModalOptionsResolverService {
       byType[type] = {
         options: this.buildConfiguredOptions(
           masters[type],
-          entryDialogConfig ? this.resolveLineMasterValueColumn(entryDialogConfig) : undefined,
+          documentWindowConfig ? this.resolveLineMasterValueColumn(documentWindowConfig) : undefined,
         ),
         records: masters[type] ?? [],
       };
@@ -94,12 +94,12 @@ export class RunModalOptionsResolverService {
   }
 
   buildLineOptionFieldMap(
-    entryDialogConfig: DocumentWindowConfig,
+    documentWindowConfig: DocumentWindowConfig,
     masters: Record<string, Record<string, unknown>[]>,
   ): Record<string, Array<{ label: string; value: unknown }>> {
     const result: Record<string, Array<{ label: string; value: unknown }>> = {};
 
-    for (const column of entryDialogConfig.lineColumns ?? []) {
+    for (const column of documentWindowConfig.lineColumns ?? []) {
       const field = this.toText(column.field ?? column.id).trim();
       const optionsKey = this.toText(
         column.optionsDataKey ?? (field ? `__options_${field}` : ''),
@@ -130,8 +130,8 @@ export class RunModalOptionsResolverService {
     return this.masterData.toSelectOptions(records, valueFields, labelFields);
   }
 
-  resolveLineNumberOptionFieldKey(entryDialogConfig: DocumentWindowConfig): string {
-    const numberColumn = this.resolveLineMasterValueColumn(entryDialogConfig);
+  resolveLineNumberOptionFieldKey(documentWindowConfig: DocumentWindowConfig): string {
+    const numberColumn = this.resolveLineMasterValueColumn(documentWindowConfig);
 
     if (numberColumn) {
       const field = this.toText(numberColumn.field ?? numberColumn.id).trim();
@@ -145,19 +145,19 @@ export class RunModalOptionsResolverService {
     return '';
   }
 
-  resolveLineTypeColumn(entryDialogConfig: DocumentWindowConfig): LineColumnConfig | undefined {
-    return (entryDialogConfig.lineColumns ?? []).find((column) =>
+  resolveLineTypeColumn(documentWindowConfig: DocumentWindowConfig): LineColumnConfig | undefined {
+    return (documentWindowConfig.lineColumns ?? []).find((column) =>
       (column.options ?? []).some((option) => this.resolveApiEndpoints(option.api).length > 0),
     );
   }
 
-  resolveLineTypeField(entryDialogConfig: DocumentWindowConfig): string {
-    const column = this.resolveLineTypeColumn(entryDialogConfig);
+  resolveLineTypeField(documentWindowConfig: DocumentWindowConfig): string {
+    const column = this.resolveLineTypeColumn(documentWindowConfig);
     return this.toText(column?.field ?? column?.id).trim();
   }
 
-  resolveLineMasterValueColumn(entryDialogConfig: DocumentWindowConfig): LineColumnConfig | undefined {
-    return (entryDialogConfig.lineColumns ?? []).find((column) => Boolean(column.fill));
+  resolveLineMasterValueColumn(documentWindowConfig: DocumentWindowConfig): LineColumnConfig | undefined {
+    return (documentWindowConfig.lineColumns ?? []).find((column) => Boolean(column.fill));
   }
 
   private resolveConfiguredFields(source: string | string[] | undefined): string[] {

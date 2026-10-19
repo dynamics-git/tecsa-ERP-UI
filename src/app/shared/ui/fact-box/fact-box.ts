@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { FactPanelSectionConfig } from '../../../platform/models/document-window-config.model';
+import { FactBoxSectionConfig } from '../../../platform/models/document-window-config.model';
 
 @Component({
   selector: 'app-fact-box',
@@ -10,7 +10,7 @@ import { FactPanelSectionConfig } from '../../../platform/models/document-window
   styleUrl: './fact-box.scss'
 })
 export class FactBox {
-  @Input() sections: FactPanelSectionConfig[] = [];
+  @Input() sections: FactBoxSectionConfig[] = [];
   @Output() action = new EventEmitter<string>();
 
   runAction(actionKey: string): void {

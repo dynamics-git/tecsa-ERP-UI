@@ -5,6 +5,10 @@ import { PurchaseOrderPage } from './features/purchasing/purchase-order/purchase
 import { LoginPage } from './features/auth/login/login';
 import { PlatformRedirect } from './features/auth/platform-redirect';
 import { authChildGuard, authGuard } from './core/guards/auth.guard';
+import { NoSeriesPage } from './features/administration/no-series/no-series';
+import { PurchaseRequisitionPage } from './features/purchasing/purchase-requisition/purchase-requisition';
+import { PurchasesPayablesSetupPage } from './features/setup/purchases-payables-setup/purchases-payables-setup';
+import { SalesReceivablesSetupPage } from './features/setup/sales-receivables-setup/sales-receivables-setup';
 
 export const routes: Routes = [
   { path: 'welcome', component: PlatformRedirect },
@@ -18,6 +22,10 @@ export const routes: Routes = [
     children: [
       { path: '', component: DashboardPage },
       { path: 'purchase-order', component: PurchaseOrderPage, data: { pageId: 'purchase-order' } },
+      { path: 'no-series', component: NoSeriesPage, data: { pageId: 'no-series' } },
+      { path: 'purchase-requisition', component: PurchaseRequisitionPage, data: { pageId: 'purchase-requisition' } },
+      { path: 'purchases-payables-setup', component: PurchasesPayablesSetupPage, data: { pageId: 'purchases-payables-setup' } },
+      { path: 'sales-receivables-setup', component: SalesReceivablesSetupPage, data: { pageId: 'sales-receivables-setup' } },
     ],
   },
   { path: '**', redirectTo: '' },

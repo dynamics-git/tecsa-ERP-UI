@@ -92,17 +92,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   get rows(): unknown[] {
-    if (!this.activeSort) {
-      return this.data;
-    }
-
-    const direction = this.activeSort.direction === 'asc' ? 1 : -1;
-    const field = this.activeSort.field;
-
-    return [...this.data].sort((left, right) => {
-      const result = this.compareValues(this.read(left, field), this.read(right, field));
-      return result * direction;
-    });
+    return this.data;
   }
 
   get isInitialLoading(): boolean {
@@ -647,6 +637,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   toggleSort(column: DisplayColumn): void {
+    if (column.sortable === false || this.config?.dataSurface?.sortable === false || this.config?.dataSource?.paging === 'cursor') return;
     const field = this.getColumnKey(column);
     if (!field.length) {
       return;
@@ -654,6 +645,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
 
     if (this.activeSort?.field !== field) {
       this.activeSort = { field, direction: 'asc' };
+      this.command.emit({ actionKey: 'sortChanged', payload: { sort: `${field} asc` } });
       return;
     }
 
@@ -661,6 +653,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
       field,
       direction: this.activeSort.direction === 'asc' ? 'desc' : 'asc',
     };
+    this.command.emit({ actionKey: 'sortChanged', payload: { sort: `${field} ${this.activeSort.direction}` } });
   }
 
   startColumnResize(event: PointerEvent, column: DisplayColumn): void {

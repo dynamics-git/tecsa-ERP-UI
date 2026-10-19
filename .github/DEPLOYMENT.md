@@ -19,7 +19,7 @@ You need to add these secrets to your GitHub repository:
 ## Workflow Configuration
 
 ### Build Output
-- The Angular app builds to: `dist/filaz-erp/browser/`
+- The Angular app builds to: `dist/tecsa-erp-ui/browser/`
 - Files are deployed to: `./public/` on your FTP server
 
 ### Triggers

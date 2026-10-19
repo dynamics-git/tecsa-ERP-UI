@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { EntryCommandButtonConfig } from '../models/document-window-config.model';
+
 import { CommandConfig } from '../models/command-config.model';
 import { ListCommandSelectionMode, ListCommandSelectionPolicyConfig } from '../models/page-config.model';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
@@ -133,10 +133,10 @@ export class DocumentPageCommandRoutingResolverService {
 
   findEntryCommandButton(params: {
     command: string;
-    headerToolbarButtons?: EntryCommandButtonConfig[];
-    lineToolbarButtons?: EntryCommandButtonConfig[];
-    detailToolbarButtons?: EntryCommandButtonConfig[];
-  }): EntryCommandButtonConfig | undefined {
+    headerToolbarButtons?: CommandConfig[];
+    lineToolbarButtons?: CommandConfig[];
+    detailToolbarButtons?: CommandConfig[];
+  }): CommandConfig | undefined {
     const normalized = this.normalizeCommandAction({ actionKey: params.command });
     if (!normalized.length) {
       return undefined;

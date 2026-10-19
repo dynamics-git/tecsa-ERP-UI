@@ -30,6 +30,7 @@ export class FieldValidationService {
 
     if (field.type === 'number' || field.type === 'currency' || field.valueType === 'number') {
       const numberValue = this.toNumber(value);
+      if (text.trim().length && numberValue === null) errors.push(`${field.label} must be a number`);
       if (numberValue !== null) {
         if (validation.min !== undefined && numberValue < validation.min) {
           errors.push(validation.message ?? `${field.label} must be at least ${validation.min}`);

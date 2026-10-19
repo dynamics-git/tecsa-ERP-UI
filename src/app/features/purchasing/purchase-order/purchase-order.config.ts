@@ -1,13 +1,13 @@
 import {
   CommandConfig,
   DataSourceConfig,
-  EntryHeaderConfig,
-  EntryFooterSectionConfig,
+  HeaderConfig,
+  FooterSectionConfig,
   LineConfig,
   ListPageConfig,
 } from '../../../platform/public-api';
 
-export const purchaseOrderHeaderConfig: EntryHeaderConfig = {
+export const purchaseOrderHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Order',
   toolbarButtons: [
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
@@ -137,7 +137,7 @@ export const purchaseOrderHeaderConfig: EntryHeaderConfig = {
           type: 'text',
           valueType: 'text',
           readonly: true,
-          factPanel: { sectionId: 'document', sectionTitle: 'Document', order: 10, fallback: '-' },
+          factBox: { sectionId: 'document', sectionTitle: 'Document', order: 10, fallback: '-' },
         },
         { key: 'dueDate', label: 'Due Date', type: 'date', valueType: 'date', readonly: true },
         {
@@ -158,7 +158,7 @@ export const purchaseOrderHeaderConfig: EntryHeaderConfig = {
           type: 'date',
           valueType: 'date',
           readonly: true,
-          factPanel: { sectionId: 'document', sectionTitle: 'Document', order: 30, fallback: '-' },
+          factBox: { sectionId: 'document', sectionTitle: 'Document', order: 30, fallback: '-' },
         },
         {
           key: 'buyFromVendorName',
@@ -167,7 +167,7 @@ export const purchaseOrderHeaderConfig: EntryHeaderConfig = {
           valueType: 'text',
           width: 'wide',
           readonly: true,
-          factPanel: {
+          factBox: {
             sectionId: 'document',
             sectionTitle: 'Document',
             label: 'Vendor',
@@ -213,7 +213,7 @@ export const purchaseOrderHeaderConfig: EntryHeaderConfig = {
           valueType: 'text',
           readonly: true,
           defaultValue: 'Open',
-          factPanel: { sectionId: 'review', sectionTitle: 'Review', order: 10, fallback: 'Open' },
+          factBox: { sectionId: 'review', sectionTitle: 'Review', order: 10, fallback: 'Open' },
         },
         {
           key: 'buyFromPostCode',
@@ -321,7 +321,7 @@ export const purchaseOrderHeaderConfig: EntryHeaderConfig = {
           label: 'Posting Date',
           type: 'date',
           valueType: 'date',
-          factPanel: { sectionId: 'document', sectionTitle: 'Document', order: 40, fallback: '-' },
+          factBox: { sectionId: 'document', sectionTitle: 'Document', order: 40, fallback: '-' },
         },
       ],
     },
@@ -335,6 +335,7 @@ export const purchaseOrderLineConfig: LineConfig = {
   },
   dataSource: {
     endpoint: '/purchaseOrderLines',
+    supportsCreate: false, supportsUpdate: false, supportsDelete: false,
     keyField: 'systemId',
     parentKeyField: 'documentNo',
     documentNoField: 'number',
@@ -403,7 +404,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       field: 'description',
       valueType: 'text',
       cellType: 'text',
-      factPanel: { sectionId: 'line', sectionTitle: 'Line', order: 10, fallback: '-' },
+      factBox: { sectionId: 'line', sectionTitle: 'Line', order: 10, fallback: '-' },
     },
     {
       id: 'unitOfMeasure',
@@ -432,7 +433,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       valueType: 'number',
       cellType: 'text',
       align: 'end',
-      factPanel: { sectionId: 'line', sectionTitle: 'Line', order: 20, fallback: '0' },
+      factBox: { sectionId: 'line', sectionTitle: 'Line', order: 20, fallback: '0' },
     },
     {
       id: 'directUnitCost',
@@ -441,7 +442,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       valueType: 'number',
       cellType: 'text',
       align: 'end',
-      factPanel: { sectionId: 'line', sectionTitle: 'Line', order: 30, fallback: '0' },
+      factBox: { sectionId: 'line', sectionTitle: 'Line', order: 30, fallback: '0' },
     },
     {
       id: 'lineAmount',
@@ -451,7 +452,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       cellType: 'text',
       readonly: true,
       align: 'end',
-      factPanel: { sectionId: 'line', sectionTitle: 'Line', order: 40, fallback: '0' },
+      factBox: { sectionId: 'line', sectionTitle: 'Line', order: 40, fallback: '0' },
     },
     {
       id: 'amountToInvoice',
@@ -461,7 +462,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       cellType: 'text',
       readonly: true,
       align: 'end',
-      factPanel: { sectionId: 'line', sectionTitle: 'Line', order: 50, fallback: '0' },
+      factBox: { sectionId: 'line', sectionTitle: 'Line', order: 50, fallback: '0' },
     },
     {
       id: 'amountInvoiced',
@@ -471,7 +472,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       cellType: 'text',
       readonly: true,
       align: 'end',
-      factPanel: { sectionId: 'line', sectionTitle: 'Line', order: 60, fallback: '0' },
+      factBox: { sectionId: 'line', sectionTitle: 'Line', order: 60, fallback: '0' },
     },
     {
       id: 'Attachment',
@@ -538,7 +539,7 @@ export const purchaseOrderLineConfig: LineConfig = {
         },
       ],
     },
-  ] satisfies EntryFooterSectionConfig[],
+  ] satisfies FooterSectionConfig[],
 };
 
 export const purchaseOrderListCommandsConfig: CommandConfig[] = [
@@ -604,6 +605,7 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
   commands: purchaseOrderListCommandsConfig,
   dataSource: {
     endpoint: '/purchaseOrderHeaders',
+    supportsCreate: false, supportsUpdate: false, supportsDelete: false,
     contractProfileKey: 'purchaseOrderHeaders',
     keyField: 'systemId',
     documentNoField: 'number',
@@ -620,7 +622,7 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
         type: 'text',
         width: '84px',
         isPrimary: true,
-        factPanel: { sectionId: 'details', sectionTitle: 'Details', order: 10, fallback: '-' },
+        factBox: { sectionId: 'details', sectionTitle: 'Details', order: 10, fallback: '-' },
       },
       {
         field: 'buyFromVendorName',
@@ -628,42 +630,42 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
         type: 'text',
         width: '268px',
         subtitleField: 'buyFromVendorNumber',
-        factPanel: { sectionId: 'details', sectionTitle: 'Details', order: 20, fallback: '-' },
+        factBox: { sectionId: 'details', sectionTitle: 'Details', order: 20, fallback: '-' },
       },
       {
         field: 'vendorStatus',
         label: 'Vendor Status',
         type: 'text',
         width: '190px',
-        factPanel: { sectionId: 'details', sectionTitle: 'Details', order: 25, fallback: '-' },
+        factBox: { sectionId: 'details', sectionTitle: 'Details', order: 25, fallback: '-' },
       },
       {
         field: 'orderDate',
         label: 'Order Date',
         type: 'date',
         width: '132px',
-        factPanel: { sectionId: 'details', sectionTitle: 'Details', order: 30, fallback: '-' },
+        factBox: { sectionId: 'details', sectionTitle: 'Details', order: 30, fallback: '-' },
       },
       {
         field: 'postingDate',
         label: 'Posting Date',
         type: 'date',
         width: '132px',
-        factPanel: { sectionId: 'details', sectionTitle: 'Details', order: 40, fallback: '-' },
+        factBox: { sectionId: 'details', sectionTitle: 'Details', order: 40, fallback: '-' },
       },
       {
         field: 'status',
         label: 'Status',
         type: 'badge',
         width: '132px',
-        factPanel: { sectionId: 'details', sectionTitle: 'Details', order: 50, fallback: '-' },
+        factBox: { sectionId: 'details', sectionTitle: 'Details', order: 50, fallback: '-' },
       },
       {
         field: 'paymentTermsCode',
         label: 'Payment Terms',
         type: 'text',
         width: '118px',
-        factPanel: { sectionId: 'details', sectionTitle: 'Details', order: 60, fallback: '-' },
+        factBox: { sectionId: 'details', sectionTitle: 'Details', order: 60, fallback: '-' },
       },
       {
         field: 'prepayment',
@@ -671,7 +673,7 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
         type: 'number',
         width: '126px',
         align: 'end',
-        factPanel: { sectionId: 'amounts', sectionTitle: 'Amounts', order: 5, fallback: '0' },
+        factBox: { sectionId: 'amounts', sectionTitle: 'Amounts', order: 5, fallback: '0' },
       },
       {
         field: 'currencyCode',
@@ -685,7 +687,7 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
         type: 'currency',
         width: '146px',
         align: 'end',
-        factPanel: { sectionId: 'amounts', sectionTitle: 'Amounts', order: 15, fallback: '0' },
+        factBox: { sectionId: 'amounts', sectionTitle: 'Amounts', order: 15, fallback: '0' },
       },
       {
         field: 'amountIncludingVAT',
@@ -693,35 +695,35 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
         type: 'currency',
         width: '164px',
         align: 'end',
-        factPanel: { sectionId: 'amounts', sectionTitle: 'Amounts', order: 20, fallback: '0' },
+        factBox: { sectionId: 'amounts', sectionTitle: 'Amounts', order: 20, fallback: '0' },
       },
       {
         field: 'grnReviewStatus',
         label: 'GRN Review',
         type: 'text',
         width: '124px',
-        factPanel: { sectionId: 'review', sectionTitle: 'Review', order: 10, fallback: '-' },
+        factBox: { sectionId: 'review', sectionTitle: 'Review', order: 10, fallback: '-' },
       },
       {
         field: 'invoiceReviewStatus',
         label: 'Invoice Review',
         type: 'text',
         width: '132px',
-        factPanel: { sectionId: 'review', sectionTitle: 'Review', order: 20, fallback: '-' },
+        factBox: { sectionId: 'review', sectionTitle: 'Review', order: 20, fallback: '-' },
       },
       {
         field: 'manualPoCancel',
         label: 'Manual PO Cancel',
         type: 'boolean',
         hidden: true,
-        factPanel: { sectionId: 'review', sectionTitle: 'Review', order: 30, fallback: 'false' },
+        factBox: { sectionId: 'review', sectionTitle: 'Review', order: 30, fallback: 'false' },
       },
       {
         field: 'variationOrder',
         label: 'Variation Order',
         type: 'boolean',
         width: '132px',
-        factPanel: { sectionId: 'review', sectionTitle: 'Review', order: 40, fallback: 'false' },
+        factBox: { sectionId: 'review', sectionTitle: 'Review', order: 40, fallback: 'false' },
       },
       {
         field: 'systemModifiedAt',
@@ -734,7 +736,7 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
         label: 'Created By',
         type: 'text',
         hidden: true,
-        factPanel: { sectionId: 'system', sectionTitle: 'System', order: 20 },
+        factBox: { sectionId: 'system', sectionTitle: 'System', order: 20 },
       },
     ],
   },

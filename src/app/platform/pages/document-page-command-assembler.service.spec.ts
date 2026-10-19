@@ -1,6 +1,7 @@
+import type { CommandConfig } from '../models/command-config.model';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataSourceConfig } from '../models/data-source-config.model';
-import { EntryCommandButtonConfig } from '../models/document-window-config.model';
+
 import { LineConfig } from '../models/line-config.model';
 import { DocumentPageCommandPermissionService } from './document-page-command-permission.service';
 import { DocumentPageCommandAssemblerService } from './document-page-command-assembler.service';
@@ -13,12 +14,12 @@ describe('DocumentPage command assembly', () => {
   };
   const pageId = 'purchase-order';
   const source = { endpoint: '/purchaseOrderHeaders' } as DataSourceConfig;
-  const button = (actionKey: string, rest: Partial<EntryCommandButtonConfig> = {}): EntryCommandButtonConfig =>
+  const button = (actionKey: string, rest: Partial<CommandConfig> = {}): CommandConfig =>
     ({ actionKey, label: actionKey, ...rest });
 
   beforeEach(() => {
     permission = {
-      apply: vi.fn((value: EntryCommandButtonConfig) => value),
+      apply: vi.fn((value: CommandConfig) => value),
       normalizePopupCommandKey: (action: unknown) => {
         const text = action == null ? '' : String(action).trim().toLowerCase();
         return text.startsWith('cmd:') ? text.slice(4) : text;
@@ -92,10 +93,10 @@ describe('DocumentPage command assembly', () => {
 
   it('preserves undefined/empty detail arrays and clones populated details before permissions', () => {
     expect(assembler.resolveDetailToolbarButtons({ pageId })).toBeUndefined();
-    const empty: EntryCommandButtonConfig[] = [];
+    const empty: CommandConfig[] = [];
     expect(assembler.resolveDetailToolbarButtons({ toolbarButtons: empty, pageId })).toBe(empty);
     const configured = [button('cmd:statistics', { label: 'Statistics' })];
-    permission.apply.mockImplementation((item: EntryCommandButtonConfig) => ({ ...item, disabled: true }));
+    permission.apply.mockImplementation((item: CommandConfig) => ({ ...item, disabled: true }));
     const result = assembler.resolveDetailToolbarButtons({ toolbarButtons: configured, pageId });
     expect(result?.[0]).toMatchObject({ actionKey: 'cmd:statistics', disabled: true });
     expect(configured[0].disabled).toBeUndefined();

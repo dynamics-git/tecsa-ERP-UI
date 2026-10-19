@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "filaz-erp": {
+    "tecsa-erp-ui": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -70,10 +70,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "filaz-erp:build:production"
+              "buildTarget": "tecsa-erp-ui:build:production"
             },
             "development": {
-              "buildTarget": "filaz-erp:build:development"
+              "buildTarget": "tecsa-erp-ui:build:development"
             }
           },
           "defaultConfiguration": "development"

@@ -5,7 +5,7 @@ import { EntityContractService } from './entity-contract.service';
 @Injectable({
   providedIn: 'root'
 })
-export class EntryRecordService {
+export class DocumentRecordService {
   constructor(private readonly contractService: EntityContractService) {}
 
   resolvePersistedRecordId(record: Record<string, unknown>, config?: DataSourceConfig): unknown {

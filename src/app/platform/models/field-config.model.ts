@@ -50,7 +50,7 @@ export interface FieldTargetConfig {
   clearOnEmpty?: boolean;
 }
 
-export interface FieldFactPanelConfig {
+export interface FieldFactBoxConfig {
   show?: boolean;
   sectionId?: string;
   sectionTitle?: string;
@@ -67,6 +67,7 @@ export interface FieldConfig {
   valueType?: FieldValueType;
   required?: boolean;
   readonly?: boolean;
+  readonlyAfterCreate?: boolean;
   disabled?: boolean;
   hidden?: boolean;
   placeholder?: string;
@@ -88,7 +89,7 @@ export interface FieldConfig {
   messages?: FieldMessagesConfig;
   width?: string;
   sectionId?: string;
-  factPanel?: boolean | FieldFactPanelConfig;
+  factBox?: boolean | FieldFactBoxConfig;
 }
 
 export interface FormSectionConfig {

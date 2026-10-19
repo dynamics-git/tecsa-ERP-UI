@@ -4,21 +4,21 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { DataSourceConfig } from '../../platform/models/data-source-config.model';
 import { FormSectionConfig } from '../../platform/models/field-config.model';
 import { DataSourceService } from '../../platform/data/data-source.service';
-import { EntryPayloadService } from '../../platform/data/entry-payload.service';
-import { EntryRecordService } from '../../platform/data/entry-record.service';
-import { EntrySavePort, EntrySaveRequest, EntrySaveResult } from '../../platform/data/entry-save.port';
+import { DocumentPayloadService } from '../../platform/data/document-payload.service';
+import { DocumentRecordService } from '../../platform/data/document-record.service';
+import { DocumentSavePort, DocumentSaveRequest, DocumentSaveResult } from '../../platform/data/document-save.port';
 
 @Injectable({
   providedIn: 'root'
 })
-export class EntrySaveService implements EntrySavePort {
+export class DocumentSaveService implements DocumentSavePort {
   constructor(
     private readonly dataSource: DataSourceService,
-    private readonly entryPayload: EntryPayloadService,
-    private readonly entryRecord: EntryRecordService
+    private readonly documentPayload: DocumentPayloadService,
+    private readonly documentRecord: DocumentRecordService
   ) {}
 
-  save(request: EntrySaveRequest): Observable<EntrySaveResult> {
+  save(request: DocumentSaveRequest): Observable<DocumentSaveResult> {
     const dataSource = this.resolveDataSourceConfig(request);
     const headerSections = this.resolveHeaderSections(request);
     const modifiedAtKey = this.resolveModifiedAtKey(request);
@@ -26,11 +26,11 @@ export class EntrySaveService implements EntrySavePort {
     if (!dataSource || !headerSections.length) {
       return of({
         saved: false,
-        errorMessage: 'Entry save configuration is missing (dataSourceConfig/headerSections).'
+        errorMessage: 'Document save configuration is missing (dataSourceConfig/headerSections).'
       });
     }
 
-    const id = this.entryRecord.resolveRecordId(request.headerData, dataSource);
+    const id = this.documentRecord.resolveRecordId(request.headerData, dataSource);
     if (!id) {
       return of({
         saved: false,
@@ -38,9 +38,9 @@ export class EntrySaveService implements EntrySavePort {
       });
     }
 
-    const payload = this.entryPayload.buildHeaderUpdatePayload(request.headerData, headerSections);
+    const payload = this.documentPayload.buildHeaderUpdatePayload(request.headerData, headerSections);
 
-    return this.dataSource.update(dataSource, id, payload).pipe(
+    return this.dataSource.update(dataSource, id, payload, request.headerData['systemRowVersion']).pipe(
       switchMap((response) => this.persistLineRows(request).pipe(
         map((lineSaveResult) => {
           if (!lineSaveResult.saved) {
@@ -50,7 +50,7 @@ export class EntrySaveService implements EntrySavePort {
           return {
             saved: true,
             modifiedAt: this.resolveModifiedAt(response, modifiedAtKey) ?? new Date().toISOString()
-          } as EntrySaveResult;
+          } as DocumentSaveResult;
         })
       )),
       catchError((error: unknown) =>
@@ -76,19 +76,19 @@ export class EntrySaveService implements EntrySavePort {
     return String(modifiedAt);
   }
 
-  private resolveDataSourceConfig(request: EntrySaveRequest): DataSourceConfig | null {
+  private resolveDataSourceConfig(request: DocumentSaveRequest): DataSourceConfig | null {
     return request.dataSourceConfig ?? null;
   }
 
-  private resolveHeaderSections(request: EntrySaveRequest): FormSectionConfig[] {
+  private resolveHeaderSections(request: DocumentSaveRequest): FormSectionConfig[] {
     return request.headerSections?.length ? request.headerSections : [];
   }
 
-  private resolveModifiedAtKey(request: EntrySaveRequest): string {
+  private resolveModifiedAtKey(request: DocumentSaveRequest): string {
     return request.modifiedAtKey?.trim() ?? '';
   }
 
-  private persistLineRows(request: EntrySaveRequest): Observable<EntrySaveResult> {
+  private persistLineRows(request: DocumentSaveRequest): Observable<DocumentSaveResult> {
     const lineDataSource = request.lineDataSourceConfig;
     const lineRows = request.lineRows ?? [];
 
@@ -105,7 +105,7 @@ export class EntrySaveService implements EntrySavePort {
     }
 
     return forkJoin(operations).pipe(
-      map(() => ({ saved: true } as EntrySaveResult)),
+      map(() => ({ saved: true } as DocumentSaveResult)),
       catchError((error: unknown) => of({
         saved: false,
         errorMessage: this.resolveErrorMessage(error)
@@ -118,11 +118,11 @@ export class EntrySaveService implements EntrySavePort {
     row: Record<string, unknown>,
     lineDataSource: DataSourceConfig
   ): Observable<unknown> | null {
-    const rowId = this.entryRecord.resolveRecordId(row, lineDataSource);
+    const rowId = this.documentRecord.resolveRecordId(row, lineDataSource);
     const payload = this.buildLinePayload(headerData, row, lineDataSource);
 
     if (rowId !== null && rowId !== undefined && rowId !== '' && lineDataSource.supportsUpdate !== false) {
-      return this.dataSource.update(lineDataSource, rowId, payload);
+      return this.dataSource.update(lineDataSource, rowId, payload, row['systemRowVersion']);
     }
 
     if (lineDataSource.supportsCreate === false || !this.shouldCreateLine(payload, lineDataSource.parentKeyField)) {

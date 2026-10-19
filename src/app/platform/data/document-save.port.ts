@@ -3,7 +3,7 @@ import { Observable, of } from 'rxjs';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { FormSectionConfig } from '../models/field-config.model';
 
-export interface EntrySaveRequest {
+export interface DocumentSaveRequest {
   scope: string;
   headerData: Record<string, unknown>;
   lineRows?: Record<string, unknown>[];
@@ -14,28 +14,28 @@ export interface EntrySaveRequest {
   modifiedAtKey?: string;
 }
 
-export interface EntrySaveResult {
+export interface DocumentSaveResult {
   saved: boolean;
   modifiedAt?: string;
   errorCode?: string;
   errorMessage?: string;
 }
 
-export interface EntrySavePort {
-  save(request: EntrySaveRequest): Observable<EntrySaveResult>;
+export interface DocumentSavePort {
+  save(request: DocumentSaveRequest): Observable<DocumentSaveResult>;
 }
 
-export const ENTRY_SAVE_PORT = new InjectionToken<EntrySavePort>('ENTRY_SAVE_PORT');
+export const DOCUMENT_SAVE_PORT = new InjectionToken<DocumentSavePort>('DOCUMENT_SAVE_PORT');
 
 @Injectable({
   providedIn: 'root'
 })
-export class NoopEntrySavePort implements EntrySavePort {
-  save(request: EntrySaveRequest): Observable<EntrySaveResult> {
+export class NoopDocumentSavePort implements DocumentSavePort {
+  save(request: DocumentSaveRequest): Observable<DocumentSaveResult> {
     void request;
     return of({
       saved: false,
-      errorMessage: 'Entry save port is not configured.'
+      errorMessage: 'Document save port is not configured.'
     });
   }
 }

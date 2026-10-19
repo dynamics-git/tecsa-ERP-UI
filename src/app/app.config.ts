@@ -7,8 +7,8 @@ import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { provideErpRest } from './core/api/erp-rest.provider';
 import { HttpInterceptorService } from './core/interceptors/http-interceptor';
-import { EntrySaveService } from './core/services/entry-save.service';
-import { ENTRY_SAVE_PORT } from './platform/public-api';
+import { DocumentSaveService } from './core/services/document-save.service';
+import { DOCUMENT_SAVE_PORT } from './platform/public-api';
 import { providePlatformGovernance } from './core/providers/platform-governance.provider';
 
 export const appConfig: ApplicationConfig = {
@@ -22,8 +22,8 @@ export const appConfig: ApplicationConfig = {
       multi: true
     },
     {
-      provide: ENTRY_SAVE_PORT,
-      useClass: EntrySaveService
+      provide: DOCUMENT_SAVE_PORT,
+      useClass: DocumentSaveService
     },
     ...providePlatformGovernance(),
     provideErpRest(),

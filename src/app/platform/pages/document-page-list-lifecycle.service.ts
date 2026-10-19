@@ -13,18 +13,19 @@ export interface DocumentPageListLifecycleContext {
 
   rows: unknown[];
   hasMore: boolean;
+  cursor?: string;
   error?: string;
   selectedRow?: unknown;
   pendingFirstPageReload: boolean;
   filterReloadTimer?: ReturnType<typeof setTimeout>;
   listLoadSubscription?: { unsubscribe(): void };
-  activeEntryDialogConfig?: DocumentWindowConfig;
+  activeDocumentWindowConfig?: DocumentWindowConfig;
   checkedRowKeys: Set<string>;
   readonly loading: boolean;
 
   buildFilter(scope: string): string;
   hydrateTargetsFromRecords(scope: string, records: unknown[]): void;
-  loadList(dataSource: DataSourceConfig, options: { skip: number; top: number; forceRefresh: boolean }): Observable<unknown>;
+  loadList(dataSource: DataSourceConfig, options: { skip: number; top: number; forceRefresh: boolean; cursor?: string }): Observable<unknown>;
   toRecords(response: unknown): unknown[];
   getErrorMessage(error: unknown): string;
   detectChanges(): void;
@@ -82,6 +83,7 @@ export class DocumentPageListLifecycleService {
       skip: reset ? 0 : ctx.rows.length,
       top: pageSize,
       forceRefresh,
+      cursor: reset ? undefined : ctx.cursor,
     };
 
     const preserveRowsDuringReset = reset && ctx.rows.length > 0;
@@ -91,7 +93,7 @@ export class DocumentPageListLifecycleService {
         ctx.rows = [];
         ctx.selectedRow = undefined;
       }
-      ctx.activeEntryDialogConfig = undefined;
+      ctx.activeDocumentWindowConfig = undefined;
       ctx.checkedRowKeys.clear();
       ctx.hasMore = true;
       ctx.listLoadSubscription?.unsubscribe();
@@ -110,7 +112,10 @@ export class DocumentPageListLifecycleService {
           const records = ctx.toRecords(response);
           ctx.hydrateTargetsFromRecords(ctx.listFilterScope, records);
           ctx.rows = reset ? records : [...ctx.rows, ...records];
-          ctx.hasMore = records.length === pageSize;
+          const meta = (response as { meta?: Record<string, unknown> })?.meta ?? {};
+          ctx.cursor = typeof meta['nextCursor'] === 'string' ? meta['nextCursor'] : undefined;
+          ctx.hasMore = ctx.listDataSource.paging === 'cursor' ? !!ctx.cursor
+            : typeof meta['total'] === 'number' ? ctx.rows.length < meta['total'] : records.length === pageSize;
 
           this.stopListLoading(ctx);
           ctx.detectChanges();

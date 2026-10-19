@@ -1,6 +1,6 @@
 import { Inject, Injectable, Optional } from '@angular/core';
 import { catchError, of, take } from 'rxjs';
-import { ENTRY_SAVE_PORT, EntrySavePort, EntrySaveResult } from './entry-save.port';
+import { DOCUMENT_SAVE_PORT, DocumentSavePort, DocumentSaveResult } from './document-save.port';
 import { FieldConfig, FieldValueType, FormSectionConfig } from '../models/field-config.model';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
@@ -22,8 +22,8 @@ export interface AutosaveOptions {
   meta?: Record<string, unknown>;
   dataSourceConfig?: DataSourceConfig;
   headerSections?: FormSectionConfig[];
-  onCompleted?: (result: EntrySaveResult) => void;
-  onFailed?: (result: EntrySaveResult) => void;
+  onCompleted?: (result: DocumentSaveResult) => void;
+  onFailed?: (result: DocumentSaveResult) => void;
 }
 
 export interface PopupActionEvent {
@@ -32,17 +32,17 @@ export interface PopupActionEvent {
   payload?: unknown;
 }
 
-export interface EntryPopupActionHandlers {
+export interface DocumentActionHandlers {
   lineChanged?: (payload: unknown) => void;
   lineSelectionChanged?: (payload: unknown) => void;
   headerChanged?: (payload: unknown) => void;
   headerInteracted?: (payload: unknown) => void;
   autosave?: (payload: unknown) => void;
-  commands?: EntryCommandHandlers;
+  commands?: DocumentCommandHandlers;
   command?: (actionKey: string, payload: unknown) => void;
 }
 
-export interface EntryCommandHandlers {
+export interface DocumentCommandHandlers {
   save?: (payload: unknown) => void;
   apply?: (payload: unknown) => void;
   lineNew?: (payload: unknown) => void;
@@ -50,20 +50,20 @@ export interface EntryCommandHandlers {
   command?: (command: string, payload: unknown) => void;
 }
 
-export interface EntryPopupRuntimeConfig {
-  entryDialogConfig?: DocumentWindowConfig | null;
+export interface DocumentRuntimeConfig {
+  documentWindowConfig?: DocumentWindowConfig | null;
   lineConfig?: LineConfig;
 }
 
 @Injectable({
   providedIn: 'root'
 })
-export class EntryStateService {
+export class DocumentStateService {
   private readonly autosaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly autosaveGenerations = new Map<string, number>();
 
   constructor(
-    @Optional() @Inject(ENTRY_SAVE_PORT) private readonly savePort: EntrySavePort | null,
+    @Optional() @Inject(DOCUMENT_SAVE_PORT) private readonly savePort: DocumentSavePort | null,
     private readonly lineCalculation: LineCalculationService
   ) {}
 
@@ -226,7 +226,7 @@ export class EntryStateService {
         catchError((error: unknown) => of({
           saved: false,
           errorMessage: this.resolveErrorMessage(error)
-        } as EntrySaveResult))
+        } as DocumentSaveResult))
       ).subscribe((result) => {
         if (!this.isCurrentAutosaveGeneration(scope, generation)) {
           return;
@@ -264,8 +264,8 @@ export class EntryStateService {
   handleEntryPopupAction(
     event: PopupActionEvent,
     popupId: string,
-    handlers: EntryPopupActionHandlers,
-    runtimeConfig?: EntryPopupRuntimeConfig
+    handlers: DocumentActionHandlers,
+    runtimeConfig?: DocumentRuntimeConfig
   ): boolean {
     if (event.popupId !== popupId) {
       return false;
@@ -328,7 +328,7 @@ export class EntryStateService {
 
   private applyLineRuntimeCalculations(
     payload: unknown,
-    runtimeConfig?: EntryPopupRuntimeConfig
+    runtimeConfig?: DocumentRuntimeConfig
   ): void {
     const change = this.resolveLineChange(payload);
     const calculation = runtimeConfig?.lineConfig?.calculation;
@@ -340,7 +340,7 @@ export class EntryStateService {
     const calculatedFields = this.lineCalculation.applyCalculations(
       change.row,
       calculation,
-      runtimeConfig?.entryDialogConfig?.headerData
+      runtimeConfig?.documentWindowConfig?.headerData
     );
     if (calculatedFields.length) {
       const payloadRecord = this.isRecord(payload) ? payload : undefined;
@@ -358,15 +358,15 @@ export class EntryStateService {
     this.recalculateRuntimeLineTotals(runtimeConfig);
   }
 
-  private applyHeaderRuntimeCalculations(runtimeConfig?: EntryPopupRuntimeConfig): void {
+  private applyHeaderRuntimeCalculations(runtimeConfig?: DocumentRuntimeConfig): void {
     const calculation = runtimeConfig?.lineConfig?.calculation;
-    const lineRows = runtimeConfig?.entryDialogConfig?.lineRows ?? [];
+    const lineRows = runtimeConfig?.documentWindowConfig?.lineRows ?? [];
     if (calculation) {
       for (const row of lineRows) {
         this.lineCalculation.applyCalculations(
           row,
           calculation,
-          runtimeConfig?.entryDialogConfig?.headerData
+          runtimeConfig?.documentWindowConfig?.headerData
         );
       }
     }
@@ -374,16 +374,16 @@ export class EntryStateService {
     this.recalculateRuntimeLineTotals(runtimeConfig);
   }
 
-  private recalculateRuntimeLineTotals(runtimeConfig?: EntryPopupRuntimeConfig): void {
-    const entryDialogConfig = runtimeConfig?.entryDialogConfig;
+  private recalculateRuntimeLineTotals(runtimeConfig?: DocumentRuntimeConfig): void {
+    const documentWindowConfig = runtimeConfig?.documentWindowConfig;
     const lineConfig = runtimeConfig?.lineConfig;
-    if (!entryDialogConfig || !lineConfig?.totalsCalculation) {
+    if (!documentWindowConfig || !lineConfig?.totalsCalculation) {
       return;
     }
 
-    entryDialogConfig.lineTotals = this.calculateLineTotals(
-      entryDialogConfig.lineRows ?? [],
-      entryDialogConfig.headerData,
+    documentWindowConfig.lineTotals = this.calculateLineTotals(
+      documentWindowConfig.lineRows ?? [],
+      documentWindowConfig.headerData,
       lineConfig
     );
   }
@@ -391,7 +391,7 @@ export class EntryStateService {
   private handleEntryCommand(
     command: string,
     payload: unknown,
-    handlers?: EntryCommandHandlers
+    handlers?: DocumentCommandHandlers
   ): boolean {
     if (!handlers) {
       return false;

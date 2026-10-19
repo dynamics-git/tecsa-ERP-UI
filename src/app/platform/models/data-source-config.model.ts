@@ -1,5 +1,16 @@
 export interface DataSourceConfig {
   endpoint: string;
+  /** REST is the ERP contract. Legacy syntax is an explicit compatibility option. */
+  addressStyle?: 'rest' | 'odata';
+  singleton?: boolean;
+  updateFields?: string[];
+  requiredCreateFields?: string[];
+  omitEmptyFields?: string[];
+  meaningfulFields?: string[];
+  permissions?: { create?: 'create' | 'modify' | 'delete'; update?: 'create' | 'modify' | 'delete'; delete?: 'create' | 'modify' | 'delete' };
+  paging?: 'offset' | 'cursor';
+  writableStates?: { field: string; values: unknown[] };
+  newRecordDefaults?: Record<string, unknown>;
   contractProfileKey?: string;
   keyField?: string;
   parentKeyField?: string;

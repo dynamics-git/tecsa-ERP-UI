@@ -1,16 +1,13 @@
+import type { CommandConfig } from './command-config.model';
 import { DataSurfaceColumnConfig } from './data-surface-config.model';
 import type { DataSourceConfig } from './data-source-config.model';
-import type {
-  EntryCommandBarConfig,
-  EntryCommandButtonConfig,
-  EntryFooterSectionConfig,
-  EntryLinePlacementConfig,
-} from './document-window-config.model';
+import type { CommandBarConfig, FooterSectionConfig, LinePlacementConfig } from './document-window-config.model';
 import {
   FieldConfig,
-  FieldFactPanelConfig,
+  FieldFactBoxConfig,
   FieldFillConfig,
   FieldOptionConfig,
+  FieldLookupConfig,
 } from './field-config.model';
 import type {
   CalculationConfig,
@@ -22,6 +19,10 @@ export type LineCellType = 'text' | 'select' | 'dropdown' | 'icon';
 export type LineValueType = 'text' | 'number' | 'boolean' | 'date';
 
 export interface LineColumnConfig extends DataSurfaceColumnConfig {
+  lookup?: FieldLookupConfig;
+  defaultValue?: unknown;
+  clearFieldsOnChange?: string[];
+  editableWhen?: { field: string; values: unknown[] };
   id: string;
   cellType?: LineCellType;
   valueType?: LineValueType;
@@ -37,14 +38,14 @@ export interface LineColumnConfig extends DataSurfaceColumnConfig {
   buttonIcon?: string;
   buttonTitle?: string;
   actionKey?: string;
-  factPanel?: boolean | FieldFactPanelConfig;
+  factBox?: boolean | FieldFactBoxConfig;
 }
 
 export interface LineConfig {
-  commandBar?: EntryCommandBarConfig;
-  placement: EntryLinePlacementConfig;
+  commandBar?: CommandBarConfig;
+  placement: LinePlacementConfig;
   dataSource: DataSourceConfig;
-  toolbarButtons: EntryCommandButtonConfig[];
+  toolbarButtons: CommandConfig[];
   columns: LineColumnConfig[];
   fields?: FieldConfig[];
   lineKeyField?: string;
@@ -55,5 +56,5 @@ export interface LineConfig {
   lineType?: LineType;
   calculation?: CalculationConfig;
   totalsCalculation?: LineTotalsCalculationConfig;
-  footerSections?: EntryFooterSectionConfig[];
+  footerSections?: FooterSectionConfig[];
 }

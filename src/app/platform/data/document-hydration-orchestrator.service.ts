@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DataSourceService } from './data-source.service';
-import { EntryResponseNormalizerService } from './entry-response-normalizer.service';
+import { DocumentResponseNormalizerService } from './document-response-normalizer.service';
 
 type LineLoadOptions = {
   timeoutMs?: number;
@@ -15,10 +15,10 @@ type LineLoadOptions = {
 @Injectable({
   providedIn: 'root',
 })
-export class EntryHydrationOrchestratorService {
+export class DocumentHydrationOrchestratorService {
   constructor(
     private readonly dataSource: DataSourceService,
-    private readonly normalizer: EntryResponseNormalizerService,
+    private readonly normalizer: DocumentResponseNormalizerService,
   ) {}
 
   extractRecords(response: unknown): Record<string, unknown>[] {
@@ -115,16 +115,10 @@ export class EntryHydrationOrchestratorService {
 
       const effectiveDataSource: DataSourceConfig = {
         ...lineDataSource,
-        endpoint: `${parentEndpoint}(${this.toODataId(parentId)})/${childCollection}`,
+        ...this.dataSource.relation(lineDataSource, headerData),
       };
 
-      const response = await firstValueFrom(
-        this.dataSource
-          .loadList(effectiveDataSource, { top: relation.top ?? lineDataSource.pageSize ?? defaultTop })
-          .pipe(timeout(timeoutMs)),
-      );
-
-      return this.extractRecords(response);
+      return this.loadBoundedRows(effectiveDataSource, timeoutMs);
     }
 
     const clauses: string[] = [];
@@ -166,13 +160,19 @@ export class EntryHydrationOrchestratorService {
         : lineDataSource.defaultFilter,
     };
 
-    const response = await firstValueFrom(
-      this.dataSource
-        .loadList(effectiveDataSource, { top: lineDataSource.pageSize ?? defaultTop })
-        .pipe(timeout(timeoutMs)),
-    );
+    return this.loadBoundedRows(effectiveDataSource, timeoutMs);
+  }
 
-    return this.extractRecords(response);
+  private async loadBoundedRows(config: DataSourceConfig, timeoutMs: number): Promise<Record<string, unknown>[]> {
+    const rows: Record<string, unknown>[] = [];
+    const top = Math.min(config.pageSize ?? 100, 200);
+    for (;;) {
+      const response = await firstValueFrom(this.dataSource.loadList(config, { top, skip: rows.length }).pipe(timeout<unknown>(timeoutMs))) as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
+      rows.push(...response.value);
+      const complete = typeof response.meta['total'] === 'number' ? rows.length >= response.meta['total'] : response.value.length < top;
+      if (complete) return rows;
+      if (rows.length >= 1000) throw new Error('This document exceeds the 1,000-line editor limit. Use a bounded worksheet.');
+    }
   }
 
   private hasValue(value: unknown): boolean {

@@ -7,8 +7,11 @@ import {
   OnChanges,
   Output,
   SimpleChanges,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { LineColumnConfig } from '../../models/line-config.model';
+import { DataSourceService } from '../../data/data-source.service';
+import { Subscription, timer, switchMap } from 'rxjs';
 
 type LineOption = { label: string; value: unknown; record?: Record<string, unknown> };
 
@@ -20,6 +23,23 @@ type LineOption = { label: string; value: unknown; record?: Record<string, unkno
   styleUrl: './document-lines.scss',
 })
 export class DocumentLines {
+  constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef) {}
+  private readonly lookupRequests = new Map<Record<string, unknown>, Subscription>();
+  searchLookup(column: LineColumnConfig, row: Record<string, unknown>, text: string): void {
+    if (!column.lookup) return;
+    this.lookupRequests.get(row)?.unsubscribe();
+    const query = text.trim().replace(/'/g, "''");
+    const fields = column.lookup.searchFields ?? [column.lookup.displayField];
+    this.lookupRequests.set(row, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: column.lookup!.endpoint, pageSize: 20,
+      defaultFilter: query ? fields.map(field => `contains(${field}, '${query}')`).join(' or ') : undefined,
+    }))).subscribe({ next: response => {
+      row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = (response as { value: Record<string, unknown>[] }).value.map(record => ({
+        value: record[column.lookup!.valueField], label: String(record[column.lookup!.displayField] ?? ''), record,
+      }));
+      this.changes.markForCheck();
+    }, error: () => {} }));
+  }
+  ngOnDestroy(): void { this.lookupRequests.forEach(request => request.unsubscribe()); }
   @Input() columns: LineColumnConfig[] = [];
   @Input() rows: Record<string, unknown>[] = [];
   @Input() showSelection = false;
@@ -63,6 +83,17 @@ export class DocumentLines {
 
     if ('rows' in changes) {
       this.reconcileRows(changes['rows'].previousValue as Record<string, unknown>[] | undefined);
+      for (const row of this.rows) for (const column of this.columns) {
+        const id = row[column.field ?? column.id];
+        if (!column.lookup || !id) continue;
+        this.lookupRequests.set(row, this.source.loadById({ endpoint: column.lookup.endpoint }, id).subscribe({
+          next: value => {
+            const record = value as Record<string, unknown>;
+            row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{ value: id, label: String(record[column.lookup!.displayField] ?? id), record }];
+            this.changes.markForCheck();
+          }, error: () => {},
+        }));
+      }
     }
   }
 
@@ -293,8 +324,12 @@ export class DocumentLines {
     this.dropdownOpened.emit({ row, column, rowIndex });
   }
 
+  isReadonly(column: LineColumnConfig, row: Record<string, unknown>): boolean {
+    return column.readonly === true || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field]));
+  }
+
   updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown): void {
-    if (column.readonly) {
+    if (this.isReadonly(column, row)) {
       return;
     }
 
@@ -304,6 +339,7 @@ export class DocumentLines {
     const selectedRecord = this.resolveSelectedRecord(column, row, value);
 
     row[field] = value;
+    for (const key of column.clearFieldsOnChange ?? []) row[key] = null;
     this.applyFill(column, row, selectedRecord);
 
     const selectedIndexes = [...this.selectedRowIndexes].filter(

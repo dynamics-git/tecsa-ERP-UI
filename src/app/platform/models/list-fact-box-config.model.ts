@@ -1,26 +1,26 @@
-export interface ListFactPanelFieldConfig {
+export interface ListFactBoxFieldConfig {
   id: string;
   label: string;
   field?: string;
 }
 
-export interface ListFactPanelBadgeConfig {
+export interface ListFactBoxBadgeConfig {
   id: string;
   label?: string;
   field?: string;
   tone?: 'neutral' | 'success' | 'warning' | 'danger';
 }
 
-export interface ListFactPanelSectionConfig {
+export interface ListFactBoxSectionConfig {
   id: string;
   title: string;
   subtitle?: string;
-  fields?: ListFactPanelFieldConfig[];
-  badges?: ListFactPanelBadgeConfig[];
+  fields?: ListFactBoxFieldConfig[];
+  badges?: ListFactBoxBadgeConfig[];
   collapsed?: boolean;
 }
 
-export interface ListFactPanelBindingConfig {
+export interface ListFactBoxBindingConfig {
   labelField?: string;
   labelFallbackFields?: string[];
   titleField?: string;
@@ -32,7 +32,7 @@ export interface ListFactPanelBindingConfig {
   summaryType?: 'text' | 'number' | 'date' | 'currency';
 }
 
-export interface ListFactPanelConfig {
+export interface ListFactBoxConfig {
   id?: string;
   label?: string;
   title?: string;
@@ -40,7 +40,7 @@ export interface ListFactPanelConfig {
   enabled?: boolean;
   width?: string;
   defaultSectionId?: string;
-  binding?: ListFactPanelBindingConfig;
-  sections?: ListFactPanelSectionConfig[];
+  binding?: ListFactBoxBindingConfig;
+  sections?: ListFactBoxSectionConfig[];
 }
 

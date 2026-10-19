@@ -5,4 +5,4 @@ export * from './fact-box/fact-box';
 export * from './dynamic-form/dynamic-form';
 export * from './action-dispatcher.service';
 export * from './confirmation.service';
-export * from './core-drawer.service';
+export * from './drawer.service';

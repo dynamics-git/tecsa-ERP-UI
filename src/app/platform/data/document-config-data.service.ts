@@ -3,12 +3,12 @@ import { FormSectionConfig } from '../models/field-config.model';
 import { LineConfig, LineColumnConfig } from '../models/line-config.model';
 import { LineMasterRegistry, LineMasterService } from './line-master.service';
 
-export type EntrySelectOption = { label: string; value: unknown };
+export type DocumentSelectOption = { label: string; value: unknown };
 
 @Injectable({
   providedIn: 'root',
 })
-export class EntryConfigDataService {
+export class DocumentConfigDataService {
   constructor(private readonly lineMasters: LineMasterService) {}
 
   buildHeaderData(
@@ -58,7 +58,7 @@ export class EntryConfigDataService {
     headerData: Record<string, unknown>,
     lineSource: unknown[],
     registry: LineMasterRegistry,
-    optionFieldMap: Record<string, EntrySelectOption[]>,
+    optionFieldMap: Record<string, DocumentSelectOption[]>,
   ): Record<string, unknown>[] {
     const records = lineSource.filter((line): line is Record<string, unknown> => this.isRecord(line));
     if (!records.length) {
@@ -88,7 +88,7 @@ export class EntryConfigDataService {
     lineConfig: LineConfig,
     headerData: Record<string, unknown>,
     registry: LineMasterRegistry,
-    optionFieldMap: Record<string, EntrySelectOption[]>,
+    optionFieldMap: Record<string, DocumentSelectOption[]>,
   ): Record<string, unknown> {
     const typeColumn = this.resolveLineTypeColumn(lineConfig);
     const typeField = this.getColumnField(typeColumn);
@@ -101,6 +101,7 @@ export class EntryConfigDataService {
         continue;
       }
 
+      if (column.defaultValue !== undefined) { row[field] = column.defaultValue; continue; }
       if (field === typeField) {
         row[field] = defaultType;
         continue;
@@ -205,7 +206,7 @@ export class EntryConfigDataService {
     row: Record<string, unknown>,
     lineConfig: LineConfig,
     registry: LineMasterRegistry,
-    optionFieldMap: Record<string, EntrySelectOption[]>,
+    optionFieldMap: Record<string, DocumentSelectOption[]>,
   ): void {
     const typeColumn = this.resolveLineTypeColumn(lineConfig);
     const typeField = this.getColumnField(typeColumn);

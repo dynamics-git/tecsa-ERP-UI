@@ -4,9 +4,9 @@ import { timeout } from 'rxjs/operators';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { RUNTIME_TIMEOUT_POLICY } from '../data/runtime-timeout-policy.token';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
-import { EntryHydrationOrchestratorService } from '../data/entry-hydration-orchestrator.service';
-import { EntryRecordService } from '../data/entry-record.service';
-import { EntryResponseNormalizerService } from '../data/entry-response-normalizer.service';
+import { DocumentHydrationOrchestratorService } from '../data/document-hydration-orchestrator.service';
+import { DocumentRecordService } from '../data/document-record.service';
+import { DocumentResponseNormalizerService } from '../data/document-response-normalizer.service';
 import { DataSourceService } from '../data/data-source.service';
 import { RunModalConfigAssemblerService } from './run-modal-config-assembler.service';
 import { RunModalConfigModule, RunModalContext } from './run-modal-config.token';
@@ -21,9 +21,9 @@ export class RunModalHydrationResolverService {
 
   constructor(
     private readonly dataSource: DataSourceService,
-    private readonly entryHydration: EntryHydrationOrchestratorService,
-    private readonly entryRecord: EntryRecordService,
-    private readonly entryResponseNormalizer: EntryResponseNormalizerService,
+    private readonly documentHydration: DocumentHydrationOrchestratorService,
+    private readonly documentRecord: DocumentRecordService,
+    private readonly documentResponseNormalizer: DocumentResponseNormalizerService,
     private readonly configAssembler: RunModalConfigAssemblerService,
   ) {}
 
@@ -37,14 +37,14 @@ export class RunModalHydrationResolverService {
       return headerData;
     }
 
-    const recordId = this.entryRecord.resolvePersistedRecordId(headerData, dataSource);
+    const recordId = this.documentRecord.resolvePersistedRecordId(headerData, dataSource);
     if (recordId === null || recordId === undefined || String(recordId).trim().length === 0) {
       return headerData;
     }
 
     try {
       const response = await firstValueFrom(this.dataSource.loadById(dataSource, recordId));
-      return this.entryResponseNormalizer.normalizeSingleRecordResponse(response, headerData);
+      return this.documentResponseNormalizer.normalizeSingleRecordResponse(response, headerData);
     } catch {
       return headerData;
     }
@@ -53,7 +53,7 @@ export class RunModalHydrationResolverService {
   resolveContextRecordId(context: RunModalContext, dataSource: DataSourceConfig): unknown {
     const providedHeader = this.toRecord(context['headerData']);
     if (providedHeader) {
-      const persisted = this.entryRecord.resolvePersistedRecordId(providedHeader, dataSource);
+      const persisted = this.documentRecord.resolvePersistedRecordId(providedHeader, dataSource);
       if (persisted !== null && persisted !== undefined && String(persisted).trim().length > 0) {
         return persisted;
       }
@@ -165,7 +165,7 @@ export class RunModalHydrationResolverService {
       return [];
     }
 
-    return this.entryHydration.loadLineRowsForHeader(
+    return this.documentHydration.loadLineRowsForHeader(
       lineDataSource,
       headerData,
       {
@@ -178,7 +178,7 @@ export class RunModalHydrationResolverService {
 
   async hydrateRelatedLines(params: {
     module: RunModalConfigModule;
-    entryDialogConfig: DocumentWindowConfig;
+    documentWindowConfig: DocumentWindowConfig;
     pickLineDataSource: (module: RunModalConfigModule) => DataSourceConfig | undefined;
     loadRelatedLineRows: (
       module: RunModalConfigModule,
@@ -186,14 +186,14 @@ export class RunModalHydrationResolverService {
     ) => Promise<Record<string, unknown>[]>;
     mapRecordsToLineRows: (
       records: Record<string, unknown>[],
-      entryDialogConfig: DocumentWindowConfig,
+      documentWindowConfig: DocumentWindowConfig,
     ) => Record<string, unknown>[];
   }): Promise<{ lineHydrateFailed: boolean; lineHydrateMessage?: string }> {
     if (!params.pickLineDataSource(params.module)) {
       return { lineHydrateFailed: false };
     }
 
-    if (!params.entryDialogConfig.headerData) {
+    if (!params.documentWindowConfig.headerData) {
       return {
         lineHydrateFailed: true,
         lineHydrateMessage: 'Header data is missing for line loading. Retry to continue.',
@@ -201,11 +201,11 @@ export class RunModalHydrationResolverService {
     }
 
     try {
-      const records = await params.loadRelatedLineRows(params.module, params.entryDialogConfig.headerData);
-      params.entryDialogConfig.lineRows = params.mapRecordsToLineRows(records, params.entryDialogConfig);
+      const records = await params.loadRelatedLineRows(params.module, params.documentWindowConfig.headerData);
+      params.documentWindowConfig.lineRows = params.mapRecordsToLineRows(records, params.documentWindowConfig);
       return { lineHydrateFailed: false };
     } catch {
-      params.entryDialogConfig.lineRows = [];
+      params.documentWindowConfig.lineRows = [];
       return {
         lineHydrateFailed: true,
         lineHydrateMessage: 'Unable to load lines. Retry to continue.',
@@ -215,19 +215,19 @@ export class RunModalHydrationResolverService {
 
   async hydrateFromApi(params: {
     module: RunModalConfigModule;
-    entryDialogConfig: DocumentWindowConfig;
+    documentWindowConfig: DocumentWindowConfig;
     context: RunModalContext;
     dataSource?: DataSourceConfig;
     resolveEntryHydrationTop: (module: RunModalConfigModule, dataSource: DataSourceConfig) => number;
     isWorksheetPage: (module: RunModalConfigModule) => boolean;
-    mergeHeaderFromFirstRecord: (record: Record<string, unknown>, entryDialogConfig: DocumentWindowConfig) => void;
+    mergeHeaderFromFirstRecord: (record: Record<string, unknown>, documentWindowConfig: DocumentWindowConfig) => void;
     mapRecordsToLineRows: (
       records: Record<string, unknown>[],
-      entryDialogConfig: DocumentWindowConfig,
+      documentWindowConfig: DocumentWindowConfig,
     ) => Record<string, unknown>[];
     hydrateRelatedLines: (
       module: RunModalConfigModule,
-      entryDialogConfig: DocumentWindowConfig,
+      documentWindowConfig: DocumentWindowConfig,
     ) => Promise<{ lineHydrateFailed: boolean; lineHydrateMessage?: string }>;
     pickLineDataSource: (module: RunModalConfigModule) => DataSourceConfig | undefined;
   }): Promise<{ lineHydrateFailed: boolean; lineHydrateMessage?: string }> {
@@ -243,22 +243,22 @@ export class RunModalHydrationResolverService {
           .loadList(params.dataSource, { top: listTop })
           .pipe(timeout(this.timeoutPolicy.hydrationTimeoutMs)),
       );
-      const records = this.entryHydration.extractRecords(response);
+      const records = this.documentHydration.extractRecords(response);
       if (!records.length) {
         if (params.isWorksheetPage(params.module)) {
-          params.entryDialogConfig.lineRows = [];
+          params.documentWindowConfig.lineRows = [];
         }
 
         if (contextRecordId !== undefined && contextRecordId !== null && String(contextRecordId).trim().length > 0) {
           try {
-            const byIdRecord = await this.entryHydration.loadHeaderById(
+            const byIdRecord = await this.documentHydration.loadHeaderById(
               params.dataSource,
               contextRecordId,
               {},
               this.timeoutPolicy.hydrationTimeoutMs,
             );
             if (Object.keys(byIdRecord).length) {
-              params.mergeHeaderFromFirstRecord(byIdRecord, params.entryDialogConfig);
+              params.mergeHeaderFromFirstRecord(byIdRecord, params.documentWindowConfig);
             }
           } catch {
             // Keep popup rendering even when API load fails.
@@ -267,14 +267,14 @@ export class RunModalHydrationResolverService {
         return { lineHydrateFailed: false };
       }
 
-      const headerRecord = this.entryHydration.pickHeaderRecord(records, contextRecordId, params.dataSource);
-      params.mergeHeaderFromFirstRecord(headerRecord, params.entryDialogConfig);
+      const headerRecord = this.documentHydration.pickHeaderRecord(records, contextRecordId, params.dataSource);
+      params.mergeHeaderFromFirstRecord(headerRecord, params.documentWindowConfig);
       if (params.isWorksheetPage(params.module)) {
-        params.entryDialogConfig.lineRows = params.mapRecordsToLineRows(records, params.entryDialogConfig);
+        params.documentWindowConfig.lineRows = params.mapRecordsToLineRows(records, params.documentWindowConfig);
         return { lineHydrateFailed: false };
       }
 
-      return params.hydrateRelatedLines(params.module, params.entryDialogConfig);
+      return params.hydrateRelatedLines(params.module, params.documentWindowConfig);
     } catch {
       if (!params.pickLineDataSource(params.module)) {
         return { lineHydrateFailed: false };

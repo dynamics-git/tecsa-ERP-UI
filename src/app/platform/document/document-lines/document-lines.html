@@ -59,7 +59,11 @@
               [class.line-icon-col]="column.cellType === 'icon'"
               [style.width]="getColumnWidthStyle(column)">
               @if (column.cellType === 'select' || column.cellType === 'dropdown') {
-                <select [value]="getCellValue(row, column)" [disabled]="column.readonly === true" (focus)="notifyDropdownOpened(column, row, rowIndex)" (change)="updateCellValue(column, row, resolveSelectValue(column, row, $any($event.target).value))">
+                @if (column.lookup && !isReadonly(column, row)) {
+                  <input type="search" [attr.aria-label]="'Search ' + column.label" placeholder="Search..."
+                    (focus)="searchLookup(column, row, $any($event.target).value)" (input)="searchLookup(column, row, $any($event.target).value)" />
+                }
+                <select [value]="getCellValue(row, column)" [disabled]="isReadonly(column, row)" (focus)="notifyDropdownOpened(column, row, rowIndex)" (change)="updateCellValue(column, row, resolveSelectValue(column, row, $any($event.target).value))">
                   @if (showEmptyOption(column, row)) {
                     <option value=""></option>
                   }
@@ -72,7 +76,7 @@
                   <i [class]="column.buttonIcon ?? ''"></i>
                 </button>
               } @else {
-                <input [value]="getCellValue(row, column)" [readonly]="column.readonly === true" [disabled]="column.readonly === true" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
+                <input [type]="column.valueType === 'date' ? 'date' : column.valueType === 'number' ? 'number' : 'text'" step="any" [value]="getCellValue(row, column)" [readonly]="isReadonly(column, row)" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
               }
             </td>
           }

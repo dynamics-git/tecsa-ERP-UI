@@ -1,6 +1,7 @@
 import { Component, EventEmitter, OnDestroy, Output } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
+import { SessionService } from '../../core/services/session.service';
 import {
   ActionDispatcherService,
   CommandConfig,
@@ -10,6 +11,7 @@ import {
 } from '../../platform/public-api';
 
 type ActionPageContext = {
+  pageId?: string;
   title: string;
   module: string;
   company: string;
@@ -40,7 +42,8 @@ export class PageActions implements OnDestroy {
 
   constructor(
     private readonly actionDispatcher: ActionDispatcherService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly session: SessionService
   ) {
     this.refreshPageContext(this.router.url);
 
@@ -82,11 +85,11 @@ export class PageActions implements OnDestroy {
   }
 
   get showNewAction(): boolean {
-    return this.pageContext.dataSource?.supportsCreate !== false;
+    return this.pageContext.dataSource?.supportsCreate !== false && this.allowed('canCreate');
   }
 
   get showDeleteAction(): boolean {
-    return this.pageContext.dataSource?.supportsDelete !== false;
+    return this.pageContext.dataSource?.supportsDelete !== false && this.allowed('canDelete');
   }
 
   get showRefreshAction(): boolean {
@@ -103,6 +106,13 @@ export class PageActions implements OnDestroy {
 
   get visibleCommands(): CommandConfig[] {
     return this.pageCommands;
+  }
+
+  private allowed(operation: string): boolean {
+    return this.session.SuperAdmin || this.session.Permissions.some(value => {
+      const grant = value as Record<string, unknown>;
+      return grant?.['pageId'] === this.pageContext.pageId && grant[operation] === true;
+    });
   }
 
   runCommand(command: CommandConfig): void {
@@ -130,6 +140,7 @@ export class PageActions implements OnDestroy {
     const pageContext = this.getEmptyPageContext();
 
     this.pageContext = {
+      pageId: configContext?.pageId,
       title: configContext?.title ?? pageContext.title,
       module: configContext?.module ?? pageContext.module,
       company: configContext?.company ?? pageContext.company,

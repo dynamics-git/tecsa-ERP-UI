@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ConfirmationDialogConfig } from '../../platform/models/confirmation-dialog-config.model';
 import { RunModalStackService } from '../../platform/run-modal/run-modal-stack.service';
+import { FieldConfig } from '../../platform/models/field-config.model';
 
 export type ConfirmationOptions = {
   title?: string;
@@ -129,6 +130,13 @@ export class ConfirmationService {
       confirmLabel: 'OK',
       kind: 'alert'
     }).then(() => undefined);
+  }
+
+  async prompt(title: string, fields: FieldConfig[]): Promise<Record<string, unknown> | null> {
+    const values = Object.fromEntries(fields.map(field => [field.key, field.defaultValue ?? '']));
+    const confirmed = await this.openDialog({ title, message: '', kind: 'confirm', confirmLabel: 'Continue', cancelLabel: 'Cancel',
+      sections: [{ id: 'command-input', fields }], values });
+    return confirmed ? values : null;
   }
 
   resolveDialog(popupId: string, value: boolean): void {
