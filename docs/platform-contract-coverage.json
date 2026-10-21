@@ -13,8 +13,10 @@
       "sharedContract": "Consistent rendering for each supported page type, in normal and stacked windows",
       "pageDeclares": "Page type, title, module, sections and data sources",
       "status": "partial",
-      "evidence": [],
-      "remaining": "Full contract verification pending; not certified complete."
+      "evidence": [
+        "2026-10-21 live No. Series: list and document FactBox hide/show; General and Lines collapse/reopen; unchanged QA2010 closes without discard dialog. Rendered list gap and FactBox radius are 0px; FactBox content 297px scrolls within 156px viewport. Checkpoint 9118670."
+      ],
+      "remaining": "Verify card, setup, worksheet and stacked list contexts; verify configured header/line/footer ordering and large-list scrolling. Existing live checks do not certify the whole row."
     },
     {
       "area": "Field types",

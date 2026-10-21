@@ -5,7 +5,7 @@ import type { ListFactBoxConfig } from '../../models/list-fact-box-config.model'
 import { LoadingIndicator } from '../../../shared/ui/loading-indicator/loading-indicator';
 import type { CommandConfig } from '../../models/command-config.model';
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, ElementRef, EventEmitter, HostListener, Input, Output, inject } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, Output, inject, viewChildren } from '@angular/core';
 import { DynamicForm } from '../../../shared/ui/dynamic-form/dynamic-form';
 import { FactBox } from '../../../shared/ui/fact-box/fact-box';
 import { DocumentLines } from '../document-lines/document-lines';
@@ -81,6 +81,7 @@ export class DocumentWindow {
   @Input() footerSections?: FooterSectionConfig[];
   @Input() attachments?: AttachmentsConfig;
   private readonly session = inject(SessionService);
+  private readonly forms = viewChildren(DynamicForm);
   @Input() factBoxConfig?: ListFactBoxConfig;
   @Input() factBoxSections?: FactBoxSectionConfig[];
   @Input() statusMessage?: DocumentStatusMessage;
@@ -316,6 +317,16 @@ export class DocumentWindow {
   }
 
   private formatDetail(field: {field?: string; label: string; type?: string}): string {
+    const definition = this.resolvedHeaderSections.flatMap(section => section.fields).find(candidate => candidate.key === field.field);
+    if (definition && (definition.lookup || definition.options?.length || ['select', 'dropdown', 'lookup'].includes(definition.type ?? ''))) {
+      const value = this.resolvedHeaderData[definition.key];
+      if (value === null || value === undefined || value === '') return '';
+      for (const form of this.forms()) {
+        const label = form.lookupLabel(definition);
+        if (label) return label;
+      }
+      return definition.options?.find(option => String(option.value) === String(value))?.label ?? 'Display value unavailable';
+    }
     const user = this.session.User as Record<string, unknown> | undefined;
     return detailValue(this.resolvedHeaderData, field, {id: this.session.UserId, name: String(user?.['name'] ?? this.session.UserName)});
   }
