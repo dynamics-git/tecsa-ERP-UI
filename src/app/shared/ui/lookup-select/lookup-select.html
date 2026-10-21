@@ -1,0 +1,28 @@
+<span class="lookup-control" (focusout)="close()">
+  <input #editor role="combobox" autocomplete="off" aria-autocomplete="list"
+    [attr.aria-label]="label" [attr.aria-required]="required || null"
+    [attr.aria-expanded]="expanded" [attr.aria-controls]="expanded ? id : null"
+    [attr.aria-activedescendant]="expanded && active >= 0 && !loading ? id + '-' + active : null"
+    [value]="expanded ? query : display" [disabled]="disabled" [attr.placeholder]="placeholder || null"
+    (focus)="open()" (click)="open()" (input)="search($any($event.target).value)" (keydown)="key($event)" />
+  <button type="button" class="lookup-toggle" tabindex="-1" [disabled]="disabled"
+    [attr.aria-label]="'Show choices for ' + label" (mousedown)="$event.preventDefault()"
+    (click)="toggle(editor)"><i class="ts-icon ts-icon-down" aria-hidden="true"></i></button>
+  @if (expanded) {
+    <span class="lookup-popup" (mousedown)="$event.preventDefault()">
+      @if (error) { <span role="alert">{{ error }}</span><button type="button" (click)="retried.emit()">Retry</button> }
+        <span #list role="listbox" [id]="id" [attr.aria-label]="label" (scroll)="loadMoreOnScroll($event)">
+          <span aria-hidden="true" [style.height.px]="beforeHeight" style="flex-shrink: 0"></span>
+          @for (option of visibleOptions; track windowStart + $index) {
+            <button type="button" role="option" tabindex="-1" [id]="id + '-' + (windowStart + $index)"
+              [class.active]="active === windowStart + $index" [attr.aria-selected]="option.value === value" [attr.aria-posinset]="windowStart + $index + 1" [attr.title]="option.label"
+              (click)="choose(option.value)">{{ option.label }}</button>
+          } @empty { @if (!loading && !error) { <span>No matching records.</span> } }
+          <span aria-hidden="true" [style.height.px]="afterHeight" style="flex-shrink: 0"></span>
+        </span>
+        @if (loading) { <app-loading-indicator label="Loading choices…" [compact]="true"></app-loading-indicator> }
+        <span class="lookup-help">Search to narrow the choices.</span>
+      @if (!required && value) { <button type="button" (click)="choose(null)">Clear selection</button> }
+    </span>
+  }
+</span>

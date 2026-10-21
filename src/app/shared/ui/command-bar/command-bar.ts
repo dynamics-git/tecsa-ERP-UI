@@ -84,7 +84,7 @@ export class CommandBar {
       new: {
         actionKey: 'new',
         label: 'New',
-        icon: 'bi bi-plus-lg',
+        icon: 'ts-icon ts-icon-plus',
         order: 10,
         group: 'Process',
         visible: true,

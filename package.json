@@ -21,10 +21,10 @@
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
-    "bootstrap": "^5.3.8",
-    "bootstrap-icons": "^1.13.1",
+    "docx": "9.12.0",
     "rxjs": "~7.8.0",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "write-excel-file": "4.1.1"
   },
   "devDependencies": {
     "@angular/build": "^21.2.9",

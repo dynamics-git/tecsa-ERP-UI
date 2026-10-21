@@ -1,5 +1,9 @@
-import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { buildFieldFilter } from '../list-filter-expression';
+import type { ListAppliedFilter } from '../../models/list-personalization-config.model';
+import type { FilterOperator } from '../../models/list-filter-config.model';
+import { ListPersonalizationService } from '../list-personalization.service';
+import { ChangeDetectorRef, Component, EventEmitter, HostBinding, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
+import { Subscription, finalize, timeout } from 'rxjs';
 import { DataSourceService } from '../../data/data-source.service';
 import { ActionDispatcherService } from '../../../shared/ui/action-dispatcher.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
@@ -8,7 +12,7 @@ import { ListFilterFieldConfig } from '../../models/list-filter-config.model';
 type FilterRow = {
   id: string;
   field: string;
-  operator: 'contains' | 'startswith' | 'eq' | 'ge' | 'le';
+  operator: FilterOperator;
   value: unknown;
 };
 
@@ -26,7 +30,15 @@ type FilterBookmark = {
 })
 export class ListFilterPanel implements OnInit, OnDestroy {
   @Input() enabled = false;
-  @Input() columns: Array<{ id?: string; label?: string; field?: string; type?: string }> = [];
+  @Input() listenToPageActions = false;
+  @Input() embedded = false;
+  @HostBinding('class.is-visible') get isVisible(): boolean { return this.visible; }
+  @HostBinding('class.embedded') get isEmbedded(): boolean { return this.embedded; }
+  validationMessage = '';
+  private appliedFilters: ListAppliedFilter[] = [];
+  private readonly personalization = inject(ListPersonalizationService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  @Input() columns: Array<{ id?: string; label?: string; field?: string; type?: string; hidden?: boolean; filterable?: boolean; filter?: Omit<ListFilterFieldConfig, 'field' | 'label'> }> = [];
   @Input() filterOptions: ListFilterFieldConfig[] = [];
   @Input() storageKey = '';
   @Output() command = new EventEmitter<{ actionKey: string; payload?: unknown }>();
@@ -43,6 +55,8 @@ export class ListFilterPanel implements OnInit, OnDestroy {
 
   private readonly subscriptions = new Subscription();
   private nextId = 0;
+  private destroyed = false;
+  private readonly loadingInstanceId = crypto.randomUUID();
 
   constructor(
     private readonly actionDispatcher: ActionDispatcherService,
@@ -55,7 +69,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
       return this.filterOptions;
     }
 
-    return this.columns
+    return this.columns.filter(column => !column.hidden && column.filterable !== false)
       .map((column) => {
         const field = String(column.field ?? column.id ?? '').trim();
         const label = String(column.label ?? field).trim();
@@ -69,13 +83,14 @@ export class ListFilterPanel implements OnInit, OnDestroy {
           label,
           type,
           options: column.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : undefined,
+          ...column.filter,
         } as ListFilterFieldConfig;
       })
       .filter((option): option is ListFilterFieldConfig => Boolean(option));
   }
 
   get canAddMoreFilters(): boolean {
-    return this.filters.length < 20;
+    return this.filters.length < 12;
   }
 
   get activeFilterCount(): number {
@@ -91,19 +106,18 @@ export class ListFilterPanel implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.actionDispatcher.action$.subscribe((event) => {
-        if (!this.enabled || event.actionKey !== 'filter') {
+        if (!this.enabled || !this.listenToPageActions || event.actionKey !== 'filter') {
           return;
         }
 
-        this.visible = !this.visible;
-        if (this.visible && this.filters.length === 0) {
-          this.ensureOneEmptyRow();
-        }
+        this.toggle();
+        this.changeDetector.markForCheck();
       })
     );
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.subscriptions.unsubscribe();
   }
 
@@ -159,7 +173,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     }
 
     if (option.type === 'dropdown' || option.type === 'select') {
-      return true;
+      return !!option.apiUrl || !!option.options?.length;
     }
 
     return Array.isArray(option.options) && option.options.length > 0;
@@ -182,9 +196,10 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     const type = this.getFieldType(field);
     if (type === 'number' || type === 'date') {
       return [
-        { value: 'eq', label: 'equals' },
-        { value: 'ge', label: '>=' },
-        { value: 'le', label: '<=' }
+        { value: 'expression', label: 'Filter expression / range' },
+        { value: 'eq', label: 'equals' }, { value: 'ne', label: 'not equal' },
+        { value: 'gt', label: 'greater than' }, { value: 'ge', label: 'at least' },
+        { value: 'lt', label: 'less than' }, { value: 'le', label: 'at most' }
       ];
     }
 
@@ -193,9 +208,10 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     }
 
     return [
+      { value: 'expression', label: 'Filter expression (wildcards / alternatives)' },
       { value: 'contains', label: 'contains' },
       { value: 'startswith', label: 'starts with' },
-      { value: 'eq', label: 'equals' }
+      { value: 'eq', label: 'equals' }, { value: 'ne', label: 'not equal' }
     ];
   }
 
@@ -223,7 +239,8 @@ export class ListFilterPanel implements OnInit, OnDestroy {
   }
 
   saveBookmark(): void {
-    const name = this.bookmarkName.trim();
+    if (!this.validateFilters()) return;
+    const name = this.bookmarkName.trim().slice(0, 60);
     if (!name.length) {
       return;
     }
@@ -253,15 +270,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
       return;
     }
 
-    this.filters = bookmark.filters.map((filter) => ({
-      id: `f-${++this.nextId}`,
-      field: filter.field,
-      operator: this.normalizeOperator(filter.operator),
-      value: filter.value
-    }));
-
-    this.filters.forEach((filter) => this.preloadSelectOptions(filter));
-    this.ensureOneEmptyRow();
+    this.setFilters(bookmark.filters, true);
   }
 
   deleteBookmark(index: number): void {
@@ -269,35 +278,50 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     this.persistBookmarks();
   }
 
-  clear(): void {
-    this.filters = [];
+  setFilters(filters: ListAppliedFilter[], apply = false): void {
+    const valid = filters.filter(filter => !!this.getFieldConfig(filter.field));
+    this.filters = valid.map(filter => ({...filter, operator: this.normalizeOperator(filter.operator), id: `f-${++this.nextId}`}));
+    this.filters.forEach(filter => this.preloadSelectOptions(filter));
     this.ensureOneEmptyRow();
-    this.command.emit({ actionKey: 'advancedFilterChanged', payload: { filters: [] } });
+    if (apply) this.apply();
+  }
+
+  toggle(): void {
+    if (!this.enabled) return;
+    if (this.visible) this.close();
+    else { this.setFilters(this.appliedFilters); this.visible = true; this.validationMessage = ''; }
+  }
+
+  clear(): void {
+    this.filters = []; this.appliedFilters = []; this.validationMessage = '';
+    this.ensureOneEmptyRow();
+    this.command.emit({actionKey: 'advancedFilterChanged', payload: {filters: []}});
   }
 
   apply(): void {
-    const filters = this.filters
-      .map((filter) => ({
-        field: filter.field.trim(),
-        operator: filter.operator,
-        value: String(filter.value ?? '').trim()
-      }))
-      .filter((filter) => filter.field.length > 0 && filter.value.length > 0);
-
-    this.command.emit({ actionKey: 'advancedFilterChanged', payload: { filters } });
+    if (!this.validateFilters()) return;
+    const filters = this.filters.filter(filter => filter.field && this.hasValue(filter.value))
+      .map(filter => ({field: filter.field, operator: filter.operator, value: String(filter.value).trim()}));
+    this.appliedFilters = structuredClone(filters);
+    this.command.emit({actionKey: 'advancedFilterChanged', payload: {filters}});
     this.visible = false;
   }
 
-  close(): void {
-    this.visible = false;
-  }
+  close(): void { this.setFilters(this.appliedFilters); this.visible = false; this.validationMessage = ''; }
 
+  private validateFilters(): boolean {
+    try {
+      for (const filter of this.filters.filter(row => row.field && this.hasValue(row.value))) {
+        const type = this.columns.find(column => (column.field ?? column.id) === filter.field)?.type ?? this.getFieldConfig(filter.field)?.valueType ?? this.getFieldType(filter.field);
+        buildFieldFilter(filter.field, String(filter.value), filter.operator, type);
+      }
+      this.validationMessage = ''; return true;
+    } catch (error) { this.validationMessage = error instanceof Error ? error.message : 'Check your filter values.'; return false; }
+  }
   removeFilter(index: number): void {
     this.filters = this.filters.filter((_, current) => current !== index);
     this.ensureOneEmptyRow();
-    if (this.activeFilterCount === 0) {
-      this.command.emit({ actionKey: 'advancedFilterChanged', payload: { filters: [] } });
-    }
+    this.validateFilters();
   }
 
   updateField(index: number, value: string): void {
@@ -317,7 +341,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
 
     this.ensureOneEmptyRow();
     if (hadValue) {
-      this.emitAdvancedFilter();
+      this.validateFilters();
     }
   }
 
@@ -331,7 +355,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
   }
 
   onValueLeave(): void {
-    this.emitAdvancedFilter();
+    this.validateFilters();
   }
 
   trackByFilter(_index: number, filter: FilterRow): string {
@@ -344,8 +368,8 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     }
 
     try {
-      const raw = window.localStorage.getItem(this.storageKeyForPage());
-      this.bookmarks = raw ? JSON.parse(raw) as FilterBookmark[] : [];
+      const stored = this.personalization.read<unknown>(this.storageKey, 'filters', []);
+      this.bookmarks = Array.isArray(stored) ? stored.filter(item => item && typeof item.name === 'string' && Array.isArray(item.filters)).slice(0, 20) : [];
     } catch {
       this.bookmarks = [];
     }
@@ -357,15 +381,14 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     }
 
     try {
-      window.localStorage.setItem(this.storageKeyForPage(), JSON.stringify(this.bookmarks));
+      this.personalization.write(this.storageKey, 'filters', this.bookmarks);
     } catch {
       // ignore storage quota issues
     }
   }
 
   private ensureOneEmptyRow(): void {
-    const hasEmpty = this.filters.some((filter) => !filter.field);
-    if (!hasEmpty && this.filters.length < 20) {
+    if (this.filters.length === 0) {
       this.addFilter();
     }
   }
@@ -384,7 +407,13 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     this.dropdownLoading[row.id] = true;
     const scope = this.buildFilterLoadScope(config.field);
     this.loading.begin(scope, `Loading ${config.label} options...`);
-    this.dataSource.loadList({ endpoint: config.apiUrl, pageSize: 50 }).subscribe({
+    this.subscriptions.add(this.dataSource.loadList({ endpoint: config.apiUrl, pageSize: 50 }).pipe(
+      timeout(15000),
+      finalize(() => {
+        this.dropdownLoading[row.id] = false; this.loading.end(scope);
+        if (!this.destroyed) this.changeDetector.markForCheck();
+      }),
+    ).subscribe({
       next: (data) => {
         const rows = this.toRecords(data);
         const valueField = config.valueField ?? 'value';
@@ -399,20 +428,18 @@ export class ListFilterPanel implements OnInit, OnDestroy {
 
         this.fieldCache[config.field] = options;
         this.dropdownItems[row.id] = options;
-        this.dropdownLoading[row.id] = false;
-        this.loading.end(scope);
+
       },
       error: () => {
-        this.dropdownLoading[row.id] = false;
-        this.loading.end(scope);
+        this.validationMessage = `Unable to load ${config.label} options. Close and reopen filters to retry.`;
       }
-    });
+    }));
   }
 
   private buildFilterLoadScope(field: string): string {
     const key = this.storageKey.trim() || 'global';
     const normalizedField = field.trim().toLowerCase() || 'options';
-    return `section:filter:${key}:${normalizedField}`;
+    return `section:filter:${key}:${this.loadingInstanceId}:${normalizedField}`;
   }
 
   private toRecords(source: unknown): Record<string, unknown>[] {
@@ -439,29 +466,13 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     return String(value).trim().length > 0;
   }
 
-  private storageKeyForPage(): string {
-    return `app-list-filter:${this.storageKey}`;
-  }
-
-  private emitAdvancedFilter(): void {
-    const filters = this.filters
-      .map((filter) => ({
-        field: filter.field.trim(),
-        operator: filter.operator,
-        value: String(filter.value ?? '').trim()
-      }))
-      .filter((filter) => filter.field.length > 0 && filter.value.length > 0);
-
-    this.command.emit({ actionKey: 'advancedFilterChanged', payload: { filters } });
-  }
-
   private getFieldConfig(field: string): ListFilterFieldConfig | undefined {
     return this.resolvedFilterOptions.find((option) => option.field === field);
   }
 
   private defaultOperatorForField(field: string): FilterRow['operator'] {
     const configured = this.getFieldConfig(field)?.operator;
-    if (configured === 'eq' || configured === 'ge' || configured === 'le' || configured === 'contains') {
+    if (configured) {
       return configured;
     }
 
@@ -499,7 +510,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
   }
 
   private normalizeOperator(value: string): FilterRow['operator'] {
-    if (value === 'eq' || value === 'ge' || value === 'le' || value === 'startswith') {
+    if (value === 'eq' || value === 'ge' || value === 'le' || value === 'startswith' || value === 'ne' || value === 'gt' || value === 'lt' || value === 'expression') {
       return value;
     }
 

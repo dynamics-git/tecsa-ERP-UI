@@ -191,3 +191,99 @@ unchanged. Naming changes do not publish, deploy or certify an SDK.
 
 References: [Angular style guide](https://angular.dev/style-guide) and
 [Business Central FactBoxes](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-adding-a-factbox-to-page).
+
+## Shared list surface contract
+
+Every connected list uses ListPage; DocumentPage and RunModal delegate list
+rendering to it. A business page declares its columns, optional search overrides, capabilities,
+filters and optional FactBox in configuration. It does not implement its own query
+or copy the shared template. The visual hierarchy is page identity/actions, list
+view/search/tools, active criteria, stable table headers, records and loaded counts.
+Loading covers the record area; headers, column widths and toolbar remain present.
+
+The second row owns search, filters, column personalization, density, saved views,
+loaded-record grouping, details and default loaded-row export. The shell
+does not duplicate those controls. Every displayed tool has a handler. Capabilities
+can hide a tool; changing presentation never grants backend permissions.
+
+Search composes all configured fields on the server. Each term can match any
+configured target. Filters are staged and validated before Apply. Text expressions
+support alternatives and edge wildcards; the current server permits ordered
+comparisons/ranges on numeric/date fields. Unsupported text ranges are rejected
+before querying. Keep the backend's type, whitelist, depth and paging limits.
+Search text is temporary. Saved views include filters, configured view predicates,
+sorting, column order/visibility/width, density, grouping and details visibility.
+Preferences and saved filters are scoped to workspace, company, user and page.
+Storage is presentation state; it never stores full ERP records or permissions.
+
+FactBox is enabled by default unless config.factBox.enabled is false. Explicit
+sections/bindings take priority, followed by opted-in column metadata. Otherwise
+the shared component derives Record details from visible columns and a bounded
+set of scalar API business fields. Honor hidden/opted-out fields. Do not dump nested
+payloads, credentials or technical identifiers as automatic fields. An empty list
+shows Select a record guidance. Filters and Details share the contextual side area;
+Details remains available while filtering. Narrow layouts stack the context pane.
+
+Grouping and all list export formats apply to loaded records and are labeled accordingly.
+Neither represents server-wide aggregation or a full-dataset export job. Selection
+also refers to loaded records. Paging remains server-side with bounded batches and
+cursor restrictions. Decimal strings retain their exact precision in display and
+export; date-only values do not shift with the user's time zone.
+
+### Verification record (local, 20 October 2026)
+
+| Feature | Verification / limit |
+| --- | --- |
+| Toolbar and headers during loading | Live desktop inspection and reload |
+| Column show/hide/order and density | Live change and persistence across reload |
+| Saved views | Live save, reload, restore filter/layout, then remove temporary review view |
+| Text wildcard/alternative filter | Live server request accepted without a validation alert |
+| FactBox empty state and layout | Live inspection; populated-record fallback requires records |
+| Search across fields and typed ranges | Source/query-contract review; available fields vary by resource |
+| Loaded-row grouping and export | Implemented; populated-record verification remains required |
+| Record selection and continuation paging | Existing common contract retained; populated-record verification remains required |
+| Source, imports and design tokens | No-emit Angular/TypeScript and repository static checks |
+
+No automated test suite or production build was run for this local pass. These
+checks do not certify production readiness or feature parity with another ERP.
+Product labels and help use TecSA branding and neutral feature terminology.
+
+Shared list typography uses TecSA semantic tokens: 20px page title, 16px section
+heading, 14px body/controls, 13px column labels and 12px supporting text. Density
+changes row height (36/44/52px), not text size. Table headings stay 40px while
+loading. Details is the single FactBox toggle; do not add letter-only shortcuts
+that duplicate it. Its pressed state reflects the visible context pane.
+
+Standard list actions use StandardListActionsService in both shell and embedded
+list toolbars. New, Delete and Refresh are present by default. Explicit
+standardActions.<action>: false hides that action; object overrides customize it.
+Unsupported operations and denied permissions remain disabled with a reason.
+The shell passes standardActions through PageContext. Column sorting uses the
+column heading and aria-sort, without reserving a separate sort-summary row.
+Only applied filters or selection create a criteria strip.
+
+Shared list tools are opt-out: omitted tools configuration enables search,
+filters, columns, density, grouping, saved views, Details and export. A false
+value disables the corresponding feature. PR uses these list defaults.
+Search fields derive from non-hidden queryable column metadata unless an explicit
+searchFields override is present. searchable:false excludes a field; filterable:false
+excludes API-unsupported/calculated fields. Text uses contains, badges equality,
+numeric/date input matches typed fields, and Yes/No matches boolean fields.
+
+Export uses one neutral menu for XLSX, DOCX, CSV and browser Print / Save as PDF.
+Scope is visible columns and currently loaded records, clearly stated in the menu.
+Export does not fetch the entire dataset. Spreadsheet/document writers load on
+first use. XLSX uses explicit strings to preserve identifiers and decimal precision.
+Generated print documents use text nodes and existing theme colors/fonts.
+Verification: XLSX and DOCX downloaded through the running browser and their
+Office ZIP structures were inspected. Current data is empty, so these are header-only
+exports. Print/PDF output and populated-data export still require visual verification.
+
+No. Series page configuration
+----------------------------
+No. Series uses pageType: 'document'. Its feature config exports page, header and
+line configurations. The list opens one document with General settings above the
+numbering-range grid. The line navigation resolves /numberSeries/{systemId}/lines.
+The separate numbering-range worksheet registration has been removed.
+Saving follows the existing configured Save/Apply convention; this page retains
+its original explicit Save command. Common list tools remain enabled by default.

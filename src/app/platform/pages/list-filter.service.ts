@@ -1,11 +1,13 @@
 import { Injectable } from '@angular/core';
 
+export interface ListSearchTarget { field: string; mode?: 'contains' | 'equals'; type?: string; }
+
 export interface ListFilterBuildInput {
   baseFilter?: string;
   viewFilter?: string;
   searchText?: string;
   advancedFilter?: string;
-  searchTargets?: Array<{ field: string; mode?: 'contains' | 'equals' }>;
+  searchTargets?: ListSearchTarget[];
 }
 
 @Injectable({
@@ -24,7 +26,7 @@ export class ListFilterService {
 
   private buildSearchFilter(
     searchText: string | undefined,
-    searchTargets: Array<{ field: string; mode?: 'contains' | 'equals' }>
+    searchTargets: ListSearchTarget[]
   ): string {
     const text = (searchText ?? '').trim();
     if (!text.length) {
@@ -37,8 +39,8 @@ export class ListFilterService {
     }
 
     const targets = searchTargets
-      .map((target) => ({ field: target.field.trim(), mode: target.mode ?? 'contains' as const }))
-      .filter((target) => target.field.length > 0);
+      .map((target) => ({ field: target.field.trim(), mode: target.mode ?? 'contains' as const, type: target.type }))
+      .filter((target) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(target.field));
 
     if (!targets.length) {
       return '';
@@ -46,35 +48,18 @@ export class ListFilterService {
 
     return terms.map((term) => {
       const escaped = term.replace(/'/g, "''");
-      const selectedTarget = this.selectSearchTarget(targets, escaped);
-
-      if (selectedTarget.mode === 'equals') {
-        return `(${selectedTarget.field} eq '${escaped}')`;
-      }
-
-      return `(contains(${selectedTarget.field}, '${escaped}'))`;
-    }).join(' and ');
-  }
-
-  private selectSearchTarget(
-    targets: Array<{ field: string; mode: 'contains' | 'equals' }>,
-    term: string
-  ): { field: string; mode: 'contains' | 'equals' } {
-    const normalized = term.toLowerCase();
-    const numberLike = /^\d+$/.test(normalized);
-
-    if (numberLike) {
-      const numberField = targets.find((target) => {
-        const key = target.field.toLowerCase();
-        return key === 'number' || key === 'no' || key.endsWith('number') || key.endsWith('no');
+      const clauses = targets.flatMap(target => {
+        if (target.type === 'boolean') {
+          const value = /^(yes|true)$/i.test(term) ? 'true' : /^(no|false)$/i.test(term) ? 'false' : undefined;
+          return value ? [`${target.field} eq ${value}`] : [];
+        }
+        if (target.type === 'number' || target.type === 'currency') return /^[+-]?\d+(?:\.\d+)?$/.test(term) ? [`${target.field} eq ${term}`] : [];
+        if (target.type === 'date') return /^\d{4}-\d{2}-\d{2}$/.test(term) && !Number.isNaN(Date.parse(term)) ? [`${target.field} eq '${escaped}'`] : [];
+        return [target.mode === 'equals' ? `${target.field} eq '${escaped}'` : `contains(${target.field}, '${escaped}')`];
       });
-
-      if (numberField) {
-        return numberField;
-      }
-    }
-
-    return targets[0];
+      // An incompatible term must match no records, never remove the search restriction.
+      return clauses.length ? '(' + clauses.join(' or ') + ')' : '(' + targets[0].field + ' eq null and ' + targets[0].field + ' ne null)';
+    }).join(' and ');
   }
 
   private wrap(value: string | undefined): string {

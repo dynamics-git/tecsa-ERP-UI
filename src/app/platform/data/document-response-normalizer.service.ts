@@ -8,15 +8,11 @@ export class DocumentResponseNormalizerService {
     response: unknown,
     fallback: Record<string, unknown>,
   ): Record<string, unknown> {
-    const mergeWithFallback = (source: Record<string, unknown>): Record<string, unknown> => {
-      const merged: Record<string, unknown> = { ...fallback };
-      for (const [key, value] of Object.entries(source)) {
-        if (value !== null && value !== undefined && String(value).trim().length > 0) {
-          merged[key] = value;
-        }
-      }
-      return merged;
-    };
+    // A server-provided null or empty value is authoritative. Only omitted fields use the fallback.
+    const mergeWithFallback = (source: Record<string, unknown>): Record<string, unknown> => ({
+      ...fallback,
+      ...source,
+    });
 
     if (this.isRecord(response)) {
       if (this.isRecord(response['data'])) return { ...fallback, ...response['data'] };
@@ -47,6 +43,6 @@ export class DocumentResponseNormalizerService {
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

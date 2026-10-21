@@ -1,0 +1,233 @@
+:host {
+  display: block;
+}
+
+.app-commandbar {
+  min-height: 60px;
+  padding: 0 18px 0 28px;
+  background: var(--ts-surface-soft);
+  box-shadow: inset 0 -1px 0 var(--ts-border);
+  border: 0;
+  border-radius: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ts-space-4);
+  font-family: var(--ts-font);
+}
+
+button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.command-context,
+.context-selector {
+  display: none;
+}
+
+.command-work {
+  min-width: 0;
+}
+
+.work-title {
+  color: var(--ts-text);
+  font-size: var(--ts-font-page-title);
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.work-meta {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--ts-muted);
+  font-size: var(--ts-font-caption);
+  font-weight: 600;
+  line-height: var(--ts-line-body);
+  white-space: nowrap;
+
+  span + span {
+    padding-left: 7px;
+    border-left: 1px solid var(--ts-border);
+  }
+}
+
+.command-main,
+.command-tools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.command-main {
+  min-width: 0;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.list-command-strip {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding-left: 8px;
+  align-content: center;
+}
+
+.cmd-primary,
+.cmd,
+.tool {
+  height: var(--ts-control-h);
+  padding: 0 10px;
+  border-radius: var(--ts-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ts-text-soft);
+  font-size: var(--ts-font-body);
+  font-weight: 600;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--ts-surface-hover);
+    color: var(--ts-text);
+  }
+}
+
+.cmd-danger {
+  color: var(--ts-danger);
+
+  &:hover {
+    background: var(--ts-danger-bg);
+    color: var(--ts-danger);
+  }
+}
+
+.cmd-primary {
+  padding: 0 13px;
+  background: var(--ts-brand-900);
+  color: var(--ts-text-inverse);
+  font-weight: 700;
+
+  &:hover {
+    background: var(--ts-brand-950);
+    color: var(--ts-text-inverse);
+  }
+}
+
+.cmd-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 7px;
+  background: var(--ts-border);
+}
+
+.cmd-divider.compact {
+  margin: 0 1px;
+}
+
+.view-switch {
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--ts-border);
+  border-radius: 7px;
+  background: var(--ts-surface);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  button {
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 5px;
+    color: var(--ts-muted);
+    font-size: var(--ts-font-caption);
+    font-weight: 600;
+
+    &.active {
+      background: var(--ts-brand-900);
+      color: var(--ts-text-inverse);
+    }
+
+    &:not(.active):hover {
+      background: var(--ts-surface-hover);
+    }
+  }
+}
+
+.tool {
+  color: var(--ts-text-soft);
+}
+
+.command-main > button,
+.command-tools > button,
+.list-command-strip > button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 1000px) {
+  .app-commandbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    padding: 10px 16px;
+  }
+
+  .command-work { grid-column: 1 / -1; }
+  .command-tools { flex-wrap: wrap; }
+}
+
+@media (max-width: 600px) {
+  .command-main,
+  .command-tools {
+    grid-column: 1 / -1;
+  }
+
+  .command-tools { justify-content: flex-end; }
+}
+
+button:disabled { color: var(--ts-muted); opacity: 0.6; cursor: default; }
+
+// Page commands follow the title; optional tools retain the right edge.
+.app-commandbar {
+  display: flex;
+  flex-wrap: wrap;
+  padding: var(--ts-space-2) calc(var(--ts-space-4) + var(--ts-space-2));
+  gap: var(--ts-space-2) var(--ts-space-4);
+}
+.command-work { flex: 0 1 auto; }
+.command-main {
+  margin-inline-start: 0;
+  justify-content: flex-start;
+  gap: var(--ts-space-3);
+  padding: 0;
+}
+.command-tools:empty { display: none; }
+.command-main > button {
+  height: var(--ts-control-h);
+  padding: 0 var(--ts-space-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ts-text-soft);
+  font-weight: 600;
+  &:hover:not(:disabled) {
+    color: var(--ts-brand-900);
+    border-bottom-color: var(--ts-brand-900);
+    background: transparent;
+  }
+  &:focus-visible { outline: 2px solid var(--ts-border-focus); outline-offset: 2px; }
+  &.cmd-primary { color: var(--ts-brand-900); }
+  &.cmd-danger { color: var(--ts-danger); }
+  &:disabled { color: var(--ts-muted); border-bottom-color: transparent; cursor: default; }
+}
+
+.command-tools { margin-inline-start: auto; }

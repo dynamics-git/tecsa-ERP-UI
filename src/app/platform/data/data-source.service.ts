@@ -15,6 +15,7 @@ export interface DataRestService {
 }
 export const DATA_REST_SERVICE = new InjectionToken<DataRestService>('RestService');
 export interface DataSourceLoadOptions {
+  maxAgeMs?: number;
   skip?: number; top?: number; cursor?: string; forceRefresh?: boolean; useCache?: boolean;
 }
 export interface DataPage { value: Record<string, unknown>[]; meta: Record<string, unknown>; }
@@ -27,6 +28,22 @@ export class DataSourceService {
   private readonly versions = new Map<string, string>();
   private readonly writes = new Map<string, Promise<unknown>>();
   private scope = '';
+  private readonly conflictedRecords = new WeakSet<Record<string, unknown>>();
+  private readonly records = new Map<string, { value: Record<string, unknown>; at: number }>();
+  private readGeneration = 0;
+  invalidateReadCache(): void { this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
+  private cacheRecord(key: string, value: Record<string, unknown>): void {
+    if (this.records.size >= 100) this.records.delete(this.records.keys().next().value!);
+    this.records.set(key, { value: structuredClone(value), at: Date.now() });
+  }
+  private readonly resourceRevisions = new Map<string, number>();
+  private revisionKey(endpoint: string): string { return this.key('/' + endpoint.split('/').filter(Boolean)[0]); }
+  getResourceRevision(config: DataSourceConfig): number { return this.resourceRevisions.get(this.revisionKey(config.endpoint)) ?? 0; }
+  private recordMutation(endpoint: string): void {
+    this.invalidateReadCache();
+    const key = this.revisionKey(endpoint);
+    this.resourceRevisions.set(key, (this.resourceRevisions.get(key) ?? 0) + 1);
+  }
   private readonly missingSingletons = new Set<string>();
 
   constructor(
@@ -37,13 +54,15 @@ export class DataSourceService {
   ) {}
 
   loadList(config: DataSourceConfig, options: DataSourceLoadOptions = {}): Observable<unknown> {
-    if (config.singleton) return this.loadSingleton(config);
+    if (config.singleton) return this.loadSingleton(config, options);
     const endpoint = this.listEndpoint(config, options);
     const key = this.key(endpoint);
-    const cached = this.getCachedList(config, options);
-    if (options.useCache && !options.forceRefresh && cached !== undefined) return of(cached);
+    const generation = this.readGeneration;
+    const cached = this.getCachedList(config, options, options.maxAgeMs ?? 300000);
+    if (options.useCache && !options.forceRefresh && cached !== undefined) return of(structuredClone(cached));
     return this.read(key, () => this.client.get(endpoint).pipe(map(response => {
       if (key !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
+      if (generation !== this.readGeneration) throw new Error('Data changed while loading. Refresh to load the current record.');
       const outer = this.asRecord(response);
       const rows = Array.isArray(response) ? response : outer?.['data'] ?? outer?.['value'];
       if (!Array.isArray(rows)) throw new Error('Unexpected ERP collection response.');
@@ -52,7 +71,10 @@ export class DataSourceService {
         const id = row[config.keyField ?? 'systemId'];
         if (this.present(id)) this.remember(this.recordEndpoint(config, id), row);
       });
-      if (options.useCache) this.lists.set(key, { response: page, at: Date.now() });
+      if (options.useCache) {
+        if (this.lists.size >= 100) this.lists.delete(this.lists.keys().next().value!);
+        this.lists.set(key, { response: structuredClone(page), at: Date.now() });
+      }
       return page;
     })));
   }
@@ -61,28 +83,44 @@ export class DataSourceService {
     const cached = this.lists.get(this.key(this.listEndpoint(config, options)));
     return cached && Date.now() - cached.at <= maxAgeMs ? cached.response : undefined;
   }
-  loadSingleton(config: DataSourceConfig): Observable<unknown> {
+  loadSingleton(config: DataSourceConfig, options: DataSourceLoadOptions = {}): Observable<unknown> {
     const endpoint = this.endpoint(config);
     const key = this.key(endpoint);
+    const generation = this.readGeneration;
+    const cached = this.records.get(key);
+    if (options.useCache && !options.forceRefresh && cached && Date.now() - cached.at < (options.maxAgeMs ?? 30000)) return of(structuredClone(cached.value));
     return this.read(key, () => this.client.get(endpoint).pipe(map(response => {
       if (key !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
+      if (generation !== this.readGeneration) throw new Error('Data changed while loading. Refresh to load the current record.');
       this.missingSingletons.delete(key);
-      return this.record(response, endpoint);
+      const record = this.record(response, endpoint);
+      if (options.useCache) this.cacheRecord(key, record);
+      return record;
     }), catchError(error => {
-      if (error?.status === 404 && key === this.key(endpoint)) this.missingSingletons.add(key);
+      if (error?.status === 404 && key === this.key(endpoint) && generation === this.readGeneration) this.missingSingletons.add(key);
       throw error;
     })));
   }
-  loadById(config: DataSourceConfig, id: unknown): Observable<unknown> {
+  loadById(config: DataSourceConfig, id: unknown, options: DataSourceLoadOptions = {}): Observable<unknown> {
     const endpoint = config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);
     const key = this.key(endpoint);
+    const generation = this.readGeneration;
+    const cached = this.records.get(key);
+    if (options.useCache && !options.forceRefresh && cached && Date.now() - cached.at < (options.maxAgeMs ?? 30000)) return of(structuredClone(cached.value));
     return this.read(key, () => this.client.get(endpoint).pipe(map(response => {
       if (key !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
-      return this.record(response, endpoint);
+      if (generation !== this.readGeneration) throw new Error('Data changed while loading. Refresh to load the current record.');
+      const record = this.record(response, endpoint);
+      if (options.useCache) this.cacheRecord(key, record);
+      return record;
     })));
   }
   create(config: DataSourceConfig, payload: unknown): Observable<unknown> { return this.mutate(config, undefined, payload, 'create'); }
   update(config: DataSourceConfig, id: unknown, payload: unknown, rowVersion?: unknown): Observable<unknown> { return this.mutate(config, id, payload, 'update', rowVersion); }
+  /** Read the version from this editor only when its queued write starts. */
+  updateRecord(config: DataSourceConfig, id: unknown, payload: unknown, record: Record<string, unknown>): Observable<unknown> {
+    return this.mutate(config, id, payload, 'update', undefined, record);
+  }
   delete(config: DataSourceConfig, id: unknown, rowVersion?: unknown): Observable<unknown> { return this.mutate(config, id, undefined, 'delete', rowVersion); }
 
   /** Explicit domain command; never inferred from a label and never auto-retried. */
@@ -94,6 +132,7 @@ export class DataSourceService {
       return this.enqueue(endpoint, async () => {
         const response = await firstValueFrom(this.client.post(`${endpoint}/${command}`, payload));
         if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
+        this.recordMutation(endpoint);
         this.lists.clear();
         return this.record(response, endpoint);
       });
@@ -110,14 +149,16 @@ export class DataSourceService {
     const rule = config.writableStates;
     return !rule || !this.present(record[config.keyField ?? 'systemId']) || rule.values.includes(record[rule.field]);
   }
-  private mutate(config: DataSourceConfig, id: unknown, body: unknown, operation: 'create' | 'update' | 'delete', rowVersion?: unknown): Observable<unknown> {
+  private mutate(config: DataSourceConfig, id: unknown, body: unknown, operation: 'create' | 'update' | 'delete', rowVersion?: unknown, editor?: Record<string, unknown>): Observable<unknown> {
     return defer(() => {
       if ((operation === 'create' && config.supportsCreate === false) || (operation === 'update' && config.supportsUpdate === false) || (operation === 'delete' && (config.supportsDelete === false || config.singleton))) throw new Error(`This resource does not support ${operation}.`);
       const endpoint = operation === 'create' || config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);
       const identity = this.key(endpoint);
       return this.enqueue(endpoint, async () => {
-        if (rowVersion !== undefined && (!Number.isSafeInteger(Number(rowVersion)) || Number(rowVersion) < 1)) throw new Error('Reload the record: its row version is invalid.');
-        const version = rowVersion !== undefined ? `"${Number(rowVersion)}"` : this.versions.get(identity);
+        if (editor && this.conflictedRecords.has(editor)) throw Object.assign(new Error('This record changed on the server. Your edits are retained. Reload and reconcile them before saving.'), { status: 412 });
+        const currentVersion = editor ? editor['systemRowVersion'] : rowVersion;
+        if (currentVersion !== undefined && (!Number.isSafeInteger(Number(currentVersion)) || Number(currentVersion) < 1)) throw new Error('Reload the record: its row version is invalid.');
+        const version = currentVersion !== undefined ? `"${Number(currentVersion)}"` : this.versions.get(identity);
         if (operation !== 'create' && !version && !(config.singleton && this.missingSingletons.has(identity))) throw new Error('Reload the record before saving: its row version is missing.');
         const payload = operation === 'delete' ? undefined : this.contracts.sanitizePayload(config, operation, body);
         const request = operation === 'delete' ? this.client.delete(endpoint, version)
@@ -127,14 +168,20 @@ export class DataSourceService {
         try {
           const response = await firstValueFrom(request);
           if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
+          this.recordMutation(endpoint);
           this.lists.clear();
           if (operation === 'delete') { this.versions.delete(identity); return response; }
           const record = this.record(response, endpoint);
+          if (editor) editor['systemRowVersion'] = record['systemRowVersion'];
           this.missingSingletons.delete(identity);
           if (operation === 'create' && !config.singleton) this.remember(this.recordEndpoint(config, record[config.keyField ?? 'systemId']), record);
           return record;
         } catch (error) {
-          if (error && typeof error === 'object' && 'status' in error && error.status === 412) this.versions.delete(identity);
+          if (error && typeof error === 'object' && 'status' in error && error.status === 412) {
+            this.versions.delete(identity);
+            this.invalidateReadCache();
+            if (editor) this.conflictedRecords.add(editor);
+          }
           throw error;
         }
       });
@@ -161,7 +208,7 @@ export class DataSourceService {
     const request = defer(factory).pipe(map(result => {
       if (context !== this.context()) throw new Error('Your company or session changed. Reopen the page.');
       return result;
-    }), finalize(() => this.requests.delete(key)), shareReplay({ bufferSize: 1, refCount: true }));
+    }), finalize(() => { if (this.requests.get(key) === request) this.requests.delete(key); }), shareReplay({ bufferSize: 1, refCount: true }));
     this.requests.set(key, request);
     return request;
   }
@@ -201,7 +248,8 @@ export class DataSourceService {
     const context = this.context();
     if (this.scope !== context) {
       this.scope = context;
-      this.lists.clear(); this.versions.clear(); this.requests.clear(); this.writes.clear(); this.missingSingletons.clear();
+      this.invalidateReadCache();
+      this.versions.clear(); this.requests.clear(); this.writes.clear(); this.missingSingletons.clear();
     }
     return `${context}|${endpoint}`;
   }

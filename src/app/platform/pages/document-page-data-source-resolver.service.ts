@@ -195,7 +195,9 @@ export class DocumentPageDataSourceResolverService {
     valueType: DocumentPageLineValueType;
   }): string[] {
     return (params.lineConfig?.columns ?? [])
-      .filter((column) => column.valueType === params.valueType)
+      .filter((column) => column.valueType === params.valueType
+        || (params.valueType === 'number' && (column.valueType === 'integer' || column.valueType === 'decimal'))
+        || (params.valueType === 'text' && column.valueType === 'code'))
       .map((column) => this.getColumnField({ column }))
       .filter(Boolean);
   }

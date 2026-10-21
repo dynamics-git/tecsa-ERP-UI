@@ -36,7 +36,7 @@ export class RunModalHost {
     return this.assembler.pickListPageConfig({ module: this.getRuntimePage(popup)!.module }) as ListPageConfig & { dataSource: DataSourceConfig };
   }
   getRuntimeHeader(popup: PopupConfig): HeaderConfig {
-    return this.assembler.pickObject({ module: this.getRuntimePage(popup)!.module, suffix: 'HeaderConfig' }) as unknown as HeaderConfig;
+    return (this.assembler.pickObject({ module: this.getRuntimePage(popup)!.module, suffix: 'HeaderConfig' }) as unknown as HeaderConfig) ?? {dialogTitle: '', toolbarButtons: [], sections: []};
   }
   getRuntimeLines(popup: PopupConfig): LineConfig | undefined {
     return this.assembler.pickObject({ module: this.getRuntimePage(popup)!.module, suffix: 'LineConfig' }) as unknown as LineConfig | undefined;

@@ -1,0 +1,61 @@
+@use '../form-control' as form-control;
+
+:host { display: block; min-width: 0; }
+.lookup-control { position: relative; display: block; }
+input {
+  @include form-control.appearance;
+  box-sizing: border-box;
+  padding-right: var(--ts-8);
+}
+.lookup-toggle {
+  position: absolute;
+  inset-inline-end: 1px;
+  top: 1px;
+  bottom: 1px;
+  width: var(--ts-8);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ts-text);
+  font-size: var(--ts-text-13);
+  cursor: pointer;
+  &:disabled { cursor: default; }
+}
+
+// Grid editors retain the existing borderless cell appearance.
+:host(.grid-editor) input {
+  height: 100%;
+  padding: 0 var(--ts-8) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--ts-text-13);
+  font-weight: 650;
+  &:focus { outline: none; box-shadow: none; }
+}
+.lookup-popup {
+  position: absolute;
+  top: 100%; left: 0; right: 0; z-index: 20;
+  display: flex; flex-direction: column;
+  padding: var(--ts-space-1);
+  border: 1px solid var(--ts-border);
+  background: var(--ts-surface);
+  color: var(--ts-text);
+  font-size: var(--ts-text-13);
+  font-weight: 650;
+  [role="listbox"] { display: flex; flex-direction: column; max-height: 220px; overflow: auto; }
+  button {
+    border: 0; background: transparent; color: inherit; text-align: left;
+    padding: var(--ts-space-2); font: inherit; cursor: pointer;
+    &:hover, &.active { background: var(--ts-control-hover-bg); }
+    &:focus-visible { outline: 2px solid var(--ts-border-focus); }
+  }
+  .lookup-help { padding: var(--ts-space-1); color: var(--ts-muted); font-weight: 400; }
+}
+
+// A consistent single-line option height lets the shared viewport bound DOM growth.
+[role="option"] { flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -93,3 +93,9 @@ select,
 textarea {
   font-family: inherit;
 }
+button, input, select, textarea { margin: 0; font-size: inherit; line-height: inherit; }
+button, select { text-transform: none; }
+table { border-collapse: collapse; }
+th { text-align: inherit; }
+img, svg { vertical-align: middle; }
+[hidden] { display: none !important; }

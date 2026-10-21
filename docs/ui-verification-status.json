@@ -1,0 +1,60 @@
+{
+  "updated": "2026-10-21",
+  "scope": "Shared frontend foundation; incremental verification, not release certification",
+  "items": [
+    {
+      "id": 1,
+      "area": "Loading, editing and persistence",
+      "status": "in_progress",
+      "verified": [
+        "Setup reopen and refresh visually checked",
+        "Unchanged focus/edit/close visually checked",
+        "Queued writes use current editor version",
+        "Independent stale editor still conflicts",
+        "Queued writes stop after conflict",
+        "Old reads rejected after invalidation",
+        "Fresh requests remain shared",
+        "Cache copies isolate consumers",
+        "Company change isolates cached reads",
+        "Live QA2010 header and persisted line updates succeeded; original description and increment restored",
+        "Live two-editor stale save rejected; local text retained; refresh asks before discard and recovers newer server record",
+        "Explicit refresh succeeded on repeat; earlier intermittent load failure remains undiagnosed",
+        "Refresh errors now preserve actual failure detail; Retry uses unsaved-change protection"
+      ],
+      "remaining": [
+        "Diagnose intermittent load timeout and verify repeat stability",
+        "Routed and stacked coverage for every supported page type"
+      ]
+    },
+    {
+      "id": 2,
+      "area": "Field types, validation and lookup contract",
+      "status": "pending_full_verification"
+    },
+    {
+      "id": 3,
+      "area": "List search, filters, sorting, paging and saved views",
+      "status": "pending_full_verification"
+    },
+    {
+      "id": 4,
+      "area": "Header/line interaction, keyboard navigation and calculations",
+      "status": "pending_full_verification"
+    },
+    {
+      "id": 5,
+      "area": "Nested windows, navigation and context preservation",
+      "status": "pending_full_verification"
+    },
+    {
+      "id": 6,
+      "area": "Visual consistency, accessibility and responsive layout",
+      "status": "pending_full_verification"
+    },
+    {
+      "id": 7,
+      "area": "Page configuration examples and developer handoff",
+      "status": "pending_full_verification"
+    }
+  ]
+}

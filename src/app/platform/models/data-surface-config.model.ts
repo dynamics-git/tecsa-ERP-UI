@@ -1,3 +1,4 @@
+import type { ListFilterFieldConfig } from './list-filter-config.model';
 import { FieldFactBoxConfig } from './field-config.model';
 
 export type DataSurfaceMode = 'table';
@@ -16,6 +17,10 @@ export interface DataSurfaceColumnConfig {
   currencyCode?: string;
   hidden?: boolean;
   sortable?: boolean;
+  filterable?: boolean;
+  /** Exclude a queryable column from shared search only when explicitly false. */
+  searchable?: boolean;
+  filter?: Omit<ListFilterFieldConfig, 'field' | 'label'>;
   factBox?: boolean | FieldFactBoxConfig;
 }
 

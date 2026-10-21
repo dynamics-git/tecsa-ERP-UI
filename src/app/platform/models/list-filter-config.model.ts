@@ -1,10 +1,11 @@
-export type FilterOperator = 'contains' | 'startswith' | 'eq' | 'ge' | 'le';
+export type FilterOperator = 'contains' | 'startswith' | 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'expression';
 
 export interface ListFilterFieldConfig {
   field: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'dropdown';
   operator?: FilterOperator;
+  valueType?: 'text' | 'number' | 'boolean' | 'date';
   placeholder?: string;
   options?: Array<{ value: unknown; label: string }>;
   defaultValue?: unknown;

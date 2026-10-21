@@ -28,9 +28,9 @@ export class Header {
   searchQuery = '';
   searchResults: MenuSearchItem[] = [];
   readonly userMenuItems: Array<{ id: string; label: string; icon: string; route?: string; disabled?: boolean }> = [
-    { id: 'profile', label: 'Profile', icon: 'bi bi-person-circle' },
-    { id: 'settings', label: 'Settings', icon: 'bi bi-sliders', disabled: true },
-    { id: 'dashboard', label: 'Dashboard', icon: 'bi bi-grid', disabled: true }
+    { id: 'profile', label: 'Profile', icon: 'ts-icon ts-icon-profile' },
+    { id: 'settings', label: 'Settings', icon: 'ts-icon ts-icon-sliders', disabled: true },
+    { id: 'dashboard', label: 'Dashboard', icon: 'ts-icon ts-icon-grid', disabled: true }
   ];
 
   constructor(
@@ -75,7 +75,7 @@ export class Header {
   }
 
   get environmentLabel(): string {
-    return this.isLive ? 'LIVE' : 'SANDBOX';
+    return this.isLive ? 'Live' : 'Sandbox';
   }
 
   toggleModule(module: string): void {

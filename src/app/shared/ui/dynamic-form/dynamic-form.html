@@ -2,14 +2,15 @@
   @for (section of visibleSections; track section.id) {
     @for (field of section.fields; track field.key) {
       @if (!field.hidden) {
-        <label [class.wide]="isWide(field)">
-          {{ field.label }}
+        <label [class.wide]="isWide(field)" [class.boolean-field]="(field.type === 'boolean' || field.valueType === 'boolean')">
+          {{ field.label }} @if (field.required) { <span aria-hidden="true">*</span> }
 
-          @if (field.type === 'select' || field.type === 'dropdown' || field.type === 'lookup') {
-            @if (field.lookup && !isFieldDisabled(field)) {
-              <input type="search" [attr.aria-label]="'Search ' + field.label" placeholder="Search..."
-                (input)="searchLookup(field, $any($event.target).value)" (focus)="searchLookup(field, $any($event.target).value)" />
-            }
+          @if (field.lookup) {
+            <app-lookup-select [placeholder]="field.placeholder ?? ''" [label]="field.label" [display]="lookupLabel(field)" [value]="data[field.key]"
+              [disabled]="isFieldDisabled(field)" [required]="field.required === true" [options]="getFieldOptions(field)"
+              [loading]="lookupOpen === field.key && lookupLoading" [error]="lookupOpen === field.key ? lookupError : ''"
+              [hasMore]="lookupOpen === field.key && lookupHasMore" (nextPage)="searchLookup(field, lookupQuery, true)" (retried)="searchLookup(field, lookupQuery, lookupRetryNextPage)" (opened)="openLookup(field)" (searched)="searchLookup(field, $event)" (selected)="chooseLookup(field, $event)" />
+          } @else if (field.type === 'select' || field.type === 'dropdown' || field.type === 'lookup') {
             <select
               [value]="getFieldValue(field)"
               [disabled]="isFieldDisabled(field)"
@@ -22,7 +23,7 @@
                 <option [value]="option.value" [selected]="isOptionSelected(field, option.value)">{{ option.label }}</option>
               }
             </select>
-          } @else if (field.type === 'boolean') {
+          } @else if ((field.type === 'boolean' || field.valueType === 'boolean')) {
             <input type="checkbox" [checked]="data[field.key] === true" [disabled]="isFieldDisabled(field)"
               (change)="updateFieldValue(field, $any($event.target).checked)" />
           } @else if (field.type === 'textarea') {
@@ -34,7 +35,7 @@
               (change)="updateFieldValue(field, coerceInputValue(field, $any($event.target).value))"></textarea>
           } @else {
             <input
-              [type]="field.type === 'date' ? 'date' : field.valueType === 'number' ? 'number' : 'text'" step="any"
+              [type]="(field.type === 'date' || field.valueType === 'date') ? 'date' : (field.type === 'number' || field.type === 'currency' || field.valueType === 'number' || field.valueType === 'integer' || field.valueType === 'decimal') ? 'number' : 'text'" step="any"
               [value]="getFieldValue(field)"
               [readOnly]="isFieldDisabled(field)"
               (focus)="notifyFieldInteracted(field)"

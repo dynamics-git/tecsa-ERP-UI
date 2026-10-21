@@ -1,9 +1,10 @@
+import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 // NOTE:
 // This file is currently a core ERP runtime/orchestration file.
 // Future refactor should split loading, popup orchestration, line runtime,
 // autosave, and command handling into smaller services.
 // Do not change behavior during this cleanup.
-import { ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject, forwardRef } from '@angular/core';
+import { HostListener, ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject, forwardRef } from '@angular/core';
 import { Observable, Subscription, forkJoin, from, of, firstValueFrom } from 'rxjs';
 import { catchError, map, timeout } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
@@ -15,12 +16,11 @@ import { ListCommandSelectionMode, ListPageConfig } from '../../models/page-conf
 import { DataSourceConfig } from '../../models/data-source-config.model';
 import { GENERIC_MESSAGES } from '../../models/generic-messages';
 import { ListPage } from '../list-page/list-page';
-import { ListFilterPanel } from '../list-filter-panel/list-filter-panel';
 import { RunModalHost } from '../../run-modal/run-modal-host/run-modal-host';
 import { ActionDispatcherService } from '../../../shared/ui/action-dispatcher.service';
 import { ApiErrorService } from '../../data/api-error.service';
 import { ConfirmationService } from '../../../shared/ui/confirmation.service';
-import { DataSourceService } from '../../data/data-source.service';
+import { DataPage, DataSourceService } from '../../data/data-source.service';
 import { DraftCreateService } from '../../data/draft-create.service';
 import { DocumentConfigDataService } from '../../data/document-config-data.service';
 import { DocumentPayloadService } from '../../data/document-payload.service';
@@ -47,6 +47,7 @@ import { DocumentPageListLifecycleContext, DocumentPageListLifecycleService } fr
 import { RuntimeValueMapperService } from '../../data/runtime-value-mapper.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
 import { RunModalService } from '../../run-modal/run-modal.service';
+import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
 import { DocumentWindow } from '../../document/document-window/document-window';
 
 type RequiredListConfig = ListPageConfig & { dataSource: DataSourceConfig };
@@ -76,8 +77,9 @@ export interface DocumentPageCommandEvent {
 @Component({
   selector: 'app-document-page',
   standalone: true,
-  imports: [ListPage, ListFilterPanel, forwardRef(() => RunModalHost), DocumentWindow],
+  imports: [ListPage, forwardRef(() => RunModalHost), DocumentWindow],
   templateUrl: './document-page.html',
+  styles: [':host { display: block; height: 100%; min-height: 0; }'],
 })
 export class DocumentPage implements OnInit, OnDestroy {
   private readonly actionDispatcher = inject(ActionDispatcherService);
@@ -109,6 +111,61 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly valueMapper = inject(RuntimeValueMapperService);
   private readonly sessionService = inject(SessionService);
   private readonly subscriptions = new Subscription();
+  private readonly commandPermission = inject(DocumentPageCommandPermissionService);
+  private readonly worksheetChangedRows = new Set<Record<string, unknown>>();
+  private worksheetPending = 0;
+  private worksheetSource?: DataSourceConfig;
+  get isWorksheetPage(): boolean { return this.listConfig.pageType === 'worksheet'; }
+  get dirtyWorksheet(): boolean { return this.isWorksheetPage && (this.worksheetChangedRows.size > 0 || this.worksheetPending > 0); }
+  private get permissionPageId(): string { return this.listConfig.permissionPageId ?? this.pageId; }
+  @HostListener('window:beforeunload', ['$event']) protectWorksheet(event: BeforeUnloadEvent): void {
+    if (this.dirtyWorksheet) { event.preventDefault(); event.returnValue = ''; }
+  }
+  canLeaveWorksheet(): boolean {
+    if (!this.dirtyWorksheet) return true;
+    this.setEntryStatus({tone: 'error', title: 'Unsaved changes', message: 'Complete or retry the changed rows before leaving.'});
+    return false;
+  }
+  private worksheetAllowed(row: Record<string, unknown>): boolean {
+    const source = this.worksheetSource ?? this.listConfig.dataSource;
+    const operation = this.hasValue(this.resolvePersistedRecordId(row, source)) ? 'modify' : 'create';
+    const mapped = source.permissions?.[operation === 'modify' ? 'update' : 'create'] ?? operation;
+    return !this.commandPermission.applyOperation({label: 'Save', actionKey: 'save'}, this.permissionPageId, mapped).disabled && this.dataSource.canWrite(source, row);
+  }
+  private async loadWorksheet(reset = true, forceRefresh = false): Promise<void> {
+    if (!this.lineConfig || this.popupLoading || this.dirtyWorksheet) return;
+    try {
+      this.worksheetSource = this.dataSource.relation(this.lineConfig.dataSource, this.initialRecord ?? {});
+      if (!this.activeDocumentWindowConfig) this.openDocumentPopup({}, []);
+      this.startPopupLoading('Loading records...');
+      const existing = reset ? [] : (this.activeDocumentWindowConfig?.lineRows ?? []).filter(row => this.hasValue(this.resolvePersistedRecordId(row, this.worksheetSource)));
+      const size = this.worksheetSource.pageSize ?? 25;
+      const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
+      const records = await this.documentHydration.resolveLineLookups(page.value, this.lineConfig.columns);
+      this.nextCursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
+      this.hasMore = this.worksheetSource.paging === 'cursor' ? !!this.nextCursor : typeof page.meta['total'] === 'number' ? existing.length + records.length < page.meta['total'] : records.length === size;
+      this.activeDocumentWindowConfig!.lineRows = this.buildLineRows({}, [...existing, ...records]);
+      this.activeLineRow = undefined; this.selectedLineIndexes = [];
+      this.ensureTrailingEmptyRows();
+      this.stopPopupLoading(); this.clearEntryStatus();
+    } catch (error) {
+      this.stopPopupLoading();
+      this.setEntryStatus({tone: 'error', title: 'Load failed', message: this.getErrorMessage(error)});
+    }
+    this.changeDetector.detectChanges();
+  }
+  loadMoreWorksheet(): void { if (this.hasMore) void this.loadWorksheet(false); }
+  private saveWorksheet(): void {
+    if (!this.lineConfig) return;
+    for (const row of this.worksheetChangedRows) this.saveLineFields(row, this.lineConfig.columns.filter(column => !column.readonly).map(column => column.field ?? column.id));
+  }
+  private worksheetSaveFinished(row: Record<string, unknown>, saved: unknown): void {
+    if (!this.isWorksheetPage) return;
+    this.worksheetPending = Math.max(0, this.worksheetPending - 1);
+    if (saved && !this.deferredLineSaveFields.has(row)) this.worksheetChangedRows.delete(row);
+    this.dirty = this.dirtyWorksheet;
+  }
+  private readonly loadingInstanceId = crypto.randomUUID();
   private readonly loadedHeaderDropdownKeys = new Set<string>();
   private readonly loadingHeaderDropdownKeys = new Set<string>();
   private readonly loadedLineOptionKeys = new Set<string>();
@@ -117,7 +174,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   @Input({ required: true }) pageId = 'document';
   @Input() listConfig: RequiredListConfig = {} as RequiredListConfig;
   @Input() setupConfig?: RequiredListConfig;
-  @Input({ required: true }) headerConfig!: HeaderConfig;
+  @Input() headerConfig: HeaderConfig = {dialogTitle: '', toolbarButtons: [], sections: []};
   @Input() lineConfig?: LineConfig;
   @Input() documentOnly = false;
   @Input() initialRecord?: Record<string, unknown>;
@@ -135,6 +192,35 @@ export class DocumentPage implements OnInit, OnDestroy {
   private pendingFirstPageReload = false;
   private savingEntry = false;
   private dirty = false;
+  private autosavePending = 0;
+  private editSequence = 0;
+  private readonly unsavedFields = new Map<Record<string, unknown>, Map<string, number>>();
+
+  private trackUnsaved(record: Record<string, unknown>, fields: string[]): void {
+    const edits = this.unsavedFields.get(record) ?? new Map<string, number>();
+    for (const field of fields) edits.set(field, ++this.editSequence);
+    this.unsavedFields.set(record, edits);
+  }
+
+  private beginAutosave(record: Record<string, unknown>, fields?: string[]): Map<string, number> {
+    this.autosavePending++;
+    return new Map([...(this.unsavedFields.get(record) ?? [])].filter(([field]) => !fields || fields.includes(field)));
+  }
+
+  private finishAutosave(record: Record<string, unknown>, sent: Map<string, number>, success: boolean): void {
+    this.autosavePending = Math.max(0, this.autosavePending - 1);
+    if (!success) return;
+    const edits = this.unsavedFields.get(record);
+    for (const [field, revision] of sent) if (edits?.get(field) === revision) edits.delete(field);
+    if (!edits?.size) this.unsavedFields.delete(record);
+    if (!this.isWorksheetPage && !this.usesManualSaveMode()) {
+      this.dirty = this.unsavedFields.size > 0 || this.autosavePending > 0;
+    }
+  }
+  private mergeAutosaveResponse(record: Record<string, unknown>, saved: Record<string, unknown>): void {
+    const pending = Object.fromEntries([...(this.unsavedFields.get(record)?.keys() ?? [])].map(field => [field, record[field]]));
+    Object.assign(record, saved, pending);
+  }
   private activeDocumentWindowConfig?: DocumentWindowConfig;
   private optionFieldMap: Record<string, SelectOption[]> = {};
   private headerDropdownRecords: Record<string, Record<string, unknown>[]> = {};
@@ -169,11 +255,11 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private get listLoadingScope(): string {
-    return `section:page:list:${this.pageId}`;
+    return `section:page:list:${this.pageId}:${this.loadingInstanceId}`;
   }
 
   private get popupLoadingScope(): string {
-    return `document:${this.pageId}:popup`;
+    return `document:${this.pageId}:${this.loadingInstanceId}:popup`;
   }
 
   get listFilterStorageKey(): string {
@@ -194,13 +280,16 @@ export class DocumentPage implements OnInit, OnDestroy {
       throw new Error('DocumentPage requires listConfig or setupConfig with dataSource.');
     }
 
+    this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
+    if (this.lineConfig) this.lineConfig = lineConfigDefaults(this.lineConfig);
+
     if (this.documentOnly) {
       this.openEntry();
       return;
     }
-    this.actionDispatcher.setPageCommands(this.listConfig.commands ?? []);
+    this.actionDispatcher.setPageCommands([...(this.listConfig.commands ?? []), ...(this.isWorksheetPage ? this.lineConfig?.toolbarButtons ?? [] : [])]);
     this.actionDispatcher.setPageContext({
-      pageId: this.pageId,
+      pageId: this.permissionPageId,
       title: this.listConfig.title,
       module: this.listConfig.module,
       company: this.listConfig.company,
@@ -208,6 +297,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       views: this.listConfig.views,
       activeViewId: this.listConfig.activeViewId,
       tools: this.listConfig.tools,
+      standardActions: this.listConfig.standardActions,
       dataSource: this.listConfig.dataSource,
     });
     this.listFilterState.initializeFromConfig(
@@ -215,7 +305,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       this.listConfig,
       this.listConfig.dataSource.defaultFilter,
     );
-    if (this.listConfig.dataSource.singleton) this.openEntry();
+    if (this.isInlineEntryPage) this.openEntry();
     else this.loadFirstPage();
 
     this.subscriptions.add(
@@ -247,7 +337,6 @@ export class DocumentPage implements OnInit, OnDestroy {
         lineChanged: (payload) => this.handleLineChanged(payload),
         lineSelectionChanged: (payload) => this.handleLineSelectionChanged(payload),
         headerChanged: (payload) => this.handleHeaderChanged(payload),
-        headerInteracted: (payload) => this.handleHeaderInteracted(payload),
         autosave: (payload) => this.handleAutosave(payload),
         command: (actionKey, payload) => this.handleEntryInteractionAction(actionKey, payload),
         commands: {
@@ -291,8 +380,9 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   handleCommand(event: { actionKey: string; payload?: unknown }): void {
+    if (this.isWorksheetPage) { this.handleEntryCommand(this.normalizeCommandAction(event.actionKey), event.payload); return; }
     if (this.listConfig.dataSource.singleton) {
-      if (event.actionKey === 'refresh') this.openEntry();
+      if (event.actionKey === 'refresh') this.refreshActiveEntry();
       return;
     }
     if (event.actionKey === 'sortChanged' && this.isRecord(event.payload)) {
@@ -301,11 +391,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
     if (this.listFilterState.applyCommand(this.listFilterScope, event.actionKey, event.payload)) {
-      if (event.actionKey === 'filterChanged') {
-        this.scheduleFilterReload();
-      } else {
-        this.loadFirstPage();
-      }
+      this.scheduleFilterReload();
       return;
     }
 
@@ -333,7 +419,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
     const record = this.isRecord(row) ? row : this.buildNewHeaderSeed();
     const persisted = this.hasPersistedIdentity(record);
-    this.pendingDraftCreateFromNew = !persisted && !!this.listConfig.dataSource.autoGenerateNumber && !!this.listConfig.dataSource.lazyCreateOnFirstInput;
+    this.pendingDraftCreateFromNew = !persisted && this.shouldCreateDraftOnInput();
     this.autosaveDeferredUntilDraftCreate = false;
     this.pendingListSyncRecord = undefined;
     this.openDocumentPopup(record, []);
@@ -369,6 +455,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     const nextHeaderData = this.buildHeaderData(headerRecord);
+    currentConfig.contentReady = true;
     currentConfig.headerData = nextHeaderData;
     currentConfig.subtitle = this.buildSubtitle(nextHeaderData, headerRecord);
     currentConfig.title = this.getDocumentTitle(headerRecord);
@@ -384,13 +471,13 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
 
     let lineLoadHandled = false;
-    const finishLineLoad = (failed: boolean): void => {
+    const finishLineLoad = (failed: boolean, error?: unknown): void => {
       if (lineLoadHandled) {
         return;
       }
 
       lineLoadHandled = true;
-      this.finishCardLineLoading(failed);
+      this.finishCardLineLoading(failed, error);
     };
 
     this.subscriptions.add(
@@ -415,9 +502,8 @@ export class DocumentPage implements OnInit, OnDestroy {
 
             finishLineLoad(false);
           },
-          error: () => {
-
-            finishLineLoad(true);
+          error: (error: unknown) => {
+            finishLineLoad(true, error);
           },
           complete: () => {
             finishLineLoad(false);
@@ -435,7 +521,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     this.startPopupLoading('Loading lines...');
   }
 
-  private finishCardLineLoading(failed = false): void {
+  private finishCardLineLoading(failed = false, error?: unknown, subject = 'Lines'): void {
     const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig) {
       this.stopPopupLoading();
@@ -448,8 +534,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     currentConfig.statusMessage = failed
       ? {
           tone: 'warning',
-          title: 'Line load delayed',
-          message: 'Could not load lines right now. Retry or reopen the document.',
+          title: `${subject} could not load`,
+          message: this.apiError.toMessage(error, `${subject} could not load. Retry to load the latest data.`),
           blocking: false,
         }
       : undefined;
@@ -508,6 +594,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       this.timeoutPolicy.hydrationTimeoutMs,
     )).pipe(
       map((response) => this.resolveHeaderRecordResponse(response, row)),
+      switchMap(record => from(this.documentHydration.resolveHeaderLookups(record, this.headerConfig.sections.flatMap(section => section.fields)))),
     );
   }
 
@@ -531,20 +618,37 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private openEntry(): void {
+    if (this.isWorksheetPage) { void this.loadWorksheet(); return; }
     if (!this.listConfig.dataSource.singleton) {
       this.openRecord(this.initialRecord ?? this.buildNewHeaderSeed());
       return;
     }
-    this.openDocumentPopup(this.buildNewHeaderSeed(), []);
+    const initialLoad = !this.activeDocumentWindowConfig;
+    if (initialLoad) this.openDocumentPopup(this.buildNewHeaderSeed(), []);
+    if (initialLoad && this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
     this.startPopupLoading('Loading setup...');
-    this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource).subscribe({
+    let setupRecordLoaded = false;
+    this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource, { useCache: true, maxAgeMs: 30000 }).pipe(
+      timeout(this.timeoutPolicy.hydrationTimeoutMs),
+      switchMap(record => {
+        setupRecordLoaded = true;
+        return from(this.documentHydration.resolveHeaderLookups(
+          this.isRecord(record) ? record : {}, this.headerConfig.sections.flatMap(section => section.fields),
+        ));
+      }),
+    ).subscribe({
       next: record => {
         this.applyHydratedHeaderRecord(this.isRecord(record) ? record : {});
         this.stopPopupLoading();
       },
       error: error => {
         this.stopPopupLoading();
-        if (error?.status !== 404) this.setEntryStatus({ tone: 'error', title: 'Load failed', message: this.getErrorMessage(error) });
+        if (!setupRecordLoaded && error?.status === 404) {
+          if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = true;
+        } else {
+          if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.interactionLocked = true;
+          this.setEntryStatus({ tone: 'error', title: 'Load failed', message: this.getErrorMessage(error) });
+        }
         this.changeDetector.detectChanges();
       },
     }));
@@ -555,19 +659,27 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   async requestClose(): Promise<void> {
-    if (this.savingEntry || this.popupLoading) return;
-    if (this.dirty) {
+    if (this.savingEntry || this.popupLoading || this.worksheetPending || this.autosavePending) return;
+    if (this.isWorksheetPage ? this.dirtyWorksheet : this.dirty) {
       const confirmed = await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and close this page?' });
       if (!confirmed) return;
     }
     this.closeRequested.emit();
   }
 
+  private validateLineRow(row: Record<string, unknown>): string[] {
+    return (this.lineConfig?.fields ?? [])
+      .filter(field => !field.readonly && !field.disabled)
+      .flatMap(field => this.fieldValidation.validateField(field, row[field.key]).errors);
+  }
+
   private async saveEntry(): Promise<boolean> {
+    if (this.isWorksheetPage) { this.saveWorksheet(); return !this.dirtyWorksheet; }
     const config = this.activeDocumentWindowConfig;
     if (!config?.headerData || this.savingEntry) return false;
     const header = config.headerData;
     const source = this.listConfig.dataSource;
+    if (!this.dirty && this.hasPersistedIdentity(header)) return true;
     if (!this.canModifyPage() || !this.dataSource.canWrite(source, header)) return false;
     for (const section of this.headerConfig.sections) {
       for (const field of section.fields) {
@@ -580,6 +692,15 @@ export class DocumentPage implements OnInit, OnDestroy {
         }
       }
     }
+    for (const row of config.lineRows ?? []) {
+      if (this.isLineRowMeaningfullyEmpty(row)) continue;
+      const errors = this.validateLineRow(row);
+      if (errors.length) {
+        this.setEntryStatus({ tone: 'error', title: 'Check line fields', message: errors.join('. ') });
+        this.changeDetector.detectChanges();
+        return false;
+      }
+    }
     this.savingEntry = true;
     this.startPopupLoading('Saving changes...');
     try {
@@ -587,7 +708,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       const payload = id || source.singleton
         ? this.documentPayload.buildHeaderUpdatePayload(header, this.headerConfig.sections)
         : this.documentPayload.buildHeaderCreatePayload(header, this.headerConfig.sections);
-      const saved = await firstValueFrom(id || source.singleton ? this.dataSource.update(source, id, payload, header['systemRowVersion']) : this.dataSource.create(source, payload));
+      const saved = await firstValueFrom(id || source.singleton ? this.dataSource.updateRecord(source, id, payload, header) : this.dataSource.create(source, payload));
       if (this.isRecord(saved)) Object.assign(header, saved);
       if (this.lineConfig) {
         const lineSource = this.dataSource.relation(this.lineConfig.dataSource, header);
@@ -600,13 +721,14 @@ export class DocumentPage implements OnInit, OnDestroy {
             ? this.documentConfigData.buildLineUpdatePayload(row, lineSource.updateFields ?? this.lineConfig.columns.filter(column => !column.readonly).map(column => column.field ?? column.id), this.lineConfig)
             : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
           if (!linePayload) throw new Error('Complete the required line fields before saving.');
-          const line = await firstValueFrom(lineId ? this.dataSource.update(lineSource, lineId, linePayload, row['systemRowVersion']) : this.dataSource.create(lineSource, linePayload));
+          const line = await firstValueFrom(lineId ? this.dataSource.updateRecord(lineSource, lineId, linePayload, row) : this.dataSource.create(lineSource, linePayload));
           if (this.isRecord(line)) Object.assign(row, line);
         }
       }
       this.pendingDraftCreateFromNew = false;
       this.refreshEntryPolicy();
       this.dirty = false;
+      this.unsavedFields.clear();
       if (!source.singleton) {
         const fresh = await firstValueFrom(this.loadHeaderRecord(header));
         Object.assign(header, fresh);
@@ -655,7 +777,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     this.activeLineRow = undefined;
     this.selectedLineIndexes = [];
 
-    if (this.documentOnly || this.listConfig.dataSource.singleton) {
+    if (this.documentOnly || this.isInlineEntryPage) {
       this.ensureTrailingEmptyRows();
       return;
     }
@@ -858,8 +980,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private openNewPreview(): void {
     this.startPopupLoading(`Preparing ${this.documentLabel.toLowerCase()}...`);
     this.pendingDraftCreateFromNew =
-      Boolean(this.listConfig.dataSource.autoGenerateNumber) &&
-      Boolean(this.listConfig.dataSource.lazyCreateOnFirstInput);
+      this.shouldCreateDraftOnInput();
     this.draftCreateInProgress = false;
     this.autosaveDeferredUntilDraftCreate = false;
     this.openRecord(this.buildNewHeaderSeed(), true);
@@ -906,7 +1027,7 @@ export class DocumentPage implements OnInit, OnDestroy {
         defaultTop: initialTop,
         allowWithoutParentKey: pageType === 'worksheet',
       },
-    ));
+    )).pipe(switchMap(rows => from(this.documentHydration.resolveLineLookups(rows, this.lineConfig!.columns))));
   }
 
   private expandLineRowsInBackground(
@@ -987,9 +1108,10 @@ export class DocumentPage implements OnInit, OnDestroy {
     const lineTotals = this.lineConfig ? this.buildLineTotals(lineRows, headerData) : this.emptyTotals();
 
     return {
-      pageLabel: this.documentLabel.toUpperCase(),
-      title: `${this.documentLabel} ${orderNumber}`.trim(),
-      subtitle: this.buildSubtitle(headerData, record),
+      factBoxConfig: this.listConfig.factBox,
+      pageLabel: this.documentLabel,
+      title: this.isWorksheetPage || this.listConfig.dataSource.singleton ? this.documentLabel : `${this.documentLabel} ${orderNumber}`.trim(),
+      subtitle: this.isWorksheetPage ? this.toText(this.initialRecord?.[this.listConfig.dataSource.documentNoField ?? 'code']) : this.buildSubtitle(headerData, record),
       headerCommandBar: this.headerConfig.commandBar,
       lineCommandBar: this.lineConfig?.commandBar,
       lineCommandPolicy: {
@@ -1011,6 +1133,10 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private resolvePopupHeaderToolbarButtons(): CommandConfig[] {
+    if (this.isWorksheetPage) {
+      const commands = [...this.headerConfig.toolbarButtons, ...(this.listConfig.commands ?? []), ...(this.lineConfig?.toolbarButtons ?? [])];
+      return this.documentOnly ? this.commandAssembler.resolveHeaderToolbarButtons({dataSource: this.listConfig.dataSource, toolbarButtons: commands, pageId: this.permissionPageId}) : [];
+    }
     return this.commandAssembler.resolveHeaderToolbarButtons({
       dataSource: this.listConfig.dataSource,
       toolbarButtons: this.headerConfig.toolbarButtons,
@@ -1027,6 +1153,15 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private refreshEntryPolicy(): void {
+    if (this.isWorksheetPage) {
+      const entry = this.activeDocumentWindowConfig;
+      if (!entry) return;
+      entry.headerSections = [];
+      entry.lineColumns = this.lineConfig?.columns ?? [];
+      entry.headerToolbarButtons = this.resolvePopupHeaderToolbarButtons();
+      entry.lineToolbarButtons = [];
+      return;
+    }
     const entry = this.activeDocumentWindowConfig;
     if (!entry) return;
     const persisted = this.hasPersistedIdentity(entry.headerData);
@@ -1070,6 +1205,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private resolvePopupLineToolbarButtons(): CommandConfig[] {
+    if (this.isWorksheetPage) return [];
     return this.commandAssembler.resolveLineToolbarButtons({
       lineConfig: this.lineConfig,
       pageId: this.listConfig.pageId || this.pageId,
@@ -1089,7 +1225,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   ): string {
     const primary = this.resolveFirstConfiguredText(headerData, ['name', 'vendor', 'customer'], fallbackRecord);
     const status = this.resolveFirstConfiguredText(headerData, ['status'], fallbackRecord);
-    return [primary || 'New', status].filter((part) => part.length > 0).join(' - ');
+    return [primary || (this.listConfig.dataSource.singleton || this.hasPersistedIdentity(headerData) ? '' : 'New'), status].filter((part) => part.length > 0).join(' - ');
   }
 
   private resolveFirstConfiguredText(
@@ -1139,13 +1275,21 @@ export class DocumentPage implements OnInit, OnDestroy {
       return [];
     }
 
-    return this.documentConfigData.buildLineRows(
+    const rows = this.documentConfigData.buildLineRows(
       this.lineConfig,
       headerData,
       lines,
       this.getLineMasterRegistry(),
       this.optionFieldMap,
     );
+    if (this.lineConfig.dataSource.supportsCreate !== false && this.lineConfig.editable !== false && this.canModifyPage()) {
+      for (const row of rows) if (!this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig.dataSource)) && this.isLineRowMeaningfullyEmpty(row)) row['__entryPlaceholder'] = true;
+      while (rows.length < 8 || !rows.some(row => row['__entryPlaceholder'])) {
+        const row = this.documentConfigData.createEmptyLineRow(this.lineConfig, headerData, this.getLineMasterRegistry(), this.optionFieldMap);
+        row['__entryPlaceholder'] = true; rows.push(row);
+      }
+    }
+    return rows;
   }
 
   private buildLineTotals(
@@ -1295,7 +1439,6 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleLineChanged(payload: unknown): void {
-    this.dirty = true;
     if (!this.lineConfig) {
       return;
     }
@@ -1305,8 +1448,13 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
+    this.dirty = true;
     const { row, field, value } = change;
+    delete row['__entryPlaceholder'];
+    this.ensureTrailingEmptyRows();
+    this.trackUnsaved(row, [field, ...(change.calculatedFields ?? [])]);
     this.activeLineRow = row;
+    if (this.isWorksheetPage) this.worksheetChangedRows.add(row);
     const typeField = this.getLineTypeField();
     const numberField = this.getLineNumberField();
 
@@ -1356,7 +1504,6 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleHeaderChanged(payload: unknown): void {
-    this.dirty = true;
     if (!this.isRecord(payload) || !this.activeDocumentWindowConfig?.headerData) {
       return;
     }
@@ -1382,6 +1529,8 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
+    this.dirty = true;
+    this.trackUnsaved(this.activeDocumentWindowConfig.headerData, [fieldKey, ...Object.keys(this.isRecord(payload['updates']) ? payload['updates'] : {})]);
     this.clearEntryStatus();
     const changed = this.documentState.applyHeaderFieldChange(
       this.activeDocumentWindowConfig.headerData,
@@ -1435,20 +1584,13 @@ export class DocumentPage implements OnInit, OnDestroy {
     });
     this.changeDetector.detectChanges();
 
+    const savedEdits = this.beginAutosave(headerData, Object.keys(updatePayload));
     this.subscriptions.add(
       this.dataSource
-        .update(this.listConfig.dataSource, headerId, updatePayload, headerData['systemRowVersion'])
+        .updateRecord(this.listConfig.dataSource, headerId, updatePayload, headerData)
         .pipe(
           catchError((error: unknown) => {
-            const rolledBack = this.documentState.rollbackHeaderFieldChange(
-              this.activeDocumentWindowConfig?.headerData ?? {},
-              payload,
-              this.headerFieldValueTypeMap,
-            );
-            if (rolledBack) {
-              this.changeDetector.detectChanges();
-            }
-
+            // Keep the user's edits available for correction or conflict reconciliation.
             this.setEntryStatus({
               tone: 'error',
               title: 'Save failed',
@@ -1459,11 +1601,12 @@ export class DocumentPage implements OnInit, OnDestroy {
           }),
         )
         .subscribe((updated) => {
+          this.finishAutosave(headerData, savedEdits, this.isRecord(updated));
           if (!this.isRecord(updated) || !this.activeDocumentWindowConfig?.headerData) {
             return;
           }
 
-          Object.assign(this.activeDocumentWindowConfig.headerData, updated);
+          this.mergeAutosaveResponse(headerData, updated);
           this.stageListSyncFromActiveHeader();
           this.setEntryStatus({
             tone: 'success',
@@ -1480,15 +1623,29 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    if (
+    if (!this.isWorksheetPage && (
       this.pendingDraftCreateFromNew ||
       this.draftCreateInProgress ||
       !this.hasPersistedIdentity(this.activeDocumentWindowConfig.headerData)
-    ) {
+    )) {
       this.autosaveDeferredUntilDraftCreate = true;
       return;
     }
 
+    if (this.isWorksheetPage && this.lineCreateInProgress.has(row)) {
+      this.deferLineSaveFields(row, fields); return;
+    }
+    if (this.isWorksheetPage) {
+      if (!this.worksheetAllowed(row)) { this.setEntryStatus({tone: 'error', title: 'Cannot save', message: 'You do not have permission to change this row.'}); return; }
+      const errors = (this.lineConfig.fields ?? []).flatMap(field => this.fieldValidation.validateField(field, row[field.key]).errors);
+      if (errors.length) { this.setEntryStatus({tone: 'error', title: 'Complete row', message: errors.join('. ')}); return; }
+    }
+    const lineErrors = this.validateLineRow(row);
+    if (lineErrors.length) {
+      this.setEntryStatus({ tone: 'error', title: 'Check line fields', message: lineErrors.join('. ') });
+      this.changeDetector.detectChanges();
+      return;
+    }
     const uniqueFields = [...new Set(fields.map((field) => field.trim()).filter(Boolean))];
     if (!uniqueFields.length) {
       return;
@@ -1517,7 +1674,8 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    const payload = this.documentConfigData.buildLineUpdatePayload(row, uniqueFields, this.lineConfig);
+    const payload = this.documentConfigData.buildLineUpdatePayload(row, this.isWorksheetPage ? this.lineConfig.dataSource.updateFields ?? uniqueFields : uniqueFields, this.lineConfig);
+    if (this.isWorksheetPage) { this.worksheetPending++; this.lineCreateInProgress.add(row); }
     this.setEntryStatus({
       tone: 'info',
       title: 'Saving',
@@ -1525,9 +1683,10 @@ export class DocumentPage implements OnInit, OnDestroy {
     });
     this.changeDetector.detectChanges();
 
+    const savedEdits = this.beginAutosave(row, Object.keys(payload));
     this.subscriptions.add(
       this.dataSource
-        .update(resolved.dataSource, rowId, payload, row['systemRowVersion'])
+        .updateRecord(resolved.dataSource, rowId, payload, row)
         .pipe(
           catchError((error: unknown) => {
             this.setEntryStatus({
@@ -1540,12 +1699,21 @@ export class DocumentPage implements OnInit, OnDestroy {
           }),
         )
         .subscribe((updated) => {
+          this.finishAutosave(row, savedEdits, !!updated);
+          if (this.isWorksheetPage) this.lineCreateInProgress.delete(row);
+          this.worksheetSaveFinished(row, updated);
           if (!updated) return;
           const updatedRecord = this.toCreatedRecord(updated);
           if (updatedRecord) {
-            Object.assign(row, updatedRecord);
+            const deferred = this.isWorksheetPage ? Object.fromEntries([...(this.deferredLineSaveFields.get(row) ?? [])].map(field => [field, row[field]])) : {};
+            this.mergeAutosaveResponse(row, updatedRecord);
+            Object.assign(row, deferred);
           }
 
+          if (this.isWorksheetPage) {
+            const deferred = this.takeDeferredLineSaveFields(row);
+            if (deferred.length) { this.saveLineFields(row, deferred); return; }
+          }
           this.recalculateActiveLineTotals();
           this.setEntryStatus({
             tone: 'success',
@@ -1580,11 +1748,6 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    const lineNoField = this.resolveLineNoField();
-    if (!lineDataSource.lineNo && lineNoField && !this.toNumber(row[lineNoField])) {
-      row[lineNoField] = this.resolveNextLineNo(row, lineNoField);
-    }
-
     const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
     if (!payload) {
       this.setEntryStatus({
@@ -1596,7 +1759,9 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
+    const savedEdits = this.beginAutosave(row);
     this.lineCreateInProgress.add(row);
+    if (this.isWorksheetPage) this.worksheetPending++;
     this.setEntryStatus({
       tone: 'info',
       title: 'Saving',
@@ -1619,12 +1784,15 @@ export class DocumentPage implements OnInit, OnDestroy {
           }),
         )
         .subscribe((created) => {
+          this.finishAutosave(row, savedEdits, !!created);
           this.lineCreateInProgress.delete(row);
+          this.worksheetSaveFinished(row, created);
 
           if (!created) return;
           const createdRecord = this.toCreatedRecord(created);
           if (createdRecord) {
-            Object.assign(row, createdRecord);
+            const deferred = this.isWorksheetPage ? Object.fromEntries([...(this.deferredLineSaveFields.get(row) ?? [])].map(field => [field, row[field]])) : {};
+            Object.assign(row, createdRecord, deferred);
           }
 
           const deferredFields = this.takeDeferredLineSaveFields(row);
@@ -1648,6 +1816,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleAutosave(payload: unknown): void {
+    if (this.isWorksheetPage) return; // Row changes already use the shared line persistence path.
     if (this.usesManualSaveMode()) {
       return;
     }
@@ -1659,31 +1828,6 @@ export class DocumentPage implements OnInit, OnDestroy {
     this.queueLocalAutosave();
   }
 
-  private handleHeaderInteracted(payload: unknown): void {
-    if (!this.pendingDraftCreateFromNew || this.draftCreateInProgress || !this.isRecord(payload)) {
-      return;
-    }
-
-    const fieldKey = this.toText(payload['fieldKey']);
-    const fieldConfig = this.headerFieldConfigMap[fieldKey];
-    if (!fieldKey.length || !fieldConfig || fieldConfig.readonly || fieldConfig.disabled) {
-      return;
-    }
-
-    if (
-      !this.activeDocumentWindowConfig?.headerData ||
-      this.hasPersistedIdentity(this.activeDocumentWindowConfig.headerData)
-    ) {
-      this.pendingDraftCreateFromNew = false;
-      return;
-    }
-
-    if (!this.canCreateDraft(this.activeDocumentWindowConfig.headerData)) {
-      return;
-    }
-
-    this.startDraftCreate(this.activeDocumentWindowConfig.headerData);
-  }
 
   private triggerDraftCreateIfReady(): void {
     const headerData = this.activeDocumentWindowConfig?.headerData;
@@ -1704,12 +1848,14 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private startDraftCreate(headerData: Record<string, unknown>): void {
+    const savedEdits = this.beginAutosave(headerData);
     this.draftCreateInProgress = true;
     this.startPopupLoading(`Creating ${this.documentLabel.toLowerCase()} draft...`);
 
     this.subscriptions.add(
       this.createDraftRecord(headerData).subscribe({
         next: (createdRecord) => {
+          this.finishAutosave(headerData, savedEdits, !!createdRecord);
           this.draftCreateInProgress = false;
           this.stopPopupLoading();
 
@@ -1729,6 +1875,7 @@ export class DocumentPage implements OnInit, OnDestroy {
           this.restoreEditableLocalEdits(localEdits, this.activeDocumentWindowConfig.headerData);
           this.pendingListSyncRecord = this.buildListSyncRecord(createdRecord);
           this.pendingDraftCreateFromNew = false;
+          this.refreshEntryPolicy();
 
           if (this.autosaveDeferredUntilDraftCreate) {
             this.autosaveDeferredUntilDraftCreate = false;
@@ -1738,6 +1885,7 @@ export class DocumentPage implements OnInit, OnDestroy {
           this.changeDetector.detectChanges();
         },
         error: () => {
+          this.finishAutosave(headerData, savedEdits, false);
           this.draftCreateInProgress = false;
           this.stopPopupLoading();
           this.setEntryStatus({
@@ -1751,6 +1899,11 @@ export class DocumentPage implements OnInit, OnDestroy {
     );
   }
 
+  private shouldCreateDraftOnInput(): boolean {
+    if (this.listConfig.dataSource.singleton || this.listConfig.dataSource.supportsCreate === false || this.usesManualSaveMode()) return false;
+    return this.listConfig.autoSave === true || (!!this.listConfig.dataSource.autoGenerateNumber && !!this.listConfig.dataSource.lazyCreateOnFirstInput);
+  }
+
   private canCreateDraft(headerData: Record<string, unknown>): boolean {
     for (const section of this.headerConfig.sections) {
       for (const field of section.fields) {
@@ -1758,7 +1911,7 @@ export class DocumentPage implements OnInit, OnDestroy {
           continue;
         }
 
-        if (!this.hasValue(headerData[field.key])) {
+        if (!this.fieldValidation.validateField(field, headerData[field.key]).valid) {
           return false;
         }
       }
@@ -1768,6 +1921,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private queueLocalAutosave(): void {
+    if (this.isWorksheetPage) { this.saveWorksheet(); return; }
     if (this.usesManualSaveMode() || this.listConfig.dataSource.singleton) {
       void this.saveEntry();
       return;
@@ -1777,6 +1931,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
+    if (!this.dirty && this.hasPersistedIdentity(headerData)) return;
     const headerId = this.resolvePersistedRecordId(headerData, this.listConfig.dataSource);
     if (this.pendingDraftCreateFromNew || this.draftCreateInProgress || !this.hasValue(headerId)) {
       this.autosaveDeferredUntilDraftCreate = true;
@@ -1819,7 +1974,10 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private usesManualSaveMode(): boolean {
-    return this.hasManualSaveCommand(this.activeDocumentWindowConfig?.headerToolbarButtons)
+    if (this.listConfig.autoSave !== undefined) return !this.listConfig.autoSave;
+    // Preserve legacy pages until their save policy is explicitly migrated.
+    return (this.isWorksheetPage && (this.hasManualSaveCommand(this.listConfig.commands) || this.hasManualSaveCommand(this.lineConfig?.toolbarButtons)))
+      || this.hasManualSaveCommand(this.activeDocumentWindowConfig?.headerToolbarButtons)
       || this.hasManualSaveCommand(this.headerConfig.toolbarButtons);
   }
 
@@ -1831,7 +1989,12 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleEntryCommand(command: string, payload: unknown): void {
-    if (command === 'retry-hydrate') { this.refreshActiveEntry(); return; }
+    if (this.isWorksheetPage) {
+      if (command === 'new') { this.appendNewLine('append'); return; }
+      if (command === 'delete') { void this.deleteLine(payload); return; }
+      if (command === 'refresh' || command === 'retry-hydrate') { void this.refreshWorksheet(); return; }
+    }
+    if (command === 'retry-hydrate') { void this.refreshEntrySafely(); return; }
     if (this.tryOpenEntryRunModal(command, payload)) {
       return;
     }
@@ -1880,6 +2043,13 @@ export class DocumentPage implements OnInit, OnDestroy {
     this.emitBusinessCommand(command, payload);
   }
 
+  private async refreshWorksheet(): Promise<void> {
+    this.dataSource.invalidateReadCache();
+    if (this.worksheetPending) return;
+    if (this.dirtyWorksheet && !await this.confirmation.confirm({title: 'Unsaved changes', message: 'Discard unsaved row changes and refresh?'})) return;
+    this.worksheetChangedRows.clear(); this.dirty = false;
+    void this.loadWorksheet(true, true);
+  }
   private async openNewEntrySafely(): Promise<void> {
     if (this.dirty && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and start a new record?' })) return;
     this.dirty = false;
@@ -1898,6 +2068,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private refreshActiveEntry(): void {
+    this.dataSource.invalidateReadCache();
     if (this.listConfig.dataSource.singleton) { this.openEntry(); return; }
     const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!this.isRecord(headerData)) {
@@ -1918,14 +2089,15 @@ export class DocumentPage implements OnInit, OnDestroy {
             this.applyHydratedHeaderRecord(headerRecord);
             this.hydrateOpenedDocumentLines(headerRecord);
           },
-          error: () => {
-            this.finishCardLineLoading(true);
+          error: (error: unknown) => {
+            this.finishCardLineLoading(true, error, 'Document');
           },
         }),
     );
   }
 
   private refreshActiveLines(): void {
+    this.dataSource.invalidateReadCache();
     if (!this.lineConfig) {
       return;
     }
@@ -1955,8 +2127,8 @@ export class DocumentPage implements OnInit, OnDestroy {
             this.changeDetector.detectChanges();
             this.finishCardLineLoading();
           },
-          error: () => {
-            this.finishCardLineLoading(true);
+          error: (error: unknown) => {
+            this.finishCardLineLoading(true, error);
           },
         }),
     );
@@ -1977,6 +2149,9 @@ export class DocumentPage implements OnInit, OnDestroy {
 
   private tryOpenEntryRunModal(command: string, payload: unknown): boolean {
     const button = this.findEntryCommandButton(command);
+    if (this.isWorksheetPage && button?.requireSelection && (!this.activeLineRow || !this.hasValue(this.resolvePersistedRecordId(this.activeLineRow, this.listConfig.dataSource)) || this.dirtyWorksheet)) {
+      this.setEntryStatus({tone: 'error', title: 'Select a saved row', message: 'Complete your changes and select a saved record first.'}); return true;
+    }
     const pageId = this.toText(button?.runModalPageId).trim();
     if (!pageId.length) {
       return false;
@@ -2008,7 +2183,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private findEntryCommandButton(command: string): CommandConfig | undefined {
     return this.commandRoutingResolver.findEntryCommandButton({
       command,
-      headerToolbarButtons: this.activeDocumentWindowConfig?.headerToolbarButtons,
+      headerToolbarButtons: this.isWorksheetPage ? [...(this.listConfig.commands ?? []), ...(this.lineConfig?.toolbarButtons ?? []), ...this.headerConfig.toolbarButtons] : this.activeDocumentWindowConfig?.headerToolbarButtons,
       lineToolbarButtons: this.activeDocumentWindowConfig?.lineToolbarButtons,
       detailToolbarButtons: this.activeDocumentWindowConfig?.detailToolbarButtons,
     });
@@ -2239,13 +2414,13 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private appendNewLine(mode: 'append' | 'prepend'): void {
+    if (this.isWorksheetPage && !this.worksheetAllowed({})) return;
     if (this.lineConfig?.dataSource.supportsCreate === false || !this.dataSource.canWrite(this.listConfig.dataSource, this.activeDocumentWindowConfig?.headerData ?? {})) return;
     if (!this.activeDocumentWindowConfig || !this.lineConfig) {
       return;
     }
 
     const lineRows = this.activeDocumentWindowConfig.lineRows ?? [];
-    this.dirty = true;
     const newRow = this.documentConfigData.createEmptyLineRow(
       this.lineConfig,
       this.activeDocumentWindowConfig.headerData ?? {},
@@ -2425,6 +2600,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private resolveLineDataSourceForHeader(header: Record<string, unknown>): ResolvedLineDataSource {
+    if (this.isWorksheetPage && this.worksheetSource) return {dataSource: this.worksheetSource, lineContextReady: true};
     const resolved: DocumentPageResolvedLineDataSource = this.dataSourceResolver.resolveLineDataSourceForHeader({
       header,
       lineConfig: this.lineConfig,
@@ -2652,48 +2828,18 @@ export class DocumentPage implements OnInit, OnDestroy {
     });
   }
 
-  private resolveNextLineNo(targetRow: Record<string, unknown>, lineNoField: string): number {
-    const lineRows = this.activeDocumentWindowConfig?.lineRows ?? [];
-    const existingLineNos = new Set<number>();
-    let maxLineNo = 0;
-
-    for (const line of lineRows) {
-      if (
-        line === targetRow ||
-        !this.hasValue(this.resolvePersistedRecordId(line, this.lineConfig?.dataSource))
-      ) {
-        continue;
-      }
-
-      const value = this.toNumber(line[lineNoField]);
-      if (value === null || value <= 0) {
-        continue;
-      }
-
-      existingLineNos.add(value);
-      maxLineNo = Math.max(maxLineNo, value);
-    }
-
-    let candidate = maxLineNo > 0 ? maxLineNo + 10000 : 10000;
-    while (existingLineNos.has(candidate)) {
-      candidate += 10000;
-    }
-
-    return candidate;
-  }
-
   private ensureTrailingEmptyRows(minEmptyRows = 1): void {
     if (!this.lineConfig || !this.activeDocumentWindowConfig) {
       return;
     }
 
-    if (this.lineConfig.dataSource.supportsCreate === false) {
+    if (this.lineConfig.dataSource.supportsCreate === false || this.lineConfig.editable === false || !this.canModifyPage()) {
       return;
     }
 
     const lineRows = this.activeDocumentWindowConfig.lineRows ?? [];
-    const emptyRows = lineRows.filter((row) => !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig?.dataSource)));
-    const missing = Math.max(0, minEmptyRows - emptyRows.length);
+    const emptyRows = lineRows.filter((row) => !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig?.dataSource)) && this.isLineRowMeaningfullyEmpty(row));
+    const missing = Math.max(0, minEmptyRows - emptyRows.length, 8 - lineRows.length);
     if (missing <= 0) {
       return;
     }
@@ -2708,13 +2854,22 @@ export class DocumentPage implements OnInit, OnDestroy {
       ));
     }
 
+    for (const row of additions) row['__entryPlaceholder'] = true;
     this.activeDocumentWindowConfig.lineRows = [...lineRows, ...additions];
     this.changeDetector.detectChanges();
   }
 
   private isLineRowMeaningfullyEmpty(row: Record<string, unknown>): boolean {
     const fields = this.lineConfig?.dataSource.meaningfulFields;
-    if (fields?.length) return !fields.some(field => this.hasValue(row[field]) && row[field] !== 0 && row[field] !== false);
+    if (fields?.length) {
+      const hasMeaningfulValue = fields.some(field => this.hasValue(row[field]) && row[field] !== 0 && row[field] !== false);
+      const changedDefault = (this.lineConfig?.columns ?? []).some(column => {
+        if (column.readonly || column.defaultValue === undefined) return false;
+        const value = row[column.field ?? column.id];
+        return String(value ?? '') !== String(column.defaultValue ?? '');
+      });
+      return !hasMeaningfulValue && !changedDefault;
+    }
     if (!this.lineConfig) {
       return true;
     }
@@ -2905,7 +3060,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
       buildFilter: (scope) => this.listFilterState.buildFilter(scope),
       hydrateTargetsFromRecords: (scope, records) => this.listFilterState.hydrateTargetsFromRecords(scope, records),
-      loadList: (dataSource, options) => this.dataSource.loadList(dataSource, options),
+      loadList: (dataSource, options) => this.dataSource.loadList(dataSource, { ...options, useCache: true, maxAgeMs: 30000 }),
       toRecords: (response) => this.toRecords(response),
       getErrorMessage: (error) => this.getErrorMessage(error),
       detectChanges: () => this.changeDetector.detectChanges(),

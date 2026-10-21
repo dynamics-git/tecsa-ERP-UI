@@ -18,11 +18,11 @@ export class ApiErrorService {
       if (this.isRecord(outerError)) {
         const nestedError = outerError['error'];
         if (this.isRecord(nestedError) && typeof nestedError['message'] === 'string' && nestedError['message'].trim()) {
-          return this.trimCorrelationId(nestedError['message']);
+          return this.withValidationDetails(nestedError['message'], nestedError['details']);
         }
 
         if (typeof outerError['message'] === 'string' && outerError['message'].trim()) {
-          return this.trimCorrelationId(outerError['message']);
+          return this.withValidationDetails(outerError['message'], outerError['errors'] ?? outerError['details']);
         }
       }
 
@@ -32,6 +32,12 @@ export class ApiErrorService {
     }
 
     return this.trimCorrelationId(fallback);
+  }
+
+  private withValidationDetails(message: string, details: unknown): string {
+    const values = this.isRecord(details) ? Object.values(details) : [];
+    const messages = values.flatMap(value => Array.isArray(value) ? value : [value]).filter((value): value is string => typeof value === 'string' && value.trim().length > 0).slice(0, 4);
+    return this.trimCorrelationId(messages.length ? messages.join(' ') : message);
   }
 
   private trimCorrelationId(raw: string): string {

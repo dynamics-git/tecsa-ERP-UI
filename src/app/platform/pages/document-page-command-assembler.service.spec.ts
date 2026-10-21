@@ -35,9 +35,9 @@ describe('DocumentPage command assembly', () => {
     expect(result.map(value => value.actionKey)).toEqual(['cmd:new', 'cmd:delete', 'cmd:refresh']);
     expect(result.map(value => value.order)).toEqual([10, 20, 30]);
     expect(result.map(value => value.isPrimary)).toEqual([true, true, true]);
-    expect(result[0].icon).toBe('bi bi-plus-lg');
+    expect(result[0].icon).toBe('ts-icon ts-icon-plus');
     expect(result[1].tone).toBe('danger');
-    expect(result[2].icon).toBe('bi bi-arrow-clockwise');
+    expect(result[2].icon).toBe('ts-icon ts-icon-refresh');
     expect(permission.apply).toHaveBeenCalledTimes(3);
     expect(permission.apply.mock.calls.every(call => call[1] === pageId)).toBe(true);
   });

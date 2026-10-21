@@ -1,3 +1,8 @@
+import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
+import { automaticDetailFields, detailValue } from '../../pages/fact-box-display';
+import { SessionService } from '../../../core/services/session.service';
+import type { ListFactBoxConfig } from '../../models/list-fact-box-config.model';
+import { LoadingIndicator } from '../../../shared/ui/loading-indicator/loading-indicator';
 import type { CommandConfig } from '../../models/command-config.model';
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, inject } from '@angular/core';
@@ -22,17 +27,41 @@ type FactBoxDraftSection = {
 @Component({
   selector: 'app-document-window',
   standalone: true,
-  imports: [DynamicForm, DocumentLines, FactBox, NgTemplateOutlet],
+  imports: [FactBoxToggle, LoadingIndicator, DynamicForm, DocumentLines, FactBox, NgTemplateOutlet],
   templateUrl: './document-window.html',
   styleUrl: './document-window.scss'
 })
 export class DocumentWindow {
+  readonly collapsedSections = new Set<string>();
+  linesCollapsed = false;
+  factBoxOpen = true;
+  lineGridHeight = 240;
+  private lineResize?: { y: number; height: number };
+  toggleSection(id: string): void {
+    if (this.collapsedSections.has(id)) this.collapsedSections.delete(id); else this.collapsedSections.add(id);
+  }
+  resizeLines(event: PointerEvent): void {
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    this.lineResize = { y: event.clientY, height: this.lineGridHeight };
+  }
+  moveLineResize(event: PointerEvent): void {
+    if (this.lineResize) this.lineGridHeight = Math.max(96, Math.min(640, this.lineResize.height + event.clientY - this.lineResize.y));
+  }
+  stopLineResize(): void { this.lineResize = undefined; }
+  resizeLinesByKeyboard(event: KeyboardEvent): void {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    this.lineGridHeight = Math.max(96, Math.min(640, this.lineGridHeight + (event.key === 'ArrowDown' ? 32 : -32)));
+  }
+
   private static readonly GLOBAL_LINE_PRIMARY_COMMANDS = new Set(['cmd:line-new', 'line-new', 'cmd:line-delete', 'line-delete']);
 
   private readonly apiError = inject(ApiErrorService);
   private readonly hostElement = inject(ElementRef<HTMLElement>);
   @Input() overlayZIndex = 21;
   @Input() embedded = false;
+  @Input() worksheet = false;
   @Input() pageLabel?: string;
   @Input() title?: string;
   @Input() subtitle?: string;
@@ -47,11 +76,15 @@ export class DocumentWindow {
   @Input() headerData?: Record<string, unknown>;
   @Input() lineColumns?: LineColumnConfig[];
   @Input() lineRows?: Record<string, unknown>[];
+  get enteredLineCount(): number { return this.resolvedLineRows.filter(row => !row['__entryPlaceholder']).length; }
   @Input() lineTotals?: LineTotalsConfig;
   @Input() footerSections?: FooterSectionConfig[];
   @Input() attachments?: AttachmentsConfig;
+  private readonly session = inject(SessionService);
+  @Input() factBoxConfig?: ListFactBoxConfig;
   @Input() factBoxSections?: FactBoxSectionConfig[];
   @Input() statusMessage?: DocumentStatusMessage;
+  @Input() contentReady = true;
   @Input() interactionLocked = false;
   @Output() closed = new EventEmitter<void>();
   @Output() action = new EventEmitter<DocumentWindowActionEvent>();
@@ -148,7 +181,7 @@ export class DocumentWindow {
         group: 'Process',
         isPrimary: true,
         order: 10,
-        icon: 'bi bi-plus-lg'
+        icon: 'ts-icon ts-icon-plus'
       });
     }
 
@@ -159,7 +192,7 @@ export class DocumentWindow {
         group: 'Process',
         isPrimary: true,
         order: 15,
-        icon: 'bi bi-trash'
+        icon: 'ts-icon ts-icon-trash'
       });
     }
 
@@ -265,11 +298,26 @@ export class DocumentWindow {
   }
 
   get resolvedFactBoxSections(): FactBoxSectionConfig[] {
+    if (this.factBoxConfig?.enabled === false) return [];
     if (this.factBoxSections?.length) {
       return this.factBoxSections;
     }
 
-    return this.buildFactBoxSectionsFromDocumentConfig();
+    if (this.factBoxConfig?.sections?.length) return this.factBoxConfig.sections.map(section => ({
+      id: section.id, title: section.title, rows: (section.fields ?? []).map(field => ({label: field.label, value: this.formatDetail(field)})),
+    }));
+    const configured = this.buildFactBoxSectionsFromDocumentConfig();
+    const hasSelectedFields = this.resolvedHeaderSections.some(section => section.fields.some(field => this.resolveFieldFactBoxConfig(field)));
+    if (hasSelectedFields || this.worksheet || !Object.keys(this.resolvedHeaderData).length) return configured;
+    const fields = automaticDetailFields(this.resolvedHeaderSections.flatMap(section => section.fields.map(field => ({
+      field: field.key, label: field.label, type: field.valueType ?? field.type, hidden: field.hidden, factBox: field.factBox,
+    }))), this.resolvedHeaderData);
+    return [...(fields.length ? [{id: 'record-details', title: 'Record details', rows: fields.map(field => ({label: field.label, value: this.formatDetail(field)}))}] : []), ...configured];
+  }
+
+  private formatDetail(field: {field?: string; label: string; type?: string}): string {
+    const user = this.session.User as Record<string, unknown> | undefined;
+    return detailValue(this.resolvedHeaderData, field, {id: this.session.UserId, name: String(user?.['name'] ?? this.session.UserName)});
   }
 
   get resolvedStatusMessage(): DocumentStatusMessage | undefined {
@@ -498,7 +546,7 @@ export class DocumentWindow {
       {
         label: attachments.primaryActionLabel,
         actionKey: attachments.primaryActionKey,
-        icon: 'bi bi-paperclip',
+        icon: 'ts-icon ts-icon-clip',
         disabled: !attachments.canUpload
       }
     ] : undefined;
@@ -533,12 +581,12 @@ export class DocumentWindow {
 
   handleLineRowChanged(event: { row: Record<string, unknown>; column: LineColumnConfig; value: unknown }): void {
     this.action.emit({ actionKey: 'line:changed', payload: event });
-    this.action.emit({ actionKey: 'cmd:autosave', payload: event });
+    // The change handler owns persistence; do not enqueue a second save.
   }
 
   handleHeaderFieldChanged(event: { fieldKey: string; value: unknown; updates?: Record<string, unknown> }): void {
     this.action.emit({ actionKey: 'header:changed', payload: event });
-    this.action.emit({ actionKey: 'cmd:autosave', payload: event });
+    // The change handler owns persistence; do not enqueue a second save.
   }
 
   handleHeaderFieldInteracted(event: { fieldKey: string }): void {

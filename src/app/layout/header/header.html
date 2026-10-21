@@ -1,16 +1,16 @@
 <header class="app-header">
   <div class="app-header-main">
-    <button type="button" class="app-brand" title="Filaz">
-      <span class="app-brand-mark">F</span>
+    <button type="button" class="app-brand" title="TecSA ERP">
+      <span class="app-brand-mark">T</span>
       <span class="app-brand-copy">
-        <span class="app-brand-text">Filaz</span>
+        <span class="app-brand-text">TecSA</span>
         <span class="app-brand-sub">Enterprise ERP</span>
       </span>
     </button>
 
 
     <button type="button" class="app-search" (click)="openGlobalSearch()">
-      <i class="bi bi-search"></i>
+      <i class="ts-icon ts-icon-search"></i>
       <span>Tell me what you want to do</span>
       <kbd>Ctrl K</kbd>
     </button>
@@ -23,7 +23,7 @@
           <span>Tell me what you want to do</span>
           <div class="app-search-panel-actions">
             <button type="button" class="app-search-close" (click)="closeGlobalSearch()">
-              <i class="bi bi-x-lg"></i>
+              <i class="ts-icon ts-icon-close"></i>
             </button>
           </div>
         </div>
@@ -51,7 +51,7 @@
                 @for (item of group.items; track item.pageId) {
                   <button type="button" class="app-search-result" (click)="onGlobalSearchSelect(item)">
                     <span class="app-search-result-icon">
-                      <i class="bi bi-layout-text-window-reverse"></i>
+                      <i class="ts-icon ts-icon-panel"></i>
                     </span>
                     <span class="app-search-result-body">
                       <span class="app-search-result-label">{{ item.label }}</span>
@@ -63,7 +63,7 @@
                       </span>
                     </span>
                     <span class="app-search-result-arrow">
-                      <i class="bi bi-arrow-up-right"></i>
+                      <i class="ts-icon ts-icon-external"></i>
                     </span>
                   </button>
                 }
@@ -92,7 +92,7 @@
         [title]="company">
         <span>Company</span>
         <strong>{{ company }}</strong>
-        <i class="bi bi-chevron-down"></i>
+        <i class="ts-icon ts-icon-down"></i>
       </button>
 
       <span class="app-env" [class.live]="isLive">
@@ -100,7 +100,7 @@
       </span>
 
       <button type="button" class="app-icon-btn" (click)="openNotifications()">
-        <i class="bi bi-bell"></i>
+        <i class="ts-icon ts-icon-bell"></i>
       </button>
 
       <button type="button" class="app-user" (click)="openUserMenu()" [title]="userDisplayName" [attr.aria-expanded]="isUserMenuOpen">
@@ -124,13 +124,13 @@
               <i [class]="item.icon"></i>
               <span>{{ item.label }}</span>
               @if (!item.disabled) {
-                <i class="bi bi-chevron-right"></i>
+                <i class="ts-icon ts-icon-right"></i>
               }
             </button>
           }
 
           <button type="button" class="app-user-menu-item danger" (click)="logout()">
-            <i class="bi bi-box-arrow-right"></i>
+            <i class="ts-icon ts-icon-logout"></i>
             <span>Sign out</span>
           </button>
         </div>
@@ -150,7 +150,7 @@
         }
         {{ module.label }}
         @if ((module.children?.length ?? 0) > 0) {
-          <i class="bi bi-chevron-down"></i>
+          <i class="ts-icon ts-icon-down"></i>
         }
       </button>
     }

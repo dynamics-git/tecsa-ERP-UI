@@ -1,3 +1,4 @@
+import type { ListPersonalizationConfig } from './list-personalization-config.model';
 import { CommandConfig, StandardCommandConfig } from './command-config.model';
 import { DataSourceConfig } from './data-source-config.model';
 import { DataSurfaceColumnConfig, DataSurfaceConfig } from './data-surface-config.model';
@@ -8,6 +9,10 @@ import { PopupConfig } from './popup-config.model';
 export type PageType = 'list' | 'card' | 'document' | 'worksheet' | 'setup';
 
 export interface PageToolsConfig {
+  search?: boolean;
+  density?: boolean;
+  grouping?: boolean;
+  savedViews?: boolean;
   refresh?: boolean;
   filter?: boolean;
   advancedFilter?: boolean;
@@ -43,6 +48,10 @@ export interface ListCommandSelectionPolicyConfig {
 export interface BasePageConfig extends Record<string, unknown> {
   pageId?: string;
   pageType?: PageType;
+  /** Explicit save policy. New page configurations should use true for autosave. */
+  autoSave?: boolean;
+  /** Related pages may use the permission scope of their owning resource. */
+  permissionPageId?: string;
   title?: string;
   subtitle?: string;
   module?: string;
@@ -57,6 +66,7 @@ export interface BasePageConfig extends Record<string, unknown> {
 }
 
 export interface ListPageConfig extends BasePageConfig {
+  personalization?: ListPersonalizationConfig;
   views?: Array<{ id: string; label: string; filter?: string }>;
   activeViewId?: string;
   searchFields?: string[];
@@ -74,4 +84,3 @@ export interface ListPageConfig extends BasePageConfig {
 
 // Setup pages share the same shape today; this alias keeps naming explicit.
 export type SetupPageConfig = ListPageConfig;
-

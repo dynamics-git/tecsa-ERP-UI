@@ -43,7 +43,9 @@
               [footerSections]="getDocumentWindowConfig(popup)?.footerSections"
               [attachments]="getDocumentWindowConfig(popup)?.attachments"
               [factBoxSections]="getDocumentWindowConfig(popup)?.factBoxSections"
+              [factBoxConfig]="getDocumentWindowConfig(popup)?.factBoxConfig"
               [statusMessage]="getDocumentWindowConfig(popup)?.statusMessage"
+              [contentReady]="getDocumentWindowConfig(popup)?.contentReady !== false"
               [interactionLocked]="getDocumentWindowConfig(popup)?.interactionLocked === true"
               (action)="onDocumentWindowAction(popup, $event)"
               (closed)="closePopup(popup)">
@@ -58,10 +60,10 @@
                 [title]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
                 [attr.aria-label]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
                 (click)="toggleListPopupMaximize(popup)">
-                <i [class]="isListPopupMaximized(popup) ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen'"></i>
+                <i [class]="isListPopupMaximized(popup) ? 'ts-icon ts-icon-collapse' : 'ts-icon ts-icon-expand'"></i>
               </button>
               <button type="button" class="list-popup-action-btn" title="Close" aria-label="Close" (click)="closePopup(popup)">
-                <i class="bi bi-x-lg"></i>
+                <i class="ts-icon ts-icon-close"></i>
               </button>
             </div>
 

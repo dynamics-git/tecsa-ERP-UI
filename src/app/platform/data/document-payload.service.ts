@@ -1,3 +1,4 @@
+import { normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
 import { FormSectionConfig } from '../models/field-config.model';
@@ -66,22 +67,7 @@ export class DocumentPayloadService {
   }
 
   private coerceFieldValue(value: unknown, valueType: string | undefined): unknown {
-    const normalizedType = String(valueType ?? '').trim().toLowerCase();
-
-    if (value === undefined || value === null) {
-      return null;
-    }
-
-    if (normalizedType === 'number' || normalizedType === 'currency') {
-      const parsed = this.toNumber(value);
-      return parsed === null ? null : parsed;
-    }
-
-    if (normalizedType === 'boolean') {
-      return this.toBoolean(value);
-    }
-
-    return value;
+    return normalizeFieldValue(value, valueType) ?? null;
   }
 
   private resolveAccessCenter(): string {

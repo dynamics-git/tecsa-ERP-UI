@@ -1,5 +1,5 @@
 .line-grid-wrap {
-  height: 178px;
+  height: var(--line-grid-height);
   overflow-y: auto;
   overflow-x: auto;
   scrollbar-gutter: stable;
@@ -259,3 +259,14 @@
     }
   }
 }
+
+.worksheet-grid { height: 100%; min-height: 240px; }
+.worksheet-grid .line-grid { width: 100%; min-width: 900px; }
+.line-grid input[type='checkbox'] { width: 18px; height: 18px; min-height: 0; accent-color: var(--ts-border-focus); }
+
+// Keep blank date cells quiet until the user edits them.
+.line-grid input.empty-date:not(:focus) { color: transparent; }
+.line-grid input.empty-date:not(:focus)::-webkit-datetime-edit { color: transparent; }
+.line-grid input.empty-date:not(:focus)::-webkit-calendar-picker-indicator { opacity: 0; }
+.line-grid td:hover input.empty-date::-webkit-calendar-picker-indicator { opacity: 1; }
+:host { display: block; min-height: 0; }

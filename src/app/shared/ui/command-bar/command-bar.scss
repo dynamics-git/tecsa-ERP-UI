@@ -1,42 +1,10 @@
-:host {
-  display: block;
-}
-
-.app-commandbar {
-  min-height: 48px;
-  padding: 6px 18px 6px 28px;
-  background: var(--ts-surface-soft);
-  box-shadow: inset 0 -1px 0 var(--ts-border);
-  border: 0;
-  border-radius: 0;
-  display: grid;
-  grid-template-columns: minmax(210px, 320px) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  font-family: var(--ts-font);
-}
-
-button {
-  border: 0;
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.55;
-  }
-}
-
-.command-work {
-  min-width: 0;
-}
+@use '../page-commandbar';
 
 :host ::ng-deep .command-work .work-title {
   color: var(--ts-text);
-  font-size: 15px;
-  font-weight: 760;
-  line-height: 1.05;
+  font-size: var(--ts-font-page-title);
+  font-weight: 600;
+  line-height: var(--ts-line-body);
   white-space: nowrap;
 }
 
@@ -47,9 +15,9 @@ button {
   gap: 7px;
   min-width: 0;
   color: var(--ts-muted);
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1;
+  font-size: var(--ts-font-caption);
+  font-weight: 600;
+  line-height: var(--ts-line-body);
   white-space: nowrap;
 
   span + span {
@@ -58,83 +26,3 @@ button {
   }
 }
 
-.command-main,
-.command-tools {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.command-main {
-  min-width: 0;
-  overflow: visible;
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
-
-.command-tools {
-  justify-content: flex-end;
-}
-
-.cmd-primary,
-.cmd,
-.tool {
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ts-text-soft);
-  font-size: 13px;
-  font-weight: 650;
-  white-space: nowrap;
-
-  &:hover:not(:disabled) {
-    background: var(--ts-surface-hover);
-    color: var(--ts-text);
-  }
-}
-
-.cmd-primary {
-  padding: 0 13px;
-  background: var(--ts-brand-900);
-  color: var(--ts-text-inverse);
-  font-weight: 760;
-
-  &:hover:not(:disabled) {
-    background: var(--ts-brand-950);
-    color: var(--ts-text-inverse);
-  }
-}
-
-.cmd-divider {
-  width: 1px;
-  height: 22px;
-  margin: 0 7px;
-  background: var(--ts-border);
-}
-
-.cmd-danger {
-  color: var(--ts-danger);
-
-  &:hover:not(:disabled) {
-    background: var(--ts-danger-bg);
-    color: var(--ts-danger);
-  }
-}
-
-@media (max-width: 1180px) {
-  .app-commandbar {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-    gap: 8px;
-    padding: 8px 12px;
-  }
-
-  .command-main,
-  .command-tools {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
-}

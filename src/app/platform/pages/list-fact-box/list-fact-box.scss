@@ -9,7 +9,7 @@
   display: inline-flex;
   align-items: center;
 
-  font-size: 11px;
+  font-size: var(--ts-font-caption);
   font-weight: 700;
 
   &.active {
@@ -20,6 +20,13 @@
 }
 
 .workspace-factbox {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-inline-start: 1px solid var(--ts-border);
+  border-radius: 0;
+  box-shadow: none;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -46,8 +53,8 @@
   h3 {
     margin: 0 0 3px;
     color: var(--ts-text);
-    font-size: 15px;
-    font-weight: 720;
+    font-size: var(--ts-font-section);
+    font-weight: 700;
     letter-spacing: 0;
     line-height: 1.15;
     overflow: hidden;
@@ -58,7 +65,7 @@
   span {
     display: block;
     color: var(--ts-muted);
-    font-size: 12px;
+    font-size: var(--ts-font-caption);
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -66,32 +73,6 @@
   }
 }
 
-.factbox-mark-button {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--ts-border);
-  border-radius: 6px;
-  background: var(--ts-surface);
-  color: var(--ts-text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-  cursor: pointer;
-
-  &:hover {
-    border-color: var(--ts-border);
-    background: var(--ts-surface-hover);
-    color: var(--ts-text);
-  }
-
-  span {
-    line-height: 1;
-  }
-}
 
 .factbox-scroll {
   min-height: 0;
@@ -104,8 +85,8 @@
   display: block;
   margin-bottom: 3px;
   color: var(--ts-muted);
-  font-size: 10px !important;
-  font-weight: 700 !important;
+  font-size: var(--ts-font-caption);
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -123,16 +104,16 @@
 
   span {
     color: var(--ts-muted);
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--ts-font-caption);
+    font-weight: 600;
   }
 
   strong {
     display: block;
     margin-top: 2px;
     color: var(--ts-text);
-    font-size: 17px;
-    font-weight: 720;
+    font-size: var(--ts-font-section);
+    font-weight: 700;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
@@ -150,8 +131,8 @@
   h4 {
     margin: 0 0 9px;
     color: var(--ts-text);
-    font-size: 12px;
-    font-weight: 720;
+    font-size: var(--ts-font-body);
+    font-weight: 700;
   }
 }
 
@@ -166,7 +147,7 @@
   span {
     min-width: 0;
     color: var(--ts-muted);
-    font-size: 12px;
+    font-size: var(--ts-font-caption);
     font-weight: 600;
     line-height: 1.35;
   }
@@ -175,7 +156,7 @@
     min-width: 0;
     max-width: 58%;
     color: var(--ts-text);
-    font-size: 13px;
+    font-size: var(--ts-font-body);
     font-weight: 700;
     line-height: 1.35;
     text-align: right;
@@ -200,8 +181,20 @@
   white-space: nowrap;
 }
 
+
+
 @media (max-width: 1180px) {
-  .workspace-factbox {
-    display: none;
-  }
+  :host { display: block; min-height: 0; }
+  .workspace-factbox { display: flex; height: 100%; }
 }
+
+.factbox-empty { padding: 20px 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: var(--ts-muted); font-size: var(--ts-font-caption); line-height: 1.5; }
+.factbox-empty strong { color: var(--ts-text-soft); font-size: var(--ts-font-label); }
+
+.factbox-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: var(--ts-control-h); padding-inline: var(--ts-space-3); border-bottom: 1px solid var(--ts-border-soft); font-size: var(--ts-font-body); color: var(--ts-text); }
+.factbox-toolbar button { display: grid; place-items: center; width: var(--ts-control-h); height: var(--ts-control-h); border: 0; background: transparent; color: var(--ts-text-soft); cursor: pointer; }
+.factbox-toolbar button:hover { background: var(--ts-surface-hover); }
+.factbox-toolbar button:focus-visible { outline: 2px solid var(--ts-border-focus); outline-offset: -2px; }
+
+:host { display: block; min-width: 0; min-height: 0; overflow: hidden; }
+@media (max-width: 1180px) { .workspace-factbox { border-inline-start: 0; border-top: 1px solid var(--ts-border); } }

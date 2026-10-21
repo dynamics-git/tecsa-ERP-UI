@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
-import { CommandConfig } from '../../platform/models/command-config.model';
+import { CommandConfig, StandardCommandConfig } from '../../platform/models/command-config.model';
 import { DataSourceConfig } from '../../platform/models/data-source-config.model';
 import { PageToolsConfig } from '../../platform/models/page-config.model';
 
@@ -18,7 +18,8 @@ export interface PageContext {
   views?: Array<{ id: string; label: string; filter?: string }>;
   activeViewId?: string;
   tools?: PageToolsConfig;
-  dataSource?: Pick<DataSourceConfig, 'supportsCreate' | 'supportsUpdate' | 'supportsDelete'>;
+  standardActions?: StandardCommandConfig;
+  dataSource?: Pick<DataSourceConfig, 'supportsCreate' | 'supportsUpdate' | 'supportsDelete' | 'permissions'>;
 }
 
 @Injectable({

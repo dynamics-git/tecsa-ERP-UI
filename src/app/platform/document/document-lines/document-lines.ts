@@ -1,3 +1,5 @@
+import { LookupSelect } from '../../../shared/ui/lookup-select/lookup-select';
+import { normalizeFieldValue, fieldValuesEqual } from '../../models/field-value';
 import { CommonModule } from '@angular/common';
 import {
   Component,
@@ -18,28 +20,65 @@ type LineOption = { label: string; value: unknown; record?: Record<string, unkno
 @Component({
   selector: 'app-document-lines',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LookupSelect],
   templateUrl: './document-lines.html',
   styleUrl: './document-lines.scss',
 })
 export class DocumentLines {
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef) {}
   private readonly lookupRequests = new Map<Record<string, unknown>, Subscription>();
-  searchLookup(column: LineColumnConfig, row: Record<string, unknown>, text: string): void {
+  private readonly selectedLookupLabels = new WeakMap<Record<string, unknown>, Map<string, string>>();
+  lookupLoading = false;
+  lookupError = '';
+  lookupHasMore = false;
+  lookupRetryNextPage = false;
+  lookupQuery = '';
+  private lookupOffset = 0;
+  private lookupCursor?: string;
+  activeLookupRow?: Record<string, unknown>;
+  activeLookupColumn = '';
+  lookupDisplay(column: LineColumnConfig, row: Record<string, unknown>): string {
+    return this.getOptions(column, row).find(option => String(option.value) === this.getCellValue(row, column))?.label ?? this.selectedLookupLabels.get(row)?.get(column.id + ':' + this.getCellValue(row, column)) ?? (column.lookup ? '' : this.getCellValue(row, column));
+  }
+  searchLookup(column: LineColumnConfig, row: Record<string, unknown>, text: string, nextPage = false): void {
+    if (nextPage && (this.lookupLoading || !this.lookupHasMore)) return;
+    this.lookupRetryNextPage = nextPage;
+    if (!nextPage) { this.lookupOffset = 0; this.lookupCursor = undefined; this.lookupHasMore = false; }
+    this.lookupQuery = text;
     if (!column.lookup) return;
+    const label = this.lookupDisplay(column, row);
+    if (label) {
+      const labels = this.selectedLookupLabels.get(row) ?? new Map<string, string>();
+      labels.set(column.id + ':' + this.getCellValue(row, column), label);
+      this.selectedLookupLabels.set(row, labels);
+    }
+    this.lookupRequests.forEach(request => request.unsubscribe());
+    this.activeLookupRow = row;
+    this.activeLookupColumn = column.id;
+    this.lookupLoading = true;
+    this.lookupError = '';
     this.lookupRequests.get(row)?.unsubscribe();
+    const bucket = column.optionsDataKey ?? `__options_${column.field ?? column.id}`;
+    if (!nextPage) row[bucket] = [];
     const query = text.trim().replace(/'/g, "''");
     const fields = column.lookup.searchFields ?? [column.lookup.displayField];
-    this.lookupRequests.set(row, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: column.lookup!.endpoint, pageSize: 20,
+    this.lookupRequests.set(row, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: column.lookup!.endpoint, paging: column.lookup!.paging, pageSize: 20,
       defaultFilter: query ? fields.map(field => `contains(${field}, '${query}')`).join(' or ') : undefined,
-    }))).subscribe({ next: response => {
-      row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = (response as { value: Record<string, unknown>[] }).value.map(record => ({
+    }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({ next: response => {
+      const page = response as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
+      this.lookupOffset += page.value.length;
+      this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
+      this.lookupHasMore = column.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
+      const options = page.value.map(record => ({
         value: record[column.lookup!.valueField], label: String(record[column.lookup!.displayField] ?? ''), record,
       }));
+      row[bucket] = nextPage ? [...(Array.isArray(row[bucket]) ? row[bucket] as unknown[] : []), ...options] : options;
+      this.lookupLoading = false;
       this.changes.markForCheck();
-    }, error: () => {} }));
+    }, error: () => { this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); } }));
   }
   ngOnDestroy(): void { this.lookupRequests.forEach(request => request.unsubscribe()); }
+  @Input() worksheet = false;
   @Input() columns: LineColumnConfig[] = [];
   @Input() rows: Record<string, unknown>[] = [];
   @Input() showSelection = false;
@@ -86,10 +125,12 @@ export class DocumentLines {
       for (const row of this.rows) for (const column of this.columns) {
         const id = row[column.field ?? column.id];
         if (!column.lookup || !id) continue;
-        this.lookupRequests.set(row, this.source.loadById({ endpoint: column.lookup.endpoint }, id).subscribe({
+        const options = row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`];
+        if (Array.isArray(options) && options.some(option => String(option?.value) === String(id))) continue;
+        this.lookupRequests.set(row, this.source.loadById({ endpoint: column.lookup.endpoint }, id, { useCache: true, maxAgeMs: 30000 }).subscribe({
           next: value => {
             const record = value as Record<string, unknown>;
-            row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{ value: id, label: String(record[column.lookup!.displayField] ?? id), record }];
+            row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{ value: id, label: String(record[column.lookup!.displayField] ?? ''), record }];
             this.changes.markForCheck();
           }, error: () => {},
         }));
@@ -287,7 +328,7 @@ export class DocumentLines {
     }
 
     const value = this.getCellValue(row, column);
-    return value ? [{ label: value, value }] : [{ label: '', value: '' }];
+    return value && !column.lookup ? [{ label: value, value }] : [];
   }
 
   isOptionSelected(
@@ -335,6 +376,8 @@ export class DocumentLines {
 
     const field = column.field ?? column.id;
     const previousValue = row[field];
+    value = normalizeFieldValue(value, column.valueType);
+    if (fieldValuesEqual(previousValue, value, column.valueType)) return;
     const rowIndex = this.rows.indexOf(row);
     const selectedRecord = this.resolveSelectedRecord(column, row, value);
 
@@ -363,12 +406,17 @@ export class DocumentLines {
           continue;
         }
 
+        if (fieldValuesEqual(target[field], value, column.valueType)) continue;
         bulkChanges.push({ rowIndex: index, previousValue: target[field], value });
         target[field] = value;
         this.applyFill(column, target, this.resolveSelectedRecord(column, target, value));
       }
 
-      this.rowChanged.emit({ row, column, value, previousValue, rowIndex, bulkChanges });
+      // Each changed row must pass through the same calculations and persistence path.
+      for (const change of bulkChanges) {
+        this.rowChanged.emit({ row: this.rows[change.rowIndex], column, ...change });
+      }
+      this.rowChanged.emit({ row, column, value, previousValue, rowIndex });
       return;
     }
 
@@ -433,17 +481,7 @@ export class DocumentLines {
   }
 
   coerceCellValue(column: LineColumnConfig, rawValue: string): unknown {
-    if (column.valueType === 'number') {
-      const normalized = rawValue.replace(/,/g, '').trim();
-      if (!normalized.length) {
-        return 0;
-      }
-
-      const parsed = Number(normalized);
-      return Number.isFinite(parsed) ? parsed : rawValue;
-    }
-
-    return rawValue;
+    return normalizeFieldValue(rawValue, column.valueType);
   }
 
   private reconcileRows(previousRows?: Record<string, unknown>[]): void {

@@ -1,17 +1,20 @@
-@if (documentOnly || listConfig.dataSource.singleton) {
+@if (documentOnly || isInlineEntryPage) {
   @if (inlineDocumentWindowConfig; as entry) {
     <app-document-window
-      [embedded]="!documentOnly"
+      [embedded]="!documentOnly" [worksheet]="isWorksheetPage"
       [pageLabel]="entry.pageLabel" [title]="entry.title" [subtitle]="entry.subtitle"
       [headerCommandBar]="entry.headerCommandBar" [lineCommandBar]="entry.lineCommandBar"
       [headerToolbarButtons]="entry.headerToolbarButtons" [lineToolbarButtons]="entry.lineToolbarButtons"
       [headerSections]="entry.headerSections" [headerData]="entry.headerData"
       [lineColumns]="entry.lineColumns" [lineRows]="entry.lineRows"
-      [linePlacement]="entry.linePlacement" [lineTotals]="entry.lineTotals"
-      [footerSections]="entry.footerSections" [factBoxSections]="entry.factBoxSections"
-      [statusMessage]="entry.statusMessage" [interactionLocked]="entry.interactionLocked === true"
+      [lineCommandPolicy]="entry.lineCommandPolicy" [linePlacement]="entry.linePlacement" [lineTotals]="entry.lineTotals"
+      [footerSections]="entry.footerSections" [factBoxSections]="entry.factBoxSections" [factBoxConfig]="entry.factBoxConfig"
+      [contentReady]="entry.contentReady !== false" [statusMessage]="entry.statusMessage" [interactionLocked]="entry.interactionLocked === true"
       (action)="handleInlineAction($event)" (closed)="requestClose()">
     </app-document-window>
+    @if (isWorksheetPage && hasMore) {
+      <button type="button" [disabled]="popupLoading || dirtyWorksheet" (click)="loadMoreWorksheet()">Load more records</button>
+    }
   }
 } @else {
 <app-list-page
@@ -31,13 +34,7 @@
   (command)="handleCommand($event)">
 </app-list-page>
 
-<app-list-filter-panel
-  [enabled]="listConfig.tools?.advancedFilter !== false"
-  [storageKey]="listFilterStorageKey"
-  [columns]="listConfig.dataSurface?.columns ?? []"
-  [filterOptions]="listConfig.filterConfig?.fields ?? []"
-  (command)="handleCommand($event)">
-</app-list-filter-panel>
+
 }
 
 @if (!documentOnly) {

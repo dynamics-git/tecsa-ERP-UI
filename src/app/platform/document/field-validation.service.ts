@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { FieldConfig } from '../models/field-config.model';
+import { compareDecimalValues } from '../models/field-value';
 
 export interface FieldValidationResult {
   valid: boolean;
@@ -23,15 +24,43 @@ export class FieldValidationService {
       return { valid: false, errors };
     }
 
-    const validation = field.validation;
-    if (!validation) {
-      return { valid: true, errors };
+    if ((field.valueType === 'date' || field.type === 'date') && text.trim()) {
+      const date = new Date(text + 'T00:00:00Z');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text) {
+        errors.push(`${field.label} must be a valid date (YYYY-MM-DD)`);
+      }
     }
+    if (field.valueType === 'decimal' && text.trim() && !/^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
+      errors.push(`${field.label} must be a decimal value`);
+    }
+    const validation = field.validation ?? {};
 
-    if (field.type === 'number' || field.type === 'currency' || field.valueType === 'number') {
+    if (field.valueType === 'decimal' && /^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
+      const [whole, fraction = ''] = text.trim().replace(/^[+-]/, '').split('.');
+      const digits = whole.replace(/^0+/, '').length + fraction.length;
+      if (validation.precision !== undefined && Math.max(1, digits) > validation.precision) errors.push(
+        validation.message ?? `${field.label} must have at most ${validation.precision} digits`,
+      );
+      if (validation.precision !== undefined && validation.scale !== undefined && whole.replace(/^0+/, '').length > validation.precision - validation.scale) errors.push(
+        validation.message ?? `${field.label} has too many digits before the decimal point`,
+      );
+      if (validation.scale !== undefined && fraction.length > validation.scale) errors.push(
+        validation.message ?? `${field.label} must have at most ${validation.scale} decimal places`,
+      );
+      if (validation.min !== undefined && compareDecimalValues(text.trim(), String(validation.min)) === -1) errors.push(
+        validation.message ?? `${field.label} must be at least ${validation.min}`,
+      );
+      if (validation.max !== undefined && compareDecimalValues(text.trim(), String(validation.max)) === 1) errors.push(
+        validation.message ?? `${field.label} must be at most ${validation.max}`,
+      );
+    }
+    if (field.valueType !== 'decimal' && (field.type === 'number' || field.type === 'currency' || ['number', 'integer'].includes(field.valueType ?? ''))) {
       const numberValue = this.toNumber(value);
       if (text.trim().length && numberValue === null) errors.push(`${field.label} must be a number`);
       if (numberValue !== null) {
+        if (field.valueType === 'integer' && !Number.isSafeInteger(numberValue)) {
+          errors.push(`${field.label} must be a safe whole number`);
+        }
         if (validation.min !== undefined && numberValue < validation.min) {
           errors.push(validation.message ?? `${field.label} must be at least ${validation.min}`);
         }

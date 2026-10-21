@@ -4,16 +4,16 @@
       <p class="eyebrow">Role Center</p>
       <h1>{{ roleTitle }}</h1>
       <div class="meta-row">
-        <span><i class="bi bi-buildings"></i>{{ activeCompany }}</span>
-        <span><i class="bi bi-diagram-3"></i>{{ roleScope }}</span>
-        <span><i class="bi bi-calendar3"></i>Working Date: {{ workingDate }}</span>
+        <span><i class="ts-icon ts-icon-building"></i>{{ activeCompany }}</span>
+        <span><i class="ts-icon ts-icon-diagram"></i>{{ roleScope }}</span>
+        <span><i class="ts-icon ts-icon-calendar"></i>Working Date: {{ workingDate }}</span>
       </div>
     </div>
 
     <div class="command-cluster">
-      <button type="button"><i class="bi bi-sliders"></i>Personalize</button>
-      <button type="button"><i class="bi bi-grid-3x3-gap"></i>My Views</button>
-      <button type="button" class="primary"><i class="bi bi-play-circle"></i>Start Day Checklist</button>
+      <button type="button"><i class="ts-icon ts-icon-sliders"></i>Personalize</button>
+      <button type="button"><i class="ts-icon ts-icon-grid"></i>My Views</button>
+      <button type="button" class="primary"><i class="ts-icon ts-icon-play-circle"></i>Start Day Checklist</button>
     </div>
   </section>
 
@@ -22,7 +22,7 @@
       <h2>Activities</h2>
       <div class="header-actions">
         <span class="info-badge">{{ activitiesCount }} items require attention</span>
-        <button type="button"><i class="bi bi-sliders"></i>Personalize</button>
+        <button type="button"><i class="ts-icon ts-icon-sliders"></i>Personalize</button>
       </div>
     </header>
 
@@ -39,7 +39,7 @@
             <strong class="activity-value">{{ activity.value }}</strong>
             @if (activity.trend) {
               <span class="trend-indicator" [class.up]="activity.trend.direction === 'up'" [class.down]="activity.trend.direction === 'down'">
-                <i class="bi" [class.bi-arrow-up]="activity.trend.direction === 'up'" [class.bi-arrow-down]="activity.trend.direction === 'down'"></i>
+                <i class="ts-icon" [class.ts-icon-arrow-up]="activity.trend.direction === 'up'" [class.ts-icon-arrow-down]="activity.trend.direction === 'down'"></i>
                 {{ activity.trend.value }}
               </span>
             }
@@ -53,7 +53,7 @@
           <div class="activity-footer">
             <a href="javascript:void(0)" class="activity-link">{{ activity.linkText || 'View all' }}</a>
             @if (activity.quickAction) {
-              <button class="quick-action" type="button"><i class="bi bi-plus-circle"></i>{{ activity.quickAction }}</button>
+              <button class="quick-action" type="button"><i class="ts-icon ts-icon-plus-circle"></i>{{ activity.quickAction }}</button>
             }
           </div>
         </div>
@@ -70,18 +70,18 @@
             <button type="button" [class.active]="activeActionView === group.key" (click)="setActionView(group.key)">{{ group.title }}</button>
           }
         </div>
-        <button type="button"><i class="bi bi-grid-3x3-gap"></i>Arrange</button>
+        <button type="button"><i class="ts-icon ts-icon-grid"></i>Arrange</button>
       </div>
     </header>
 
     <div class="action-groups">
       @if (recentActions.length > 0) {
         <article class="action-group quick-access">
-          <h3><i class="bi bi-clock-history"></i>Recent & Favorites</h3>
+          <h3><i class="ts-icon ts-icon-clock"></i>Recent & Favorites</h3>
           <div class="action-tiles compact">
             @for (action of recentActions; track action.title) {
               <button class="action-tile" type="button" [class.starred]="action.starred">
-                <i class="bi" [class]="'bi bi-' + action.icon"></i>
+                <i class="ts-icon" [class]="'ts-icon ts-icon-' + action.icon"></i>
                 <strong>{{ action.title }}</strong>
                 @if (action.lastUsed) {
                   <span class="last-used">{{ action.lastUsed }}</span>
@@ -98,7 +98,7 @@
           <div class="action-tiles">
             @for (action of group.actions; track action.title) {
               <button class="action-tile" type="button">
-                <i class="bi" [class]="'bi bi-' + action.icon"></i>
+                <i class="ts-icon" [class]="'ts-icon ts-icon-' + action.icon"></i>
                 <strong>{{ action.title }}</strong>
                 <small>{{ action.module }}</small>
               </button>
@@ -146,7 +146,7 @@
       <article class="insight-part">
         <header class="section-header">
           <h2>Analytics Signals</h2>
-          <button type="button"><i class="bi bi-graph-up"></i>Analyze</button>
+          <button type="button"><i class="ts-icon ts-icon-chart"></i>Analyze</button>
         </header>
 
         <div class="signal-lines">
@@ -155,7 +155,7 @@
               <div class="signal-header">
                 <span>{{ signal.metric }}</span>
                 @if (signal.alert) {
-                  <i class="bi bi-exclamation-circle alert-icon"></i>
+                  <i class="ts-icon ts-icon-info alert-icon"></i>
                 }
               </div>
               <strong>{{ signal.value }}</strong>

@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { SessionService } from '../../../core/services/session.service';
 
 type ActivityCard = {
   title: string;
@@ -66,7 +67,8 @@ type ApprovalItem = {
 export class DashboardPage {
   readonly roleTitle = 'Finance Controller Role Center';
   readonly workingDate = '03 Jul 2026';
-  readonly activeCompany = 'FILAZE Manufacturing Sdn. Bhd.';
+  private readonly session = inject(SessionService);
+  get activeCompany(): string { return this.session.CompanyName || 'Company'; }
   readonly roleScope = 'Malaysia Group';
 
   activeActionView = 'all';

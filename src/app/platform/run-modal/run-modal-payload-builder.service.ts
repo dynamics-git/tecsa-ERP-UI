@@ -105,12 +105,6 @@ export class RunModalPayloadBuilderService {
       dataSource: params.dataSource,
       firstPresentValue: params.firstPresentValue,
     });
-    this.ensureLineNo({
-      binding: params.binding,
-      row: params.row,
-      documentWindowConfig: params.documentWindowConfig,
-      pickObjectFromModule: params.pickObjectFromModule,
-    });
 
     const source: Record<string, unknown> = { ...params.row };
 
@@ -211,28 +205,6 @@ export class RunModalPayloadBuilderService {
     });
   }
 
-  ensureLineNo(params: {
-    binding: RunModalPayloadBindingContext;
-    row: Record<string, unknown>;
-    documentWindowConfig: DocumentWindowConfig;
-    pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
-  }): void {
-    const lineKeyField = this.resolveLineKeyField({
-      binding: params.binding,
-      pickObjectFromModule: params.pickObjectFromModule,
-    });
-
-    if (!lineKeyField || this.toNumber(params.row[lineKeyField]) > 0) {
-      return;
-    }
-
-    params.row[lineKeyField] = this.resolveNextLineNo({
-      rows: params.documentWindowConfig.lineRows ?? [],
-      targetRow: params.row,
-      lineKeyField,
-    });
-  }
-
   resolveLineKeyField(params: {
     binding: RunModalPayloadBindingContext;
     pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
@@ -256,26 +228,6 @@ export class RunModalPayloadBuilderService {
 
   hasMeaningfulPayloadValue(value: unknown): boolean {
     return value !== null && value !== undefined && String(value).trim().length > 0;
-  }
-
-  resolveNextLineNo(params: {
-    rows: Record<string, unknown>[];
-    targetRow: Record<string, unknown>;
-    lineKeyField: string;
-  }): number {
-    let maxLineNo = 0;
-    for (const row of params.rows) {
-      if (row === params.targetRow) {
-        continue;
-      }
-
-      const lineNo = this.toNumber(row[params.lineKeyField]);
-      if (lineNo > maxLineNo) {
-        maxLineNo = lineNo;
-      }
-    }
-
-    return maxLineNo > 0 ? maxLineNo + 10000 : 10000;
   }
 
   applyFixedParentFields(params: {

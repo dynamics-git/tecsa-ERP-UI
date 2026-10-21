@@ -1,3 +1,4 @@
+import { normalizeFieldValue } from '../models/field-value';
 import { Inject, Injectable, Optional } from '@angular/core';
 import { catchError, of, take } from 'rxjs';
 import { DOCUMENT_SAVE_PORT, DocumentSavePort, DocumentSaveResult } from './document-save.port';
@@ -521,36 +522,6 @@ export class DocumentStateService {
   }
 
   private coerceValue(value: unknown, valueType: FieldValueType | undefined): unknown {
-    switch (valueType) {
-      case 'number': {
-        const parsed = this.toNumber(value);
-        if (parsed === null) {
-          const text = this.toText(value);
-          return text.length ? text : '';
-        }
-
-        return parsed;
-      }
-      case 'boolean': {
-        if (typeof value === 'boolean') {
-          return value;
-        }
-
-        const normalized = this.toText(value).trim().toLowerCase();
-        if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') {
-          return true;
-        }
-
-        if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
-          return false;
-        }
-
-        return Boolean(value);
-      }
-      case 'date':
-      case 'text':
-      default:
-        return this.toText(value);
-    }
+    return normalizeFieldValue(value, valueType);
   }
 }

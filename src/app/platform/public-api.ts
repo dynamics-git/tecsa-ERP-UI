@@ -46,3 +46,9 @@ export * from './run-modal/run-modal-config.token';
 export * from './run-modal/run-modal-loading.service';
 export * from './run-modal/run-modal.service';
 export * from '../shared/ui/public-api';
+
+export * from './models/list-personalization-config.model';
+export * from './pages/list-filter-expression';
+export * from './pages/list-personalization.service';
+
+export * from './pages/standard-list-actions.service';

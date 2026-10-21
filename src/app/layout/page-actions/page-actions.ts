@@ -1,12 +1,17 @@
-import { Component, EventEmitter, OnDestroy, Output } from '@angular/core';
+import { FactBoxHostService } from '../../shared/ui/fact-box-toggle/fact-box-host.service';
+import { FactBoxToggle } from '../../shared/ui/fact-box-toggle/fact-box-toggle';
+import { ChangeDetectorRef, Component, EventEmitter, OnDestroy, Output, inject } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import { Subscription, filter } from 'rxjs';
+import { Subscription, asapScheduler, filter, observeOn } from 'rxjs';
 import { SessionService } from '../../core/services/session.service';
 import {
   ActionDispatcherService,
   CommandConfig,
   DataSourceConfig,
   PageContext,
+  StandardListActionsService,
+  StandardCommandConfig,
+  StandardCommandStateConfig,
   PageToolsConfig
 } from '../../platform/public-api';
 
@@ -19,15 +24,18 @@ type ActionPageContext = {
   views?: Array<{ id: string; label: string; filter?: string }>;
   activeViewId?: string;
   tools?: PageToolsConfig;
-  dataSource?: Pick<DataSourceConfig, 'supportsCreate' | 'supportsUpdate' | 'supportsDelete'>;
+  standardActions?: StandardCommandConfig;
+  dataSource?: Pick<DataSourceConfig, 'supportsCreate' | 'supportsUpdate' | 'supportsDelete' | 'permissions'>;
 };
 
 @Component({
   selector: 'app-page-actions',
+  imports: [FactBoxToggle],
   templateUrl: './page-actions.html',
   styleUrl: './page-actions.scss'
 })
 export class PageActions implements OnDestroy {
+  readonly factBoxHost = inject(FactBoxHostService);
   @Output() newClick = new EventEmitter<void>();
   @Output() deleteClick = new EventEmitter<void>();
   @Output() refreshClick = new EventEmitter<void>();
@@ -39,6 +47,8 @@ export class PageActions implements OnDestroy {
   pageCommands: CommandConfig[] = [];
   private configuredPageContext?: Partial<PageContext>;
   private readonly subscriptions = new Subscription();
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly standardActions = inject(StandardListActionsService);
 
   constructor(
     private readonly actionDispatcher: ActionDispatcherService,
@@ -53,14 +63,19 @@ export class PageActions implements OnDestroy {
         this.refreshPageContext(event.urlAfterRedirects);
       }));
 
-    this.subscriptions.add(this.actionDispatcher.pageCommands$.subscribe((commands) => {
+    this.subscriptions.add(this.actionDispatcher.pageCommands$.pipe(observeOn(asapScheduler)).subscribe((commands) => {
       this.pageCommands = commands.filter((command) => !command.hidden);
+      this.changeDetector.markForCheck();
     }));
 
-    this.subscriptions.add(this.actionDispatcher.pageContext$.subscribe((context) => {
+// Routed pages publish their context during initialization, after the shell
+    // was checked. Deliver it on the next turn and notify zoneless rendering.
+    this.subscriptions.add(this.actionDispatcher.pageContext$.pipe(observeOn(asapScheduler)).subscribe((context) => {
       this.configuredPageContext = context ?? undefined;
       this.refreshPageContext(this.router.url);
+      this.changeDetector.markForCheck();
     }));
+    this.subscriptions.add(this.session.permissionsLoaded$.subscribe(() => this.changeDetector.markForCheck()));
   }
 
   ngOnDestroy(): void {
@@ -76,6 +91,7 @@ export class PageActions implements OnDestroy {
   }
 
   get showFilterTool(): boolean {
+    if (!this.pageContext.pageId) return false;
     const tools = this.pageContext.tools;
     if (!tools) {
       return true;
@@ -84,23 +100,29 @@ export class PageActions implements OnDestroy {
     return tools.filter !== false || tools.advancedFilter !== false;
   }
 
-  get showNewAction(): boolean {
-    return this.pageContext.dataSource?.supportsCreate !== false && this.allowed('canCreate');
+  get standardActionItems(): Array<StandardCommandStateConfig & { actionKey: 'new' | 'delete' | 'refresh' }> {
+    if (!this.pageContext.pageId) return [];
+    const resolved = this.standardActions.resolve(this.pageContext);
+    return (['new', 'delete', 'refresh'] as const).flatMap(actionKey => {
+      const state = resolved[actionKey];
+      return typeof state === 'object' && state.visible !== false && !state.hidden ? [{ ...state, actionKey }] : [];
+    }).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
 
-  get showDeleteAction(): boolean {
-    return this.pageContext.dataSource?.supportsDelete !== false && this.allowed('canDelete');
-  }
-
-  get showRefreshAction(): boolean {
-    return this.pageContext.tools?.refresh !== false;
+  runStandardAction(action: StandardCommandStateConfig & { actionKey: 'new' | 'delete' | 'refresh' }): void {
+    if (action.disabled) return;
+    if (action.actionKey === 'new') this.newClick.emit();
+    else if (action.actionKey === 'delete') this.deleteClick.emit();
+    else this.refreshClick.emit();
   }
 
   get showExportTool(): boolean {
+    if (!this.pageContext.pageId) return false;
     return this.pageContext.tools?.export !== false;
   }
 
   get showColumnsTool(): boolean {
+    if (!this.pageContext.pageId) return false;
     return this.pageContext.tools?.columns !== false;
   }
 
@@ -148,6 +170,7 @@ export class PageActions implements OnDestroy {
       views: configContext?.views ?? pageContext.views,
       activeViewId: configContext?.activeViewId ?? pageContext.activeViewId,
       tools: configContext?.tools ?? pageContext.tools,
+      standardActions: configContext?.standardActions,
       dataSource: configContext?.dataSource ?? pageContext.dataSource
     };
 

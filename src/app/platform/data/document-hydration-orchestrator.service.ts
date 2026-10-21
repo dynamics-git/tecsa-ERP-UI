@@ -1,3 +1,5 @@
+import { FieldConfig } from '../models/field-config.model';
+import { LineColumnConfig } from '../models/line-config.model';
 import { Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
@@ -21,6 +23,40 @@ export class DocumentHydrationOrchestratorService {
     private readonly normalizer: DocumentResponseNormalizerService,
   ) {}
 
+
+  async resolveHeaderLookups(record: Record<string, unknown>, fields: FieldConfig[]): Promise<Record<string, unknown>> {
+    const result = { ...record };
+    await Promise.all(fields.filter(field => field.lookup && this.hasValue(record[field.key])).map(async field => {
+      const lookup = field.lookup!;
+      const selected = await firstValueFrom(this.dataSource.loadById(
+        { endpoint: lookup.endpoint }, record[field.key], { useCache: true, maxAgeMs: 30000 },
+      ).pipe(timeout<unknown>(10000)));
+      result[field.optionsDataKey ?? `__options_${field.key}`] = [selected];
+    }));
+    return result;
+  }
+
+  async resolveLineLookups(rows: Record<string, unknown>[], columns: LineColumnConfig[]): Promise<Record<string, unknown>[]> {
+    // Bound request concurrency for large documents; DataSourceService shares identical requests.
+    const result = rows.map(row => ({ ...row }));
+    const jobs = result.flatMap(row => columns.filter(column => column.lookup && this.hasValue(row[column.field ?? column.id]))
+      .map(column => async () => {
+        const lookup = column.lookup!;
+        const id = row[column.field ?? column.id];
+        const record = await firstValueFrom(this.dataSource.loadById(
+          { endpoint: lookup.endpoint }, id, { useCache: true, maxAgeMs: 30000 },
+        ).pipe(timeout<unknown>(10000))) as Record<string, unknown>;
+        row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{
+          value: id, label: String(record[lookup.displayField] ?? ''), record,
+        }];
+      }));
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(6, jobs.length) }, async () => {
+      while (cursor < jobs.length) await jobs[cursor++]();
+    }));
+    return result;
+  }
+
   extractRecords(response: unknown): Record<string, unknown>[] {
     if (Array.isArray(response)) {
       return response.filter((item): item is Record<string, unknown> => this.isRecord(item));
@@ -40,7 +76,7 @@ export class DocumentHydrationOrchestratorService {
     timeoutMs: number,
   ): Promise<Record<string, unknown>> {
     const response = await firstValueFrom(
-      this.dataSource.loadById(dataSourceConfig, id).pipe(timeout(timeoutMs)),
+      this.dataSource.loadById(dataSourceConfig, id, { useCache: true, maxAgeMs: 30000 }).pipe(timeout(timeoutMs)),
     );
 
     return this.normalizer.normalizeSingleRecordResponse(response, fallback);
@@ -167,7 +203,7 @@ export class DocumentHydrationOrchestratorService {
     const rows: Record<string, unknown>[] = [];
     const top = Math.min(config.pageSize ?? 100, 200);
     for (;;) {
-      const response = await firstValueFrom(this.dataSource.loadList(config, { top, skip: rows.length }).pipe(timeout<unknown>(timeoutMs))) as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
+      const response = await firstValueFrom(this.dataSource.loadList(config, { top, skip: rows.length, useCache: true, maxAgeMs: 30000 }).pipe(timeout<unknown>(timeoutMs))) as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
       rows.push(...response.value);
       const complete = typeof response.meta['total'] === 'number' ? rows.length >= response.meta['total'] : response.value.length < top;
       if (complete) return rows;

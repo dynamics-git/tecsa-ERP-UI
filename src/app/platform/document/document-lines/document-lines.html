@@ -1,4 +1,4 @@
-<div class="line-grid-wrap" tabindex="0" (keydown)="handleGridKeydown($event)">
+<div class="line-grid-wrap" [class.worksheet-grid]="worksheet" tabindex="0" (keydown)="handleGridKeydown($event)">
   <table class="line-grid" [class.with-selection]="showSelection">
     <thead>
       <tr>
@@ -18,7 +18,7 @@
             [class.line-icon-col]="column.cellType === 'icon'"
             [style.width]="getColumnWidthStyle(column)">
             <div class="line-header-cell">
-              <span>{{ column.label }}</span>
+              <span>{{ column.label }} @if (column.required) { <span aria-hidden="true">*</span> }</span>
               @if (enableColumnResize) {
                 <button
                   type="button"
@@ -42,7 +42,7 @@
                 class="row-pointer"
                 [class.is-active]="isActiveRow(rowIndex)"
                 (click)="$event.stopPropagation(); activateRow(rowIndex)">
-                <i class="bi bi-chevron-right"></i>
+                <i class="ts-icon ts-icon-right"></i>
               </button>
             </td>
             <td class="row-check-col">
@@ -58,11 +58,18 @@
               [class.amount]="column.align === 'end' || column.type === 'currency'"
               [class.line-icon-col]="column.cellType === 'icon'"
               [style.width]="getColumnWidthStyle(column)">
-              @if (column.cellType === 'select' || column.cellType === 'dropdown') {
-                @if (column.lookup && !isReadonly(column, row)) {
-                  <input type="search" [attr.aria-label]="'Search ' + column.label" placeholder="Search..."
-                    (focus)="searchLookup(column, row, $any($event.target).value)" (input)="searchLookup(column, row, $any($event.target).value)" />
-                }
+              @if (column.lookup) {
+                <app-lookup-select class="grid-editor" [label]="column.label" [display]="lookupDisplay(column, row)" [value]="row[column.field ?? column.id]"
+                  [disabled]="isReadonly(column, row)" [required]="column.required === true" [options]="getOptions(column, row)"
+                  [loading]="activeLookupRow === row && activeLookupColumn === column.id && lookupLoading"
+                  [error]="activeLookupRow === row && activeLookupColumn === column.id ? lookupError : ''"
+                  (opened)="notifyDropdownOpened(column, row, rowIndex); searchLookup(column, row, '')"
+                  [hasMore]="activeLookupRow === row && activeLookupColumn === column.id && lookupHasMore"
+                  (nextPage)="searchLookup(column, row, lookupQuery, true)"
+                  (retried)="searchLookup(column, row, lookupQuery, lookupRetryNextPage)"
+                  (searched)="searchLookup(column, row, $event)"
+                  (selected)="updateCellValue(column, row, $event)" />
+              } @else if (column.cellType === 'select' || column.cellType === 'dropdown') {
                 <select [value]="getCellValue(row, column)" [disabled]="isReadonly(column, row)" (focus)="notifyDropdownOpened(column, row, rowIndex)" (change)="updateCellValue(column, row, resolveSelectValue(column, row, $any($event.target).value))">
                   @if (showEmptyOption(column, row)) {
                     <option value=""></option>
@@ -75,8 +82,10 @@
                 <button type="button" [title]="column.buttonTitle ?? ''" (click)="runAction(column, row, rowIndex)">
                   <i [class]="column.buttonIcon ?? ''"></i>
                 </button>
+              } @else if (column.valueType === 'boolean') {
+                <input type="checkbox" [attr.aria-label]="column.label" [checked]="getCellValue(row, column) === 'true'" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, $any($event.target).checked)" />
               } @else {
-                <input [type]="column.valueType === 'date' ? 'date' : column.valueType === 'number' ? 'number' : 'text'" step="any" [value]="getCellValue(row, column)" [readonly]="isReadonly(column, row)" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
+                <input [class.empty-date]="column.valueType === 'date' && !getCellValue(row, column)" [attr.aria-label]="column.label" [type]="column.valueType === 'date' ? 'date' : (column.valueType === 'number' || column.valueType === 'integer' || column.valueType === 'decimal') ? 'number' : 'text'" step="any" [value]="getCellValue(row, column)" [readonly]="isReadonly(column, row)" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
               }
             </td>
           }

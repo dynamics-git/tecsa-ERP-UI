@@ -9,19 +9,13 @@
   </div>
 
   <div class="command-main">
-    @if (showNewAction) {
-      <button type="button" class="cmd-primary" (click)="newClick.emit()">
-        <i class="bi bi-plus-lg"></i>
-        New
+    @for (action of standardActionItems; track action.actionKey) {
+      <button type="button" class="cmd" [class.cmd-primary]="action.actionKey === 'new'"
+        [disabled]="action.disabled"
+        [title]="action.tooltip ?? action.label ?? ''" (click)="runStandardAction(action)">
+        @if (action.icon) { <i [class]="action.icon" aria-hidden="true"></i> }
+        {{ action.label }}
       </button>
-    }
-
-    @if (showDeleteAction) {
-      <button type="button" class="cmd" (click)="deleteClick.emit()">Delete</button>
-    }
-
-    @if (showRefreshAction) {
-      <button type="button" class="cmd" (click)="refreshClick.emit()">Refresh</button>
     }
 
     @if (visibleCommands.length) {
@@ -32,7 +26,7 @@
           <button
             type="button"
             class="cmd"
-            [class.cmd-danger]="command.tone === 'danger'"
+
             [disabled]="command.disabled"
             [title]="command.tooltip ?? command.label"
             (click)="runCommand(command)">
@@ -49,34 +43,9 @@
     }
   </div>
 
-  <div class="command-tools">
-    @if (pageViews.length) {
-      <div class="view-switch">
-        @for (view of pageViews; track view.id) {
-          <button type="button" [class.active]="isViewActive(view.id)" (click)="setView(view)">{{ view.label }}</button>
-        }
-      </div>
+  @if (factBoxHost.host(); as host) {
+    @if (host.factBoxEnabled) {
+      <div class="command-tools"><app-fact-box-toggle [expanded]="host.factboxOpen" (toggled)="host.toggleFactbox()"></app-fact-box-toggle></div>
     }
-
-    @if (showFilterTool) {
-      <button type="button" class="tool" (click)="filterClick.emit()">
-        <i class="bi bi-funnel"></i>
-        Filter
-      </button>
-    }
-
-    @if (showExportTool) {
-      <button type="button" class="tool" (click)="exportClick.emit()">
-        <i class="bi bi-download"></i>
-        Export
-      </button>
-    }
-
-    @if (showColumnsTool) {
-      <button type="button" class="tool">
-        <i class="bi bi-layout-three-columns"></i>
-        Columns
-      </button>
-    }
-  </div>
+  }
 </section>

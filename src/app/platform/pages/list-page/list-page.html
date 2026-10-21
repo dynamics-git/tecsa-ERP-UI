@@ -18,79 +18,117 @@
           }
         </div>
       </div>
+      @if (factBoxEnabled) { <div app-command-tools><app-fact-box-toggle [expanded]="factboxOpen" (toggled)="toggleFactbox()"></app-fact-box-toggle></div> }
     </app-command-bar>
   }
 
-  <section class="workspace-layout" [class.factbox-closed]="!factboxOpen">
+  <section class="workspace-layout" [style.--list-details-width]="config?.factBox?.width ?? '280px'" [class.factbox-closed]="!factboxOpen || !factBoxEnabled || filterPanel.visible" [class.filters-open]="filterPanel.visible">
 
     <div class="workspace-grid">
 
       @if (normalizedErrorMessage) {
         <div class="list-error-banner" role="alert" aria-live="assertive">
-          <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+          <i class="ts-icon ts-icon-warning" aria-hidden="true"></i>
           <span>{{ normalizedErrorMessage }}</span>
           <button type="button" class="list-error-dismiss" aria-label="Dismiss error" (click)="dismissError()">
-            <i class="bi bi-x-lg" aria-hidden="true"></i>
+            <i class="ts-icon ts-icon-close" aria-hidden="true"></i>
           </button>
         </div>
       }
 
-      <div class="dataset-strip">
-
-        <div class="dataset-views">
-          @if (views.length) {
-            @for (view of views; track view.id) {
-              <button [class.active]="isViewActive(view.id)" (click)="setActiveView(view.id)">{{ view.label }}</button>
-            }
-          } @else {
-            <button class="active">All</button>
-          }
-        </div>
-
-        <div class="dataset-right">
-
-          @if (isBasicFilterEnabled) {
-            <div class="filter-chips">
-              <span><i class="bi bi-funnel"></i> All statuses</span>
-              <span><i class="bi bi-sort-numeric-down"></i> No. asc</span>
-              @if (selectedCount > 0) {
-                <span>{{ selectedCount }} selected <button type="button" (click)="clearSelection()">Clear</button></span>
-              }
-            </div>
-          }
-
-          @if (isBasicFilterEnabled) {
-            <div class="dataset-search">
-              <i class="bi bi-search"></i>
-              <input
-                type="text"
-                [value]="searchText"
-                [placeholder]="searchPlaceholder"
-                (input)="handleSearchInput($event)"
-              />
-            </div>
-          }
-
-          <div class="dataset-tools">
-            <button type="button" title="Group">
-              <i class="bi bi-collection"></i>
-            </button>
-            <button
-              type="button"
-              [title]="'Density: ' + densityLabel"
-              [attr.aria-label]="'Density: ' + densityLabel"
-              (click)="cycleDensity()">
-              <i class="bi bi-text-paragraph"></i>
-            </button>
-            <button type="button" title="Save view">
-              <i class="bi bi-bookmark"></i>
-            </button>
+      <div class="dataset-strip" aria-label="List tools">
+        @if (searchEnabled) {
+          <div class="dataset-search">
+            <i class="ts-icon ts-icon-search" aria-hidden="true"></i>
+            <input #searchInput type="search" aria-label="Search this list" maxlength="200" [value]="searchText"
+              [placeholder]="searchPlaceholder" (input)="handleSearchInput($event)" />
+            @if (searchText) { <button type="button" aria-label="Clear list search" (click)="clearSearch()"><i class="ts-icon ts-icon-close" aria-hidden="true"></i></button> }
           </div>
+        }
+        <div class="dataset-tools">
+          @if (advancedFilterEnabled) {
+            <button type="button" [class.active]="filterPanel.visible" [attr.aria-expanded]="filterPanel.visible" (click)="filterPanel.toggle()">
+              <i class="ts-icon ts-icon-filter" aria-hidden="true"></i> Filters @if (appliedFilters.length) { <span>{{ appliedFilters.length }}</span> }
+            </button>
+          }
+          @if (columnsEnabled) { <button type="button" [attr.aria-expanded]="showColumns" (click)="showColumns = !showColumns"><i class="ts-icon ts-icon-columns" aria-hidden="true"></i> Columns</button> }
+          @if (views.length || savedViews.length || config?.tools?.density !== false || config?.tools?.grouping !== false) {
+            <details class="list-export-menu list-view-menu">
+              <summary><i class="ts-icon ts-icon-sliders" aria-hidden="true"></i> View</summary>
+              <div class="list-export-options" aria-label="View options">
+                <label class="view-option">List view
+                  <select aria-label="List view" [value]="currentViewId" (change)="setActiveView($any($event.target).value)">
+                    @if (allRecordsViewId === '__all') { <option value="__all">All records</option> }
+                    @for (view of views; track view.id) { <option [value]="view.id">{{ view.label }}</option> }
+                    @for (view of savedViews; track view.id) { <option [value]="view.id">{{ view.label }} (saved)</option> }
+                  </select>
+                </label>
+          @if (config?.tools?.density !== false) {
+            <label class="view-option">Row density<select aria-label="Row density" [value]="density" (change)="setDensity($any($event.target).value)">
+              <option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option>
+            </select></label>
+          }
+          @if (config?.tools?.grouping !== false) {
+            <label class="view-option">Group loaded records<select aria-label="Group loaded records" title="Groups the records currently loaded; counts are not company totals." [value]="groupingField" (change)="setGrouping($any($event.target).value)">
+              <option value="">Group by: none</option>
+              @for (column of configurableColumns; track column.field ?? column.id) { <option [value]="column.field ?? column.id" [selected]="groupingField === (column.field ?? column.id)">Group by: {{ column.label }}</option> }
+            </select></label>
+          }
 
+              </div>
+            </details>
+          }
+          @if (savedViewsEnabled) { <button type="button" [attr.aria-expanded]="showSaveView" (click)="showSaveView = !showSaveView"><i class="ts-icon ts-icon-bookmark" aria-hidden="true"></i> Save view</button> }
+          @if (config?.tools?.export !== false) {
+            <details class="list-export-menu">
+              <summary class="export-trigger" aria-label="Export" title="Export"><i class="ts-icon ts-icon-download" aria-hidden="true"></i></summary>
+              <div class="list-export-options" aria-label="Export loaded records">
+                <span>{{ rows.length }} loaded records · Visible columns</span>
+                <button type="button" [disabled]="exportBusy" (click)="exportLoadedRows('xlsx')">Excel (.xlsx)</button>
+                <button type="button" [disabled]="exportBusy" (click)="exportLoadedRows('docx')">Word (.docx)</button>
+                <button type="button" [disabled]="exportBusy" (click)="exportLoadedRows('csv')">CSV (.csv)</button>
+                <button type="button" [disabled]="exportBusy" (click)="exportLoadedRows('print')">Print / Save as PDF</button>
+              </div>
+            </details>
+          }
         </div>
-
       </div>
+      @if (appliedFilters.length || selectedCount) {
+        <div class="list-context-strip" aria-label="Current list criteria">
+          @for (filter of appliedFilters; track $index) {
+            <button type="button" class="filter-chip" [title]="'Remove filter: ' + filterCaption(filter)" (click)="removeAppliedFilter($index)">{{ filterCaption(filter) }} <i class="ts-icon ts-icon-close" aria-hidden="true"></i></button>
+          }
+          @if (selectedCount) { <button type="button" class="filter-chip" (click)="clearSelection()">{{ selectedCount }} selected · Clear</button> }
+        </div>
+      }
+      @if (showSaveView) {
+        <form class="list-save-view" (submit)="$event.preventDefault(); saveView()">
+          <label>View name <input type="text" aria-label="View name" maxlength="60" [value]="viewName" (input)="viewName = $any($event.target).value" /></label>
+          <button type="submit" [disabled]="!viewName.trim()">Save</button>
+          @if (currentViewId.startsWith('personal-')) { <button type="button" (click)="removeSavedView()">Delete saved view</button> }
+          <button type="button" (click)="showSaveView = false">Cancel</button>
+          <span>Filters, sorting and layout are saved for your user and company. Search text is temporary.</span>
+        </form>
+      }
+      @if (personalizationMessage) { <div class="list-preference-message" role="status">{{ personalizationMessage }} <button type="button" aria-label="Dismiss view message" (click)="personalizationMessage = ''">×</button></div> }
+      @if (showColumns) {
+        <section class="list-column-panel" aria-label="Column personalization">
+          <header><strong>Columns</strong><button type="button" (click)="resetColumns()">Reset columns</button><button type="button" (click)="showColumns = false">Close</button></header>
+          <div class="column-options">
+            @for (column of configurableColumns; track column.field ?? column.id; let index = $index) {
+              <div class="column-option">
+                <label><input type="checkbox" [checked]="!hiddenColumns.has(column.field ?? column.id ?? column.label)"
+                  [disabled]="columns.length === 1 && !hiddenColumns.has(column.field ?? column.id ?? column.label)"
+                  (change)="setColumnVisible(column, $any($event.target).checked)" />{{ column.label }}</label>
+                <button type="button" [attr.aria-label]="'Move ' + column.label + ' left'" [disabled]="index === 0" (click)="moveColumn(column, -1)"><i class="ts-icon ts-icon-arrow-left" aria-hidden="true"></i></button>
+                <button type="button" [attr.aria-label]="'Move ' + column.label + ' right'" [disabled]="index === configurableColumns.length - 1" (click)="moveColumn(column, 1)"><i class="ts-icon ts-icon-arrow" aria-hidden="true"></i></button>
+              </div>
+            }
+          </div>
+        </section>
+      }
 
+      <div class="grid-region" [attr.aria-busy]="loading">
       <div #gridScroll class="grid-scroll" (scroll)="onGridScroll($event)">
 
         <table
@@ -113,7 +151,7 @@
               <label class="grid-check">
                 <input
                   type="checkbox"
-                  [disabled]="!isMultiSelect"
+                  aria-label="Select loaded rows" [disabled]="!isMultiSelect || config?.dataSurface?.selectable === false || !rows.length"
                   [checked]="isAllRowsSelected"
                   [indeterminate]="isSelectionPartial"
                   (click)="toggleAllRows($event)" />
@@ -123,7 +161,8 @@
             @for (column of columns; track column.field ?? column.id ?? column.label) {
               <th
                 [class.amount]="column.align === 'end' || column.type === 'currency'"
-                [class.sorted]="getColumnSortDirection(column)">
+                [class.sorted]="getColumnSortDirection(column)"
+                [attr.aria-sort]="getColumnSortDirection(column) === 'asc' ? 'ascending' : getColumnSortDirection(column) === 'desc' ? 'descending' : 'none'">
                 <button
                   class="th-sort"
                   [disabled]="column.sortable === false || config?.dataSurface?.sortable === false || config?.dataSource?.paging === 'cursor'"
@@ -133,20 +172,21 @@
                   (click)="toggleSort(column)">
                   {{ column.label }}
                   @if (getColumnSortDirection(column) === 'asc') {
-                    <i class="bi bi-arrow-up-short"></i>
+                    <i class="ts-icon ts-icon-arrow-up"></i>
                   } @else if (getColumnSortDirection(column) === 'desc') {
-                    <i class="bi bi-arrow-down-short"></i>
+                    <i class="ts-icon ts-icon-arrow-down"></i>
                   } @else {
-                    <i class="bi bi-filter"></i>
+                    <i class="ts-icon ts-icon-sort" aria-hidden="true"></i>
                   }
                 </button>
-                <span
-                  class="column-resizer"
-                  role="separator"
-                  aria-orientation="vertical"
-                  title="Resize column"
-                  (pointerdown)="startColumnResize($event, column)">
-                </span>
+                @if (config?.dataSurface?.resizable !== false) {
+                  <span class="column-resizer" role="separator" tabindex="0" aria-orientation="vertical"
+                    [attr.aria-label]="'Resize ' + column.label" [attr.title]="'Resize ' + column.label"
+                    [attr.aria-valuenow]="columnWidthNumber(column)" aria-valuemin="72" aria-valuemax="800"
+                    (keydown.arrowleft)="$event.preventDefault(); resizeColumn(column, -16)"
+                    (keydown.arrowright)="$event.preventDefault(); resizeColumn(column, 16)"
+                    (pointerdown)="startColumnResize($event, column)"></span>
+                }
               </th>
             }
           </tr>
@@ -154,8 +194,19 @@
 
         <tbody>
 
-          @for (row of rows; track getRowKey(row)) {
+          @for (group of rowGroups; track group.key) {
+          @if (groupingField) {
+            <tr class="list-group-row"><td [attr.colspan]="columns.length + 2">
+              <button type="button" [attr.aria-expanded]="!collapsedGroups.has(group.key)" (click)="toggleGroup(group.key)">
+                <i [class]="collapsedGroups.has(group.key) ? 'ts-icon ts-icon-right' : 'ts-icon ts-icon-down'" aria-hidden="true"></i>
+                {{ group.label }} · {{ group.rows.length }} loaded
+              </button>
+            </td></tr>
+          }
+          @if (!collapsedGroups.has(group.key)) {
+          @for (row of group.rows; track getRowKey(row)) {
             <tr
+              tabindex="0" (keydown)="onRowKey($event, row)"
               (click)="selectRow(row)"
               (dblclick)="openRow(row, $event)"
               [class.selected]="getSelectedRowKey() === getRowKey(row)">
@@ -169,6 +220,7 @@
                 <label class="grid-check">
                   <input
                     type="checkbox"
+                    [attr.aria-label]="'Select ' + getRowKey(row)" [disabled]="config?.dataSurface?.selectable === false"
                     [checked]="isRowChecked(row)"
                     (click)="toggleRow(row, $event)" />
                   <span></span>
@@ -187,6 +239,9 @@
                       (click)="openPrimary(row, $event)">
                       {{ getCellValue(row, column) }}
                     </button>
+                    @if (column.subtitleField) {
+                      <div class="cell-sub">{{ getSubtitle(row, column) }}</div>
+                    }
                   } @else if (column.subtitleField) {
                     <div class="cell-title">
                       {{ getCellValue(row, column) }}
@@ -209,6 +264,8 @@
             </tr>
           }
 
+          }
+          }
         </tbody>
 
       </table>
@@ -216,33 +273,32 @@
       </div>
 
       @if (loading) {
-        <div class="list-loading-footer" aria-live="polite" aria-busy="true">
-          <div class="list-loading-card" role="status" aria-atomic="true">
-            <span class="list-loading-spinner" aria-hidden="true"></span>
-            <span>{{ loadingLabel }}</span>
-          </div>
+        <div class="list-loading-state" [class.initial-loading]="isInitialLoading" aria-live="polite">
+          <app-loading-indicator [label]="loadingLabel"></app-loading-indicator>
         </div>
       }
+      @if (!loading && !rows.length && !normalizedErrorMessage) {
+        <div class="list-empty-state" role="status">No records to display.</div>
+      }
+      </div>
+      <footer class="list-statusbar">
+        <span aria-live="polite">{{ rows.length }} records loaded @if (selectedCount) { · {{ selectedCount }} selected }</span>
+        @if (hasMore && rows.length) { <button type="button" [disabled]="loading" (click)="loadMore.emit()">{{ loading ? 'Loading…' : 'Load more records' }}</button> }
+      </footer>
 
     </div>
 
-    @if (factboxOpen) {
+    @if (factboxOpen && factBoxEnabled && !filterPanel.visible) {
       <app-list-fact-box
         [config]="config"
         [selectedRow]="selectedRow"
-        (closeRequested)="factboxOpen = false">
+        (closeRequested)="toggleFactbox()">
       </app-list-fact-box>
-    } @else {
-      <button
-        type="button"
-        class="factbox-open-tab"
-        title="Show factbox"
-        aria-label="Show factbox"
-        (click)="factboxOpen = true">
-        <span class="factbox-tab-mark">F</span>
-        <span>Factbox</span>
-      </button>
     }
+    <app-list-filter-panel #filterPanel [embedded]="true" [enabled]="advancedFilterEnabled"
+      [listenToPageActions]="!showCommandBar" [storageKey]="personalizationKey"
+      [columns]="config?.dataSurface?.columns ?? []" [filterOptions]="config?.filterConfig?.fields ?? []"
+      (command)="handleAdvancedFilter($event)"></app-list-filter-panel>
 
   </section>
 

@@ -1,0 +1,318 @@
+{
+  "updated": "2026-10-21",
+  "source": "User-supplied platform contract checklist",
+  "statusLegend": {
+    "verified": "Entire row verified",
+    "partial": "Existing implementation or limited evidence; remaining checks listed",
+    "missing": "Confirmed absent",
+    "backend-dependent": "Requires backend guarantee"
+  },
+  "items": [
+    {
+      "area": "Page structure",
+      "sharedContract": "Consistent rendering for each supported page type, in normal and stacked windows",
+      "pageDeclares": "Page type, title, module, sections and data sources",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Field types",
+      "sharedContract": "Consistent formatting, editing, conversion and validation",
+      "pageDeclares": "Semantic type: text, code, integer, decimal, boolean, date, date/time, time, identifier, etc.",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Code fields",
+      "sharedContract": "Apply the agreed trimming and uppercase policy consistently",
+      "pageDeclares": "Field is a code; length and any specific restrictions",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Text fields",
+      "sharedContract": "Preserve casing, support single/multiple lines and length limits",
+      "pageDeclares": "Label, length, multiline where needed",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Numbers and amounts",
+      "sharedContract": "Correct precision, formatting and input validation without losing decimal accuracy",
+      "pageDeclares": "Precision, scale, limits, currency or unit relationship",
+      "status": "partial",
+      "evidence": [
+        "Exact decimal comparison implemented; checks cover large values, fractions, exponent-form numeric bounds, precision and scale. Angular compilation passed."
+      ],
+      "remaining": "Currency/unit relationships, locale formatting and arbitrary-precision bound declarations need verification."
+    },
+    {
+      "area": "Dates and times",
+      "sharedContract": "Consistent display, calendar entry, blank state and timezone handling where relevant",
+      "pageDeclares": "Date versus timestamp, limits and defaults",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Choice dropdowns",
+      "sharedContract": "One dropdown with keyboard selection; search where appropriate",
+      "pageDeclares": "Fixed options and stored/display values",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Record lookups",
+      "sharedContract": "**One searchable dropdown**, arrow, initial results, server search, paging, selected-value display, loading and retry",
+      "pageDeclares": "Resource, stored key, display fields and business filters",
+      "status": "partial",
+      "evidence": [
+        "Live setup: saved PR label, opening choices, searching PR, selecting same value verified.",
+        "Shared form and grid lookups fetch 20 and append on scroll. New search resets paging. Duplicate in-flight and end-of-results requests guarded. Isolated checks cover 20/40/45 records and reset.",
+        "Live search with no matches followed by Escape retained saved PR label.",
+        "Shared lookup viewport renders at most 60 choices in an isolated 10,000-choice check; Angular compilation passed. Keyboard first/last entry and pending/error page boundary checks passed.",
+        "Retry retains the current page; cancellation and cursor paging have isolated verification."
+      ],
+      "remaining": "Live large-data viewport verification and bounded loaded-data memory remain; cursor mode requires a supported backend resource profile."
+    },
+    {
+      "area": "Dependent lookups",
+      "sharedContract": "Refresh choices when the controlling field changes; handle invalid selections",
+      "pageDeclares": "Relationship, such as location → bin",
+      "status": "missing",
+      "evidence": [],
+      "remaining": "FieldLookupConfig has no controlling-field relationship contract. Shared form and line lookup search currently send text search only. Add declarative dependency filtering and invalidate dependent selections consistently before certification."
+    },
+    {
+      "area": "Required fields",
+      "sharedContract": "Visible required indicator, field-level message and save validation",
+      "pageDeclares": "Required rule, including conditional rules",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Defaults",
+      "sharedContract": "Apply defaults to new records without overwriting saved values",
+      "pageDeclares": "Default value or supported default provider",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Readonly and visibility",
+      "sharedContract": "Consistent readonly, disabled and hidden states",
+      "pageDeclares": "Conditions based on record state and permissions",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Header–line relationship",
+      "sharedContract": "Load and save children under the correct saved parent",
+      "pageDeclares": "Parent key, child resource/navigation and line identity",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Line numbering",
+      "sharedContract": "Display the backend-assigned number; keep temporary UI row identity separate",
+      "pageDeclares": "Which field identifies the persisted line",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Editable grids",
+      "sharedContract": "Keyboard navigation, blank entry row, selection, validation, internal scrolling and resizing",
+      "pageDeclares": "Columns, editors, widths and business restrictions",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Blank rows",
+      "sharedContract": "Never save untouched placeholders, count them as records, or trigger discard warnings",
+      "pageDeclares": "Normally nothing",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Save modes",
+      "sharedContract": "Reliable autosave and manual save using the same lifecycle; clear pending/saved/failed states",
+      "pageDeclares": "Override the platform’s save default when needed",
+      "status": "partial",
+      "evidence": [
+        "Live QA2010 header and line autosave succeeded; reversible verification values restored."
+      ],
+      "remaining": "Complete manual-save and close-with-pending-save coverage."
+    },
+    {
+      "area": "Close and refresh",
+      "sharedContract": "Protect genuine unsaved changes; avoid unnecessary reloads; retain selection and scroll",
+      "pageDeclares": "Exceptional page behaviour only",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Concurrent editing",
+      "sharedContract": "Detect stale versions and explain conflicts without silently overwriting another user",
+      "pageDeclares": "Normally nothing; backend supplies version information",
+      "status": "partial",
+      "evidence": [
+        "Live QA2010 two-editor conflict: stale write rejected, typed text retained, refresh confirmation shown, newer server value loaded.",
+        "Isolated queued-write checks: current version used; subsequent conflicted writes blocked."
+      ],
+      "remaining": "Line conflicts and manual-save conflict coverage pending."
+    },
+    {
+      "area": "Standard commands",
+      "sharedContract": "New, Delete, Refresh and other applicable commands; consistent disabled states and explanations",
+      "pageDeclares": "Explicit opt-outs and additional business actions",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "List search",
+      "sharedContract": "Server-side search across eligible fields, with debounce and cancellation",
+      "pageDeclares": "Optional search restrictions or priorities",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Filters and sorting",
+      "sharedContract": "Type-aware filters, clear/reset, column sorting and stable ordering",
+      "pageDeclares": "Business defaults and excluded fields",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Large lists",
+      "sharedContract": "Continuation paging, bounded rendering and cancellation of obsolete requests",
+      "pageDeclares": "Resource and optional page-size override",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Columns and views",
+      "sharedContract": "Resize, reorder, show/hide, density and saved/reset views",
+      "pageDeclares": "Initial column layout and restrictions",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Exports",
+      "sharedContract": "Shared Excel/PDF/other supported formats, explicit export scope and permission checks",
+      "pageDeclares": "Opt-outs or a specialised report definition",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Details / FactBox",
+      "sharedContract": "Useful, formatted selected-record details; one open/close control",
+      "pageDeclares": "Optional curated content; safe metadata-based fallback",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Business actions",
+      "sharedContract": "Shared execution, progress, confirmation when necessary and error handling",
+      "pageDeclares": "Action name, availability and backend operation",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Calculations",
+      "sharedContract": "Display calculated values and totals consistently",
+      "pageDeclares": "Dependencies and supported calculation declarations; backend owns authoritative business totals",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Errors and loading",
+      "sharedContract": "Stable headers/toolbars; distinguish loading, empty results, validation failures and connection failures",
+      "pageDeclares": "Normally nothing",
+      "status": "partial",
+      "evidence": [
+        "Explicit refresh passed on repeat. Error path now preserves actual failure details.",
+        "Setup lookup failure no longer treated as missing setup; routed setup PR display verified."
+      ],
+      "remaining": "Intermittent load failure cause and all page-type loading paths."
+    },
+    {
+      "area": "Design tokens",
+      "sharedContract": "Shared typography, spacing, colours, borders, focus and control sizing",
+      "pageDeclares": "Rare supported layout overrides",
+      "status": "partial",
+      "evidence": [
+        "SCSS token governance guard passed."
+      ],
+      "remaining": "Visual consistency verification across all page types."
+    },
+    {
+      "area": "Accessibility",
+      "sharedContract": "Labels, focus management, keyboard operation and readable errors",
+      "pageDeclares": "Meaningful labels and help text",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Company and permissions",
+      "sharedContract": "Company-scoped data, permission-aware actions and isolated caches",
+      "pageDeclares": "Resource/action identifiers; backend remains authoritative",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Extensions / SDK",
+      "sharedContract": "Typed contracts, documented extension points and compatibility rules",
+      "pageDeclares": "Module registration and explicit custom behaviour",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Page configuration",
+      "sharedContract": "Fields, sections, columns, relationships and exceptions",
+      "pageDeclares": "",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Page component TypeScript",
+      "sharedContract": "Connect configuration to the shared engine; business-specific hooks only when necessary",
+      "pageDeclares": "",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    },
+    {
+      "area": "Page HTML",
+      "sharedContract": "Host the shared template; custom markup only for a genuine special requirement",
+      "pageDeclares": "",
+      "status": "partial",
+      "evidence": [],
+      "remaining": "Full contract verification pending; not certified complete."
+    }
+  ]
+}

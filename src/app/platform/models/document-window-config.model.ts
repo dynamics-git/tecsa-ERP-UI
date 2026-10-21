@@ -1,3 +1,4 @@
+import type { ListFactBoxConfig } from './list-fact-box-config.model';
 import { FormSectionConfig } from './field-config.model';
 import type { LineColumnConfig } from './line-config.model';
 import { CommandConfig } from './command-config.model';
@@ -125,6 +126,8 @@ export interface DocumentWindowConfig {
   footerSections?: FooterSectionConfig[];
   attachments?: AttachmentsConfig;
   factBoxSections?: FactBoxSectionConfig[];
+  factBoxConfig?: ListFactBoxConfig;
   statusMessage?: DocumentStatusMessage;
+  contentReady?: boolean;
   interactionLocked?: boolean;
 }

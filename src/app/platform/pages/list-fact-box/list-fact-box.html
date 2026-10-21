@@ -1,5 +1,6 @@
 <aside class="workspace-factbox">
 
+
   <div class="factbox-header">
 
     <div>
@@ -8,18 +9,12 @@
       <span>{{ subtitle }}</span>
     </div>
 
-    <button
-      type="button"
-      class="factbox-mark-button"
-      (click)="requestClose()"
-      aria-label="Hide factbox"
-      title="Hide factbox">
-      <span>F</span>
-    </button>
-
-  </div>
+</div>
 
   <div class="factbox-scroll">
+    @if (!hasRecord) {
+      <div class="factbox-empty"><i class="ts-icon ts-icon-info" aria-hidden="true"></i><strong>Select a record</strong><span>Details from the selected record will appear here.</span></div>
+    }
 
     @if (hasSummary || hasStatus) {
     <div class="factbox-summary">
@@ -48,7 +43,7 @@
                 @if (field.type === 'badge') {
                   <strong class="fact-badge">{{ getFieldValue(field) }}</strong>
                 } @else {
-                  <strong>{{ getFieldValue(field) }}</strong>
+                  <strong [attr.title]="getFieldTooltip(field) || null">{{ getFieldValue(field) }}</strong>
                 }
               </div>
             }

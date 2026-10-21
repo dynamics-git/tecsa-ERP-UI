@@ -1,5 +1,7 @@
+import { buildFieldFilter } from './list-filter-expression';
+import type { FilterOperator } from '../models/list-filter-config.model';
 import { Injectable } from '@angular/core';
-import { ListFilterService } from './list-filter.service';
+import { ListFilterService, ListSearchTarget } from './list-filter.service';
 
 export interface ListViewFilterConfig {
   id: string;
@@ -7,11 +9,12 @@ export interface ListViewFilterConfig {
 }
 
 export interface ListFilterStateInit {
+  filterFields?: Array<{field: string; type: string; valueType?: string}>;
   baseFilter?: string;
   views?: ListViewFilterConfig[];
   activeViewId?: string;
   searchFields?: string[];
-  columns?: Array<{ id?: string; label?: string; field?: string; type?: string }>;
+  columns?: Array<{ id?: string; label?: string; field?: string; type?: string; hidden?: boolean; searchable?: boolean; filterable?: boolean }>;
   basicEnabled?: boolean;
   advancedEnabled?: boolean;
 }
@@ -25,7 +28,8 @@ type ListFilterState = {
   activeViewFilter?: string;
   searchText: string;
   advancedFilter?: string;
-  searchTargets: Array<{ field: string; mode: 'contains' | 'equals' }>;
+  fieldTypes: Record<string, string>;
+  searchTargets: Array<ListSearchTarget>;
 };
 
 @Injectable({
@@ -43,15 +47,16 @@ export class ListFilterStateService {
       activeViewId?: string;
       searchFields?: string[];
       tools?: unknown;
+      filterConfig?: {enabled: boolean; fields?: Array<{field: string; type: string; valueType?: string}>};
       dataSurface?: {
-        columns?: Array<{ id?: string; label?: string; field?: string; type?: string }>;
+        columns?: Array<{ id?: string; label?: string; field?: string; type?: string; hidden?: boolean; searchable?: boolean; filterable?: boolean }>;
       };
     },
     baseFilter?: string
   ): void {
     const tools = listConfig.tools;
-    const isBasicFilterEnabled = !this.isRecord(tools) || tools['filter'] !== false;
-    const isAdvancedFilterEnabled = !this.isRecord(tools) || tools['advancedFilter'] !== false;
+    const isBasicFilterEnabled = !this.isRecord(tools) || tools['filter'] !== false && tools['search'] !== false;
+    const isAdvancedFilterEnabled = listConfig.filterConfig?.enabled !== false && (!this.isRecord(tools) || tools['advancedFilter'] !== false);
 
     this.initialize(scope, {
       baseFilter,
@@ -59,6 +64,7 @@ export class ListFilterStateService {
       activeViewId: listConfig.activeViewId,
       searchFields: listConfig.searchFields,
       columns: listConfig.dataSurface?.columns,
+      filterFields: listConfig.filterConfig?.fields,
       basicEnabled: isBasicFilterEnabled,
       advancedEnabled: isAdvancedFilterEnabled
     });
@@ -75,6 +81,7 @@ export class ListFilterStateService {
       views,
       activeViewId,
       activeViewFilter: this.resolveViewFilter(views, activeViewId),
+      fieldTypes: Object.fromEntries([...(init.filterFields ?? []).map(field => [field.field, field.valueType ?? field.type]), ...(init.columns ?? []).map(column => [column.field ?? column.id ?? '', column.type ?? 'text'])]),
       searchText: '',
       advancedFilter: undefined,
       searchTargets: this.resolveSearchTargets(init.searchFields ?? [], init.columns ?? [])
@@ -96,7 +103,7 @@ export class ListFilterStateService {
         return false;
       }
 
-      const nextAdvanced = this.readAdvancedFilter(payload);
+      const nextAdvanced = this.readAdvancedFilter(payload, state.fieldTypes);
       if (nextAdvanced !== state.advancedFilter) {
         state.advancedFilter = nextAdvanced;
         return true;
@@ -116,7 +123,7 @@ export class ListFilterStateService {
     let changed = false;
 
     const viewId = this.toText(payload['viewId']);
-    if (viewId.length && viewId !== state.activeViewId) {
+    if (this.hasOwn(payload, 'viewId') && viewId !== state.activeViewId) {
       state.activeViewId = viewId;
       state.activeViewFilter = this.resolveViewFilter(state.views, viewId);
       changed = true;
@@ -180,13 +187,13 @@ export class ListFilterStateService {
 
   private resolveSearchTargets(
     requestedFields: string[],
-    columns: Array<{ id?: string; label?: string; field?: string; type?: string }>
-  ): Array<{ field: string; mode: 'contains' | 'equals' }> {
-    const aliasMap = new Map<string, { field: string; mode: 'contains' | 'equals' }>();
-    const derivedTargets: Array<{ field: string; mode: 'contains' | 'equals' }> = [];
+    columns: Array<{ id?: string; label?: string; field?: string; type?: string; hidden?: boolean; searchable?: boolean; filterable?: boolean }>
+  ): Array<ListSearchTarget> {
+    const aliasMap = new Map<string, ListSearchTarget>();
+    const derivedTargets: Array<ListSearchTarget> = [];
 
     columns.forEach((column) => {
-      if (!this.isSearchableColumnType(column.type)) {
+      if (column.hidden === true || column.searchable === false || column.filterable === false || !this.isSearchableColumnType(column.type)) {
         return;
       }
 
@@ -195,7 +202,7 @@ export class ListFilterStateService {
         return;
       }
 
-      const target = { field: canonicalField, mode: this.resolveSearchMode(column.type) };
+      const target = { field: canonicalField, mode: this.resolveSearchMode(column.type), type: column.type };
       derivedTargets.push(target);
       this.registerAlias(aliasMap, canonicalField, target);
       this.registerAlias(aliasMap, column.id, target);
@@ -208,7 +215,7 @@ export class ListFilterStateService {
 
     const resolved = requestedFields
       .map((field) => aliasMap.get(this.normalize(field)))
-      .filter((target): target is { field: string; mode: 'contains' | 'equals' } => Boolean(target));
+      .filter((target): target is ListSearchTarget => Boolean(target));
 
     return this.uniqueTargets(resolved);
   }
@@ -219,7 +226,7 @@ export class ListFilterStateService {
       return true;
     }
 
-    return normalized === 'text' || normalized === 'badge' || normalized === 'lookup';
+    return ['text', 'badge', 'lookup', 'number', 'currency', 'date', 'boolean'].includes(normalized);
   }
 
   private resolveSearchMode(type: unknown): 'contains' | 'equals' {
@@ -232,9 +239,9 @@ export class ListFilterStateService {
   }
 
   private registerAlias(
-    map: Map<string, { field: string; mode: 'contains' | 'equals' }>,
+    map: Map<string, ListSearchTarget>,
     alias: unknown,
-    target: { field: string; mode: 'contains' | 'equals' }
+    target: ListSearchTarget
   ): void {
     const normalized = this.normalize(alias);
     if (normalized.length && !map.has(normalized)) {
@@ -242,8 +249,8 @@ export class ListFilterStateService {
     }
   }
 
-  private uniqueTargets(targets: Array<{ field: string; mode: 'contains' | 'equals' }>): Array<{ field: string; mode: 'contains' | 'equals' }> {
-    const unique = new Map<string, { field: string; mode: 'contains' | 'equals' }>();
+  private uniqueTargets(targets: Array<ListSearchTarget>): Array<ListSearchTarget> {
+    const unique = new Map<string, ListSearchTarget>();
     targets.forEach((target) => {
       if (!unique.has(target.field)) {
         unique.set(target.field, target);
@@ -257,7 +264,7 @@ export class ListFilterStateService {
     return this.toText(value).toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
-  private readAdvancedFilter(payload: unknown): string | undefined {
+  private readAdvancedFilter(payload: unknown, types: Record<string, string>): string | undefined {
     if (typeof payload === 'string') {
       const direct = payload.trim();
       return direct.length ? direct : undefined;
@@ -276,13 +283,13 @@ export class ListFilterStateService {
     const searchTerm = this.toText(payload['searchTerm'] ?? payload['value']);
     if (selectedColumn.length && searchTerm.length) {
       const operator = this.toText(payload['operator']).toLowerCase();
-      return this.buildAdvancedClause(selectedColumn, searchTerm, operator || 'contains');
+      return buildFieldFilter(selectedColumn, searchTerm, (operator || 'contains') as FilterOperator, types[selectedColumn]);
     }
 
     const filters = payload['filters'];
     if (Array.isArray(filters)) {
       const clauses = filters
-        .map((entry) => this.buildAdvancedClauseFromFilterEntry(entry))
+        .map((entry) => this.buildAdvancedClauseFromFilterEntry(entry, types))
         .filter((clause): clause is string => Boolean(clause));
 
       if (clauses.length) {
@@ -293,7 +300,7 @@ export class ListFilterStateService {
     return undefined;
   }
 
-  private buildAdvancedClauseFromFilterEntry(entry: unknown): string | undefined {
+  private buildAdvancedClauseFromFilterEntry(entry: unknown, types: Record<string, string>): string | undefined {
     if (!this.isRecord(entry)) {
       return undefined;
     }
@@ -306,54 +313,7 @@ export class ListFilterStateService {
       return undefined;
     }
 
-    return this.buildAdvancedClause(field, value, operator);
-  }
-
-  private buildAdvancedClause(field: string, rawValue: string, operator: string): string {
-    const normalizedOperator = operator === 'ge' || operator === 'le' || operator === 'eq' || operator === 'startswith'
-      ? operator
-      : 'contains';
-
-    if (normalizedOperator === 'eq' && /[,|]\s*/.test(rawValue)) {
-      const values = rawValue
-        .split(/[,|]\s*/)
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0);
-
-      if (!values.length) {
-        return '';
-      }
-
-      return `(${values.map((value) => `${field} eq ${this.toODataLiteral(value)}`).join(' or ')})`;
-    }
-
-    if (normalizedOperator === 'contains' || normalizedOperator === 'startswith') {
-      const escaped = this.escapeODataString(rawValue);
-      return `${normalizedOperator}(${field}, '${escaped}')`;
-    }
-
-    return `${field} ${normalizedOperator} ${this.toODataLiteral(rawValue)}`;
-  }
-
-  private toODataLiteral(value: string): string {
-    const trimmed = value.trim();
-    if (!trimmed.length) {
-      return "''";
-    }
-
-    if (trimmed === 'true' || trimmed === 'false') {
-      return trimmed;
-    }
-
-    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-      return trimmed;
-    }
-
-    return `'${this.escapeODataString(trimmed)}'`;
-  }
-
-  private escapeODataString(value: string): string {
-    return value.replace(/'/g, "''");
+    return buildFieldFilter(field, value, operator as FilterOperator, types[field]);
   }
 
   private toText(value: unknown): string {

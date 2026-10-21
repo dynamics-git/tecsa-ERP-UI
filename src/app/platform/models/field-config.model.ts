@@ -12,7 +12,8 @@ export type FieldType =
   | 'textarea'
   | 'badge';
 
-export type FieldValueType = 'text' | 'number' | 'boolean' | 'date';
+import type { FieldValueType } from './field-value';
+export type { FieldValueType } from './field-value';
 
 export interface FieldOptionConfig {
   label: string;
@@ -27,6 +28,8 @@ export interface FieldLookupConfig {
   valueField: string;
   displayField: string;
   searchFields?: string[];
+  /** Use cursor only when the backend resource declares cursor support. */
+  paging?: 'offset' | 'cursor';
   allowOpenCard?: boolean;
 }
 
@@ -34,6 +37,10 @@ export interface FieldValidationConfig {
   min?: number;
   max?: number;
   maxLength?: number;
+  /** Maximum total digits for decimal fields. */
+  precision?: number;
+  /** Maximum fractional digits for decimal fields. */
+  scale?: number;
   pattern?: string;
   message?: string;
 }

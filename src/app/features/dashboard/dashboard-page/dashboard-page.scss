@@ -200,7 +200,7 @@
       padding: 3px 8px;
       border-radius: 10px;
       font-weight: 600;
-      text-transform: uppercase;
+      text-transform: none;
       letter-spacing: 0.3px;
 
       &.urgent {
@@ -672,7 +672,7 @@
         font-size: 11px;
         color: var(--ts-text-muted);
         margin-bottom: 6px;
-        text-transform: uppercase;
+        text-transform: none;
         letter-spacing: 0.5px;
         font-weight: 600;
       }

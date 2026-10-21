@@ -53,6 +53,7 @@ export class RunModalConfigAssemblerService {
     const lineTotals = this.buildLineTotals({ source: lineTotalsDefault });
 
     const documentWindowConfig: DocumentWindowConfig = {
+      factBoxConfig: this.pickListPageConfig({module: params.module})?.factBox,
       pageLabel,
       title,
       headerCommandBar: headerCommandBar as DocumentWindowConfig['headerCommandBar'],
@@ -180,7 +181,7 @@ export class RunModalConfigAssemblerService {
     }
 
     const base = params.title.trim() || this.toTitleCase(params.pageId);
-    return base.toUpperCase();
+    return base;
   }
 
   pickArray(params: { module: RunModalConfigModule; suffix: string }): unknown[] {

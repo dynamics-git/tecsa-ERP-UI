@@ -1,3 +1,4 @@
+import { normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { FormSectionConfig } from '../models/field-config.model';
 import { LineConfig, LineColumnConfig } from '../models/line-config.model';
@@ -134,9 +135,11 @@ export class DocumentConfigDataService {
       return { ...row };
     }
 
+    if ((lineConfig.dataSource.requiredCreateFields ?? []).some(field => !this.hasValue(row[field]))) return null;
     const payload: Record<string, unknown> = {};
     for (const field of fields) {
-      payload[field] = row[field];
+      if (field === lineConfig.lineKeyField) continue; // Assigned by the backend.
+      payload[field] = normalizeFieldValue(row[field], lineConfig.columns.find(c => (c.field ?? c.id) === field)?.valueType);
     }
 
     const parentKeyField = lineConfig.dataSource.parentKeyField?.trim();
@@ -161,11 +164,11 @@ export class DocumentConfigDataService {
     const payload: Record<string, unknown> = {};
 
     for (const field of new Set(fields)) {
-      if (!field.trim() || blocked.has(field)) {
+      if (!field.trim() || blocked.has(field) || field === lineConfig.lineKeyField) {
         continue;
       }
 
-      payload[field] = row[field];
+      payload[field] = normalizeFieldValue(row[field], lineConfig.columns.find(c => (c.field ?? c.id) === field)?.valueType);
     }
 
     return payload;

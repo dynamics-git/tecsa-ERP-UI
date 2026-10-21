@@ -40,7 +40,7 @@ export class DocumentSaveService implements DocumentSavePort {
 
     const payload = this.documentPayload.buildHeaderUpdatePayload(request.headerData, headerSections);
 
-    return this.dataSource.update(dataSource, id, payload, request.headerData['systemRowVersion']).pipe(
+    return this.dataSource.updateRecord(dataSource, id, payload, request.headerData).pipe(
       switchMap((response) => this.persistLineRows(request).pipe(
         map((lineSaveResult) => {
           if (!lineSaveResult.saved) {
@@ -122,7 +122,7 @@ export class DocumentSaveService implements DocumentSavePort {
     const payload = this.buildLinePayload(headerData, row, lineDataSource);
 
     if (rowId !== null && rowId !== undefined && rowId !== '' && lineDataSource.supportsUpdate !== false) {
-      return this.dataSource.update(lineDataSource, rowId, payload, row['systemRowVersion']);
+      return this.dataSource.updateRecord(lineDataSource, rowId, payload, row);
     }
 
     if (lineDataSource.supportsCreate === false || !this.shouldCreateLine(payload, lineDataSource.parentKeyField)) {

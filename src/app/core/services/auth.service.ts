@@ -263,10 +263,10 @@ export class AuthService {
 
   private getDeviceName(): string {
     if (typeof navigator === 'undefined') {
-      return 'Filaz ERP';
+      return 'TecSA ERP';
     }
 
-    return navigator.userAgent || 'Filaz ERP';
+    return navigator.userAgent || 'TecSA ERP';
   }
 
   private mapEngineToSessionContext(

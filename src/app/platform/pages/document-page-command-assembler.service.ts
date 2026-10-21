@@ -21,7 +21,7 @@ export class DocumentPageCommandAssemblerService {
         actionKey: 'cmd:new',
         isPrimary: true,
         order: 10,
-        icon: 'bi bi-plus-lg',
+        icon: 'ts-icon ts-icon-plus',
         disabled: !supportsCreate,
         tooltip: !supportsCreate ? 'Create is not supported for this page.' : undefined,
       },
@@ -30,7 +30,7 @@ export class DocumentPageCommandAssemblerService {
         actionKey: 'cmd:delete',
         isPrimary: true,
         order: 20,
-        icon: 'bi bi-trash',
+        icon: 'ts-icon ts-icon-trash',
         tone: 'danger',
         disabled: !supportsDelete,
         tooltip: !supportsDelete ? 'Delete is not supported for this page.' : undefined,
@@ -40,7 +40,7 @@ export class DocumentPageCommandAssemblerService {
         actionKey: 'cmd:refresh',
         isPrimary: true,
         order: 30,
-        icon: 'bi bi-arrow-clockwise',
+        icon: 'ts-icon ts-icon-refresh',
       },
     ];
 
@@ -64,7 +64,7 @@ export class DocumentPageCommandAssemblerService {
         actionKey: 'cmd:line-new',
         isPrimary: true,
         order: 10,
-        icon: 'bi bi-plus-lg',
+        icon: 'ts-icon ts-icon-plus',
         disabled: !supportsCreate,
         tooltip: !supportsCreate ? 'Line create is not supported for this page.' : undefined,
       },
@@ -73,7 +73,7 @@ export class DocumentPageCommandAssemblerService {
         actionKey: 'cmd:line-delete',
         isPrimary: true,
         order: 20,
-        icon: 'bi bi-trash',
+        icon: 'ts-icon ts-icon-trash',
         tone: 'danger',
         disabled: !supportsDelete,
         tooltip: !supportsDelete ? 'Line delete is not supported for this page.' : undefined,
@@ -83,7 +83,7 @@ export class DocumentPageCommandAssemblerService {
         actionKey: 'cmd:line-refresh',
         isPrimary: true,
         order: 30,
-        icon: 'bi bi-arrow-clockwise',
+        icon: 'ts-icon ts-icon-refresh',
       },
     ];
 

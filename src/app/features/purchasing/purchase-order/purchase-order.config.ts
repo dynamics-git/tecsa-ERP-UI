@@ -17,7 +17,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       group: 'Process',
       isPrimary: true,
       order: 10,
-      icon: 'bi bi-arrow-repeat',
+      icon: 'ts-icon ts-icon-refresh',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -25,7 +25,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:reopen',
       group: 'Process',
       order: 20,
-      icon: 'bi bi-box-arrow-in-right',
+      icon: 'ts-icon ts-icon-logout',
     },
     {
       label: 'Pre payment',
@@ -33,7 +33,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       group: 'Process',
       isPrimary: true,
       order: 30,
-      icon: 'bi bi-credit-card',
+      icon: 'ts-icon ts-icon-card',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -42,7 +42,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       group: 'Approval',
       isPrimary: true,
       order: 40,
-      icon: 'bi bi-send',
+      icon: 'ts-icon ts-icon-send',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -50,7 +50,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:CancelApprovalRequest',
       group: 'Approval',
       order: 50,
-      icon: 'bi bi-x-circle',
+      icon: 'ts-icon ts-icon-close-circle',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -58,7 +58,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:GRNReview',
       group: 'Review',
       order: 60,
-      icon: 'bi bi-file-earmark-check',
+      icon: 'ts-icon ts-icon-check-square',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -66,7 +66,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:CancelGRNReview',
       group: 'Review',
       order: 70,
-      icon: 'bi bi-file-earmark-x',
+      icon: 'ts-icon ts-icon-close-square',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -74,7 +74,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:InvoiceReview',
       group: 'Review',
       order: 80,
-      icon: 'bi bi-receipt',
+      icon: 'ts-icon ts-icon-receipt',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -82,7 +82,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:CancelInvoiceReview',
       group: 'Review',
       order: 90,
-      icon: 'bi bi-x-square',
+      icon: 'ts-icon ts-icon-close-square',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -91,7 +91,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       group: 'Process',
       isPrimary: true,
       order: 100,
-      icon: 'bi bi-cloud-upload',
+      icon: 'ts-icon ts-icon-upload',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -99,7 +99,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:ConverttoVariationOrder',
       group: 'Process',
       order: 110,
-      icon: 'bi bi-arrow-left-right',
+      icon: 'ts-icon ts-icon-exchange',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -107,7 +107,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:manualPOCancel',
       group: 'More',
       order: 120,
-      icon: 'bi bi-ban',
+      icon: 'ts-icon ts-icon-ban',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -115,7 +115,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:SubmitWorkflow',
       group: 'Approval',
       order: 130,
-      icon: 'bi bi-send',
+      icon: 'ts-icon ts-icon-send',
     },
     // Real PO command from old app. UI/config reference only; business logic is not implemented yet.
     {
@@ -123,7 +123,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       actionKey: 'cmd:CancelWorkflow',
       group: 'Approval',
       order: 140,
-      icon: 'bi bi-x-circle',
+      icon: 'ts-icon ts-icon-close-circle',
     },
   ],
   sections: [
@@ -352,7 +352,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       group: 'Process',
       isPrimary: true,
       order: 10,
-      icon: 'bi bi-plus-lg',
+      icon: 'ts-icon ts-icon-plus',
     },
     { label: 'Insert', actionKey: 'cmd:line-insert', group: 'Process', order: 20 },
     {
@@ -360,14 +360,14 @@ export const purchaseOrderLineConfig: LineConfig = {
       actionKey: 'cmd:line-delete',
       group: 'Process',
       order: 25,
-      icon: 'bi bi-trash',
+      icon: 'ts-icon ts-icon-trash',
     },
     {
       label: 'Attachments',
       actionKey: 'dialog:attachments',
       group: 'More',
       order: 30,
-      icon: 'bi bi-paperclip',
+      icon: 'ts-icon ts-icon-clip',
     },
   ],
   columns: [
@@ -478,7 +478,7 @@ export const purchaseOrderLineConfig: LineConfig = {
       id: 'Attachment',
       label: '',
       cellType: 'icon',
-      buttonIcon: 'bi bi-paperclip',
+      buttonIcon: 'ts-icon ts-icon-clip',
       buttonTitle: 'Line attachment',
       actionKey: 'dialog:attachments',
     },
@@ -549,35 +549,35 @@ export const purchaseOrderListCommandsConfig: CommandConfig[] = [
     label: 'Review',
     actionKey: 'cmd:po-review',
     group: 'process',
-    icon: 'bi bi-check2-square',
+    icon: 'ts-icon ts-icon-check-square',
   },
   {
     id: 'po-send',
     label: 'Send',
     actionKey: 'cmd:po-send',
     group: 'process',
-    icon: 'bi bi-send',
+    icon: 'ts-icon ts-icon-send',
   },
   {
     id: 'po-print',
     label: 'Print',
     actionKey: 'cmd:po-print',
     group: 'documents',
-    icon: 'bi bi-printer',
+    icon: 'ts-icon ts-icon-printer',
   },
   {
     id: 'po-export-file',
     label: 'Export File',
     actionKey: 'cmd:po-export-file',
     group: 'documents',
-    icon: 'bi bi-file-earmark-arrow-down',
+    icon: 'ts-icon ts-icon-download',
   },
   {
     id: 'po-more-action',
     label: 'More Action',
     actionKey: 'cmd:po-more-action',
     group: 'more',
-    icon: 'bi bi-three-dots',
+    icon: 'ts-icon ts-icon-more',
   },
 ];
 

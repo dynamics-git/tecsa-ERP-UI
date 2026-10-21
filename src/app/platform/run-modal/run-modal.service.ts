@@ -38,6 +38,7 @@ export class RunModalService {
   private readonly parents = new Map<string, string>();
   private failure = '';
   private readonly entryPages = new Map<string, string>();
+  private readonly entryRevisions = new Map<string, { source: DataSourceConfig; revision: number }>();
   readonly entriesChanged$ = new Subject<string>();
 
   constructor() {
@@ -53,18 +54,22 @@ export class RunModalService {
     if (!definition || !config?.dataSource) { this.failure = `config-not-found:${request.pageId}`; return false; }
     const permitted = this.session.SuperAdmin || this.session.Permissions.some((value: unknown) => {
       const grant = value as Record<string, unknown>;
-      return grant?.['pageId'] === definition.pageId && grant['canRead'] === true;
+      return grant?.['pageId'] === (config.permissionPageId ?? definition.pageId) && grant['canRead'] === true;
     });
     if (!permitted) { this.failure = 'permission-denied'; return false; }
     const id = request.popupId ?? `run-modal-${definition.pageId}-${crypto.randomUUID()}`;
     const context = request.context ?? {};
-    const target = config.dataSource.singleton ? 'entry' : request.target ?? 'list';
+    const target = config.pageType === 'worksheet' || config.dataSource.singleton ? 'entry' : request.target ?? 'list';
     if (target === 'entry') {
-      const record = context['headerData'] && typeof context['headerData'] === 'object' ? context['headerData'] as Record<string, unknown> : {};
+      const candidate = config.pageType === 'worksheet' ? context['activeLine'] ?? context['headerData'] : context['headerData'];
+      const record = candidate && typeof candidate === 'object' ? candidate as Record<string, unknown> : {};
       const opened = this.stack.open({ id, title: config.title, mode: request.mode ?? 'page', size: request.size ?? 'full', allowNested: request.allowNested ?? true, closeOnBackdrop: false,
         data: { runtimePage: { pageId: definition.pageId, module: definition.module, record } } satisfies RunModalHostData });
       if (opened && typeof context['parentPopupId'] === 'string') this.parents.set(id, context['parentPopupId']);
-      if (opened) this.entryPages.set(id, definition.pageId);
+      if (opened) {
+        this.entryPages.set(id, definition.pageId);
+        this.entryRevisions.set(id, { source: config.dataSource, revision: this.data.getResourceRevision(config.dataSource) });
+      }
       this.failure = opened ? '' : 'popup-open-blocked';
       return opened;
     }
@@ -92,7 +97,7 @@ export class RunModalService {
     if (event.actionKey === 'sortChanged') {
       binding.source = { ...binding.source, defaultSort: String((event.payload as { sort: string }).sort) };
     } else if (event.actionKey !== 'refresh' && !this.filters.applyCommand(id, event.actionKey, event.payload)) return false;
-    await this.loadList(id, true);
+    await this.loadList(id, true, event.actionKey === 'refresh');
     return true;
   }
   async loadNextListPage(id: string): Promise<void> {
@@ -106,12 +111,15 @@ export class RunModalService {
     this.parents.delete(id);
     const page = this.entryPages.get(id);
     this.entryPages.delete(id);
-    if (page) this.entriesChanged$.next(page);
-    if (parent) void this.loadList(parent, true);
+    const initial = this.entryRevisions.get(id);
+    this.entryRevisions.delete(id);
+    const changed = initial && this.data.getResourceRevision(initial.source) !== initial.revision;
+    if (page && changed) this.entriesChanged$.next(page);
+    if (parent && changed) void this.loadList(parent, true);
   }
   getLastOpenFailureReason(): string { return this.failure; }
 
-  private async loadList(id: string, reset: boolean): Promise<void> {
+  private async loadList(id: string, reset: boolean, forceRefresh = false): Promise<void> {
     const binding = this.lists.get(id);
     if (!binding || (binding.loading && !reset)) return;
     const generation = ++binding.generation;
@@ -120,7 +128,7 @@ export class RunModalService {
     try {
       const source = { ...binding.source, defaultFilter: this.filters.buildFilter(id) };
       const size = source.pageSize ?? 20;
-      const page = await firstValueFrom(this.data.loadList(source, { top: size, skip: reset ? 0 : binding.rows.length, cursor: reset ? undefined : binding.cursor }).pipe(timeout<unknown>(this.policy.hydrationTimeoutMs))) as DataPage;
+      const page = await firstValueFrom(this.data.loadList(source, { top: size, skip: reset ? 0 : binding.rows.length, cursor: reset ? undefined : binding.cursor, useCache: true, maxAgeMs: 30000, forceRefresh }).pipe(timeout<unknown>(this.policy.hydrationTimeoutMs))) as DataPage;
       if (generation !== binding.generation || !this.lists.has(id)) return;
       binding.rows = reset ? page.value : [...binding.rows, ...page.value];
       binding.cursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;

@@ -16,7 +16,7 @@ import type {
 
 export type LineType = 'item' | 'account' | 'resource' | 'text' | 'charge' | 'generic';
 export type LineCellType = 'text' | 'select' | 'dropdown' | 'icon';
-export type LineValueType = 'text' | 'number' | 'boolean' | 'date';
+export type LineValueType = import('./field-value').FieldValueType;
 
 export interface LineColumnConfig extends DataSurfaceColumnConfig {
   lookup?: FieldLookupConfig;
@@ -26,6 +26,8 @@ export interface LineColumnConfig extends DataSurfaceColumnConfig {
   id: string;
   cellType?: LineCellType;
   valueType?: LineValueType;
+  required?: boolean;
+  validation?: FieldConfig['validation'];
   readonly?: boolean;
   options?: FieldOptionConfig[];
   api?: string | string[];

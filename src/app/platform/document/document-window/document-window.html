@@ -1,4 +1,4 @@
-<section class="entry-pane" [class.maximized]="maximized" [class.embedded]="embedded" [class.interaction-locked]="isInteractionLocked" [style.z-index]="overlayZIndex" [attr.aria-label]="title || pageLabel || 'Document'">
+<section class="entry-pane" [class.maximized]="maximized" [class.embedded]="embedded" [class.worksheet]="worksheet" [class.interaction-locked]="isInteractionLocked" [style.z-index]="overlayZIndex" [attr.aria-label]="title || pageLabel || 'Document'">
   <header class="entry-header">
     <div>
       <span>{{ pageLabel }}</span>
@@ -13,16 +13,16 @@
             @if (resolvedStatusMessage.tone === 'info') {
               <span class="status-spinner"></span>
             } @else if (resolvedStatusMessage.tone === 'success') {
-              <i class="bi bi-check-lg"></i>
+              <i class="ts-icon ts-icon-check"></i>
             } @else if (resolvedStatusMessage.tone === 'warning') {
-              <i class="bi bi-exclamation-lg"></i>
+              <i class="ts-icon ts-icon-warning"></i>
             } @else if (resolvedStatusMessage.tone === 'error') {
-              <i class="bi bi-x-lg"></i>
+              <i class="ts-icon ts-icon-close"></i>
             }
           </span>
             <span class="status-label" [attr.title]="resolvedStatusLabel">{{ resolvedStatusLabel }}</span>
         } @else {
-          <span class="status-label">Ready</span>
+          <span class="status-label">{{ isInteractionLocked ? (resolvedStatusMessage?.title || 'Loading') : 'Ready' }}</span>
         }
       </div>
 
@@ -42,16 +42,16 @@
           [title]="maximized ? 'Restore' : 'Maximize'"
           (click)="toggleEntrySize()"
         >
-          <i [class]="maximized ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen'"></i>
+          <i [class]="maximized ? 'ts-icon ts-icon-collapse' : 'ts-icon ts-icon-expand'"></i>
         </button>
         <button type="button" title="Close" (click)="closed.emit()">
-          <i class="bi bi-x-lg"></i>
+          <i class="ts-icon ts-icon-close"></i>
         </button>
       }
     </div>
   </header>
 
-  @if (resolvedPrimaryHeaderToolbarButtons.length || resolvedGroupedHeaderToolbarButtons.length) {
+  @if (resolvedPrimaryHeaderToolbarButtons.length || resolvedGroupedHeaderToolbarButtons.length || resolvedFactBoxSections.length) {
     <div class="entry-commandbar">
       @if (resolvedPrimaryHeaderToolbarButtons.length) {
         <div class="entry-commandbar-primary">
@@ -80,7 +80,7 @@
             <details class="group-menu" (toggle)="handleGroupMenuToggle($event)">
               <summary>
                 {{ group.name }}
-                <i class="bi bi-chevron-down"></i>
+                <i class="ts-icon ts-icon-down"></i>
               </summary>
 
               <div class="group-menu-items">
@@ -101,25 +101,25 @@
           }
         </div>
       }
+      @if (resolvedFactBoxSections.length) {
+        <app-fact-box-toggle class="entry-details-toggle" [expanded]="factBoxOpen" (toggled)="factBoxOpen = !factBoxOpen"></app-fact-box-toggle>
+      }
     </div>
   }
 
-  <div class="entry-body" [attr.aria-busy]="isInteractionLocked">
-    @if (isInteractionLocked) {
+  <div class="entry-body" [class.without-factbox]="!resolvedFactBoxSections.length || !factBoxOpen" [attr.aria-busy]="isInteractionLocked">
+    @if (isInteractionLocked && resolvedStatusMessage?.tone === 'info') {
       <div class="entry-local-loader" aria-live="polite" aria-busy="true">
-        <div class="entry-local-loader-card" role="status" aria-atomic="true">
-          <span class="status-spinner" aria-hidden="true"></span>
-          <span>{{ resolvedStatusLabel || 'Loading...' }}</span>
-        </div>
+        <app-loading-indicator [label]="resolvedStatusLabel || 'Loading…'"></app-loading-indicator>
       </div>
     }
 
-    <div class="entry-work">
+    <div class="entry-work" [style.visibility]="contentReady ? null : 'hidden'" [attr.inert]="isInteractionLocked ? '' : null" [class.end-lines-layout]="shouldRenderLinesAtEnd">
       @if (resolvedHeaderSections.length) {
         @for (headerSection of resolvedHeaderSections; track headerSection.id) {
           <section class="entry-section">
             <div class="section-title">
-              <h3>{{ headerSection.title ?? 'Section' }}</h3>
+              <h3><button class="section-toggle" type="button" [attr.aria-expanded]="!collapsedSections.has(headerSection.id)" (click)="toggleSection(headerSection.id)"><i class="ts-icon" [class.ts-icon-right]="collapsedSections.has(headerSection.id)" [class.ts-icon-down]="!collapsedSections.has(headerSection.id)"></i>{{ headerSection.title ?? 'Section' }}</button></h3>
 
               @if (headerSection.actionLabel && headerSection.actionDialog) {
                 <button type="button" [disabled]="isInteractionLocked" (click)="openDocumentDetail(headerSection.actionDialog)">{{ headerSection.actionLabel }}</button>
@@ -128,7 +128,7 @@
               }
             </div>
 
-            <app-dynamic-form
+            <app-dynamic-form [hidden]="collapsedSections.has(headerSection.id)"
               [sections]="[headerSection]"
               [data]="resolvedHeaderData"
               (fieldInteracted)="handleHeaderFieldInteracted($event)"
@@ -149,7 +149,7 @@
 
     </div>
 
-    @if (resolvedFactBoxSections.length) {
+    @if (resolvedFactBoxSections.length && factBoxOpen) {
       <aside class="entry-info">
         <app-fact-box
           [sections]="resolvedFactBoxSections"
@@ -161,10 +161,10 @@
   </div>
 
   <ng-template #lineStackTemplate>
-    <section class="entry-section lines-section">
+    <section class="entry-section lines-section" [class.collapsed]="linesCollapsed" [style.--line-grid-height]="lineGridHeight + 'px'">
       <div class="section-title">
-        <h3>Lines</h3>
-        <span>{{ resolvedLineRows.length }} lines</span>
+        <h3><button class="section-toggle" type="button" [attr.aria-expanded]="!linesCollapsed" (click)="linesCollapsed = !linesCollapsed"><i class="ts-icon" [class.ts-icon-right]="linesCollapsed" [class.ts-icon-down]="!linesCollapsed"></i>Lines</button></h3>
+        <span>{{ enteredLineCount }} {{ enteredLineCount === 1 ? 'line' : 'lines' }}</span>
       </div>
 
       @if (resolvedPrimaryLineToolbarButtons.length || resolvedGroupedLineToolbarButtons.length) {
@@ -196,7 +196,7 @@
                 <details class="group-menu" (toggle)="handleGroupMenuToggle($event)">
                   <summary>
                     {{ group.name }}
-                    <i class="bi bi-chevron-down"></i>
+                    <i class="ts-icon ts-icon-down"></i>
                   </summary>
 
                   <div class="group-menu-items">
@@ -223,7 +223,7 @@
       }
 
       <app-document-lines
-        [columns]="resolvedLineColumns"
+        [worksheet]="worksheet" [columns]="resolvedLineColumns"
         [rows]="resolvedLineRows"
         [showSelection]="true"
         (action)="handleLineAction($event)"
@@ -231,6 +231,7 @@
         (selectionChanged)="handleLineSelectionChanged($event)"
         (rowChanged)="handleLineRowChanged($event)">
       </app-document-lines>
+      <div class="line-height-handle" role="separator" tabindex="0" aria-label="Resize line grid" aria-orientation="horizontal" [attr.aria-valuenow]="lineGridHeight" aria-valuemin="96" aria-valuemax="640" (pointerdown)="resizeLines($event)" (pointermove)="moveLineResize($event)" (pointerup)="stopLineResize()" (pointercancel)="stopLineResize()" (keydown)="resizeLinesByKeyboard($event)"></div>
     </section>
 
     @if (resolvedFooterSections.length) {
@@ -265,7 +266,7 @@
           <h3>{{ detailTitle }}</h3>
         </div>
         <button type="button" title="Close" (click)="closeDocumentDetail()">
-          <i class="bi bi-x-lg"></i>
+          <i class="ts-icon ts-icon-close"></i>
         </button>
       </header>
 

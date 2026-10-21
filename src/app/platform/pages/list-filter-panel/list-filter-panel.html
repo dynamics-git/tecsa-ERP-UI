@@ -2,28 +2,29 @@
   <section class="ts-list-filter-panel ts-factbox" aria-label="Advanced filters">
     <header class="ts-factbox-header">
       <div class="title-wrap">
-        <strong class="ts-factbox-title">Advanced filters</strong>
-        <span class="ts-factbox-subtitle">{{ activeFilterCount }} active</span>
+        <strong class="ts-factbox-title">Filters</strong>
+        <span class="ts-factbox-subtitle">{{ activeFilterCount }} rules</span>
       </div>
       <div class="actions">
         <button type="button" class="micro-action" (click)="addFilter()" [disabled]="!canAddMoreFilters">
-          <i class="bi bi-plus"></i>
+          <i class="ts-icon ts-icon-plus"></i>
           Add filter
         </button>
         <button type="button" class="micro-action" (click)="close()" aria-label="Close advanced filters">
-          <i class="bi bi-x"></i>
+          <i class="ts-icon ts-icon-close"></i>
           Close
         </button>
       </div>
     </header>
 
     <div class="panel-body">
+      @if (validationMessage) { <p class="filter-validation" role="alert">{{ validationMessage }}</p> }
 
     @if (bookmarks.length > 0) {
       <section class="bookmarks">
         <button type="button" class="bookmarks-toggle" (click)="showBookmarks = !showBookmarks">
-          <span><i class="bi bi-bookmark"></i> Saved filters ({{ bookmarks.length }})</span>
-          <i [class]="showBookmarks ? 'bi bi-chevron-up' : 'bi bi-chevron-down'"></i>
+          <span><i class="ts-icon ts-icon-bookmark"></i> Saved filters ({{ bookmarks.length }})</span>
+          <i [class]="showBookmarks ? 'ts-icon ts-icon-up' : 'ts-icon ts-icon-down'"></i>
         </button>
 
         @if (showBookmarks) {
@@ -31,11 +32,11 @@
             @for (bookmark of bookmarks; track bookmark.name + '-' + $index) {
               <div class="bookmark-row">
                 <button type="button" class="bookmark-apply" (click)="applyBookmark($index)">
-                  <i class="bi bi-play-fill"></i>
+                  <i class="ts-icon ts-icon-play"></i>
                   <span>{{ bookmark.name }}</span>
                 </button>
                 <button type="button" class="ts-icon-btn danger" (click)="deleteBookmark($index)">
-                  <i class="bi bi-trash"></i>
+                  <i class="ts-icon ts-icon-trash"></i>
                 </button>
               </div>
             }
@@ -66,7 +67,7 @@
               <span class="ts-label">Operator</span>
               <select class="ts-select" [value]="filter.operator" (change)="updateOperator($index, $any($event.target).value)">
                 @for (option of getOperators(filter.field); track option.value) {
-                  <option [value]="option.value">{{ option.label }}</option>
+                  <option [value]="option.value" [selected]="option.value === filter.operator">{{ option.label }}</option>
                 }
               </select>
             </label>
@@ -80,13 +81,15 @@
                   (change)="updateValue($index, $any($event.target).value); onValueLeave()">
                   <option value="">Select value</option>
                   @for (option of getValueOptions(filter); track option.label + '-' + option.value) {
-                    <option [value]="option.value">{{ option.label }}</option>
+                    <option [value]="option.value" [selected]="'' + option.value === '' + filter.value">{{ option.label }}</option>
                   }
                 </select>
               } @else {
                 <input
                   class="ts-control"
-                  [type]="getValueInputType(filter.field)"
+                  [type]="filter.operator === 'expression' ? 'text' : getValueInputType(filter.field)"
+                  maxlength="200"
+                  (keydown.enter)="apply()"
                   [value]="filter.value"
                   [placeholder]="getFieldPlaceholder(filter.field)"
                   (input)="updateValue($index, $any($event.target).value)"
@@ -97,7 +100,7 @@
         </div>
 
         <button type="button" class="micro-icon-action danger row-remove" (click)="removeFilter($index)" aria-label="Remove filter row">
-          <i class="bi bi-trash3"></i>
+          <i class="ts-icon ts-icon-trash"></i>
         </button>
       </div>
     }
@@ -105,7 +108,7 @@
     </div>
 
     <footer class="panel-footer">
-      <span class="ts-helper">Use comma values with equals for multi-value match.</span>
+      <span class="ts-helper">Filter expressions: A|B · *text*. Number/date fields also support ranges (100..200) and comparisons. Rules use AND.</span>
       <div class="footer-actions">
         @if (storageKey.length) {
           @if (showSaveInput) {

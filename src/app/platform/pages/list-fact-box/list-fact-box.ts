@@ -1,4 +1,7 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { automaticDetailFields, detailValue } from '../fact-box-display';
+import { SessionService } from '../../../core/services/session.service';
+import { formatRecordValue } from '../record-value-formatter';
+import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FieldFactBoxConfig } from '../../models/field-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
 
@@ -25,11 +28,14 @@ type FactBoxDisplayField = {
   styleUrl: './list-fact-box.scss',
 })
 export class ListFactBox {
+  private readonly session = inject(SessionService);
   @Input() config?: ListPageConfig;
   @Input() selectedRow?: unknown;
   @Output() closeRequested = new EventEmitter<void>();
 
   collapsed = false;
+
+  get hasRecord(): boolean { return this.isRecord(this.selectedRow) && Object.keys(this.selectedRow).length > 0; }
 
   get label(): string {
     const factBox = this.config?.factBox;
@@ -175,10 +181,18 @@ export class ListFactBox {
       sections.set(sectionId, existing);
     });
 
+    if (!sections.size && this.hasRecord) return this.buildAutomaticSections();
+
     return Array.from(sections.values()).map((section) => ({
       ...section,
       fields: [...section.fields].sort((left, right) => left.order - right.order),
     }));
+  }
+
+  private buildAutomaticSections(): Array<{title: string; fields: FactBoxDisplayField[]}> {
+    const row = this.toRecord(this.selectedRow) ?? {};
+    const fields = automaticDetailFields(this.columns.map(column => ({...column, field: this.resolveColumnField(column)})), row).map((field, order) => ({...field, order}));
+    return fields.length ? [{title: 'Record details', fields}] : [];
   }
 
   private get columns(): ListPageColumnConfig[] {
@@ -300,17 +314,20 @@ export class ListFactBox {
 
   getFieldValue(field: FactBoxDisplayField): string {
     if (field.field) {
-      const formatted = this.formatValue(this.read(this.selectedRow, field.field), {
-        id: field.field,
-        label: field.label,
-        type: field.type,
-        currencyCode: field.currencyCode,
+      const formatted = detailValue(this.toRecord(this.selectedRow) ?? {}, field, {
+        id: this.session.UserId,
+        name: this.toText(this.read(this.session.User, 'name')) || this.session.UserName,
       });
 
       return formatted.length ? formatted : this.toText(field.fallback);
     }
 
     return this.toText(field.fallback);
+  }
+
+  getFieldTooltip(field: FactBoxDisplayField): string {
+    return field.field && /^(system)?(created|modified)(at|by)$/i.test(field.field.replace(/_/g, ''))
+      ? this.toText(this.read(this.selectedRow, field.field)) : '';
   }
 
   hasFieldValue(field: FactBoxDisplayField): boolean {
@@ -378,43 +395,7 @@ export class ListFactBox {
     value: unknown,
     column: { type?: string; id?: string; label?: string; currencyCode?: string },
   ): string {
-    if (value === undefined || value === null || value === '') {
-      return '';
-    }
-
-    if (column.type === 'date' && typeof value === 'string') {
-      const date = new Date(value);
-
-      if (!Number.isNaN(date.getTime())) {
-        return new Intl.DateTimeFormat('en-US', {
-          month: 'short',
-          day: '2-digit',
-          year: 'numeric',
-        }).format(date);
-      }
-    }
-
-    if (
-      (column.type === 'number' || column.type === 'currency') &&
-      (typeof value === 'number' || typeof value === 'string')
-    ) {
-      const numeric = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''));
-      if (!Number.isNaN(numeric)) {
-        const formatted = new Intl.NumberFormat('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(numeric);
-
-        if (column.type === 'currency') {
-          const code = this.toText(column.currencyCode).trim();
-          return code ? `${code} ${formatted}` : formatted;
-        }
-
-        return formatted;
-      }
-    }
-
-    return String(value);
+    return formatRecordValue(value, column);
   }
 
   private isGenericSubtitle(value: string): boolean {

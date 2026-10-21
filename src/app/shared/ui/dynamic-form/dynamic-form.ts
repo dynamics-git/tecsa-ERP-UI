@@ -1,3 +1,5 @@
+import { LookupSelect } from '../lookup-select/lookup-select';
+import { normalizeFieldValue, fieldValuesEqual } from '../../../platform/models/field-value';
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output, ChangeDetectorRef } from '@angular/core';
 import { FieldConfig, FormSectionConfig } from '../../../platform/models/field-config.model';
@@ -23,37 +25,89 @@ type FieldDropdownOpenEvent = {
 @Component({
   selector: 'app-dynamic-form',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LookupSelect],
   templateUrl: './dynamic-form.html',
   styleUrl: './dynamic-form.scss',
 })
 export class DynamicForm {
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef) {}
   private readonly lookups = new Map<string, Subscription>();
+  private readonly lookupLabels = new Map<string, string>();
   private readonly selectedLookups = new Set<string>();
   ngOnChanges(): void {
     for (const section of this.sections) for (const field of section.fields) {
       const id = this.data[field.key];
       const bucket = field.optionsDataKey ?? `__options_${field.key}`;
-      if (!field.lookup || !id || (Array.isArray(this.data[bucket]) && (this.data[bucket] as unknown[]).length)) continue;
+      if (!field.lookup || !id) continue;
+      const records = this.data[bucket];
+      if (Array.isArray(records) && records.some(record => this.isRecord(record) && String(this.resolveOptionValue(field, record)) === String(id))) continue;
       const selectedKey = `${field.key}:${id}`;
       if (this.selectedLookups.has(selectedKey)) continue;
       this.selectedLookups.add(selectedKey);
       this.lookups.get(field.key)?.unsubscribe();
       this.lookups.set(field.key, this.source.loadById({ endpoint: field.lookup.endpoint }, id).subscribe({
-        next: record => { this.data[bucket] = [record]; this.changes.markForCheck(); }, error: () => {},
+        next: record => {
+          if (this.isRecord(record)) this.lookupLabels.set(field.key + ':' + id, this.resolveOptionLabel(field, record));
+          this.data[bucket] = [record]; this.changes.markForCheck();
+        }, error: () => { this.selectedLookups.delete(selectedKey); },
       }));
     }
   }
-  searchLookup(field: FieldConfig, text: string): void {
+  lookupOpen = '';
+  lookupQuery = '';
+  lookupLoading = false;
+  lookupError = '';
+  lookupHasMore = false;
+  lookupRetryNextPage = false;
+  private lookupOffset = 0;
+  private lookupCursor?: string;
+  lookupActive = -1;
+  private static nextId = 0;
+  readonly lookupId = 'lookup-' + DynamicForm.nextId++;
+  lookupLabel(field: FieldConfig): string {
+    return this.lookupLabels.get(field.key + ':' + this.getFieldValue(field)) ?? this.getFieldOptions(field).find(option => this.isOptionSelected(field, option.value))?.label ?? '';
+  }
+  openLookup(field: FieldConfig): void {
+    if (this.isFieldDisabled(field)) return;
+    const currentLabel = this.lookupLabel(field);
+    if (currentLabel) this.lookupLabels.set(field.key + ':' + this.getFieldValue(field), currentLabel);
+    this.lookups.forEach(subscription => subscription.unsubscribe());
+    this.lookupOpen = field.key;
+    this.lookupQuery = '';
+    this.lookupActive = -1;
+    this.notifyFieldInteracted(field);
+    this.notifyDropdownOpened(field);
+    this.searchLookup(field, '');
+  }
+  closeLookup(): void { this.lookupOpen = ''; this.lookupActive = -1; }
+  chooseLookup(field: FieldConfig, value: unknown): void {
+    const option = this.getFieldOptions(field).find(item => String(item.value) === String(value));
+    if (option) this.lookupLabels.set(field.key + ':' + value, option.label);
+    this.updateFieldValue(field, value);
+    this.closeLookup();
+  }
+  searchLookup(field: FieldConfig, text: string, nextPage = false): void {
+    if (nextPage && (this.lookupLoading || !this.lookupHasMore)) return;
+    this.lookupRetryNextPage = nextPage;
+    if (!nextPage) { this.lookupOffset = 0; this.lookupCursor = undefined; this.lookupHasMore = false; }
+    this.lookupQuery = text;
+    this.lookupActive = -1;
+    this.lookupLoading = true;
+    this.lookupError = '';
     if (!field.lookup) return;
     this.lookups.get(field.key)?.unsubscribe();
+    const bucket = field.optionsDataKey ?? `__options_${field.key}`;
+    if (!nextPage) this.data[bucket] = [];
     const escaped = text.trim().replace(/'/g, "''");
     const fields = field.lookup.searchFields ?? [field.lookup.displayField];
     const filter = escaped ? fields.map(key => `contains(${key}, '${escaped}')`).join(' or ') : undefined;
-    this.lookups.set(field.key, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: field.lookup!.endpoint, defaultFilter: filter, pageSize: 20 }))).subscribe({
-      next: response => { this.data[field.optionsDataKey ?? `__options_${field.key}`] = (response as { value: unknown[] }).value; this.changes.markForCheck(); },
-      error: () => { /* Keep the existing selection if a lookup is denied or unavailable. */ },
+    this.lookups.set(field.key, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: field.lookup!.endpoint, paging: field.lookup!.paging, defaultFilter: filter, pageSize: 20 }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({
+      next: response => { const page = response as { value: unknown[]; meta: Record<string, unknown> };
+        this.lookupOffset += page.value.length;
+        this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
+        this.lookupHasMore = field.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
+        this.data[bucket] = nextPage ? [...(Array.isArray(this.data[bucket]) ? this.data[bucket] as unknown[] : []), ...page.value] : page.value; this.lookupLoading = false; this.changes.markForCheck(); },
+      error: () => { this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); },
     }));
   }
   ngOnDestroy(): void { this.lookups.forEach(subscription => subscription.unsubscribe()); }
@@ -94,13 +148,13 @@ export class DynamicForm {
           }))
           .filter((option) => String(option.value).length > 0);
         const selected = this.getFieldValue(field);
-        if (selected && !options.some(option => String(option.value) === selected)) options.unshift({ label: selected, value: selected });
+        if (selected && this.lookupOpen !== field.key && !options.some(option => String(option.value) === selected)) options.unshift({ label: this.lookupLabels.get(field.key + ':' + selected) ?? (field.lookup ? '' : selected), value: selected });
         return options;
       }
     }
 
     const value = this.getFieldValue(field);
-    return value ? [{ label: value, value }] : [];
+    return value && !field.lookup ? [{ label: value, value }] : [];
   }
 
   isOptionSelected(field: FieldConfig, optionValue: unknown): boolean {
@@ -116,7 +170,9 @@ export class DynamicForm {
   }
 
   updateFieldValue(field: FieldConfig, value: unknown): void {
+    value = normalizeFieldValue(value, field.valueType ?? field.type);
     const previousValue = this.data[field.key];
+    if (fieldValuesEqual(previousValue, value, field.valueType ?? field.type)) return;
     this.data[field.key] = value;
     const updates = this.resolveTargetUpdates(field, value);
     const previousUpdates: Record<string, unknown> = {};
@@ -215,29 +271,7 @@ export class DynamicForm {
   }
 
   coerceInputValue(field: FieldConfig, rawValue: string): unknown {
-    switch (field.valueType) {
-      case 'number': {
-        const normalized = rawValue.replace(/,/g, '').trim();
-        if (!normalized.length) {
-          return '';
-        }
-
-        const parsed = Number(normalized);
-        return Number.isFinite(parsed) ? parsed : rawValue;
-      }
-      case 'boolean': {
-        const normalized = rawValue.trim().toLowerCase();
-        if (!normalized.length) {
-          return false;
-        }
-
-        return (
-          normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on'
-        );
-      }
-      default:
-        return rawValue;
-    }
+    return normalizeFieldValue(rawValue, field.valueType ?? field.type);
   }
 
   private resolveTargetUpdates(

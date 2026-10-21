@@ -1,5 +1,15 @@
+import { FactBoxHostService } from '../../../shared/ui/fact-box-toggle/fact-box-host.service';
+import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
+import { LoadingIndicator } from '../../../shared/ui/loading-indicator/loading-indicator';
+import { ListExportService, ListExportFormat } from '../list-export.service';
+import { StandardListActionsService } from '../standard-list-actions.service';
+import { formatRecordValue } from '../record-value-formatter';
+import { ListFilterPanel } from '../list-filter-panel/list-filter-panel';
+import { ListPersonalizationService } from '../list-personalization.service';
+import type { ListAppliedFilter, ListPersonalizationState, ListSavedView } from '../../models/list-personalization-config.model';
 import {
   AfterViewChecked,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
@@ -13,7 +23,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { SessionService } from '../../../core/services/session.service';
-import { CommandConfig, StandardCommandConfig, StandardCommandStateConfig } from '../../models/command-config.model';
+import { CommandConfig, StandardCommandConfig } from '../../models/command-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
 import { CommandBar } from '../../../shared/ui/command-bar/command-bar';
 import { ListFactBox } from '../list-fact-box/list-fact-box';
@@ -42,12 +52,17 @@ type ListDensity = 'compact' | 'comfortable' | 'spacious';
 @Component({
   selector: 'app-list-page',
   standalone: true,
-  imports: [CommandBar, ListFactBox],
+  imports: [FactBoxToggle, LoadingIndicator,  CommandBar, ListFactBox, ListFilterPanel],
   templateUrl: './list-page.html',
   styleUrl: './list-page.scss',
 })
 export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
+  private readonly factBoxHost = inject(FactBoxHostService);
   private readonly sessionService = inject(SessionService);
+  private readonly standardActions = inject(StandardListActionsService);
+  private readonly listExport = inject(ListExportService);
+  exportBusy = false;
+  private readonly changeDetector = inject(ChangeDetectorRef);
   @ViewChild('gridScroll') private readonly gridScroll?: ElementRef<HTMLElement>;
 
   @Input() config?: ListPageConfig;
@@ -70,21 +85,213 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   density: ListDensity = 'compact';
   factboxOpen = true;
   private activeViewId?: string;
-  private dismissTimer?: ReturnType<typeof setTimeout>;
   private activeSort?: ActiveSort;
   private activeResize?: ActiveResize;
   private readonly resizedColumnWidths = new Map<string, number>();
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (!('errorMessage' in changes)) {
-      return;
+  private readonly personalization = inject(ListPersonalizationService);
+  @ViewChild('filterPanel') private filterPanel?: ListFilterPanel;
+  savedViews: ListSavedView[] = [];
+  appliedFilters: ListAppliedFilter[] = [];
+  columnOrder: string[] = [];
+  hiddenColumns = new Set<string>();
+  showColumns = false;
+  showSaveView = false;
+  groupingField = '';
+  collapsedGroups = new Set<string>();
+  get rowGroups(): Array<{key: string; label: string; rows: unknown[]}> {
+    if (!this.groupingField) return [{key: 'all', label: '', rows: this.rows}];
+    const groups = new Map<string, {key: string; label: string; rows: unknown[]}>();
+    for (const row of this.rows) {
+      const value = this.read(row, this.groupingField), key = typeof value + ':' + String(value ?? '');
+      if (!groups.has(key)) groups.set(key, {key, label: value === null || value === undefined || value === '' ? '(blank)' : typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value), rows: []});
+      groups.get(key)!.rows.push(row);
     }
+    return [...groups.values()];
+  }
+  setGrouping(field: string): void { this.groupingField = field; this.collapsedGroups.clear(); this.persistPersonalization(); }
+  toggleGroup(key: string): void { if (this.collapsedGroups.has(key)) this.collapsedGroups.delete(key); else this.collapsedGroups.add(key); }
+  viewName = '';
+  personalizationMessage = '';
+  private preferenceScope = '';
 
-    this.resetErrorDismissTimer();
+  get configurableColumns(): DisplayColumn[] {
+    const columns = (this.config?.dataSurface?.columns ?? []).filter(column => column.hidden !== true);
+    const positions = new Map(this.columnOrder.map((key, index) => [key, index]));
+    return [...columns].sort((a, b) => (positions.get(this.getColumnKey(a)) ?? 999) - (positions.get(this.getColumnKey(b)) ?? 999));
+  }
+
+  get advancedFilterEnabled(): boolean { return this.config?.tools?.advancedFilter !== false && this.config?.filterConfig?.enabled !== false; }
+  get columnsEnabled(): boolean { return this.config?.tools?.columns !== false; }
+  get savedViewsEnabled(): boolean { return this.config?.tools?.savedViews !== false && this.config?.personalization?.enabled !== false; }
+  get factBoxEnabled(): boolean { return this.config?.factBox?.enabled !== false; }
+  columnWidthNumber(column: DisplayColumn): number { return this.parseColumnWidth(this.getColumnWidth(column)); }
+  resizeColumn(column: DisplayColumn, delta: number): void {
+    this.resizedColumnWidths.set(this.getColumnKey(column), Math.min(800, Math.max(72, this.columnWidthNumber(column) + delta)));
+    this.persistPersonalization();
+  }
+  onRowKey(event: KeyboardEvent, row: unknown): void {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Enter') { event.preventDefault(); this.openRow(row); }
+    if (event.key === ' ' && this.config?.dataSurface?.selectable !== false) { event.preventDefault(); this.toggleRow(row, event); }
+  }
+  get searchEnabled(): boolean { return this.isBasicFilterEnabled && this.config?.tools?.search !== false; }
+  get allRecordsViewId(): string { return this.views.find(view => !view.filter?.trim())?.id ?? '__all'; }
+  get currentViewId(): string {
+    const id = this.activeViewId ?? this.config?.activeViewId ?? this.views[0]?.id ?? '__all';
+    return id === '__all' ? this.allRecordsViewId : id;
+  }
+  get currentSort(): ActiveSort | undefined {
+    if (this.activeSort) return this.activeSort;
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(asc|desc)?/i.exec(this.config?.dataSource?.defaultSort ?? '');
+    return match ? {field: match[1]!, direction: match[2]?.toLowerCase() === 'desc' ? 'desc' : 'asc'} : undefined;
+  }
+  get sortLabel(): string {
+    const sort = this.currentSort;
+    if (!sort) return '';
+    const label = this.configurableColumns.find(column => this.getColumnKey(column) === sort.field)?.label ?? sort.field;
+    return `${label}: ${sort.direction === 'asc' ? 'ascending' : 'descending'}`;
+  }
+  get personalizationKey(): string { return this.config?.personalization?.storageKey ?? this.config?.pageId ?? this.config?.dataSurface?.id ?? 'list'; }
+  get currentPersonalization(): ListPersonalizationState {
+    return {columnOrder: this.columnOrder, hiddenColumns: [...this.hiddenColumns], columnWidths: Object.fromEntries(this.resizedColumnWidths), density: this.density, factBoxOpen: this.factboxOpen, groupingField: this.groupingField};
+  }
+
+  initializePersonalization(): void {
+    const scope = `${this.sessionService.UserId}:${this.sessionService.Company}:${this.personalizationKey}`;
+    if (this.preferenceScope === scope) return;
+    this.preferenceScope = scope;
+    if (this.config?.personalization?.enabled === false) return;
+    this.restorePersonalization(this.personalization.read<unknown>(this.personalizationKey, 'layout', null));
+    const views = this.personalization.read<unknown>(this.personalizationKey, 'views', []);
+    const fields = new Set((this.config?.dataSurface?.columns ?? []).map(column => this.getColumnKey(column)));
+    this.savedViews = Array.isArray(views) ? views.filter((view): view is ListSavedView => {
+      if (!view || typeof view !== 'object') return false;
+      const item = view as ListSavedView;
+      return typeof item.id === 'string' && typeof item.label === 'string' && item.label.length <= 60 && Array.isArray(item.filters)
+        && item.filters.every(filter => fields.has(filter.field) && typeof filter.value === 'string') && (!item.viewFilter || typeof item.viewFilter === 'string') && !!item.personalization;
+    }).slice(0, 20) : [];
+  }
+
+  restorePersonalization(value: unknown): void {
+    if (!value || typeof value !== 'object') return;
+    const state = value as Partial<ListPersonalizationState>;
+    const fields = new Set((this.config?.dataSurface?.columns ?? []).filter(column => !column.hidden).map(column => this.getColumnKey(column)));
+    this.columnOrder = Array.isArray(state.columnOrder) ? [...new Set(state.columnOrder.filter(field => fields.has(field)))] : [];
+    this.hiddenColumns = new Set(Array.isArray(state.hiddenColumns) ? state.hiddenColumns.filter(field => fields.has(field)) : []);
+    if (this.hiddenColumns.size >= fields.size) this.hiddenColumns.clear();
+    this.resizedColumnWidths.clear();
+    if (state.columnWidths && typeof state.columnWidths === 'object') {
+      for (const [field, width] of Object.entries(state.columnWidths)) if (fields.has(field) && Number.isFinite(width)) this.resizedColumnWidths.set(field, Math.min(800, Math.max(72, width)));
+    }
+    if (state.density === 'compact' || state.density === 'comfortable' || state.density === 'spacious') this.density = state.density;
+    this.groupingField = state.groupingField && fields.has(state.groupingField) ? state.groupingField : '';
+    if (typeof state.factBoxOpen === 'boolean') this.factboxOpen = state.factBoxOpen;
+  }
+
+  persistPersonalization(): void {
+    if (this.config?.personalization?.enabled === false) return;
+    if (!this.personalization.write(this.personalizationKey, 'layout', this.currentPersonalization)) this.personalizationMessage = 'Layout is applied for this session; browser storage is unavailable.';
+  }
+
+  setDensity(value: string): void {
+    if (value !== 'compact' && value !== 'comfortable' && value !== 'spacious') return;
+    this.density = value;
+    this.persistPersonalization();
+  }
+
+  setColumnVisible(column: DisplayColumn, visible: boolean): void {
+    const field = this.getColumnKey(column);
+    if (visible) this.hiddenColumns.delete(field);
+    else if (this.columns.length > 1) this.hiddenColumns.add(field);
+    this.persistPersonalization();
+  }
+
+  moveColumn(column: DisplayColumn, delta: number): void {
+    const keys = this.configurableColumns.map(item => this.getColumnKey(item));
+    const index = keys.indexOf(this.getColumnKey(column)), next = index + delta;
+    if (index < 0 || next < 0 || next >= keys.length) return;
+    [keys[index], keys[next]] = [keys[next]!, keys[index]!];
+    this.columnOrder = keys;
+    this.persistPersonalization();
+  }
+
+  resetColumns(): void { this.columnOrder = []; this.hiddenColumns.clear(); this.resizedColumnWidths.clear(); this.persistPersonalization(); }
+
+  handleAdvancedFilter(event: {actionKey: string; payload?: unknown}): void {
+    if (event.actionKey === 'advancedFilterChanged') {
+      const payload = event.payload as {filters?: ListAppliedFilter[]};
+      this.appliedFilters = payload?.filters ?? [];
+    }
+    this.command.emit(event);
+  }
+
+  removeAppliedFilter(index: number): void {
+    this.filterPanel?.setFilters(this.appliedFilters.filter((_, current) => index !== current), true);
+  }
+
+  filterCaption(filter: ListAppliedFilter): string {
+    const column = this.configurableColumns.find(item => this.getColumnKey(item) === filter.field);
+    return `${column?.label ?? filter.field} ${filter.operator === 'expression' ? ':' : filter.operator} ${filter.value}`;
+  }
+
+  clearSearch(): void { this.searchText = ''; this.emitFilterChanged(); }
+
+  saveView(): void {
+    const label = this.viewName.trim().slice(0, 60);
+    if (!label) return;
+    const existing = this.savedViews.find(view => view.label.toLowerCase() === label.toLowerCase());
+    if (!existing && this.savedViews.length >= 20) { this.personalizationMessage = 'Remove a saved view before adding another (limit 20).'; return; }
+    const view: ListSavedView = {id: existing?.id ?? `personal-${crypto.randomUUID()}`, label, filters: structuredClone(this.appliedFilters), sort: this.currentSort ? `${this.currentSort.field} ${this.currentSort.direction}` : undefined, viewFilter: this.savedViews.find(view => view.id === this.currentViewId)?.viewFilter ?? this.views.find(view => view.id === this.currentViewId)?.filter, personalization: structuredClone(this.currentPersonalization)};
+    this.savedViews = [...this.savedViews.filter(item => item.id !== view.id), view];
+    this.activeViewId = view.id;
+    this.showSaveView = false;
+    this.personalizationMessage = this.personalization.write(this.personalizationKey, 'views', this.savedViews) ? 'View saved for your user and company.' : 'View is available for this session; browser storage is unavailable.';
+  }
+
+  removeSavedView(): void {
+    this.savedViews = this.savedViews.filter(view => view.id !== this.currentViewId);
+    this.personalization.write(this.personalizationKey, 'views', this.savedViews);
+    this.setActiveView('__all');
+  }
+
+  async exportLoadedRows(format: ListExportFormat = 'csv'): Promise<void> {
+    if (this.config?.tools?.export === false || this.exportBusy) return;
+    this.exportBusy = true;
+    try {
+      await this.listExport.export(format, {
+        title: this.config?.title ?? 'List', fileName: this.config?.pageId ?? 'list',
+        headers: this.columns.map(column => column.label),
+        rows: this.rows.map(row => this.columns.map(column => this.getCellValue(row, column))),
+      });
+    } catch (error) {
+      this.personalizationMessage = format === 'print' ? 'Allow the print window to open, then try again.' : 'Export could not be completed. Refresh the page and try again.';
+    } finally { this.exportBusy = false; this.changeDetector.markForCheck(); }
+  }
+
+  @HostListener('keydown', ['$event'])
+  handleListKey(event: KeyboardEvent): void {
+    if (event.key === 'Escape') { this.showColumns = false; this.showSaveView = false; this.filterPanel?.close(); return; }
+    if (event.altKey && event.key.toLowerCase() === 'f' && this.advancedFilterEnabled) { event.preventDefault(); this.filterPanel?.toggle(); return; }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && this.searchEnabled) { event.preventDefault(); this.searchInput?.nativeElement.focus(); }
+  }
+
+  @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
+
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!this.showCommandBar) this.factBoxHost.host.set(this);
+    else if (this.factBoxHost.host() === this) this.factBoxHost.host.set(null);
+    if ('config' in changes) this.initializePersonalization();
+    if ('data' in changes) {
+      const available = new Set(this.data.map(row => this.getRowKey(row)));
+      const selected = new Set([...this.selectedNos].filter(key => available.has(key)));
+      if (selected.size !== this.selectedNos.size) { this.selectedNos = selected; queueMicrotask(() => this.emitCheckedKeysChanged()); }
+    }
   }
 
   ngOnDestroy(): void {
-    this.clearErrorDismissTimer();
+    if (this.factBoxHost.host() === this) this.factBoxHost.host.set(null);
   }
 
   get usesConfiguredData(): boolean {
@@ -104,11 +311,11 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   get loadingLabel(): string {
-    return this.isLoadingMore ? 'Refreshing list data...' : 'Loading list data...';
+    return this.isLoadingMore ? 'Loading records...' : 'Loading list data...';
   }
 
   get columns(): DisplayColumn[] {
-    return (this.config?.dataSurface?.columns ?? []).filter((column) => column.hidden !== true);
+    return this.configurableColumns.filter(column => !this.hiddenColumns.has(this.getColumnKey(column)));
   }
 
   get gridMinWidth(): string {
@@ -117,7 +324,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
       (total, column) => total + this.parseColumnWidth(this.getColumnWidth(column)),
       0,
     );
-    return `${Math.max(1180, rowControlWidth + visibleColumnWidth)}px`;
+    return `${Math.max(320, rowControlWidth + visibleColumnWidth)}px`;
   }
 
   get selectedRow(): unknown {
@@ -141,7 +348,6 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   dismissError(): void {
-    this.clearErrorDismissTimer();
     this.errorDismissed.emit();
   }
 
@@ -160,7 +366,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   get searchPlaceholder(): string {
-    return this.config?.searchPlaceholder ?? '';
+    return this.config?.searchPlaceholder ?? 'Search this list…';
   }
 
   get isBasicFilterEnabled(): boolean {
@@ -168,41 +374,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   get resolvedStandardActions(): StandardCommandConfig {
-    const supportsCreateBlocked = this.config?.dataSource?.supportsCreate === false;
-    const supportsDeleteBlocked = this.config?.dataSource?.supportsDelete === false;
-    const permissions = this.resolvePagePermissionFlags();
-    const canCreate = permissions.canCreate;
-    const canDelete = permissions.canDelete;
-
-    return {
-      new: this.mergeStandardActionState(this.config?.standardActions?.new, {
-        label: 'New',
-        icon: 'bi bi-plus-lg',
-        order: 10,
-        visible: true,
-        hidden: false,
-        disabled: supportsCreateBlocked || !canCreate,
-        tooltip: supportsCreateBlocked
-          ? 'Create is not supported for this page.'
-          : (!canCreate ? 'You do not have create permission.' : undefined),
-      }),
-      delete: this.mergeStandardActionState(this.config?.standardActions?.delete, {
-        label: 'Delete',
-        order: 20,
-        visible: true,
-        hidden: false,
-        disabled: supportsDeleteBlocked || !canDelete,
-        tooltip: supportsDeleteBlocked
-          ? 'Delete is not supported for this page.'
-          : (!canDelete ? 'You do not have delete permission.' : undefined),
-      }),
-      refresh: this.mergeStandardActionState(this.config?.standardActions?.refresh, {
-        label: 'Refresh',
-        order: 30,
-        visible: true,
-        disabled: false,
-      }),
-    };
+    return this.standardActions.resolve(this.config ?? {});
   }
 
   get resolvedCommands(): CommandConfig[] {
@@ -225,24 +397,6 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
           tooltip: command.tooltip ?? 'You do not have execute permission.',
         };
       });
-  }
-
-  private mergeStandardActionState(
-    configured: boolean | StandardCommandStateConfig | undefined,
-    defaults: StandardCommandStateConfig,
-  ): boolean | StandardCommandStateConfig {
-    if (configured === false) {
-      return false;
-    }
-
-    if (configured === true || configured === undefined) {
-      return defaults;
-    }
-
-    return {
-      ...defaults,
-      ...configured,
-    };
   }
 
   private resolvePagePermissionFlags(): {
@@ -387,7 +541,9 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   toggleFactbox(): void {
-    this.factboxOpen = !this.factboxOpen;
+    if (this.filterPanel?.visible) { this.filterPanel.close(); this.factboxOpen = true; }
+    else this.factboxOpen = !this.factboxOpen;
+    this.persistPersonalization();
   }
 
   isViewActive(viewId: string): boolean {
@@ -397,10 +553,19 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
 
   setActiveView(viewId: string): void {
     this.activeViewId = viewId;
-    const viewFilter = this.views.find((view) => view.id === viewId)?.filter;
-    if (this.isBasicFilterEnabled) {
-      this.command.emit({ actionKey: 'viewChanged', payload: { viewId, viewFilter } });
-      this.emitFilterChanged();
+    const saved = this.savedViews.find(view => view.id === viewId);
+    this.command.emit({actionKey: 'viewChanged', payload: {viewId, viewFilter: saved?.viewFilter ?? this.views.find(view => view.id === viewId)?.filter ?? ''}});
+    this.filterPanel?.setFilters(saved?.filters ?? [], true);
+    if (saved) {
+      this.restorePersonalization(saved.personalization);
+      this.persistPersonalization();
+      if (saved.sort && this.config?.dataSource?.paging !== 'cursor') {
+        const match = /^([A-Za-z_][A-Za-z0-9_]*) (asc|desc)$/.exec(saved.sort);
+        if (match && this.configurableColumns.some(column => this.getColumnKey(column) === match[1] && column.sortable !== false)) {
+          this.activeSort = {field: match[1]!, direction: match[2] as SortDirection};
+          this.command.emit({actionKey: 'sortChanged', payload: {sort: saved.sort}});
+        }
+      }
     }
   }
 
@@ -515,7 +680,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
       return this.config.behavior.defaultIcon;
     }
 
-    return 'bi bi-chevron-right';
+    return 'ts-icon ts-icon-right';
   }
 
   isRowChecked(row: unknown): boolean {
@@ -549,26 +714,6 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
 
   private emitCheckedKeysChanged(): void {
     this.checkedKeysChanged.emit(Array.from(this.selectedNos));
-  }
-
-  private resetErrorDismissTimer(): void {
-    this.clearErrorDismissTimer();
-    if (!this.normalizedErrorMessage) {
-      return;
-    }
-
-    this.dismissTimer = setTimeout(() => {
-      this.dismissError();
-    }, 8000);
-  }
-
-  private clearErrorDismissTimer(): void {
-    if (!this.dismissTimer) {
-      return;
-    }
-
-    clearTimeout(this.dismissTimer);
-    this.dismissTimer = undefined;
   }
 
   selectRow(row: unknown): void {
@@ -605,7 +750,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
     }
 
     if (this.isPrimaryColumn(column)) {
-      return '72px';
+      return '128px';
     }
 
     if (column.subtitleField) {
@@ -633,7 +778,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
 
   getColumnSortDirection(column: DisplayColumn): SortDirection | undefined {
     const field = this.getColumnKey(column);
-    return this.activeSort?.field === field ? this.activeSort.direction : undefined;
+    return this.currentSort?.field === field ? this.currentSort.direction : undefined;
   }
 
   toggleSort(column: DisplayColumn): void {
@@ -643,7 +788,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
       return;
     }
 
-    if (this.activeSort?.field !== field) {
+    if (this.currentSort?.field !== field) {
       this.activeSort = { field, direction: 'asc' };
       this.command.emit({ actionKey: 'sortChanged', payload: { sort: `${field} asc` } });
       return;
@@ -651,12 +796,13 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
 
     this.activeSort = {
       field,
-      direction: this.activeSort.direction === 'asc' ? 'desc' : 'asc',
+      direction: this.currentSort?.direction === 'asc' ? 'desc' : 'asc',
     };
     this.command.emit({ actionKey: 'sortChanged', payload: { sort: `${field} ${this.activeSort.direction}` } });
   }
 
   startColumnResize(event: PointerEvent, column: DisplayColumn): void {
+    if (this.config?.dataSurface?.resizable === false) return;
     event.preventDefault();
     event.stopPropagation();
 
@@ -684,6 +830,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
 
   @HostListener('window:pointerup')
   stopColumnResize(): void {
+    if (this.activeResize) this.persistPersonalization();
     this.activeResize = undefined;
   }
 
@@ -731,11 +878,11 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   ngAfterViewChecked(): void {
-    // Intentionally no-op. Auto-load caused repeated background fetch churn on small datasets.
+    // Loading more records is driven by scrolling, not change detection.
   }
 
   onGridScroll(event: Event): void {
-    if (!this.usesConfiguredData || this.loading || !this.hasMore) {
+    if (!this.usesConfiguredData || this.loading || !this.hasMore || this.config?.dataSurface?.infiniteScroll === false) {
       return;
     }
 
@@ -758,7 +905,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
     }
 
     const viewId = this.activeViewId ?? this.config?.activeViewId ?? '';
-    const viewFilter = this.views.find((view) => view.id === viewId)?.filter;
+    const viewFilter = this.savedViews.find(view => view.id === viewId)?.viewFilter ?? this.views.find((view) => view.id === viewId)?.filter ?? '';
     this.command.emit({
       actionKey: 'filterChanged',
       payload: {
@@ -788,35 +935,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
     value: unknown,
     column: { type?: string; id?: string; label?: string; currencyCode?: string },
   ): string {
-    if (value === undefined || value === null || value === '') {
-      return '';
-    }
-
-    if (column.type === 'date' && typeof value === 'string') {
-      const date = new Date(value);
-
-      if (!Number.isNaN(date.getTime())) {
-        return new Intl.DateTimeFormat('en-US', {
-          month: 'short',
-          day: '2-digit',
-          year: 'numeric',
-        }).format(date);
-      }
-    }
-
-    if (column.type === 'currency' && typeof value === 'number') {
-      if (column.currencyCode) {
-        return new Intl.NumberFormat(undefined, {
-          style: 'currency',
-          currency: column.currencyCode,
-          currencyDisplay: 'code',
-        }).format(value);
-      }
-
-      return new Intl.NumberFormat(undefined).format(value);
-    }
-
-    return String(value);
+    return formatRecordValue(value, column);
   }
 
   private read(row: unknown, field: string): unknown {

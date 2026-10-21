@@ -29,12 +29,12 @@
   gap: 1px;
 
   .ts-factbox-title {
-    font-size: 16px;
+    font-size: var(--ts-font-section);
     line-height: 1.1;
   }
 
   .ts-factbox-subtitle {
-    font-size: 12px;
+    font-size: var(--ts-font-caption);
     color: var(--ts-muted);
   }
 }
@@ -88,12 +88,12 @@
   background: transparent;
   padding: 0;
   min-height: 24px;
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--ts-font-body);
+  font-weight: 600;
   color: var(--ts-text);
 
   i {
-    font-size: 13px;
+    font-size: var(--ts-font-body);
     color: var(--ts-muted);
   }
 }
@@ -116,8 +116,8 @@
   justify-content: flex-start;
   min-width: 0;
   min-height: 28px;
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--ts-font-body);
+  font-weight: 600;
   border: 0;
   background: transparent;
   padding: 0;
@@ -143,22 +143,22 @@
   gap: 4px;
 
   .ts-label {
-    font-size: 11px;
+    font-size: var(--ts-font-caption);
     font-weight: 700;
     color: var(--ts-muted);
   }
 
   .ts-select,
   .ts-control {
-    height: 30px;
-    min-height: 30px;
+    height: var(--ts-control-h);
+    min-height: var(--ts-control-h);
     padding: 0 9px;
     border: 1px solid var(--ts-border);
     border-radius: 6px;
     background: var(--ts-surface);
     color: var(--ts-text);
-    font-size: 13px;
-    font-weight: 650;
+    font-size: var(--ts-font-body);
+    font-weight: 600;
   }
 }
 
@@ -184,12 +184,12 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--ts-font-caption);
   font-weight: 700;
   letter-spacing: 0.01em;
 
   i {
-    font-size: 12px;
+    font-size: var(--ts-font-caption);
   }
 }
 
@@ -205,7 +205,7 @@
   color: var(--ts-muted);
 
   i {
-    font-size: 14px;
+    font-size: var(--ts-font-body);
   }
 }
 
@@ -226,8 +226,8 @@
   border: 0;
   background: transparent;
   color: var(--ts-muted);
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--ts-font-body);
+  font-weight: 600;
   padding: 0;
   min-height: 24px;
 }
@@ -246,9 +246,9 @@
 }
 
 .compact-apply {
-  min-height: 30px;
+  min-height: var(--ts-control-h);
   min-width: 74px;
-  font-size: 13px;
+  font-size: var(--ts-font-body);
 }
 
 @media (max-width: 960px) {
@@ -272,3 +272,11 @@
     width: 100%;
   }
 }
+
+:host { display: none; }
+:host(.is-visible) { display: block; }
+:host(.embedded) { position: static; inset: auto; z-index: auto; min-width: 0; height: 100%; }
+:host(.embedded) .ts-list-filter-panel { width: 100%; max-width: none; height: 100%; box-shadow: none; border-radius: 0 0 6px 6px; }
+.filter-validation { margin: 0; padding: 8px; border: 1px solid var(--ts-danger-border); background: var(--ts-danger-bg); color: var(--ts-danger); font-size: var(--ts-font-caption); }
+.row { padding: 8px 0; border-bottom: 1px solid var(--ts-border-soft); }
+.ts-select, .ts-control { font-size: var(--ts-font-body); }
