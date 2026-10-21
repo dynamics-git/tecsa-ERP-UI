@@ -31,8 +31,8 @@
     z-index: 1;
     background: var(--ts-surface-soft);
     color: var(--ts-muted);
-    font-size: var(--ts-text-11);
-    font-weight: 700;
+    font-size: var(--ts-font-label);
+    font-weight: 600;
     letter-spacing: 0;
     text-transform: none;
     border-bottom-color: var(--ts-border);
@@ -75,8 +75,8 @@
 
   td {
     color: var(--ts-text);
-    font-size: var(--ts-text-13);
-    font-weight: 650;
+    font-size: var(--ts-font-body);
+    font-weight: 500;
     background: var(--ts-surface);
   }
 
@@ -98,8 +98,8 @@
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: var(--ts-text-13);
-    font-weight: 650;
+    font-size: var(--ts-font-body);
+    font-weight: 500;
     box-sizing: border-box;
 
     &:focus {

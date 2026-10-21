@@ -31,7 +31,7 @@
 
 .entry-header {
   min-height: 70px;
-  padding: 13px 16px;
+  padding: var(--ts-space-3) var(--ts-space-4);
   background: var(--ts-surface);
   border-bottom: 1px solid var(--ts-border);
   display: flex;
@@ -41,14 +41,14 @@
   span,
   p {
     color: var(--ts-muted);
-    font-size: 12px;
-    font-weight: 650;
+    font-size: var(--ts-font-caption);
+    font-weight: 500;
   }
 
   h2 {
     margin: 2px 0;
-    font-size: 18px;
-    font-weight: 800;
+    font-size: var(--ts-font-page-title);
+    font-weight: 600;
   }
 
   p {
@@ -162,7 +162,7 @@
 .line-commandbar {
   flex: 0 0 auto;
   min-height: 42px;
-  padding: 0 14px;
+  padding: 0 var(--ts-space-4);
   background: var(--ts-surface);
   border-bottom: 1px solid var(--ts-border);
   display: flex;
@@ -171,7 +171,7 @@
 
   button {
     height: 30px;
-    padding: 0 10px;
+    padding: 0;
     border: 0;
     border-radius: 6px;
     background: transparent;
@@ -180,8 +180,8 @@
     align-items: center;
     gap: 6px;
     font: inherit;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: var(--ts-font-body);
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -199,7 +199,7 @@
 .entry-commandbar-groups {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--ts-space-4);
 }
 
 .group-menu {
@@ -345,12 +345,12 @@
 }
 
 .section-title {
-  padding: 0 12px;
+  padding: 0 var(--ts-space-4);
 
   h3 {
     margin: 0;
-    font-size: 13px;
-    font-weight: 800;
+    font-size: var(--ts-font-body);
+    font-weight: 600;
   }
 
   span {
@@ -360,14 +360,16 @@
   }
 
   button {
+    font-size: var(--ts-font-body);
+    font-weight: 600;
     height: 26px;
-    padding: 0 9px;
+    padding: 0;
     background: var(--ts-surface);
   }
 }
 
 .document-footer {
-  padding: 10px;
+  padding: var(--ts-space-3) var(--ts-space-4);
   background: var(--ts-surface-soft);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 250px;

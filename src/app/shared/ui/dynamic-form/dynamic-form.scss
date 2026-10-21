@@ -1,15 +1,15 @@
 @use '../form-control' as form-control;
 
 .header-form {
-  padding: 10px;
+  padding: var(--ts-space-3) var(--ts-space-4);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 9px 10px;
 
   label {
     color: var(--ts-muted);
-    font-size: 11px;
-    font-weight: 700;
+    font-size: var(--ts-font-label);
+    font-weight: 500;
   }
 
   input:not([type="checkbox"]),
@@ -27,8 +27,8 @@
     background: var(--ts-surface);
     color: var(--ts-text);
     font: inherit;
-    font-size: 13px;
-    font-weight: 650;
+    font-size: var(--ts-font-body);
+    font-weight: 500;
     resize: vertical;
   }
 
