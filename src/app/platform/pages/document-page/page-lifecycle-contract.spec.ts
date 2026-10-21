@@ -1,3 +1,5 @@
+import { purchasesPayablesSetupHeaderConfig, purchasesPayablesSetupListConfig } from '../../../features/setup/purchases-payables-setup/purchases-payables-setup.config';
+import { salesReceivablesSetupHeaderConfig, salesReceivablesSetupListConfig } from '../../../features/setup/sales-receivables-setup/sales-receivables-setup.config';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { By } from '@angular/platform-browser';
@@ -12,7 +14,7 @@ import { providePlatformGovernance } from '../../../core/providers/platform-gove
 
 describe('Page lifecycle with synthetic data, no operational records',()=>{
  const record={id:'fixture-1',code:'PR',description:'Purchase Requisition',systemRowVersion:1};
- function create(type:'card'|'document'|'setup'|'worksheet',response?:Subject<unknown>){
+ function create(type:'card'|'document'|'setup'|'worksheet',response?:Subject<unknown>,autoSave=false,headerConfig?:typeof purchasesPayablesSetupHeaderConfig){
   let current = structuredClone(record);
   const get=vi.fn((endpoint:string)=>response ?? of(endpoint.includes('lines')?{data:[{id:'line-1',lineNo:10000,quantity:2,systemRowVersion:1}]}:{data:current}));
   const patch=vi.fn((endpoint:string,body:Record<string,unknown>)=>{if(!endpoint.includes('lines')) current={...current,...body,systemRowVersion:current.systemRowVersion+1};return of({data:endpoint.includes('lines')?{id:'line-1',...body,systemRowVersion:2}:current});});
@@ -21,8 +23,8 @@ describe('Page lifecycle with synthetic data, no operational records',()=>{
   const f=TestBed.createComponent(DocumentPage);
   f.componentRef.setInput('pageId','fixture');f.componentRef.setInput('documentOnly',true);
   f.componentRef.setInput('initialRecord',structuredClone(record));
-  f.componentRef.setInput('listConfig',{pageId:'fixture',pageType:type,title:'Fixture page',autoSave:false,identity:{primaryField:'code',secondaryField:'description'},dataSource:{endpoint:'/fixtures',keyField:'id',singleton:type==='setup',supportsCreate:true,supportsUpdate:true,supportsDelete:true},factBox:{enabled:true},dataSurface:{columns:[{field:'code',label:'Code'}]}});
-  f.componentRef.setInput('headerConfig',{dialogTitle:'Fixture page',toolbarButtons:[],sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code',valueType:'code',required:true},{key:'description',label:'Description'}]}]});
+  f.componentRef.setInput('listConfig',{pageId:'fixture',pageType:type,title:'Fixture page',autoSave,identity:{primaryField:'code',secondaryField:'description'},dataSource:{endpoint:'/fixtures',keyField:'id',singleton:type==='setup',supportsCreate:true,supportsUpdate:true,supportsDelete:true},factBox:{enabled:true},dataSurface:{columns:[{field:'code',label:'Code'}]}});
+  f.componentRef.setInput('headerConfig',headerConfig ?? {dialogTitle:'Fixture page',toolbarButtons:[],sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code',valueType:'code',required:true},{key:'description',label:'Description'}]}]});
   if(type==='document'||type==='worksheet')f.componentRef.setInput('lineConfig',{placement:{mode:'end'},lineKeyField:'lineNo',toolbarButtons:[],dataSource:{endpoint:'/lines',keyField:'id',navigation:{parentEndpoint:'/fixtures',parentIdFields:['id'],childCollection:'lines'}},columns:[{id:'lineNo',label:'Line No.',readonly:true,valueType:'integer'},{id:'quantity',label:'Quantity',valueType:'number'}],fields:[{key:'quantity',label:'Quantity',valueType:'number'}]});
   f.detectChanges();return {f,get,patch};
  }
@@ -33,6 +35,25 @@ describe('Page lifecycle with synthetic data, no operational records',()=>{
   form.updateFieldValue(form.sections[0].fields[0],' pr ');form.notifyFieldInteracted(form.sections[0].fields[0]);
   await f.whenStable();expect(patch).not.toHaveBeenCalled();
   let closed=false;f.componentInstance.closeRequested.subscribe(()=>closed=true);await f.componentInstance.requestClose();expect(closed).toBe(true);f.destroy();
+ });
+
+ for(const [name,list,header] of [
+  ['Purchases',purchasesPayablesSetupListConfig,purchasesPayablesSetupHeaderConfig],
+  ['Sales',salesReceivablesSetupListConfig,salesReceivablesSetupHeaderConfig],
+ ] as const)it(name+' setup autosaves real edits without a Save toolbar command',async()=>{
+  expect(list.autoSave).toBe(true);
+  const {f,patch}=create('setup',undefined,list.autoSave,header);
+  await vi.waitFor(()=>expect(f.componentInstance.inlineDocumentWindowConfig?.contentReady).toBe(true));
+  await f.whenStable();f.detectChanges();
+  expect(f.componentInstance.inlineDocumentWindowConfig?.headerToolbarButtons?.some(button=>button.actionKey==='cmd:save')).toBe(false);
+  const form=f.debugElement.queryAll(By.directive(DynamicForm)).map(element=>element.componentInstance as DynamicForm).find(form=>form.sections.some(section=>section.fields.some(field=>field.key==='extDocNoMandatory')))!;
+  const field=form.sections.flatMap(section=>section.fields).find(field=>field.key==='extDocNoMandatory')!;
+  form.updateFieldValue(field,true);
+  await vi.waitFor(()=>expect(patch).toHaveBeenCalledTimes(1));await f.whenStable();
+  expect(patch.mock.calls[0][0]).toBe('/fixtures');
+  expect(patch.mock.calls[0][1]).toEqual({extDocNoMandatory:true});
+  form.updateFieldValue(field,true);form.notifyFieldInteracted(field);
+  await f.whenStable();expect(patch).toHaveBeenCalledTimes(1);f.destroy();
  });
  it('protects invalid typed drafts on close without sending them to the API',async()=>{
   const {f,patch}=create('card');await vi.waitFor(()=>expect(f.componentInstance.inlineDocumentWindowConfig?.contentReady).toBe(true));await f.whenStable();f.detectChanges();

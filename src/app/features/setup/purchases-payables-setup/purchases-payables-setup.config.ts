@@ -2,9 +2,7 @@ import { DataSourceConfig, HeaderConfig, ListPageConfig } from '../../../platfor
 
 export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchases & Payables Setup',
-  toolbarButtons: [
-    { label: 'Save', actionKey: 'cmd:save', isPrimary: true, icon: 'ts-icon ts-icon-check' },
-  ],
+  toolbarButtons: [],
   sections: [
     {
       id: 'numbering',
@@ -234,6 +232,7 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
 export const purchasesPayablesSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   pageId: 'purchases-payables-setup',
   pageType: 'setup',
+  autoSave: true,
   title: 'Purchases & Payables Setup',
   module: 'Purchase',
   menu: {

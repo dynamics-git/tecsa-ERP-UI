@@ -2,9 +2,7 @@ import { DataSourceConfig, HeaderConfig, ListPageConfig } from '../../../platfor
 
 export const salesReceivablesSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'Sales & Receivables Setup',
-  toolbarButtons: [
-    { label: 'Save', actionKey: 'cmd:save', isPrimary: true, icon: 'ts-icon ts-icon-check' },
-  ],
+  toolbarButtons: [],
   sections: [
     {
       id: 'numbering',
@@ -218,6 +216,7 @@ export const salesReceivablesSetupHeaderConfig: HeaderConfig = {
 export const salesReceivablesSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   pageId: 'sales-receivables-setup',
   pageType: 'setup',
+  autoSave: true,
   title: 'Sales & Receivables Setup',
   module: 'Sales',
   menu: { module: 'Sales', group: 'Setup', icon: 'ts-icon ts-icon-settings', route: '/sales-receivables-setup' },
