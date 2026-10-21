@@ -1,8 +1,11 @@
+import { FieldValidationService } from '../../../platform/document/field-validation.service';
+import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../../../platform/models/field-state';
+import { lookupQuery, clearDependentLookups } from '../../../platform/data/lookup-dependencies';
 import { resolveLookupIdentity } from '../../../platform/data/record-identity';
 import { LookupSelect } from '../lookup-select/lookup-select';
-import { normalizeFieldValue, fieldValuesEqual } from '../../../platform/models/field-value';
+import { normalizeFieldValue, fieldValuesEqual, fieldInputType, fieldEditorValue } from '../../../platform/models/field-value';
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output, ChangeDetectorRef } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectorRef, SimpleChanges } from '@angular/core';
 import { FieldConfig, FormSectionConfig } from '../../../platform/models/field-config.model';
 import { DataSourceService } from '../../../platform/data/data-source.service';
 import { Subscription, timer, switchMap } from 'rxjs';
@@ -31,15 +34,32 @@ type FieldDropdownOpenEvent = {
   styleUrl: './dynamic-form.scss',
 })
 export class DynamicForm {
-  constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef) {}
+  constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
+  readonly errors = new Map<string,string>();
+  private readonly drafts = new Map<string,unknown>();
+  errorId(field: FieldConfig): string { return this.lookupId + '-error-' + field.key; }
+  validate(): boolean {
+    this.errors.clear();
+    for (const section of this.sections) for (const field of section.fields) {
+      if (this.isHidden(field) || this.isFieldDisabled(field)) continue;
+      const result = this.validation.validateField(field, this.drafts.has(field.key) ? this.drafts.get(field.key) : this.data[field.key], this.data);
+      if (!result.valid) this.errors.set(field.key,result.errors[0]);
+    }
+    this.changes.markForCheck(); return this.errors.size === 0;
+  }
   private readonly lookups = new Map<string, Subscription>();
   private readonly lookupLabels = new Map<string, string>();
   private readonly selectedLookups = new Set<string>();
-  ngOnChanges(): void {
+  ngOnChanges(changes?:SimpleChanges): void {
+    if (changes?.['data'] && !changes['data'].firstChange) {
+      for(const fieldKey of this.drafts.keys()) this.draftChanged.emit({fieldKey,invalid:false});
+      this.drafts.clear();this.errors.clear();
+    }
     for (const section of this.sections) for (const field of section.fields) {
       const id = this.data[field.key];
       const bucket = field.optionsDataKey ?? `__options_${field.key}`;
-      if (!field.lookup || !id) continue;
+      if (!field.lookup || !id || !lookupQuery(field.lookup, this.data).ready) continue;
+      const context = lookupQuery(field.lookup, this.data).filter;
       const records = this.data[bucket];
       if (Array.isArray(records) && records.some(record => this.isRecord(record) && String(this.resolveOptionValue(field, record)) === String(id))) continue;
       const selectedKey = `${field.key}:${id}`;
@@ -48,6 +68,7 @@ export class DynamicForm {
       this.lookups.get(field.key)?.unsubscribe();
       this.lookups.set(field.key, this.source.loadById({ endpoint: field.lookup.endpoint }, id).subscribe({
         next: record => {
+          if (String(this.data[field.key]) !== String(id) || lookupQuery(field.lookup!, this.data).filter !== context) return;
           if (this.isRecord(record)) this.lookupLabels.set(field.key + ':' + id, this.resolveOptionLabel(field, record));
           this.data[bucket] = [record]; this.changes.markForCheck();
         }, error: () => { this.selectedLookups.delete(selectedKey); },
@@ -88,6 +109,9 @@ export class DynamicForm {
     this.closeLookup();
   }
   searchLookup(field: FieldConfig, text: string, nextPage = false): void {
+    if (!field.lookup) return;
+    const query = lookupQuery(field.lookup, this.data, text);
+    if (!query.ready) { this.lookups.get(field.key)?.unsubscribe(); this.lookupLoading = false; this.lookupHasMore = false; return; }
     if (nextPage && (this.lookupLoading || !this.lookupHasMore)) return;
     this.lookupRetryNextPage = nextPage;
     if (!nextPage) { this.lookupOffset = 0; this.lookupCursor = undefined; this.lookupHasMore = false; }
@@ -99,37 +123,44 @@ export class DynamicForm {
     this.lookups.get(field.key)?.unsubscribe();
     const bucket = field.optionsDataKey ?? `__options_${field.key}`;
     if (!nextPage) this.data[bucket] = [];
-    const escaped = text.trim().replace(/'/g, "''");
-    const fields = field.lookup.searchFields ?? [field.lookup.displayField];
-    const filter = escaped ? fields.map(key => `contains(${key}, '${escaped}')`).join(' or ') : undefined;
+    const filter = query.filter;
     this.lookups.set(field.key, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: field.lookup!.endpoint, paging: field.lookup!.paging, defaultFilter: filter, pageSize: 20 }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({
-      next: response => { const page = response as { value: unknown[]; meta: Record<string, unknown> };
+      next: response => {
+        if (lookupQuery(field.lookup!, this.data, text).filter !== query.filter || this.lookupOpen !== field.key) return;
+        const page = response as { value: unknown[]; meta: Record<string, unknown> };
         this.lookupOffset += page.value.length;
         this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
         this.lookupHasMore = field.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
         this.data[bucket] = nextPage ? [...(Array.isArray(this.data[bucket]) ? this.data[bucket] as unknown[] : []), ...page.value] : page.value; this.lookupLoading = false; this.changes.markForCheck(); },
-      error: () => { this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); },
+      error: () => { if (lookupQuery(field.lookup!, this.data, text).filter !== query.filter || this.lookupOpen !== field.key) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); },
     }));
   }
   ngOnDestroy(): void { this.lookups.forEach(subscription => subscription.unsubscribe()); }
   @Input() sections: FormSectionConfig[] = [];
+  @Input() dependencySections?: FormSectionConfig[];
   @Input() data: Record<string, unknown> = {};
+  @Output() draftChanged = new EventEmitter<{fieldKey:string;invalid:boolean}>();
   @Output() fieldChanged = new EventEmitter<FieldChangeEvent>();
   @Output() fieldInteracted = new EventEmitter<FieldInteractEvent>();
   @Output() dropdownOpened = new EventEmitter<FieldDropdownOpenEvent>();
 
   get visibleSections(): FormSectionConfig[] {
-    return this.sections.filter((section) => section.fields.some((field) => !field.hidden));
+    return this.sections.filter((section) => section.fields.some((field) => !this.isHidden(field)));
   }
 
+  inputType(field: FieldConfig): string { return fieldInputType(field.valueType ?? field.type); }
+
+  isRequired(field: FieldConfig): boolean { return fieldIsRequired(field, this.data); }
+  isHidden(field: FieldConfig): boolean { return fieldIsHidden(field, this.data); }
+
   getFieldValue(field: FieldConfig): string {
-    const value = this.data[field.key] ?? field.defaultValue;
+    const value = this.drafts.has(field.key) ? this.drafts.get(field.key) : this.data[field.key] === undefined ? field.defaultValue : this.data[field.key];
 
     if (value === undefined || value === null) {
       return '';
     }
 
-    return String(value);
+    return fieldEditorValue(value, field.valueType ?? field.type);
   }
 
   getFieldOptions(field: FieldConfig): Array<{ label: string; value: unknown }> {
@@ -171,11 +202,15 @@ export class DynamicForm {
   }
 
   updateFieldValue(field: FieldConfig, value: unknown): void {
+    if (this.isFieldDisabled(field) || this.isHidden(field)) return;
     value = normalizeFieldValue(value, field.valueType ?? field.type);
+    const result = this.validation.validateField(field,value,this.data);
+    if (!result.valid) { this.drafts.set(field.key,value); this.errors.set(field.key,result.errors[0]); this.draftChanged.emit({fieldKey:field.key,invalid:true}); this.changes.markForCheck(); return; }
+    this.drafts.delete(field.key); this.errors.delete(field.key); this.draftChanged.emit({fieldKey:field.key,invalid:false}); this.changes.markForCheck();
     const previousValue = this.data[field.key];
     if (fieldValuesEqual(previousValue, value, field.valueType ?? field.type)) return;
     this.data[field.key] = value;
-    const updates = this.resolveTargetUpdates(field, value);
+    const updates = this.resolveTargetUpdates(field, value) ?? {};
     const previousUpdates: Record<string, unknown> = {};
 
     if (updates) {
@@ -185,6 +220,15 @@ export class DynamicForm {
       }
     }
 
+    const dependencies = clearDependentLookups((this.dependencySections ?? this.sections).flatMap(section => section.fields), [field.key, ...Object.keys(updates).filter(key => !fieldValuesEqual(previousUpdates[key], updates[key]))], this.data);
+    Object.assign(updates, dependencies.updates);
+    Object.assign(previousUpdates, dependencies.previous);
+    for (const key of dependencies.invalidated) {
+      this.lookups.get(key)?.unsubscribe();
+      for (const cacheKey of this.lookupLabels.keys()) if (cacheKey.startsWith(key + ':')) this.lookupLabels.delete(cacheKey);
+      for (const selectedKey of this.selectedLookups) if (selectedKey.startsWith(key + ':')) this.selectedLookups.delete(selectedKey);
+      if (this.lookupOpen === key) { this.closeLookup(); this.lookupLoading = false; this.lookupHasMore = false; }
+    }
     this.fieldChanged.emit({
       fieldKey: field.key,
       value,
@@ -195,7 +239,7 @@ export class DynamicForm {
   }
 
   isFieldDisabled(field: FieldConfig): boolean {
-    return field.disabled === true || field.readonly === true;
+    return field.disabled === true || fieldIsReadonly(field, this.data) || (!!field.lookup && !lookupQuery(field.lookup, this.data).ready);
   }
 
   notifyFieldInteracted(field: FieldConfig): void {

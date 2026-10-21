@@ -47,6 +47,8 @@ type ActiveResize = {
   startWidth: number;
 };
 
+type ListRenderEntry = {key: string; row?: unknown; group?: {key: string; label: string; rows: unknown[]}};
+
 type ListDensity = 'compact' | 'comfortable' | 'spacious';
 
 @Component({
@@ -111,6 +113,33 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
   setGrouping(field: string): void { this.groupingField = field; this.collapsedGroups.clear(); this.persistPersonalization(); }
   toggleGroup(key: string): void { if (this.collapsedGroups.has(key)) this.collapsedGroups.delete(key); else this.collapsedGroups.add(key); }
+  private renderOffset = 0;
+  private measuredRowHeight?: number;
+  private resetRenderViewport(): void { this.renderOffset = 0; if (this.gridScroll) this.gridScroll.nativeElement.scrollTop = 0; }
+  private renderCache?: {data: unknown[]; length: number; grouping: string; collapsed: string; entries: ListRenderEntry[]};
+  private get renderEntries(): ListRenderEntry[] {
+    const collapsed = [...this.collapsedGroups].sort().join('|');
+    const cached = this.renderCache;
+    if (cached && cached.data === this.data && cached.length === this.data.length && cached.grouping === this.groupingField && cached.collapsed === collapsed) return cached.entries;
+    const entries: ListRenderEntry[] = [];
+    for (const group of this.rowGroups) {
+      if (this.groupingField) entries.push({key:'group:' + group.key, group});
+      if (!this.collapsedGroups.has(group.key)) for (const row of group.rows) entries.push({key:'row:' + this.getRowKey(row), row});
+    }
+    this.renderCache = {data:this.data, length:this.data.length, grouping:this.groupingField, collapsed, entries};
+    return entries;
+  }
+  get renderWindow(): {entries: ListRenderEntry[]; before: number; after: number; start: number; total:number} {
+    const entries = this.renderEntries;
+    // Subtitle rows can vary in height; measure their real height before windowing.
+    const height = this.renderRowHeight;
+    const first = entries.length > 200 ? Math.min(Math.max(0, Math.floor(this.renderOffset / height) - 12), Math.max(0, entries.length - 80)) : 0;
+    const end = entries.length > 200 ? Math.min(entries.length, first + 80) : entries.length;
+    return {entries:entries.slice(first,end), before:first * height, after:(entries.length-end) * height, start:first, total:entries.length};
+  }
+  private get renderRowHeight(): number {
+    return this.measuredRowHeight ?? (this.density === 'compact' ? 36 : this.density === 'spacious' ? 52 : 44);
+  }
   viewName = '';
   personalizationMessage = '';
   private preferenceScope = '';
@@ -132,6 +161,22 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
   onRowKey(event: KeyboardEvent, row: unknown): void {
     if (event.target !== event.currentTarget) return;
+    if (['ArrowDown','ArrowUp','Home','End'].includes(event.key)) {
+      event.preventDefault();
+      const entries = this.renderEntries.filter(entry => !entry.group);
+      const current = entries.findIndex(entry => entry.row === row);
+      const index = event.key === 'Home' ? 0 : event.key === 'End' ? entries.length-1 : Math.min(entries.length-1,Math.max(0,current+(event.key === 'ArrowDown' ? 1 : -1)));
+      const next = entries[index];
+      if (next) {
+        const position = this.renderEntries.indexOf(next);
+        this.renderOffset = position * this.renderRowHeight;
+        if (this.gridScroll) this.gridScroll.nativeElement.scrollTop = this.renderOffset;
+        this.selectRow(next.row); this.changeDetector.detectChanges();
+        const key = this.getRowKey(next.row);
+        Array.from(this.gridScroll?.nativeElement.querySelectorAll<HTMLElement>('tr[data-record-key]') ?? []).find(element => element.dataset['recordKey'] === key)?.focus();
+      }
+      return;
+    }
     if (event.key === 'Enter') { event.preventDefault(); this.openRow(row); }
     if (event.key === ' ' && this.config?.dataSurface?.selectable !== false) { event.preventDefault(); this.toggleRow(row, event); }
   }
@@ -195,6 +240,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   setDensity(value: string): void {
+    this.measuredRowHeight = undefined;
     if (value !== 'compact' && value !== 'comfortable' && value !== 'spacious') return;
     this.density = value;
     this.persistPersonalization();
@@ -282,8 +328,12 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.showCommandBar) this.factBoxHost.host.set(this);
     else if (this.factBoxHost.host() === this) this.factBoxHost.host.set(null);
-    if ('config' in changes) this.initializePersonalization();
+    if ('config' in changes) { this.initializePersonalization(); this.renderCache = undefined; this.measuredRowHeight = undefined; }
     if ('data' in changes) {
+      this.renderCache = undefined;
+      if (!changes['data'].previousValue?.length || this.data.length < changes['data'].previousValue.length) {
+        this.renderOffset = 0; if (this.gridScroll) this.gridScroll.nativeElement.scrollTop = 0;
+      }
       const available = new Set(this.data.map(row => this.getRowKey(row)));
       const selected = new Set([...this.selectedNos].filter(key => available.has(key)));
       if (selected.size !== this.selectedNos.size) { this.selectedNos = selected; queueMicrotask(() => this.emitCheckedKeysChanged()); }
@@ -527,6 +577,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   cycleDensity(): void {
+    this.measuredRowHeight = undefined;
     if (this.density === 'comfortable') {
       this.density = 'compact';
       return;
@@ -782,6 +833,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   toggleSort(column: DisplayColumn): void {
+    this.resetRenderViewport();
     if (column.sortable === false || this.config?.dataSurface?.sortable === false || this.config?.dataSource?.paging === 'cursor') return;
     const field = this.getColumnKey(column);
     if (!field.length) {
@@ -882,6 +934,11 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   onGridScroll(event: Event): void {
+    if (event.target instanceof HTMLElement) {
+      const measured = event.target.querySelector('tbody tr[data-record-row]')?.getBoundingClientRect().height;
+      if (measured && measured > 0) this.measuredRowHeight = measured;
+      this.renderOffset = event.target.scrollTop;
+    }
     if (!this.usesConfiguredData || this.loading || !this.hasMore || this.config?.dataSurface?.infiniteScroll === false) {
       return;
     }
@@ -900,6 +957,7 @@ export class ListPage implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   private emitFilterChanged(): void {
+    this.resetRenderViewport();
     if (!this.isBasicFilterEnabled) {
       return;
     }

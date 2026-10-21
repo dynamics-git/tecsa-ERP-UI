@@ -1,4 +1,4 @@
-import { normalizeFieldValue } from '../models/field-value';
+import { normalizeFieldValue, fieldValuesEqual } from '../models/field-value';
 import { Inject, Injectable, Optional } from '@angular/core';
 import { catchError, of, take } from 'rxjs';
 import { DOCUMENT_SAVE_PORT, DocumentSavePort, DocumentSaveResult } from './document-save.port';
@@ -106,15 +106,19 @@ export class DocumentStateService {
     let changed = false;
 
     if (fieldKey.length > 0) {
+      const previous = 'previousValue' in payload ? payload['previousValue'] : headerData[fieldKey];
+      changed = !fieldValuesEqual(previous, value, valueTypeMap[fieldKey]);
       headerData[fieldKey] = value;
-      changed = true;
     }
 
     const updates = payload['updates'];
     if (this.isRecord(updates)) {
       for (const [targetKey, targetValue] of Object.entries(updates)) {
-        headerData[targetKey] = this.coerceValue(targetValue, valueTypeMap[targetKey]);
-        changed = true;
+        const previousUpdates = this.isRecord(payload['previousUpdates']) ? payload['previousUpdates'] : {};
+        const previous = targetKey in previousUpdates ? previousUpdates[targetKey] : headerData[targetKey];
+        const next = this.coerceValue(targetValue, valueTypeMap[targetKey]);
+        changed = !fieldValuesEqual(previous, next, valueTypeMap[targetKey]) || changed;
+        headerData[targetKey] = next;
       }
     }
 
@@ -432,7 +436,7 @@ export class DocumentStateService {
       row,
       field: this.toText(column['field'] ?? column['id']),
       value: payload['value'],
-      calculatedFields: this.toTextArray(payload['calculatedFields'])
+      calculatedFields: [...new Set([...this.toTextArray(payload['calculatedFields']), ...this.toTextArray(payload['updatedFields'])])]
     };
   }
 

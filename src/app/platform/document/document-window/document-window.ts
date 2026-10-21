@@ -82,6 +82,8 @@ export class DocumentWindow {
   @Input() attachments?: AttachmentsConfig;
   private readonly session = inject(SessionService);
   private readonly forms = viewChildren(DynamicForm);
+  validateHeaderForms(): boolean { return this.forms().map(form => form.validate()).every(Boolean); }
+  @Input() preferenceKey = '';
   @Input() factBoxConfig?: ListFactBoxConfig;
   @Input() factBoxSections?: FactBoxSectionConfig[];
   @Input() statusMessage?: DocumentStatusMessage;

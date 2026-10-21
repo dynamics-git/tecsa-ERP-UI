@@ -1,7 +1,7 @@
 @if (documentOnly || isInlineEntryPage) {
   @if (inlineDocumentWindowConfig; as entry) {
     <app-document-window
-      [embedded]="!documentOnly" [worksheet]="isWorksheetPage"
+      [preferenceKey]="pageId" [embedded]="!documentOnly" [worksheet]="isWorksheetPage"
       [pageLabel]="entry.pageLabel" [title]="entry.title" [subtitle]="entry.subtitle"
       [headerCommandBar]="entry.headerCommandBar" [lineCommandBar]="entry.lineCommandBar"
       [headerToolbarButtons]="entry.headerToolbarButtons" [lineToolbarButtons]="entry.lineToolbarButtons"

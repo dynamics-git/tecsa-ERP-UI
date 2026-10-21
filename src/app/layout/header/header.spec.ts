@@ -17,7 +17,7 @@ describe('Header', () => {
 
     // Global search now reads explicit backend-derived page permissions.
     TestBed.inject(SessionService).Permissions = [{
-      PageId: 'purchase-order', PageName: 'Purchase Order', ObjectName: 'purchase_orders', ReadPermission: 'Yes',
+      PageId: 'purchase-requisition', PageName: 'Purchase Order', ObjectName: 'purchase_orders', ReadPermission: 'Yes',
     }];
     fixture = TestBed.createComponent(Header);
     component = fixture.componentInstance;
@@ -35,7 +35,7 @@ describe('Header', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(fixture.nativeElement.querySelector('input[type="search"]')).not.toBeNull();
     component.onGlobalSearchInput('purchase');
-    expect(component.searchResults.map(item => item.pageId)).toEqual(['purchase-order']);
+    expect(component.searchResults.map(item => item.pageId)).toEqual(['purchase-requisition']);
   });
   it('hides unpermitted pages from global search', () => {
     TestBed.inject(SessionService).Permissions = [];

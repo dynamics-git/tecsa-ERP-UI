@@ -69,6 +69,7 @@ export class LookupSelect {
       this.active = !length ? -1 : this.active < 0
         ? (event.key === 'ArrowDown' ? 0 : length - 1)
         : (this.active + (event.key === 'ArrowDown' ? 1 : -1) + length) % length;
+      if (this.active >= 0 && (this.active < this.windowStart || this.active >= this.windowStart + this.windowSize)) this.windowStart = Math.max(0, Math.min(this.active - 10, length - this.windowSize));
       if (this.active >= 0 && this.list) {
         const list = this.list.nativeElement;
         const top = this.active * this.rowHeight;
@@ -78,6 +79,7 @@ export class LookupSelect {
         }
       }
     }
+    if (event.key === 'Enter' && this.expanded && this.error) { event.preventDefault(); event.stopPropagation(); this.retried.emit(); return; }
     if (event.key === 'Enter' && this.expanded) {
       event.preventDefault(); event.stopPropagation();
       const option = this.options[this.active];

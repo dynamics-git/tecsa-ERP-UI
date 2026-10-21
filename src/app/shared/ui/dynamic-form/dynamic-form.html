@@ -1,22 +1,22 @@
 <div class="header-form">
   @for (section of visibleSections; track section.id) {
     @for (field of section.fields; track field.key) {
-      @if (!field.hidden) {
+      @if (!isHidden(field)) {
         <label [class.wide]="isWide(field)" [class.boolean-field]="(field.type === 'boolean' || field.valueType === 'boolean')">
-          {{ field.label }} @if (field.required) { <span aria-hidden="true">*</span> }
+          {{ field.label }} @if (isRequired(field)) { <span aria-hidden="true">*</span> }
 
           @if (field.lookup) {
             <app-lookup-select [placeholder]="field.placeholder ?? ''" [label]="field.label" [display]="lookupLabel(field)" [value]="data[field.key]"
-              [disabled]="isFieldDisabled(field)" [required]="field.required === true" [options]="getFieldOptions(field)"
+              [disabled]="isFieldDisabled(field)" [required]="isRequired(field)" [options]="getFieldOptions(field)"
               [loading]="lookupOpen === field.key && lookupLoading" [error]="lookupOpen === field.key ? lookupError : ''"
               [hasMore]="lookupOpen === field.key && lookupHasMore" (nextPage)="searchLookup(field, lookupQuery, true)" (retried)="searchLookup(field, lookupQuery, lookupRetryNextPage)" (opened)="openLookup(field)" (searched)="searchLookup(field, $event)" (selected)="chooseLookup(field, $event)" />
           } @else if (field.type === 'select' || field.type === 'dropdown' || field.type === 'lookup') {
             <select
-              [value]="getFieldValue(field)"
+              [value]="getFieldValue(field)" [attr.aria-invalid]="errors.has(field.key) || null" [attr.aria-describedby]="errors.has(field.key) ? errorId(field) : null"
               [disabled]="isFieldDisabled(field)"
               (focus)="notifyFieldInteracted(field); notifyDropdownOpened(field)"
               (change)="updateFieldValue(field, resolveSelectValue(field, $any($event.target).value))">
-              @if (!field.required || showEmptyOption(field)) {
+              @if (!isRequired(field) || showEmptyOption(field)) {
                 <option value=""></option>
               }
               @for (option of getFieldOptions(field); track $index) {
@@ -29,18 +29,19 @@
           } @else if (field.type === 'textarea') {
             <textarea
               rows="3"
-              [value]="getFieldValue(field)"
+              [value]="getFieldValue(field)" [attr.aria-invalid]="errors.has(field.key) || null" [attr.aria-describedby]="errors.has(field.key) ? errorId(field) : null"
               [readOnly]="isFieldDisabled(field)"
               (focus)="notifyFieldInteracted(field)"
               (change)="updateFieldValue(field, coerceInputValue(field, $any($event.target).value))"></textarea>
           } @else {
             <input
-              [type]="(field.type === 'date' || field.valueType === 'date') ? 'date' : (field.type === 'number' || field.type === 'currency' || field.valueType === 'number' || field.valueType === 'integer' || field.valueType === 'decimal') ? 'number' : 'text'" step="any"
-              [value]="getFieldValue(field)"
+              [type]="inputType(field)" [attr.inputmode]="field.valueType === 'decimal' ? 'decimal' : null" step="any" [attr.aria-required]="isRequired(field)"
+              [value]="getFieldValue(field)" [attr.aria-invalid]="errors.has(field.key) || null" [attr.aria-describedby]="errors.has(field.key) ? errorId(field) : null"
               [readOnly]="isFieldDisabled(field)"
               (focus)="notifyFieldInteracted(field)"
               (change)="updateFieldValue(field, coerceInputValue(field, $any($event.target).value))" />
           }
+          @if (errors.get(field.key); as error) { <span class="field-error" role="alert" [id]="errorId(field)">{{ error }}</span> }
         </label>
       }
     }

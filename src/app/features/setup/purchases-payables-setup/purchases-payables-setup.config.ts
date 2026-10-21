@@ -1,4 +1,4 @@
-import { HeaderConfig } from '../../../platform/public-api';
+import { DataSourceConfig, HeaderConfig, ListPageConfig } from '../../../platform/public-api';
 
 export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchases & Payables Setup',
@@ -229,4 +229,26 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
       ],
     },
   ],
+};
+
+export const purchasesPayablesSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  pageId: 'purchases-payables-setup',
+  pageType: 'setup',
+  title: 'Purchases & Payables Setup',
+  module: 'Purchase',
+  menu: {
+    module: 'Purchase',
+    group: 'Setup',
+    icon: 'ts-icon ts-icon-settings',
+    route: '/purchases-payables-setup',
+  },
+  tools: { filter: false, advancedFilter: false, export: false, columns: false },
+  dataSource: {
+    endpoint: '/purchasesPayablesSetup',
+    singleton: true,
+    keyField: 'systemId',
+    supportsCreate: false,
+    supportsUpdate: true,
+    supportsDelete: false,
+  },
 };

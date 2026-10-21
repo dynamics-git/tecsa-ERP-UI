@@ -27,12 +27,18 @@ export function lineConfigDefaults(config: LineConfig): LineConfig {
       valueType: column.valueType ?? legacy?.valueType,
       readonly: column.readonly ?? legacy?.readonly,
       required: column.required ?? legacy?.required,
+      requiredWhen: column.requiredWhen ?? legacy?.requiredWhen,
+      readonlyWhen: column.readonlyWhen ?? legacy?.readonlyWhen,
       validation: column.validation ?? legacy?.validation,
     };
   });
   config = { ...config, fields: [...resolvedFields, ...(config.fields ?? []).filter(f => !resolvedFields.some(r => r.key === f.key))],
     columns: config.columns.map(column => ({
       ...column,
+      required: column.required ?? resolvedFields.find(f => f.key === (column.field ?? column.id))?.required,
+      validation: column.validation ?? resolvedFields.find(f => f.key === (column.field ?? column.id))?.validation,
+      requiredWhen: column.requiredWhen ?? resolvedFields.find(f => f.key === (column.field ?? column.id))?.requiredWhen,
+      readonlyWhen: column.readonlyWhen ?? resolvedFields.find(f => f.key === (column.field ?? column.id))?.readonlyWhen,
       readonly: column.readonly ?? resolvedFields.find(f => f.key === (column.field ?? column.id))?.readonly,
       valueType: column.valueType ?? resolvedFields.find(f => f.key === (column.field ?? column.id))?.valueType,
     })),

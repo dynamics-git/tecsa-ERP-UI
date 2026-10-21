@@ -40,6 +40,8 @@ export class ListFilterStateService {
 
   constructor(private readonly listFilters: ListFilterService) {}
 
+  release(scope:string):void { this.states.delete(scope); }
+
   initializeFromConfig(
     scope: string,
     listConfig: {
@@ -226,7 +228,7 @@ export class ListFilterStateService {
       return true;
     }
 
-    return ['text', 'badge', 'lookup', 'number', 'currency', 'date', 'boolean'].includes(normalized);
+    return ['text', 'code', 'badge', 'lookup', 'number', 'integer', 'decimal', 'currency', 'date', 'boolean', 'email', 'url', 'phone'].includes(normalized);
   }
 
   private resolveSearchMode(type: unknown): 'contains' | 'equals' {

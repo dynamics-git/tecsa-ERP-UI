@@ -49,7 +49,7 @@ export class EntityContractService {
 
       const mappedKey = outboundFieldMap.get(this.normalizeToken(key)) ?? key;
       if (config.omitEmptyFields?.includes(mappedKey) && (value === '' || value === null || value === undefined)) continue;
-      if (allowed?.length && !allowed.includes(mappedKey)) continue;
+      if (allowed && !allowed.includes(mappedKey)) continue;
       if (operation === 'update' && config.updateBlockedFields?.includes(mappedKey)) continue;
       if (omitted.has(this.normalizeToken(key)) || omitted.has(this.normalizeToken(mappedKey))) {
         continue;

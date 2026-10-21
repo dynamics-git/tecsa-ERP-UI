@@ -23,7 +23,7 @@ export class DocumentConfigDataService {
       for (const field of section.fields) {
         const source = record[field.key];
         data[field.key] =
-          source === null || source === undefined || source === '' ? (field.defaultValue ?? '') : source;
+          source === undefined ? (field.defaultValue !== undefined ? field.defaultValue : '') : source;
 
         const optionsKey = this.getOptionsDataKey(field.key, field.optionsDataKey);
         data[optionsKey] = dropdownRecords[optionsKey] ?? data[optionsKey] ?? [];
@@ -132,7 +132,7 @@ export class DocumentConfigDataService {
   ): Record<string, unknown> | null {
     const fields = lineConfig.dataSource.createFields ?? [];
     if (!fields.length) {
-      return { ...row };
+      return null;
     }
 
     if ((lineConfig.dataSource.requiredCreateFields ?? []).some(field => !this.hasValue(row[field]))) return null;
@@ -199,7 +199,7 @@ export class DocumentConfigDataService {
     }
 
     if (column.valueType === 'number') {
-      return this.toNumber(value) ?? 0;
+      return normalizeFieldValue(value, column.valueType);
     }
 
     return value ?? '';

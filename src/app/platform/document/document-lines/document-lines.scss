@@ -270,3 +270,5 @@
 .line-grid input.empty-date:not(:focus)::-webkit-calendar-picker-indicator { opacity: 0; }
 .line-grid td:hover input.empty-date::-webkit-calendar-picker-indicator { opacity: 1; }
 :host { display: block; min-height: 0; }
+
+.cell-error { display: block; color: var(--ts-danger); font-size: var(--ts-font-label); white-space: normal; }

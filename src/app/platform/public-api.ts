@@ -54,3 +54,5 @@ export * from './pages/list-personalization.service';
 export * from './pages/standard-list-actions.service';
 
 export * from './models/record-identity.model';
+
+export * from './pages/unsaved-changes.service';

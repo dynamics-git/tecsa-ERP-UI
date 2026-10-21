@@ -82,6 +82,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
           field,
           label,
           type,
+          valueType: ['decimal','integer','boolean'].includes(column.type ?? '') ? column.type : undefined,
           options: column.type === 'boolean' ? [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] : undefined,
           ...column.filter,
         } as ListFilterFieldConfig;
@@ -216,6 +217,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
   }
 
   getValueInputType(field: string): 'text' | 'number' | 'date' {
+    if (this.resolvedFilterOptions.find(option => option.field === field)?.valueType === 'decimal') return 'text';
     const type = this.getFieldType(field);
     if (type === 'number' || type === 'currency') {
       return 'number';

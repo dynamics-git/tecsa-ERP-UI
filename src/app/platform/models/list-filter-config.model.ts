@@ -1,3 +1,4 @@
+import type { FieldValueType } from './field-value';
 export type FilterOperator = 'contains' | 'startswith' | 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'expression';
 
 export interface ListFilterFieldConfig {
@@ -5,7 +6,7 @@ export interface ListFilterFieldConfig {
   label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'dropdown';
   operator?: FilterOperator;
-  valueType?: 'text' | 'number' | 'boolean' | 'date';
+  valueType?: FieldValueType;
   placeholder?: string;
   options?: Array<{ value: unknown; label: string }>;
   defaultValue?: unknown;

@@ -44,7 +44,7 @@ export class RunModalService {
   constructor() {
     this.stack.stack$.subscribe(stack => {
       const ids = new Set(stack.map(popup => popup.id));
-      for (const id of this.lists.keys()) if (!ids.has(id)) this.lists.delete(id);
+      for (const id of this.lists.keys()) if (!ids.has(id)) { this.lists.delete(id); this.filters.release(id); }
     });
   }
 
@@ -78,7 +78,7 @@ export class RunModalService {
     const binding: ListBinding = { pageId: definition.pageId, module: definition.module, source, context, rows: [], loading: false, hasMore: true, generation: 0 };
     const opened = this.stack.open({ id, title: config.title, mode: request.mode ?? 'page', size: request.size ?? 'full', allowNested: request.allowNested ?? true,
       data: { runModalList: { pageId: definition.pageId, config, rows: [], loading: true, hasMore: false } } satisfies RunModalHostData });
-    if (!opened) { this.failure = 'popup-open-blocked'; return false; }
+    if (!opened) { this.filters.release(id); this.failure = 'popup-open-blocked'; return false; }
     this.failure = '';
     this.lists.set(id, binding);
     void this.loadList(id, true);
@@ -107,6 +107,7 @@ export class RunModalService {
   releasePopup(id: string): void {
     this.state.releasePopup(id);
     this.lists.delete(id);
+    this.filters.release(id);
     const parent = this.parents.get(id);
     this.parents.delete(id);
     const page = this.entryPages.get(id);

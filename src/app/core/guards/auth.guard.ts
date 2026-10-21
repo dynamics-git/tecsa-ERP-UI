@@ -1,3 +1,4 @@
+import { UnsavedChangesService } from '../../platform/public-api';
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivateChildFn, CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
 import { PermissionService } from '../services/permission.service';
@@ -33,3 +34,5 @@ export const guestGuard: CanActivateFn = () => {
 
   return true;
 };
+
+export const unsavedChangesGuard: CanActivateChildFn = () => !inject(SessionService).isSessionValid() || inject(UnsavedChangesService).canLeave();

@@ -1,3 +1,4 @@
+import { fieldIsReadonly } from '../models/field-state';
 import { normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
@@ -54,7 +55,7 @@ export class DocumentPayloadService {
 
     for (const section of sections) {
       for (const field of section.fields) {
-        if (field.readonly) {
+        if (fieldIsReadonly(field, headerData)) {
           continue;
         }
 

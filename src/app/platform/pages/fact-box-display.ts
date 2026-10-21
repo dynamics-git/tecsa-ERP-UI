@@ -15,6 +15,7 @@ export function automaticDetailFields(columns: DetailField[], row: Record<string
   }
   for(const [field,value] of Object.entries(row)) {
     if(fields.length>=24) break;
+    if(!auditLabel(field)) continue;
     if(seen.has(field.toLowerCase()) || value==null || typeof value==='object') continue;
     if(/password|token|secret|credential|authorization|hash|salt|etag|rowversion/i.test(field) || /^(systemId|id|companyId|workspaceId|tenantId|createdBy|modifiedBy|__.*)$/i.test(field)) continue;
     fields.push({field,label:auditLabel(field)||field.replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase()),type:typeof value==='boolean'?'boolean':typeof value==='number'?'number':'text'});

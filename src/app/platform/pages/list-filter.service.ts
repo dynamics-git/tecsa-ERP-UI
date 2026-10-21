@@ -53,7 +53,7 @@ export class ListFilterService {
           const value = /^(yes|true)$/i.test(term) ? 'true' : /^(no|false)$/i.test(term) ? 'false' : undefined;
           return value ? [`${target.field} eq ${value}`] : [];
         }
-        if (target.type === 'number' || target.type === 'currency') return /^[+-]?\d+(?:\.\d+)?$/.test(term) ? [`${target.field} eq ${term}`] : [];
+        if (['number','integer','decimal','currency'].includes(target.type ?? '')) return /^[+-]?\d+(?:\.\d+)?$/.test(term) ? [`${target.field} eq ${term}`] : [];
         if (target.type === 'date') return /^\d{4}-\d{2}-\d{2}$/.test(term) && !Number.isNaN(Date.parse(term)) ? [`${target.field} eq '${escaped}'`] : [];
         return [target.mode === 'equals' ? `${target.field} eq '${escaped}'` : `contains(${target.field}, '${escaped}')`];
       });

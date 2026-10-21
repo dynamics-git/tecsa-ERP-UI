@@ -60,7 +60,7 @@
               [style.width]="getColumnWidthStyle(column)">
               @if (column.lookup) {
                 <app-lookup-select class="grid-editor" [label]="column.label" [display]="lookupDisplay(column, row)" [value]="row[column.field ?? column.id]"
-                  [disabled]="isReadonly(column, row)" [required]="column.required === true" [options]="getOptions(column, row)"
+                  [disabled]="isReadonly(column, row)" [required]="isRequired(column, row)" [options]="getOptions(column, row)"
                   [loading]="activeLookupRow === row && activeLookupColumn === column.id && lookupLoading"
                   [error]="activeLookupRow === row && activeLookupColumn === column.id ? lookupError : ''"
                   (opened)="notifyDropdownOpened(column, row, rowIndex); searchLookup(column, row, '')"
@@ -85,8 +85,9 @@
               } @else if (column.valueType === 'boolean') {
                 <input type="checkbox" [attr.aria-label]="column.label" [checked]="getCellValue(row, column) === 'true'" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, $any($event.target).checked)" />
               } @else {
-                <input [class.empty-date]="column.valueType === 'date' && !getCellValue(row, column)" [attr.aria-label]="column.label" [type]="column.valueType === 'date' ? 'date' : (column.valueType === 'number' || column.valueType === 'integer' || column.valueType === 'decimal') ? 'number' : 'text'" step="any" [value]="getCellValue(row, column)" [readonly]="isReadonly(column, row)" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
+                <input [class.empty-date]="column.valueType === 'date' && !getCellValue(row, column)" [attr.aria-label]="column.label" [type]="inputType(column)" [attr.inputmode]="column.valueType === 'decimal' ? 'decimal' : null" [attr.aria-invalid]="cellError(row, column) ? true : null" [attr.aria-describedby]="cellError(row,column) ? editorId + '-error-' + rowIndex + '-' + column.id : null" step="any" [attr.aria-required]="isRequired(column, row)" [value]="getCellValue(row, column)" [readonly]="isReadonly(column, row)" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
               }
+              @if (cellError(row,column); as error) { <span class="cell-error" role="alert" [id]="editorId + '-error-' + rowIndex + '-' + column.id">{{ error }}</span> }
             </td>
           }
         </tr>

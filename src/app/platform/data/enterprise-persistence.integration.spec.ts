@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SessionService } from '../../core/services/session.service';
 import { DocumentSaveService } from '../../core/services/document-save.service';
-import { purchaseOrderListConfig } from '../../features/purchasing/purchase-order/purchase-order.config';
+import { DataSourceConfig } from '../models/data-source-config.model';
+const fixtureSource: DataSourceConfig = { endpoint: '/fixtureHeaders', keyField: 'Id', supportsCreate: true, supportsUpdate: true, supportsDelete: true };
 import { DATA_REST_SERVICE, DataRestService } from './data-source.service';
 import { DraftCreateService } from './draft-create.service';
 import { DataSourceService } from './data-source.service';
@@ -72,7 +73,7 @@ describe('Enterprise persistence integration', () => {
     dataSource = TestBed.inject(DataSourceService);
   });
 
-  it('retries create when BC reports unknown property', () => {
+  it('retries create when BC reports unknown property', async () => {
     let attempt = 0;
     postImpl = () => {
       attempt += 1;
@@ -83,15 +84,10 @@ describe('Enterprise persistence integration', () => {
       return of({ Id: 'PO-1' });
     };
 
-    let actual: unknown;
-    draftCreate
-      .createWithUnknownPropertyFallback(purchaseOrderListConfig.dataSource, {
+    const actual = await firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, {
         CreatedBy: 'tester',
         CurrencyCode: 'MYR'
-      })
-      .subscribe((response) => {
-        actual = response;
-      });
+      }));
 
     expect(actual).toEqual({ Id: 'PO-1' });
     expect(postCalls.length).toBe(2);
@@ -103,17 +99,12 @@ describe('Enterprise persistence integration', () => {
     expect('CurrencyCode' in secondPayload).toBeFalsy();
   });
 
-  it('returns null without retrying when BC rejects a create body', () => {
+  it('returns null without retrying when BC rejects a create body', async () => {
     postImpl = () => throwError(() => bcError('Values must be provided in the body.'));
 
-    let actual: unknown;
-    draftCreate
-      .createWithUnknownPropertyFallback(purchaseOrderListConfig.dataSource, {
+    const actual = await firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, {
         UnknownField: 'value'
-      })
-      .subscribe((response) => {
-        actual = response;
-      });
+      }));
 
     expect(actual).toBeNull();
     expect(postCalls.length).toBe(1);
@@ -122,27 +113,24 @@ describe('Enterprise persistence integration', () => {
     expect(sentPayload).toEqual({ UnknownField: 'value' });
   });
 
-  it('returns save error when BC rejects readonly field update shape', () => {
+  it('returns save error when BC rejects readonly field update shape', async () => {
     patchImpl = () => throwError(() => bcError("Control 'Status' is read-only and cannot be modified."));
 
     let actualSaved = true;
     let actualMessage = '';
 
-    entrySave
-      .save({
+    const result = await firstValueFrom(entrySave.save({
         scope: 'purchase-order-entry',
-        dataSourceConfig: purchaseOrderListConfig.dataSource,
+        dataSourceConfig: fixtureSource,
         headerSections: [{ id: 'header', fields: [{ key: 'VendorOrderNumber', label: 'Vendor Order Number', type: 'text' }] }],
         headerData: {
-          Id: 'PO-ID-1',
+          Id: 'PO-ID-1', systemRowVersion: 1,
           Status: 'Released',
           VendorOrderNumber: 'V-123'
         }
-      })
-      .subscribe((result) => {
-        actualSaved = result.saved;
-        actualMessage = result.errorMessage ?? '';
-      });
+      }));
+    actualSaved = result.saved;
+    actualMessage = result.errorMessage ?? '';
 
     expect(actualSaved).toBeFalsy();
     expect(actualMessage.toLowerCase()).toContain('read-only');
@@ -152,7 +140,7 @@ describe('Enterprise persistence integration', () => {
 
   it('does not send an empty draft create request', () => {
     let actual: unknown;
-    draftCreate.createWithUnknownPropertyFallback(purchaseOrderListConfig.dataSource, {})
+    draftCreate.createWithUnknownPropertyFallback(fixtureSource, {})
       .subscribe(response => actual = response);
     expect(actual).toBeNull();
     expect(postCalls).toEqual([]);
@@ -166,21 +154,13 @@ describe('Enterprise persistence integration', () => {
     expect(patchCalls).toEqual([]);
   });
 
-  it('surfaces delete error from BC response shape', () => {
+  it('surfaces delete error from BC response shape', async () => {
     deleteImpl = () => throwError(() => bcError('The requested record was not found.'));
 
     let actualErrorMessage = '';
 
-    dataSource.delete(purchaseOrderListConfig.dataSource, 'PO-ID-404').subscribe({
-      next: () => {
-        throw new Error('Expected delete to fail');
-      },
-      error: (error) => {
-        actualErrorMessage =
-          (error as any)?.error?.error?.message ??
-          (error as any)?.error?.message ??
-          '';
-      }
+    await firstValueFrom(dataSource.delete(fixtureSource, 'PO-ID-404', 1)).catch(error => {
+      actualErrorMessage = error?.error?.error?.message ?? error?.error?.message ?? '';
     });
 
     expect(actualErrorMessage).toContain('not found');

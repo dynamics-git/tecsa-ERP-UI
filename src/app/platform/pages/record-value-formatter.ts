@@ -21,7 +21,7 @@ export function formatRecordValue(value: unknown, format: RecordValueFormat): st
     const date = new Date(dateOnly ? `${value}T00:00:00Z` : value);
     if (!Number.isNaN(date.getTime())) return new Intl.DateTimeFormat(undefined, {year: 'numeric', month: 'short', day: '2-digit', ...(dateOnly ? {timeZone: 'UTC'} : {})}).format(date);
   }
-  if ((format.type === 'number' || format.type === 'currency') && (typeof value === 'number' || typeof value === 'string')) {
+  if ((['number','integer','decimal','currency'].includes(format.type ?? '')) && (typeof value === 'number' || typeof value === 'string')) {
     const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(String(value));
     if (match) {
       const decimal = new Intl.NumberFormat().formatToParts(1.1).find(part => part.type === 'decimal')?.value ?? '.';

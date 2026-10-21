@@ -132,7 +132,7 @@
       <div #gridScroll class="grid-scroll" (scroll)="onGridScroll($event)">
 
         <table
-          class="app-grid"
+          class="app-grid" [attr.aria-rowcount]="renderWindow.total + 1"
           [class.density-compact]="density === 'compact'"
           [class.density-spacious]="density === 'spacious'"
           [style.min-width]="gridMinWidth">
@@ -194,8 +194,10 @@
 
         <tbody>
 
-          @for (group of rowGroups; track group.key) {
-          @if (groupingField) {
+          @let viewport = renderWindow;
+          @if (viewport.before) { <tr aria-hidden="true" class="virtual-spacer"><td [attr.colspan]="columns.length + 2" [style.height.px]="viewport.before"></td></tr> }
+          @for (entry of viewport.entries; track entry.key) {
+          @if (entry.group; as group) {
             <tr class="list-group-row"><td [attr.colspan]="columns.length + 2">
               <button type="button" [attr.aria-expanded]="!collapsedGroups.has(group.key)" (click)="toggleGroup(group.key)">
                 <i [class]="collapsedGroups.has(group.key) ? 'ts-icon ts-icon-right' : 'ts-icon ts-icon-down'" aria-hidden="true"></i>
@@ -203,9 +205,9 @@
               </button>
             </td></tr>
           }
-          @if (!collapsedGroups.has(group.key)) {
-          @for (row of group.rows; track getRowKey(row)) {
-            <tr
+          @if (!entry.group) {
+          @let row = entry.row;
+            <tr data-record-row [attr.data-record-key]="getRowKey(row)" [attr.aria-rowindex]="viewport.start + $index + 2"
               tabindex="0" (keydown)="onRowKey($event, row)"
               (click)="selectRow(row)"
               (dblclick)="openRow(row, $event)"
@@ -263,9 +265,8 @@
               }
             </tr>
           }
-
           }
-          }
+          @if (viewport.after) { <tr aria-hidden="true" class="virtual-spacer"><td [attr.colspan]="columns.length + 2" [style.height.px]="viewport.after"></td></tr> }
         </tbody>
 
       </table>

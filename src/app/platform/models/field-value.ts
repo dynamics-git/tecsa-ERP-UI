@@ -1,7 +1,9 @@
 /** Shared value semantics. Invalid input is preserved for validation, never silently zeroed. */
-export type FieldValueType = 'text' | 'code' | 'number' | 'integer' | 'decimal' | 'boolean' | 'date';
+export type FieldValueType = 'text' | 'code' | 'number' | 'integer' | 'decimal' | 'boolean' | 'date' | 'datetime' | 'time' | 'guid' | 'email' | 'url' | 'phone';
 export function normalizeFieldValue(value: unknown, type?: string): unknown {
   if (value === null || value === undefined) return value;
+  if (type === 'datetime' && typeof value === 'string' && isValidDateTime(value)) return new Date(value).toISOString();
+  if (type === 'guid') return String(value).trim().toLowerCase();
   if (type === 'code') return String(value).trim().toUpperCase();
   // API decimal values remain strings so large quantities/costs do not lose digits.
   if (type === 'decimal') return String(value).trim();
@@ -61,4 +63,29 @@ export function compareDecimalValues(left: string, right: string): -1 | 0 | 1 | 
   const result = a.whole.length !== b.whole.length ? (a.whole.length < b.whole.length ? -1 : 1)
     : a.whole !== b.whole ? (a.whole < b.whole ? -1 : 1) : af === bf ? 0 : af < bf ? -1 : 1;
   return (a.negative ? -result : result) as -1 | 0 | 1;
+}
+
+/** Native editors share one type mapping in forms and editable grids. */
+export function fieldInputType(type?: string): string {
+  if (type === 'datetime') return 'datetime-local';
+  if (['date', 'time', 'email', 'url'].includes(type ?? '')) return type!;
+  if (type === 'phone') return 'tel';
+  if (['number', 'integer', 'currency'].includes(type ?? '')) return 'number';
+  // Decimal strings remain text to preserve arbitrary precision through the DOM.
+  return 'text';
+}
+export function fieldEditorValue(value: unknown, type?: string): string {
+  if (value === null || value === undefined) return '';
+  if (type === 'datetime' && isValidDateTime(String(value))) {
+    const date = new Date(String(value));
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return date.getFullYear() + '-' + pad(date.getMonth()+1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds()) + (date.getMilliseconds() ? '.' + String(date.getMilliseconds()).padStart(3, '0') : '');
+  }
+  return String(value);
+}
+export function isValidDateTime(text: string): boolean {
+  const parts = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})?$/.exec(text);
+  if (!parts || Number(parts[2]) > 23 || Number(parts[3]) > 59 || Number(parts[4] ?? 0) > 59) return false;
+  const day = new Date(parts[1] + 'T00:00:00Z');
+  return Number.isFinite(day.getTime()) && day.toISOString().slice(0,10) === parts[1] && Number.isFinite(new Date(text).getTime());
 }

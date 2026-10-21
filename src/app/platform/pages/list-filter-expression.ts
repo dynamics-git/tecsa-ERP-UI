@@ -4,6 +4,7 @@ import type { FilterOperator } from '../models/list-filter-config.model';
 export function buildFieldFilter(field: string, value: string, operator: FilterOperator, type = 'text'): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(field)) throw new Error('Select a valid filter field.');
   if (!['contains', 'startswith', 'eq', 'ne', 'gt', 'ge', 'lt', 'le', 'expression'].includes(operator)) throw new Error('Select a supported filter operator.');
+  if (type === 'integer' || type === 'decimal') type = 'number';
   const raw = value.trim();
   if (!raw || raw.length > 200) throw new Error('Enter a filter value of up to 200 characters.');
   const literal = (input: string): string => {

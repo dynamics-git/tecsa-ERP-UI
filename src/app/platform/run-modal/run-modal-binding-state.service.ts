@@ -7,7 +7,7 @@ import { RunModalStackService } from './run-modal-stack.service';
 })
 export class RunModalBindingStateService {
   readonly bindings = new Map<string, unknown>();
-  readonly autosaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly autosaveTimers = new Map<string, ReturnType<typeof setTimeout> | number>();
   lastOpenFailureReason = '';
 
   constructor(private readonly popupStack: RunModalStackService) {
@@ -36,7 +36,7 @@ export class RunModalBindingStateService {
 
   clearAutosave(popupId: string): void {
     const timer = this.autosaveTimers.get(popupId);
-    if (timer) {
+    if (timer !== undefined) {
       clearTimeout(timer);
       this.autosaveTimers.delete(popupId);
     }

@@ -1,9 +1,14 @@
+import { ListPersonalizationService } from '../../pages/list-personalization.service';
+import { FieldValidationService } from '../field-validation.service';
+import { fieldIsRequired, fieldIsReadonly } from '../../models/field-state';
+import { lookupQuery, clearDependentLookups } from '../../data/lookup-dependencies';
 import { resolveLookupIdentity } from '../../data/record-identity';
 import { LookupSelect } from '../../../shared/ui/lookup-select/lookup-select';
-import { normalizeFieldValue, fieldValuesEqual } from '../../models/field-value';
+import { normalizeFieldValue, fieldValuesEqual , fieldInputType, fieldEditorValue } from '../../models/field-value';
 import { CommonModule } from '@angular/common';
 import {
   Component,
+  inject,
   EventEmitter,
   HostListener,
   Input,
@@ -26,7 +31,7 @@ type LineOption = { label: string; value: unknown; record?: Record<string, unkno
   styleUrl: './document-lines.scss',
 })
 export class DocumentLines {
-  constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef) {}
+  constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
   private readonly lookupRequests = new Map<Record<string, unknown>, Subscription>();
   private readonly selectedLookupLabels = new WeakMap<Record<string, unknown>, Map<string, string>>();
   lookupLoading = false;
@@ -42,6 +47,9 @@ export class DocumentLines {
     return this.getOptions(column, row).find(option => String(option.value) === this.getCellValue(row, column))?.label ?? this.selectedLookupLabels.get(row)?.get(column.id + ':' + this.getCellValue(row, column)) ?? (column.lookup ? '' : this.getCellValue(row, column));
   }
   searchLookup(column: LineColumnConfig, row: Record<string, unknown>, text: string, nextPage = false): void {
+    if (!column.lookup || this.isReadonly(column, row)) return;
+    const lookupFilter = lookupQuery(column.lookup, row, text, this.headerData);
+    if (!lookupFilter.ready) { this.lookupLoading = false; this.lookupHasMore = false; return; }
     if (nextPage && (this.lookupLoading || !this.lookupHasMore)) return;
     this.lookupRetryNextPage = nextPage;
     if (!nextPage) { this.lookupOffset = 0; this.lookupCursor = undefined; this.lookupHasMore = false; }
@@ -61,11 +69,11 @@ export class DocumentLines {
     this.lookupRequests.get(row)?.unsubscribe();
     const bucket = column.optionsDataKey ?? `__options_${column.field ?? column.id}`;
     if (!nextPage) row[bucket] = [];
-    const query = text.trim().replace(/'/g, "''");
-    const fields = column.lookup.searchFields ?? [column.lookup.displayField];
+
     this.lookupRequests.set(row, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: column.lookup!.endpoint, paging: column.lookup!.paging, pageSize: 20,
-      defaultFilter: query ? fields.map(field => `contains(${field}, '${query}')`).join(' or ') : undefined,
+      defaultFilter: lookupFilter.filter,
     }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({ next: response => {
+      if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return;
       const page = response as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
       this.lookupOffset += page.value.length;
       this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
@@ -76,9 +84,20 @@ export class DocumentLines {
       row[bucket] = nextPage ? [...(Array.isArray(row[bucket]) ? row[bucket] as unknown[] : []), ...options] : options;
       this.lookupLoading = false;
       this.changes.markForCheck();
-    }, error: () => { this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); } }));
+    }, error: () => { if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); } }));
   }
   ngOnDestroy(): void { this.lookupRequests.forEach(request => request.unsubscribe()); }
+  private static nextEditorId = 0;
+  readonly editorId = 'line-editor-' + DocumentLines.nextEditorId++;
+  private readonly preferences = inject(ListPersonalizationService);
+  @Input() preferenceKey = '';
+  private readonly touchedFields = new WeakMap<Record<string,unknown>,Set<string>>();
+  cellError(row: Record<string,unknown>,column:LineColumnConfig):string {
+    const key=column.field ?? column.id;
+    if (!this.touchedFields.get(row)?.has(key) || this.isReadonly(column,row)) return '';
+    return this.validation.validateField({key,label:column.label,valueType:column.valueType,required:column.required,requiredWhen:column.requiredWhen,validation:column.validation},row[key],row).errors[0] ?? '';
+  }
+  @Input() headerData: Record<string,unknown> = {};
   @Input() worksheet = false;
   @Input() columns: LineColumnConfig[] = [];
   @Input() rows: Record<string, unknown>[] = [];
@@ -96,6 +115,7 @@ export class DocumentLines {
     value: unknown;
     previousValue?: unknown;
     rowIndex?: number;
+    updatedFields?: string[];
     bulkChanges?: Array<{ rowIndex: number; previousValue: unknown; value: unknown }>;
   }>();
   @Output() dropdownOpened = new EventEmitter<{
@@ -125,11 +145,13 @@ export class DocumentLines {
       this.reconcileRows(changes['rows'].previousValue as Record<string, unknown>[] | undefined);
       for (const row of this.rows) for (const column of this.columns) {
         const id = row[column.field ?? column.id];
-        if (!column.lookup || !id) continue;
+        if (!column.lookup || !id || !lookupQuery(column.lookup, row, '', this.headerData).ready) continue;
+        const context = lookupQuery(column.lookup, row, '', this.headerData).filter;
         const options = row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`];
         if (Array.isArray(options) && options.some(option => String(option?.value) === String(id))) continue;
         this.lookupRequests.set(row, this.source.loadById({ endpoint: column.lookup.endpoint }, id, { useCache: true, maxAgeMs: 30000 }).subscribe({
           next: value => {
+            if (String(row[column.field ?? column.id]) !== String(id) || lookupQuery(column.lookup!, row, '', this.headerData).filter !== context) return;
             const record = value as Record<string, unknown>;
             row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{ value: id, label: this.resolveLookupLabel(column, record), record }];
             this.changes.markForCheck();
@@ -283,13 +305,15 @@ export class DocumentLines {
     };
   }
 
+  inputType(column: LineColumnConfig): string { return fieldInputType(column.valueType); }
+
   getCellValue(row: Record<string, unknown>, column: LineColumnConfig): string {
     const value = row[column.field ?? column.id];
     if (this.isLineNoColumn(column) && (value === 0 || value === '0')) {
       return '';
     }
 
-    return value === undefined || value === null ? '' : String(value);
+    return fieldEditorValue(value, column.valueType);
   }
 
   private isLineNoColumn(column: LineColumnConfig): boolean {
@@ -373,8 +397,10 @@ export class DocumentLines {
     this.dropdownOpened.emit({ row, column, rowIndex });
   }
 
+  isRequired(column: LineColumnConfig, row: Record<string,unknown>): boolean { return fieldIsRequired(column,row); }
+
   isReadonly(column: LineColumnConfig, row: Record<string, unknown>): boolean {
-    return column.readonly === true || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field]));
+    return fieldIsReadonly(column, row) || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) || (!!column.lookup && !lookupQuery(column.lookup, row, '', this.headerData).ready);
   }
 
   updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown): void {
@@ -386,13 +412,18 @@ export class DocumentLines {
     const previousValue = row[field];
     value = normalizeFieldValue(value, column.valueType);
     if (fieldValuesEqual(previousValue, value, column.valueType)) return;
+    const touched = this.touchedFields.get(row) ?? new Set<string>(); touched.add(field); this.touchedFields.set(row,touched);
     const rowIndex = this.rows.indexOf(row);
     const selectedRecord = this.resolveSelectedRecord(column, row, value);
 
+    const before = { ...row };
     row[field] = value;
     for (const key of column.clearFieldsOnChange ?? []) row[key] = null;
     this.applyFill(column, row, selectedRecord);
 
+    const dependent = clearDependentLookups(this.columns, Object.keys(row).filter(key => !key.startsWith('__') && !Object.is(before[key], row[key])), row);
+    this.invalidateLookupRows(row, dependent.invalidated);
+    const updatedFields = this.columns.map(column => column.field ?? column.id).filter(key => key !== field && !Object.is(before[key], row[key]));
     const selectedIndexes = [...this.selectedRowIndexes].filter(
       (index) => index >= 0 && index < this.rows.length,
     );
@@ -403,7 +434,7 @@ export class DocumentLines {
       selectedIndexes.includes(rowIndex);
 
     if (applyBulk) {
-      const bulkChanges: Array<{ rowIndex: number; previousValue: unknown; value: unknown }> = [];
+      const bulkChanges: Array<{ rowIndex: number; previousValue: unknown; value: unknown; updatedFields?: string[] }> = [];
       for (const index of selectedIndexes) {
         if (index === rowIndex) {
           continue;
@@ -416,19 +447,34 @@ export class DocumentLines {
 
         if (fieldValuesEqual(target[field], value, column.valueType)) continue;
         bulkChanges.push({ rowIndex: index, previousValue: target[field], value });
+        const targetBefore = { ...target };
         target[field] = value;
+        for (const key of column.clearFieldsOnChange ?? []) target[key] = null;
         this.applyFill(column, target, this.resolveSelectedRecord(column, target, value));
+        const dependent = clearDependentLookups(this.columns, Object.keys(target).filter(key => !key.startsWith('__') && !Object.is(targetBefore[key], target[key])), target);
+        this.invalidateLookupRows(target, dependent.invalidated);
+        const change = bulkChanges[bulkChanges.length - 1];
+        change.updatedFields = this.columns.map(column => column.field ?? column.id).filter(key => key !== field && !Object.is(targetBefore[key], target[key]));
       }
 
       // Each changed row must pass through the same calculations and persistence path.
       for (const change of bulkChanges) {
         this.rowChanged.emit({ row: this.rows[change.rowIndex], column, ...change });
       }
-      this.rowChanged.emit({ row, column, value, previousValue, rowIndex });
+      this.rowChanged.emit({ row, column, value, previousValue, rowIndex, updatedFields });
       return;
     }
 
-    this.rowChanged.emit({ row, column, value, previousValue, rowIndex });
+    this.rowChanged.emit({ row, column, value, previousValue, rowIndex, updatedFields });
+  }
+
+  private invalidateLookupRows(row: Record<string, unknown>, fields: string[]): void {
+    if (!fields.length) return;
+    this.lookupRequests.get(row)?.unsubscribe();
+    this.selectedLookupLabels.delete(row);
+    if (this.activeLookupRow === row && fields.some(field => this.columns.find(column => (column.field ?? column.id) === field)?.id === this.activeLookupColumn)) {
+      this.activeLookupRow = undefined; this.activeLookupColumn = ''; this.lookupLoading = false; this.lookupHasMore = false;
+    }
   }
 
   resolveSelectValue(
@@ -557,7 +603,7 @@ export class DocumentLines {
   private getColumnSettingsStorageKey(): string {
     const path = typeof window !== 'undefined' ? window.location.pathname : 'workspace';
     const columnKey = this.columns.map((column) => column.id).join('|') || 'none';
-    return `app-line-widths:${path}:${columnKey}`;
+    return `line-grid:${this.preferenceKey || path}:${columnKey}`;
   }
 
   private loadPersistedColumnWidths(): void {
@@ -575,7 +621,7 @@ export class DocumentLines {
       const parsed = JSON.parse(raw) as Record<string, number>;
       for (const [columnId, width] of Object.entries(parsed)) {
         if (Number.isFinite(width) && width > 0) {
-          this.columnWidths.set(columnId, Math.max(this.minColumnWidth, width));
+          this.columnWidths.set(columnId, Math.min(800, Math.max(this.minColumnWidth, width)));
         }
       }
     } catch {
@@ -593,7 +639,7 @@ export class DocumentLines {
       this.columnWidths.forEach((width, columnId) => {
         payload[columnId] = width;
       });
-      window.localStorage.setItem(this.getColumnSettingsStorageKey(), JSON.stringify(payload));
+      this.preferences.write(this.getColumnSettingsStorageKey(),'widths',payload);
     } catch {
       // Ignore storage errors so resizing still works in-memory.
     }

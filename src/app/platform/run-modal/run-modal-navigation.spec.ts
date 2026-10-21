@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
@@ -15,6 +15,8 @@ import { RunModalStackService } from './run-modal-stack.service';
 import { RunModalService } from './run-modal.service';
 import { RunModalBindingStateService } from './run-modal-binding-state.service';
 import { RunModalLoadingService } from './run-modal-loading.service';
+import { SessionService } from '../../core/services/session.service';
+import { DocumentPage } from '../pages/document-page/document-page';
 import { ConfirmationService } from '../../shared/ui/confirmation.service';
 import { DrawerService } from '../../shared/ui/drawer.service';
 
@@ -23,6 +25,7 @@ describe('RunModal navigation', () => {
   let stack: RunModalStackService;
   let runModal: RunModalService;
   let requests: string[];
+  let fixture: ComponentFixture<RunModalHost>;
   const header = { systemId: 'PO-1', number: 'PO-1', buyFromVendorName: 'Fixture Vendor', status: 'Open' };
   const line = { systemId: 'LINE-1', documentNo: 'PO-1', lineNo: 10000, description: 'Fixture line', quantity: 2, directUnitCost: 10 };
 
@@ -42,12 +45,23 @@ describe('RunModal navigation', () => {
         { provide: DATA_REST_SERVICE, useValue: rest }],
     });
     stack = TestBed.inject(RunModalStackService);
+    TestBed.inject(SessionService).SuperAdmin = true;
     runModal = TestBed.inject(RunModalService);
+    fixture = TestBed.createComponent(RunModalHost);
+    fixture.detectChanges();
     stack.stack$.subscribe(value => popups = value);
   });
 
   const data = (popup: PopupConfig) => popup.data as RunModalHostData;
+  const configFor = (popup: PopupConfig) => {
+    fixture.detectChanges();
+    const index = popups.filter(item => data(item).runtimePage).indexOf(popup);
+    return (fixture.debugElement.queryAll(By.directive(DocumentPage))[index].componentInstance as DocumentPage).inlineDocumentWindowConfig!;
+  };
   const settle = async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
     await vi.waitFor(() => expect(TestBed.inject(RunModalLoadingService).isAnyLoading()).toBe(false));
     // Option hydration runs after the header/line loader completes.
     await Promise.resolve();
@@ -61,14 +75,13 @@ describe('RunModal navigation', () => {
     const parent = popups[0];
     const rows = data(parent).runModalList!.rows;
     expect(rows).toEqual([header]);
-    const fixture = TestBed.createComponent(RunModalHost);
     fixture.detectChanges();
     fixture.componentInstance.toggleListPopupMaximize(parent);
     expect(await runModal.openEntryFromList(parent.id, rows[0])).toBe(true);
     await settle();
     const child = popups[1];
-    expect(data(child).documentWindowConfig!.headerData!['number']).toBe('PO-1');
-    expect(data(child).documentWindowConfig!.lineRows![0]['description']).toBe('Fixture line');
+    expect(configFor(child).headerData!['number']).toBe('PO-1');
+    expect(configFor(child).lineRows![0]['description']).toBe('Fixture line');
     expect(requests.some(endpoint => endpoint.startsWith('/purchaseOrderLines') && endpoint.includes('PO-1'))).toBe(true);
     fixture.componentInstance.closePopup(child);
     fixture.detectChanges();
@@ -76,22 +89,23 @@ describe('RunModal navigation', () => {
     expect(data(popups[0]).runModalList!.rows).toBe(rows);
     expect(fixture.componentInstance.isListPopupMaximized(parent)).toBe(true);
     expect(TestBed.inject(RunModalBindingStateService).bindings.has(child.id)).toBe(false);
-    expect(TestBed.inject(RunModalBindingStateService).bindings.has(parent.id)).toBe(true);
+    expect(data(parent).runModalList).toBeDefined();
     expect(navigate).not.toHaveBeenCalled();
   });
 
   it('retains the mounted parent window, unsaved header/line edits and maximize state through three levels', async () => {
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
+    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
     await settle();
-    const fixture = TestBed.createComponent(RunModalHost);
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
-    const config = data(popups[0]).documentWindowConfig!;
+    const config = configFor(popups[0]);
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     config.lineRows![0]['description'] = 'Unsaved line';
+    fixture.changeDetectorRef.markForCheck();
     const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
     parentWindow.toggleEntrySize();
     for (const id of ['child', 'grandchild']) {
-      expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: id, allowNested: true })).toBe(true);
+      expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: id, allowNested: true })).toBe(true);
       await settle();
     }
     fixture.detectChanges();
@@ -100,7 +114,7 @@ describe('RunModal navigation', () => {
     fixture.componentInstance.closePopup(popups[1]);
     fixture.detectChanges();
     expect(popups.map(popup => popup.id)).toEqual(['parent']);
-    expect(data(popups[0]).documentWindowConfig).toBe(config);
+    expect(configFor(popups[0])).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
     expect(config.lineRows![0]['description']).toBe('Unsaved line');
     expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
@@ -110,25 +124,27 @@ describe('RunModal navigation', () => {
   it('keeps unsaved document and maximize state when a document command opens a related list', async () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate');
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
+    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
     await settle();
     const parent = popups[0];
-    const config = data(parent).documentWindowConfig!;
+    const config = configFor(parent);
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     config.lineRows![0]['description'] = 'Unsaved line';
+    fixture.changeDetectorRef.markForCheck();
     config.headerToolbarButtons = [
       ...(config.headerToolbarButtons ?? []),
       { label: 'Related purchase orders', actionKey: 'cmd:related-list',
         runModalPageId: 'purchase-order', runModalTarget: 'list' },
     ];
 
-    const fixture = TestBed.createComponent(RunModalHost);
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     const host = fixture.componentInstance;
     const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
     parentWindow.toggleEntrySize();
 
-    host.onDocumentWindowAction(parent, { actionKey: 'cmd:related-list' });
+    const page = fixture.debugElement.query(By.directive(DocumentPage)).componentInstance as DocumentPage;
+    (page as any).handleEntryCommand('cmd:related-list', {});
     await vi.waitFor(() => expect(popups).toHaveLength(2));
     await settle();
     fixture.detectChanges();
@@ -140,7 +156,7 @@ describe('RunModal navigation', () => {
     host.closePopup(relatedList);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
-    expect(data(parent).documentWindowConfig).toBe(config);
+    expect(configFor(parent)).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
     expect(config.lineRows![0]['description']).toBe('Unsaved line');
     expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
@@ -149,13 +165,14 @@ describe('RunModal navigation', () => {
   });
 
   it('preserves the edited parent when DocumentPage commands open a related list', async () => {
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
+    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
     await settle();
     const parent = popups[0];
-    const config = data(parent).documentWindowConfig!;
+    const config = configFor(parent);
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     config.lineRows![0]['description'] = 'Edited line';
-    const fixture = TestBed.createComponent(RunModalHost);
+    fixture.changeDetectorRef.markForCheck();
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
     parentWindow.toggleEntrySize();
@@ -179,7 +196,7 @@ describe('RunModal navigation', () => {
     fixture.componentInstance.closePopup(popups[1]);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
-    expect(data(parent).documentWindowConfig).toBe(config);
+    expect(configFor(parent)).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
     expect(config.lineRows![0]['description']).toBe('Edited line');
     expect(fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance).toBe(parentWindow);
@@ -187,22 +204,22 @@ describe('RunModal navigation', () => {
   });
 
   it('opens global search over an existing document without replacing its parent', async () => {
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' })).toBe(true);
+    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
     await settle();
-    const config = data(popups[0]).documentWindowConfig!;
+    const config = configFor(popups[0]);
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
     expect(await TestBed.inject(GlobalSearchPopupService).openByPageId('purchase-order')).toBe(true);
     await settle();
     expect(popups).toHaveLength(2);
     expect(data(popups[1]).runModalList).toBeDefined();
-    const host = TestBed.createComponent(RunModalHost).componentInstance;
+    const host = fixture.componentInstance;
     host.closePopup(popups[1]);
-    expect(data(popups[0]).documentWindowConfig).toBe(config);
+    expect(configFor(popups[0])).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
   });
 
   it('keeps document, drawer and confirmation layers independent when closing back to the document', async () => {
-    await runModal.open({ pageId: 'purchase-order', target: 'entry', popupId: 'parent' });
+    await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' });
     await settle();
     const parent = popups[0];
     const host = TestBed.createComponent(RunModalHost).componentInstance;

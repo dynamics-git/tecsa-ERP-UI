@@ -1,11 +1,11 @@
 {
-  "updated": "2026-10-21",
-  "scope": "Shared frontend foundation; incremental verification, not release certification",
+  "updated": "2026-10-22",
+  "scope": "Shared frontend contracts checked with synthetic records and controlled API responses. No operational business records are required. This is not backend or production-release certification.",
   "items": [
     {
       "id": 1,
       "area": "Loading, editing and persistence",
-      "status": "in_progress",
+      "status": "frontend_fixture_verified",
       "verified": [
         "Setup reopen and refresh visually checked",
         "Unchanged focus/edit/close visually checked",
@@ -22,39 +22,83 @@
         "Refresh errors now preserve actual failure detail; Retry uses unsaved-change protection"
       ],
       "remaining": [
-        "Diagnose intermittent load timeout and verify repeat stability",
-        "Routed and stacked coverage for every supported page type"
+        "No business-data requirement: synthetic frontend and focused backend verification completed. New domain resources require their own contract tests."
       ]
     },
     {
       "id": 2,
       "area": "Field types, validation and lookup contract",
-      "status": "pending_full_verification"
+      "status": "frontend_fixture_verified",
+      "remaining": [
+        "No business-data requirement: synthetic frontend and focused backend verification completed. New domain resources require their own contract tests."
+      ]
     },
     {
       "id": 3,
       "area": "List search, filters, sorting, paging and saved views",
-      "status": "pending_full_verification"
+      "status": "frontend_fixture_verified",
+      "remaining": [
+        "No business-data requirement: synthetic frontend and focused backend verification completed. New domain resources require their own contract tests."
+      ]
     },
     {
       "id": 4,
       "area": "Header/line interaction, keyboard navigation and calculations",
-      "status": "pending_full_verification"
+      "status": "frontend_fixture_verified",
+      "remaining": [
+        "No business-data requirement: synthetic frontend and focused backend verification completed. New domain resources require their own contract tests."
+      ]
     },
     {
       "id": 5,
       "area": "Nested windows, navigation and context preservation",
-      "status": "pending_full_verification"
+      "status": "frontend_fixture_verified",
+      "remaining": [
+        "No business-data requirement: synthetic frontend and focused backend verification completed. New domain resources require their own contract tests."
+      ]
     },
     {
       "id": 6,
       "area": "Visual consistency, accessibility and responsive layout",
-      "status": "pending_full_verification"
+      "status": "manual_signoff_remaining",
+      "remaining": [
+        "Cross-browser visual and full screen-reader sign-off"
+      ]
     },
     {
       "id": 7,
       "area": "Page configuration examples and developer handoff",
-      "status": "pending_full_verification"
+      "status": "frontend_fixture_verified",
+      "remaining": [
+        "No business-data requirement: synthetic frontend and focused backend verification completed. New domain resources require their own contract tests."
+      ]
     }
-  ]
+  ],
+  "coverage": "platform-contract-coverage.json",
+  "dataRequired": false,
+  "lastVerification": {
+    "localDate": "2026-10-22",
+    "frontend": {
+      "command": "npm run verify:ui",
+      "tests": 127,
+      "testFiles": 24,
+      "productionBuild": "passed",
+      "importBoundaries": "passed",
+      "scssTokens": "passed"
+    },
+    "backend": {
+      "command": "php artisan test --compact --filter='NumberSeriesTest|NumberSeriesRelationshipsTest|PermissionFoundationTest|AuthCompanyContextTest|PurchaseRequisitionFoundationTest'",
+      "tests": 58,
+      "assertions": 858,
+      "database": "dedicated PostgreSQL testing database; harness rejects operational databases",
+      "formatCheck": "passed for changed files"
+    },
+    "operationalDataUsed": false,
+    "operationalDataMigrated": false
+  },
+  "reviewCounts": {
+    "frontend-verified": 29,
+    "resource-verified": 5,
+    "partial": 2
+  }
 }

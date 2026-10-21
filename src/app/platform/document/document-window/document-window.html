@@ -129,8 +129,9 @@
             </div>
 
             <app-dynamic-form [hidden]="collapsedSections.has(headerSection.id)"
-              [sections]="[headerSection]"
+              [sections]="[headerSection]" [dependencySections]="resolvedHeaderSections"
               [data]="resolvedHeaderData"
+              (draftChanged)="action.emit({actionKey: 'header-draft', payload: $event})"
               (fieldInteracted)="handleHeaderFieldInteracted($event)"
               (dropdownOpened)="handleHeaderDropdownOpened($event)"
               (fieldChanged)="handleHeaderFieldChanged($event)">
@@ -223,7 +224,7 @@
       }
 
       <app-document-lines
-        [worksheet]="worksheet" [columns]="resolvedLineColumns"
+        [preferenceKey]="preferenceKey || pageLabel || 'document'" [worksheet]="worksheet" [headerData]="resolvedHeaderData" [columns]="resolvedLineColumns"
         [rows]="resolvedLineRows"
         [showSelection]="true"
         (action)="handleLineAction($event)"

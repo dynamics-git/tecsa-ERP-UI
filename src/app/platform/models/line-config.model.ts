@@ -19,6 +19,8 @@ export type LineCellType = 'text' | 'select' | 'dropdown' | 'icon';
 export type LineValueType = import('./field-value').FieldValueType;
 
 export interface LineColumnConfig extends DataSurfaceColumnConfig {
+  requiredWhen?: FieldConfig['requiredWhen'];
+  readonlyWhen?: FieldConfig['readonlyWhen'];
   lookup?: FieldLookupConfig;
   defaultValue?: unknown;
   clearFieldsOnChange?: string[];

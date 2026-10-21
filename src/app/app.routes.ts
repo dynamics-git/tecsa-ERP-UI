@@ -4,7 +4,7 @@ import { DashboardPage } from './features/dashboard/dashboard-page/dashboard-pag
 import { PurchaseOrderPage } from './features/purchasing/purchase-order/purchase-order';
 import { LoginPage } from './features/auth/login/login';
 import { PlatformRedirect } from './features/auth/platform-redirect';
-import { authChildGuard, authGuard } from './core/guards/auth.guard';
+import { authChildGuard, authGuard, unsavedChangesGuard } from './core/guards/auth.guard';
 import { NoSeriesPage } from './features/administration/no-series/no-series';
 import { PurchaseRequisitionPage } from './features/purchasing/purchase-requisition/purchase-requisition';
 import { PurchasesPayablesSetupPage } from './features/setup/purchases-payables-setup/purchases-payables-setup';
@@ -18,7 +18,7 @@ export const routes: Routes = [
     path: '',
     component: MainLayout,
     canActivate: [authGuard],
-    canActivateChild: [authChildGuard],
+    canActivateChild: [authChildGuard, unsavedChangesGuard],
     children: [
       { path: '', component: DashboardPage },
       { path: 'purchase-order', component: PurchaseOrderPage, data: { pageId: 'purchase-order' } },

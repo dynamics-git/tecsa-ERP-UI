@@ -1,3 +1,6 @@
+import { UnsavedChangesService } from '../unsaved-changes.service';
+import { clearDependentLookups } from '../../data/lookup-dependencies';
+import { fieldIsRequired } from '../../models/field-state';
 import { resolvePageIdentity, recordIdentityText } from '../../data/record-identity';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 // NOTE:
@@ -5,7 +8,7 @@ import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/documen
 // Future refactor should split loading, popup orchestration, line runtime,
 // autosave, and command handling into smaller services.
 // Do not change behavior during this cleanup.
-import { HostListener, ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject, forwardRef } from '@angular/core';
+import { HostListener, ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject, forwardRef, ViewChild } from '@angular/core';
 import { Observable, Subscription, forkJoin, from, of, firstValueFrom } from 'rxjs';
 import { catchError, map, timeout } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
@@ -112,6 +115,9 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly valueMapper = inject(RuntimeValueMapperService);
   private readonly sessionService = inject(SessionService);
   private readonly subscriptions = new Subscription();
+  private readonly unsavedNavigation = inject(UnsavedChangesService);
+  get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0; }
+  get hasPendingWrites(): boolean { return this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0; }
   private readonly commandPermission = inject(DocumentPageCommandPermissionService);
   private readonly worksheetChangedRows = new Set<Record<string, unknown>>();
   private worksheetPending = 0;
@@ -120,7 +126,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   get dirtyWorksheet(): boolean { return this.isWorksheetPage && (this.worksheetChangedRows.size > 0 || this.worksheetPending > 0); }
   private get permissionPageId(): string { return this.listConfig.permissionPageId ?? this.pageId; }
   @HostListener('window:beforeunload', ['$event']) protectWorksheet(event: BeforeUnloadEvent): void {
-    if (this.dirtyWorksheet) { event.preventDefault(); event.returnValue = ''; }
+    if (this.hasUnsavedChanges || this.hasPendingWrites) { event.preventDefault(); event.returnValue = ''; }
   }
   canLeaveWorksheet(): boolean {
     if (!this.dirtyWorksheet) return true;
@@ -172,6 +178,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly loadedLineOptionKeys = new Set<string>();
   private readonly loadingLineOptionKeys = new Set<string>();
 
+  @ViewChild(DocumentWindow) private documentWindow?: DocumentWindow;
   @Input({ required: true }) pageId = 'document';
   @Input() listConfig: RequiredListConfig = {} as RequiredListConfig;
   @Input() setupConfig?: RequiredListConfig;
@@ -193,6 +200,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private pendingFirstPageReload = false;
   private savingEntry = false;
   private dirty = false;
+  private readonly invalidHeaderDrafts = new Set<string>();
   private autosavePending = 0;
   private editSequence = 0;
   private readonly unsavedFields = new Map<Record<string, unknown>, Map<string, number>>();
@@ -273,6 +281,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.unsavedNavigation.register(this,{changed:()=>this.hasUnsavedChanges,saving:()=>this.hasPendingWrites});
     if (!this.listConfig?.dataSource && this.setupConfig?.dataSource) {
       this.listConfig = this.setupConfig;
     }
@@ -318,6 +327,8 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.unsavedNavigation.release(this);
+    if (!this.documentOnly) this.listFilterState.release(this.listFilterScope);
     if (!this.documentOnly) {
       this.actionDispatcher.clearPageCommands();
       this.actionDispatcher.clearPageContext();
@@ -657,12 +668,17 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   handleInlineAction(event: { actionKey: string; payload?: unknown }): void {
+    if (event.actionKey === 'header-draft') {
+      const payload = event.payload as {fieldKey:string;invalid:boolean};
+      if (payload.invalid) this.invalidHeaderDrafts.add(payload.fieldKey); else this.invalidHeaderDrafts.delete(payload.fieldKey);
+      return;
+    }
     this.handlePopupAction({ ...event, popupId: this.entryPopupId });
   }
 
   async requestClose(): Promise<void> {
     if (this.savingEntry || this.popupLoading || this.worksheetPending || this.autosavePending) return;
-    if (this.isWorksheetPage ? this.dirtyWorksheet : this.dirty) {
+    if (this.invalidHeaderDrafts.size || (this.isWorksheetPage ? this.dirtyWorksheet : this.dirty)) {
       const confirmed = await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and close this page?' });
       if (!confirmed) return;
     }
@@ -672,7 +688,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private validateLineRow(row: Record<string, unknown>): string[] {
     return (this.lineConfig?.fields ?? [])
       .filter(field => !field.readonly && !field.disabled)
-      .flatMap(field => this.fieldValidation.validateField(field, row[field.key]).errors);
+      .flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
   }
 
   private async saveEntry(): Promise<boolean> {
@@ -681,12 +697,13 @@ export class DocumentPage implements OnInit, OnDestroy {
     if (!config?.headerData || this.savingEntry) return false;
     const header = config.headerData;
     const source = this.listConfig.dataSource;
+    if (this.documentWindow && !this.documentWindow.validateHeaderForms()) return false;
     if (!this.dirty && this.hasPersistedIdentity(header)) return true;
     if (!this.canModifyPage() || !this.dataSource.canWrite(source, header)) return false;
     for (const section of this.headerConfig.sections) {
       for (const field of section.fields) {
         if (field.readonly || field.disabled) continue;
-        const validation = this.fieldValidation.validateField(field, header[field.key]);
+        const validation = this.fieldValidation.validateField(field, header[field.key], header);
         if (!validation.valid) {
           this.setEntryStatus({ tone: 'error', title: 'Check required fields', message: validation.errors.join(' ') });
           this.changeDetector.detectChanges();
@@ -710,21 +727,30 @@ export class DocumentPage implements OnInit, OnDestroy {
       const payload = id || source.singleton
         ? this.documentPayload.buildHeaderUpdatePayload(header, this.headerConfig.sections)
         : this.documentPayload.buildHeaderCreatePayload(header, this.headerConfig.sections);
-      const saved = await firstValueFrom(id || source.singleton ? this.dataSource.updateRecord(source, id, payload, header) : this.dataSource.create(source, payload));
-      if (this.isRecord(saved)) Object.assign(header, saved);
+      const headerEdits = this.unsavedFields.get(header);
+      if ((!id && !source.singleton) || headerEdits?.size) {
+        const headerPayload = id || source.singleton ? Object.fromEntries(Object.entries(payload).filter(([key]) => headerEdits?.has(key))) : payload;
+        if (Object.keys(headerPayload).length) {
+          const saved = await firstValueFrom(id || source.singleton ? this.dataSource.updateRecord(source, id, headerPayload, header) : this.dataSource.create(source, headerPayload));
+          if (this.isRecord(saved)) Object.assign(header, saved);
+        }
+        this.unsavedFields.delete(header);
+      }
       if (this.lineConfig) {
         const lineSource = this.dataSource.relation(this.lineConfig.dataSource, header);
         for (const row of config.lineRows ?? []) {
           const lineId = this.resolvePersistedRecordId(row, lineSource);
+          if (this.hasValue(lineId) && !this.unsavedFields.get(row)?.size) continue;
           if (!this.hasValue(lineId) && this.isLineRowMeaningfullyEmpty(row)) continue;
           const required = lineSource.requiredCreateFields ?? [];
           if (!lineId && required.some(field => !this.hasValue(row[field]))) throw new Error('Complete the required line fields before saving.');
           const linePayload = lineId
-            ? this.documentConfigData.buildLineUpdatePayload(row, lineSource.updateFields ?? this.lineConfig.columns.filter(column => !column.readonly).map(column => column.field ?? column.id), this.lineConfig)
+            ? this.documentConfigData.buildLineUpdatePayload(row, [...(this.unsavedFields.get(row)?.keys() ?? [])].filter(field => !lineSource.updateFields || lineSource.updateFields.includes(field)), this.lineConfig)
             : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
           if (!linePayload) throw new Error('Complete the required line fields before saving.');
           const line = await firstValueFrom(lineId ? this.dataSource.updateRecord(lineSource, lineId, linePayload, row) : this.dataSource.create(lineSource, linePayload));
           if (this.isRecord(line)) Object.assign(row, line);
+          this.unsavedFields.delete(row);
         }
       }
       this.pendingDraftCreateFromNew = false;
@@ -1470,7 +1496,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     const fieldKey = this.toText(payload['fieldKey']);
     const fieldConfig = this.headerFieldConfigMap[fieldKey];
-    const validation = this.fieldValidation.validateField(fieldConfig, payload['value']);
+    const validation = this.fieldValidation.validateField(fieldConfig, payload['value'], this.activeDocumentWindowConfig.headerData);
     if (!validation.valid) {
       const rolledBack = this.documentState.rollbackHeaderFieldChange(
         this.activeDocumentWindowConfig.headerData,
@@ -1489,26 +1515,35 @@ export class DocumentPage implements OnInit, OnDestroy {
       return;
     }
 
-    this.dirty = true;
-    this.trackUnsaved(this.activeDocumentWindowConfig.headerData, [fieldKey, ...Object.keys(this.isRecord(payload['updates']) ? payload['updates'] : {})]);
-    this.clearEntryStatus();
     const changed = this.documentState.applyHeaderFieldChange(
       this.activeDocumentWindowConfig.headerData,
       payload,
       this.headerFieldValueTypeMap,
     );
     if (changed) {
+      this.dirty = true;
+      this.trackUnsaved(this.activeDocumentWindowConfig.headerData, [fieldKey, ...Object.keys(this.isRecord(payload['updates']) ? payload['updates'] : {})]);
+      this.clearEntryStatus();
       this.activeDocumentWindowConfig.title = this.getDocumentTitle(this.activeDocumentWindowConfig.headerData);
       this.activeDocumentWindowConfig.subtitle = '';
+      const dependentLineChanges: Array<{row: Record<string,unknown>; fields: string[]}> = [];
+      const changedHeaderFields = [fieldKey, ...Object.keys(this.isRecord(payload['updates']) ? payload['updates'] : {})];
+      for (const row of this.activeDocumentWindowConfig.lineRows ?? []) {
+        const dependencyChanges = clearDependentLookups(this.lineConfig?.columns ?? [], changedHeaderFields, row, 'header');
+        const fields = Object.keys(dependencyChanges.updates);
+        if (!fields.length) continue;
+        this.trackUnsaved(row, fields);
+        dependentLineChanges.push({row,fields});
+      }
       this.triggerDraftCreateIfReady();
       if (!this.usesManualSaveMode()) {
-        this.saveHeaderFields(payload);
+        this.saveHeaderFields(payload, dependentLineChanges);
       }
       this.changeDetector.detectChanges();
     }
   }
 
-  private saveHeaderFields(payload: Record<string, unknown>): void {
+  private saveHeaderFields(payload: Record<string, unknown>, dependentLines: Array<{row:Record<string,unknown>;fields:string[]}> = []): void {
     const headerData = this.activeDocumentWindowConfig?.headerData;
     if (!headerData) {
       return;
@@ -1569,6 +1604,10 @@ export class DocumentPage implements OnInit, OnDestroy {
           }
 
           this.mergeAutosaveResponse(headerData, updated);
+          for (const change of dependentLines) {
+            const pending = change.fields.filter(field => this.unsavedFields.get(change.row)?.has(field));
+            if (pending.length && this.activeDocumentWindowConfig.lineRows?.includes(change.row)) this.saveLineFields(change.row,pending);
+          }
           this.stageListSyncFromActiveHeader();
           this.setEntryStatus({
             tone: 'success',
@@ -1599,7 +1638,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     }
     if (this.isWorksheetPage) {
       if (!this.worksheetAllowed(row)) { this.setEntryStatus({tone: 'error', title: 'Cannot save', message: 'You do not have permission to change this row.'}); return; }
-      const errors = (this.lineConfig.fields ?? []).flatMap(field => this.fieldValidation.validateField(field, row[field.key]).errors);
+      const errors = (this.lineConfig.fields ?? []).flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
       if (errors.length) { this.setEntryStatus({tone: 'error', title: 'Complete row', message: errors.join('. ')}); return; }
     }
     const lineErrors = this.validateLineRow(row);
@@ -1869,11 +1908,11 @@ export class DocumentPage implements OnInit, OnDestroy {
   private canCreateDraft(headerData: Record<string, unknown>): boolean {
     for (const section of this.headerConfig.sections) {
       for (const field of section.fields) {
-        if (!field.required || field.readonly || field.disabled) {
+        if (!fieldIsRequired(field, headerData) || field.readonly || field.disabled) {
           continue;
         }
 
-        if (!this.fieldValidation.validateField(field, headerData[field.key]).valid) {
+        if (!this.fieldValidation.validateField(field, headerData[field.key], headerData).valid) {
           return false;
         }
       }
@@ -2013,7 +2052,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     void this.loadWorksheet(true, true);
   }
   private async openNewEntrySafely(): Promise<void> {
-    if (this.dirty && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and start a new record?' })) return;
+    if ((this.dirty || this.invalidHeaderDrafts.size) && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and start a new record?' })) return;
     this.dirty = false;
     this.openNewPreview();
   }

@@ -10,7 +10,8 @@
     "lint:imports": "node scripts/check-import-boundaries.mjs",
     "lint:tokens": "node scripts/check-scss-token-rules.mjs",
     "lint": "npm run lint:imports && npm run lint:tokens",
-    "ci:guardrails": "npm run lint:imports && npm run lint:tokens"
+    "ci:guardrails": "npm run lint:imports && npm run lint:tokens",
+    "verify:ui": "node scripts/verify-ui-contract.mjs"
   },
   "private": true,
   "packageManager": "npm@10.8.2",

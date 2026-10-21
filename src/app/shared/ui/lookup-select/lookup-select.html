@@ -1,6 +1,6 @@
 <span class="lookup-control" (focusout)="close()">
   <input #editor role="combobox" autocomplete="off" aria-autocomplete="list"
-    [attr.aria-label]="label" [attr.aria-required]="required || null"
+    [attr.aria-invalid]="error ? true : null" [attr.aria-label]="label" [attr.aria-required]="required || null"
     [attr.aria-expanded]="expanded" [attr.aria-controls]="expanded ? id : null"
     [attr.aria-activedescendant]="expanded && active >= 0 && !loading ? id + '-' + active : null"
     [value]="expanded ? query : display" [disabled]="disabled" [attr.placeholder]="placeholder || null"

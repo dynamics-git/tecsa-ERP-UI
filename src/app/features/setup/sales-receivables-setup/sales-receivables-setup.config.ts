@@ -1,4 +1,4 @@
-import { HeaderConfig } from '../../../platform/public-api';
+import { DataSourceConfig, HeaderConfig, ListPageConfig } from '../../../platform/public-api';
 
 export const salesReceivablesSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'Sales & Receivables Setup',
@@ -213,4 +213,21 @@ export const salesReceivablesSetupHeaderConfig: HeaderConfig = {
       ],
     },
   ],
+};
+
+export const salesReceivablesSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  pageId: 'sales-receivables-setup',
+  pageType: 'setup',
+  title: 'Sales & Receivables Setup',
+  module: 'Sales',
+  menu: { module: 'Sales', group: 'Setup', icon: 'ts-icon ts-icon-settings', route: '/sales-receivables-setup' },
+  tools: { filter: false, advancedFilter: false, export: false, columns: false },
+  dataSource: {
+    endpoint: '/salesReceivablesSetup',
+    singleton: true,
+    keyField: 'systemId',
+    supportsCreate: false,
+    supportsUpdate: true,
+    supportsDelete: false,
+  },
 };

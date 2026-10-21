@@ -4,6 +4,11 @@ import type { CommandConfig } from './command-config.model';
 export type FieldType =
   | 'text'
   | 'number'
+  | 'datetime'
+  | 'time'
+  | 'email'
+  | 'url'
+  | 'phone'
   | 'date'
   | 'boolean'
   | 'currency'
@@ -24,7 +29,21 @@ export interface FieldOptionConfig {
 
 export type FieldFillConfig = Record<string, string | string[]>;
 
+export interface LookupDependencyConfig {
+  /** Line lookups may explicitly depend on a field in their parent header. */
+  source?: 'record' | 'header';
+  /** Field on the lookup resource to constrain. */
+  field: string;
+  /** Field on the current header or line record supplying the value. */
+  valueFrom: string;
+  valueType?: 'text' | 'number' | 'boolean';
+}
+
 export interface FieldLookupConfig {
+  /** All dependencies must have values before a lookup can be searched. */
+  dependsOn?: LookupDependencyConfig[];
+  /** Fixed business filter combined with dependency and search clauses. */
+  filter?: string;
   identity?: RecordIdentityConfig;
   endpoint: string;
   valueField: string;
@@ -36,8 +55,8 @@ export interface FieldLookupConfig {
 }
 
 export interface FieldValidationConfig {
-  min?: number;
-  max?: number;
+  min?: number | string;
+  max?: number | string;
   maxLength?: number;
   /** Maximum total digits for decimal fields. */
   precision?: number;
@@ -69,7 +88,13 @@ export interface FieldFactBoxConfig {
   buttons?: CommandConfig[];
 }
 
+/** Declarative condition evaluated against the current header or line record. */
+export interface FieldCondition { field: string; values: unknown[]; negate?: boolean; }
+
 export interface FieldConfig {
+  requiredWhen?: FieldCondition;
+  readonlyWhen?: FieldCondition;
+  hiddenWhen?: FieldCondition;
   key: string;
   label: string;
   type?: FieldType;
