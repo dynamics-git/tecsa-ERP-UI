@@ -1,3 +1,4 @@
+import { resolvePageIdentity } from '../../data/record-identity';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 // NOTE:
 // This file is currently a core ERP runtime/orchestration file.
@@ -459,6 +460,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     currentConfig.headerData = nextHeaderData;
     currentConfig.subtitle = this.buildSubtitle(nextHeaderData, headerRecord);
     currentConfig.title = this.getDocumentTitle(headerRecord);
+    currentConfig.pageLabel = this.isWorksheetPage || this.listConfig.dataSource.singleton ? this.documentLabel : undefined;
     this.refreshEntryPolicy();
     this.changeDetector.detectChanges();
     return nextHeaderData;
@@ -1101,16 +1103,14 @@ export class DocumentPage implements OnInit, OnDestroy {
 
   private buildDocumentWindowConfig(row?: unknown, lineSource?: unknown[]): DocumentWindowConfig {
     const record = this.isRecord(row) ? row : {};
-    const documentNoField = this.listConfig.dataSource.documentNoField;
-    const orderNumber = documentNoField ? this.toText(record[documentNoField]) || 'New' : 'New';
     const headerData = this.buildHeaderData(record);
     const lineRows = this.lineConfig ? this.buildLineRows(headerData, lineSource ?? []) : [];
     const lineTotals = this.lineConfig ? this.buildLineTotals(lineRows, headerData) : this.emptyTotals();
 
     return {
       factBoxConfig: this.listConfig.factBox,
-      pageLabel: this.documentLabel,
-      title: this.isWorksheetPage || this.listConfig.dataSource.singleton ? this.documentLabel : `${this.documentLabel} ${orderNumber}`.trim(),
+      pageLabel: this.isWorksheetPage || this.listConfig.dataSource.singleton ? this.documentLabel : undefined,
+      title: this.getDocumentTitle(record),
       subtitle: this.isWorksheetPage ? this.toText(this.initialRecord?.[this.listConfig.dataSource.documentNoField ?? 'code']) : this.buildSubtitle(headerData, record),
       headerCommandBar: this.headerConfig.commandBar,
       lineCommandBar: this.lineConfig?.commandBar,
@@ -1223,40 +1223,8 @@ export class DocumentPage implements OnInit, OnDestroy {
     headerData: Record<string, unknown>,
     fallbackRecord: Record<string, unknown> = {},
   ): string {
-    const primary = this.resolveFirstConfiguredText(headerData, ['name', 'vendor', 'customer'], fallbackRecord);
-    const status = this.resolveFirstConfiguredText(headerData, ['status'], fallbackRecord);
-    return [primary || (this.listConfig.dataSource.singleton || this.hasPersistedIdentity(headerData) ? '' : 'New'), status].filter((part) => part.length > 0).join(' - ');
-  }
-
-  private resolveFirstConfiguredText(
-    data: Record<string, unknown>,
-    hints: string[],
-    fallbackRecord: Record<string, unknown> = {},
-  ): string {
-    const normalizedHints = hints.map((hint) => hint.toLowerCase());
-    for (const section of this.headerConfig.sections) {
-      for (const field of section.fields) {
-        const normalized = field.key.toLowerCase();
-        if (normalizedHints.some((hint) => normalized.includes(hint))) {
-          const value = this.toText(data[field.key]).trim();
-          if (value.length) {
-            return value;
-          }
-        }
-      }
-    }
-
-    for (const [key, value] of Object.entries(fallbackRecord)) {
-      const normalized = key.toLowerCase();
-      if (normalizedHints.some((hint) => normalized.includes(hint))) {
-        const text = this.toText(value).trim();
-        if (text.length) {
-          return text;
-        }
-      }
-    }
-
-    return '';
+    if (this.isWorksheetPage || this.listConfig.dataSource.singleton) return '';
+    return resolvePageIdentity({...fallbackRecord, ...headerData}, this.listConfig).secondary;
   }
 
   private buildHeaderData(record: Record<string, unknown>): Record<string, unknown> {
@@ -1538,6 +1506,8 @@ export class DocumentPage implements OnInit, OnDestroy {
       this.headerFieldValueTypeMap,
     );
     if (changed) {
+      this.activeDocumentWindowConfig.title = this.getDocumentTitle(this.activeDocumentWindowConfig.headerData);
+      this.activeDocumentWindowConfig.subtitle = this.buildSubtitle(this.activeDocumentWindowConfig.headerData);
       this.triggerDraftCreateIfReady();
       if (!this.usesManualSaveMode()) {
         this.saveHeaderFields(payload);
@@ -2729,12 +2699,11 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private getDocumentTitle(row: unknown): string {
-    if (!this.isRecord(row)) {
-      return this.documentLabel;
-    }
-
-    const documentNoField = this.listConfig.dataSource.documentNoField;
-    return `${this.documentLabel} ${documentNoField ? row[documentNoField] ?? '' : ''}`.trim();
+    if (this.isWorksheetPage || this.listConfig.dataSource.singleton) return this.documentLabel;
+    const identity = resolvePageIdentity(row, this.listConfig);
+    if (identity.primary) return identity.primary;
+    const record = this.isRecord(row) ? row : {};
+    return this.hasPersistedIdentity(record) ? this.documentLabel : 'New ' + this.documentLabel;
   }
 
   private getRowKey(row: unknown): string {

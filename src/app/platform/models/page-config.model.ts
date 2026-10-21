@@ -1,3 +1,4 @@
+import type { RecordIdentityConfig } from './record-identity.model';
 import type { ListPersonalizationConfig } from './list-personalization-config.model';
 import { CommandConfig, StandardCommandConfig } from './command-config.model';
 import { DataSourceConfig } from './data-source-config.model';
@@ -52,6 +53,8 @@ export interface BasePageConfig extends Record<string, unknown> {
   autoSave?: boolean;
   /** Related pages may use the permission scope of their owning resource. */
   permissionPageId?: string;
+  /** Optional page override; shared resource/column metadata supplies defaults. */
+  identity?: RecordIdentityConfig;
   title?: string;
   subtitle?: string;
   module?: string;

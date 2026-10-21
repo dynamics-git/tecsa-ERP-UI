@@ -14,7 +14,8 @@
       "pageDeclares": "Page type, title, module, sections and data sources",
       "status": "partial",
       "evidence": [
-        "2026-10-21 live No. Series: list and document FactBox hide/show; General and Lines collapse/reopen; unchanged QA2010 closes without discard dialog. Rendered list gap and FactBox radius are 0px; FactBox content 297px scrolls within 156px viewport. Checkpoint 9118670."
+        "2026-10-21 live No. Series: list and document FactBox hide/show; General and Lines collapse/reopen; unchanged QA2010 closes without discard dialog. Rendered list gap and FactBox radius are 0px; FactBox content 297px scrolls within 156px viewport. Checkpoint 9118670.",
+        "2026-10-21 shared record identity resolver: optional page overrides, existing documentNoField/isPrimary/subtitleField and one resource profile definition. Live PR popup shows PR plus Purchase Requisition; list FactBox shares identity. Unchanged record closes cleanly. Isolated checks cover overrides, no guessing, nested paths, duplicate/empty/zero values."
       ],
       "remaining": "Verify card, setup, worksheet and stacked list contexts; verify configured header/line/footer ordering and large-list scrolling. Existing live checks do not certify the whole row."
     },

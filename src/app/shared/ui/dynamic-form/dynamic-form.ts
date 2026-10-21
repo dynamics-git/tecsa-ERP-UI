@@ -1,3 +1,4 @@
+import { resolveLookupIdentity } from '../../../platform/data/record-identity';
 import { LookupSelect } from '../lookup-select/lookup-select';
 import { normalizeFieldValue, fieldValuesEqual } from '../../../platform/models/field-value';
 import { CommonModule } from '@angular/common';
@@ -231,6 +232,7 @@ export class DynamicForm {
       );
     }
 
+    if (field.lookup && !field.labelField && !field.bindLabel) return resolveLookupIdentity(item, field.lookup);
     const labelFields = this.resolveFieldCandidates(field.labelField ?? field.bindLabel ?? field.lookup?.displayField);
     for (const labelField of labelFields) {
       if (labelField in item) {

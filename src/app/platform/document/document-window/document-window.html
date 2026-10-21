@@ -1,9 +1,9 @@
 <section class="entry-pane" [class.maximized]="maximized" [class.embedded]="embedded" [class.worksheet]="worksheet" [class.interaction-locked]="isInteractionLocked" [style.z-index]="overlayZIndex" [attr.aria-label]="title || pageLabel || 'Document'">
   <header class="entry-header">
     <div>
-      <span>{{ pageLabel }}</span>
+      @if (pageLabel && pageLabel !== title) { <span>{{ pageLabel }}</span> }
       <h2>{{ title }}</h2>
-      <p>{{ subtitle }}</p>
+      @if (subtitle && subtitle !== title) { <p>{{ subtitle }}</p> }
     </div>
 
     <div class="entry-window-actions">

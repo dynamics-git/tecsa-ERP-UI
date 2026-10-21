@@ -1,3 +1,4 @@
+import type { RecordIdentityConfig } from './record-identity.model';
 import type { CommandConfig } from './command-config.model';
 
 export type FieldType =
@@ -24,6 +25,7 @@ export interface FieldOptionConfig {
 export type FieldFillConfig = Record<string, string | string[]>;
 
 export interface FieldLookupConfig {
+  identity?: RecordIdentityConfig;
   endpoint: string;
   valueField: string;
   displayField: string;

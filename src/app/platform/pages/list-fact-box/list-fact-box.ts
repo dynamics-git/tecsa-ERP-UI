@@ -1,15 +1,10 @@
+import { resolvePageIdentity } from '../../data/record-identity';
 import { automaticDetailFields, detailValue } from '../fact-box-display';
 import { SessionService } from '../../../core/services/session.service';
 import { formatRecordValue } from '../record-value-formatter';
 import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FieldFactBoxConfig } from '../../models/field-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
-
-type DisplayColumn = ListPageColumnConfig & {
-  primary?: boolean;
-  sortable?: boolean;
-  filterable?: boolean;
-};
 
 type FactBoxDisplayField = {
   label: string;
@@ -63,12 +58,13 @@ export class ListFactBox {
     const titleField = factBox?.binding?.titleField;
     const fallbackFields = factBox?.binding?.titleFallbackFields?.length
       ? factBox.binding.titleFallbackFields
-      : this.defaultTitleFields;
+      : [];
 
     return String(
       (titleField ? this.read(this.selectedRow, titleField) : undefined) ??
         this.readFirst(this.selectedRow, fallbackFields) ??
         factBox?.title ??
+        (resolvePageIdentity(this.selectedRow, this.config).primary || undefined) ??
         this.config?.title ??
         '',
     );
@@ -83,7 +79,7 @@ export class ListFactBox {
 
     const subtitleField = factBox?.binding?.subtitleField;
     const subtitleFallbackFields =
-      factBox?.binding?.subtitleFallbackFields ?? this.defaultSubtitleFields;
+      factBox?.binding?.subtitleFallbackFields ?? [];
 
     const rowSubtitle = this.toText(
       (subtitleField ? this.read(this.selectedRow, subtitleField) : undefined) ??
@@ -93,6 +89,8 @@ export class ListFactBox {
       return rowSubtitle;
     }
 
+    const identitySubtitle = resolvePageIdentity(this.selectedRow, this.config).secondary;
+    if (identitySubtitle) return identitySubtitle;
     const module = this.toText(this.config?.module).trim();
     if (module.length) {
       return module;
@@ -199,39 +197,8 @@ export class ListFactBox {
     return this.config?.dataSurface?.columns ?? [];
   }
 
-  private get visibleColumns(): ListPageColumnConfig[] {
-    return this.columns.filter((column) => column.hidden !== true);
-  }
-
   private get factBoxColumns(): ListPageColumnConfig[] {
     return this.columns;
-  }
-
-  private get defaultTitleFields(): string[] {
-    const primary = this.visibleColumns.find(
-      (column) => column.isPrimary || (column as DisplayColumn).primary,
-    );
-    const field = primary ? this.resolveColumnField(primary) : '';
-    return field ? [field] : [];
-  }
-
-  private get defaultSubtitleFields(): string[] {
-    const primary = this.visibleColumns.find(
-      (column) => column.isPrimary || (column as DisplayColumn).primary,
-    );
-    const subtitleField = (primary as DisplayColumn | undefined)?.subtitleField;
-    if (subtitleField) {
-      return [subtitleField];
-    }
-
-    const status = this.visibleColumns.find(
-      (column) =>
-        column.type === 'badge' ||
-        column.id?.toLowerCase() === 'status' ||
-        column.field?.toLowerCase() === 'status',
-    );
-    const field = status ? this.resolveColumnField(status) : '';
-    return field ? [field] : [];
   }
 
   private resolveColumnField(column: ListPageColumnConfig): string {

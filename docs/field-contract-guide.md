@@ -44,3 +44,19 @@ No historical codes or number ranges are migrated by this change.
 Datetime, time, GUID validation, email/file/password editors and remote uniqueness checks are not implemented by this change. Do not configure unsupported types.
 
 Decimal validation supports `validation: { precision: 18, scale: 4, min: 0 }`. Precision is total storage digits; scale reserves fractional digits. Bounds are compared as decimal strings without rounding the input through JavaScript Number. Existing numeric min/max declarations remain supported; arbitrary-precision string bounds are not yet part of the config contract.
+
+## Record display identity
+
+Record identity is separate from the database key. The shared resolver reads only declared fields; it does not infer identity from JSON order or field names.
+
+Defaults come from an existing entity contract profile's optional identity metadata. A resource can declare this once for cards, document captions, FactBox headings and lookup display:
+
+```ts
+identity: { primaryField: 'code', secondaryField: 'description' }
+```
+
+No identity block is required on each page. Primary-field precedence is optional page identity override, dataSource.documentNoField, the isPrimary column, then resource metadata. Secondary-field precedence is optional page identity override, the primary column's subtitleField, then resource metadata. An empty-string override suppresses a field. Without a declared secondary field, the subtitle is omitted.
+
+No. Series declares its resource identity once in entity-contract-profiles.ts. Its page needs no additional identity block. Singleton setup and worksheet titles keep their page context. New records without a display key use New plus the page title. Record captions update after a valid header change.
+
+Lookup displayFormat and labelField/bindLabel remain explicit display overrides. Otherwise lookups use their displayField with the shared resource description. Lookup valueField still controls the stored key. Explicit FactBox bindings remain supported.

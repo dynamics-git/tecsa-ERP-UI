@@ -1,3 +1,4 @@
+import { resolveLookupIdentity } from '../../data/record-identity';
 import { LookupSelect } from '../../../shared/ui/lookup-select/lookup-select';
 import { normalizeFieldValue, fieldValuesEqual } from '../../models/field-value';
 import { CommonModule } from '@angular/common';
@@ -70,7 +71,7 @@ export class DocumentLines {
       this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
       this.lookupHasMore = column.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
       const options = page.value.map(record => ({
-        value: record[column.lookup!.valueField], label: String(record[column.lookup!.displayField] ?? ''), record,
+        value: record[column.lookup!.valueField], label: this.resolveLookupLabel(column, record), record,
       }));
       row[bucket] = nextPage ? [...(Array.isArray(row[bucket]) ? row[bucket] as unknown[] : []), ...options] : options;
       this.lookupLoading = false;
@@ -130,7 +131,7 @@ export class DocumentLines {
         this.lookupRequests.set(row, this.source.loadById({ endpoint: column.lookup.endpoint }, id, { useCache: true, maxAgeMs: 30000 }).subscribe({
           next: value => {
             const record = value as Record<string, unknown>;
-            row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{ value: id, label: String(record[column.lookup!.displayField] ?? ''), record }];
+            row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{ value: id, label: this.resolveLookupLabel(column, record), record }];
             this.changes.markForCheck();
           }, error: () => {},
         }));
@@ -294,6 +295,13 @@ export class DocumentLines {
   private isLineNoColumn(column: LineColumnConfig): boolean {
     const key = String(column.field ?? column.id ?? '').trim().toLowerCase();
     return key === 'lineno' || key === 'line_no' || key === 'line no' || key === 'line no.';
+  }
+
+  private resolveLookupLabel(column: LineColumnConfig, record: Record<string, unknown>): string {
+    if (column.displayFormat) return column.displayFormat.replace(/\[([^\]]+)\]/g, (_match, key: string) => String(record[key] ?? ''));
+    const fields = Array.isArray(column.labelField) ? column.labelField : column.labelField ? [column.labelField] : [];
+    for (const field of fields) if (record[field] !== null && record[field] !== undefined) return String(record[field]);
+    return column.lookup ? resolveLookupIdentity(record, column.lookup) : '';
   }
 
   getOptions(column: LineColumnConfig, row: Record<string, unknown>): LineOption[] {
