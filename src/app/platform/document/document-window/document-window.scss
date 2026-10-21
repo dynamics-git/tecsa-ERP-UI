@@ -588,7 +588,20 @@
 .end-lines-layout app-document-lines { flex: 1; min-height: 0; overflow: hidden; }
 .end-lines-layout > .footer-section { flex: 0 0 auto; }
 
-.section-toggle { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; color: inherit; font: inherit; padding: 0; cursor: pointer; }
+.section-title .section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ts-space-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ts-text);
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.section-title .section-toggle:hover { color: var(--ts-brand-900); }
+.section-title .section-toggle:focus-visible { outline: 2px solid var(--ts-border-focus); outline-offset: 2px; }
 app-dynamic-form[hidden] { display: none; }
 .end-lines-layout > .lines-section { flex: 0 0 auto; }
 .lines-section.collapsed { min-height: 0; flex: 0 0 auto; }

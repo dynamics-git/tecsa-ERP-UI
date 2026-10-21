@@ -1,4 +1,4 @@
-import { resolvePageIdentity } from '../data/record-identity';
+import { resolvePageIdentity, recordIdentityText } from '../data/record-identity';
 import { Injectable, inject } from '@angular/core';
 import { AttachmentsConfig, DocumentWindowConfig } from '../models/document-window-config.model';
 import { ListPageConfig } from '../models/page-config.model';
@@ -58,9 +58,9 @@ export class RunModalConfigAssemblerService {
     const isRecordPage = !!pageConfig && pageConfig.dataSource?.singleton !== true && !['worksheet', 'setup'].includes(pageConfig.pageType ?? 'document');
     const documentWindowConfig: DocumentWindowConfig = {
       factBoxConfig: this.pickListPageConfig({module: params.module})?.factBox,
-      pageLabel: isRecordPage ? undefined : pageLabel,
-      title: isRecordPage ? identity.primary || title : title,
-      subtitle: isRecordPage ? identity.secondary : undefined,
+      pageLabel,
+      title: isRecordPage && identity.primary ? recordIdentityText(identity) : title,
+      subtitle: undefined,
       headerCommandBar: headerCommandBar as DocumentWindowConfig['headerCommandBar'],
       lineCommandBar: lineCommandBar as DocumentWindowConfig['lineCommandBar'],
       linePlacement: linePlacement as DocumentWindowConfig['linePlacement'],

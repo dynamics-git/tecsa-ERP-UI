@@ -60,6 +60,7 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   pageId: 'purchase-requisition',
   pageType: 'document',
   title: 'Purchase Requisition',
+  identity: { primaryField: 'number', secondaryField: 'purpose' },
   module: 'Purchase',
   menu: {
     module: 'Purchase',

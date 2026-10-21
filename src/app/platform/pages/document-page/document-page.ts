@@ -1,4 +1,4 @@
-import { resolvePageIdentity } from '../../data/record-identity';
+import { resolvePageIdentity, recordIdentityText } from '../../data/record-identity';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 // NOTE:
 // This file is currently a core ERP runtime/orchestration file.
@@ -458,9 +458,9 @@ export class DocumentPage implements OnInit, OnDestroy {
     const nextHeaderData = this.buildHeaderData(headerRecord);
     currentConfig.contentReady = true;
     currentConfig.headerData = nextHeaderData;
-    currentConfig.subtitle = this.buildSubtitle(nextHeaderData, headerRecord);
+    currentConfig.subtitle = '';
     currentConfig.title = this.getDocumentTitle(headerRecord);
-    currentConfig.pageLabel = this.isWorksheetPage || this.listConfig.dataSource.singleton ? this.documentLabel : undefined;
+    currentConfig.pageLabel = this.documentLabel;
     this.refreshEntryPolicy();
     this.changeDetector.detectChanges();
     return nextHeaderData;
@@ -1109,9 +1109,9 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     return {
       factBoxConfig: this.listConfig.factBox,
-      pageLabel: this.isWorksheetPage || this.listConfig.dataSource.singleton ? this.documentLabel : undefined,
+      pageLabel: this.documentLabel,
       title: this.getDocumentTitle(record),
-      subtitle: this.isWorksheetPage ? this.toText(this.initialRecord?.[this.listConfig.dataSource.documentNoField ?? 'code']) : this.buildSubtitle(headerData, record),
+      subtitle: this.isWorksheetPage ? this.toText(this.initialRecord?.[this.listConfig.dataSource.documentNoField ?? 'code']) : '',
       headerCommandBar: this.headerConfig.commandBar,
       lineCommandBar: this.lineConfig?.commandBar,
       lineCommandPolicy: {
@@ -1217,14 +1217,6 @@ export class DocumentPage implements OnInit, OnDestroy {
       toolbarButtons: this.headerConfig.detailToolbarButtons,
       pageId: this.listConfig.pageId || this.pageId,
     });
-  }
-
-  private buildSubtitle(
-    headerData: Record<string, unknown>,
-    fallbackRecord: Record<string, unknown> = {},
-  ): string {
-    if (this.isWorksheetPage || this.listConfig.dataSource.singleton) return '';
-    return resolvePageIdentity({...fallbackRecord, ...headerData}, this.listConfig).secondary;
   }
 
   private buildHeaderData(record: Record<string, unknown>): Record<string, unknown> {
@@ -1507,7 +1499,7 @@ export class DocumentPage implements OnInit, OnDestroy {
     );
     if (changed) {
       this.activeDocumentWindowConfig.title = this.getDocumentTitle(this.activeDocumentWindowConfig.headerData);
-      this.activeDocumentWindowConfig.subtitle = this.buildSubtitle(this.activeDocumentWindowConfig.headerData);
+      this.activeDocumentWindowConfig.subtitle = '';
       this.triggerDraftCreateIfReady();
       if (!this.usesManualSaveMode()) {
         this.saveHeaderFields(payload);
@@ -2701,7 +2693,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private getDocumentTitle(row: unknown): string {
     if (this.isWorksheetPage || this.listConfig.dataSource.singleton) return this.documentLabel;
     const identity = resolvePageIdentity(row, this.listConfig);
-    if (identity.primary) return identity.primary;
+    if (identity.primary) return recordIdentityText(identity);
     const record = this.isRecord(row) ? row : {};
     return this.hasPersistedIdentity(record) ? this.documentLabel : 'New ' + this.documentLabel;
   }

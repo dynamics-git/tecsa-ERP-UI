@@ -45,3 +45,8 @@ export function resolveLookupIdentity(row: unknown, lookup: {endpoint: string; d
   });
   return [identity.primary, identity.secondary].filter(Boolean).join(' — ');
 }
+
+/** A single record line below the stable page name. */
+export function recordIdentityText(identity: {primary: string; secondary: string}): string {
+  return [identity.primary, identity.secondary].filter(Boolean).join(' — ');
+}

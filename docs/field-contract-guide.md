@@ -57,6 +57,8 @@ identity: { primaryField: 'code', secondaryField: 'description' }
 
 No identity block is required on each page. Primary-field precedence is optional page identity override, dataSource.documentNoField, the isPrimary column, then resource metadata. Secondary-field precedence is optional page identity override, the primary column's subtitleField, then resource metadata. An empty-string override suppresses a field. Without a declared secondary field, the subtitle is omitted.
 
-No. Series declares its resource identity once in entity-contract-profiles.ts. Its page needs no additional identity block. Singleton setup and worksheet titles keep their page context. New records without a display key use New plus the page title. Record captions update after a valid header change.
+No. Series declares reusable resource defaults in entity-contract-profiles.ts and explicitly documents code/description in its page configuration. Purchase Requisition explicitly uses number/purpose. Page identity overrides remain optional for other pages. Singleton setup and worksheet titles keep their page context. New records without a display key use New plus the page title. Record captions update after a valid header change.
 
 Lookup displayFormat and labelField/bindLabel remain explicit display overrides. Otherwise lookups use their displayField with the shared resource description. Lookup valueField still controls the stored key. Explicit FactBox bindings remain supported.
+
+The document header keeps its configured page name above one record line: primary value plus secondary value, separated by an em dash. For example, No. Series above PR — Purchase Requisition. Identity values never replace the page name.
