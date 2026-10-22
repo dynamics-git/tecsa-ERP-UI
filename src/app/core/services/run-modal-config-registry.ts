@@ -1,8 +1,8 @@
-import { RunModalConfigModule } from '../../platform/public-api';
+import { PageType, RunModalConfigModule } from '../../platform/public-api';
 import { runModalPageModules } from '../../features/run-modal-page-modules';
 
 type PageOpenTarget = 'list' | 'entry';
-type PageTypeName = 'list' | 'card' | 'document' | 'worksheet' | 'setup';
+type PageTypeName = PageType;
 
 type RegisteredPageConfig = {
   moduleRef: RunModalConfigModule;
@@ -11,10 +11,11 @@ type RegisteredPageConfig = {
 
 const registeredPages = buildPageRegistry(runModalPageModules);
 
-function buildPageRegistry(modules: RunModalConfigModule[]): Map<string, RegisteredPageConfig> {
+export function buildPageRegistry(modules: RunModalConfigModule[]): Map<string, RegisteredPageConfig> {
   const registry = new Map<string, RegisteredPageConfig>();
 
   for (const moduleRef of modules) {
+    let declaredPages = 0;
     for (const exportedValue of Object.values(moduleRef)) {
       if (!isRecord(exportedValue)) {
         continue;
@@ -25,13 +26,21 @@ function buildPageRegistry(modules: RunModalConfigModule[]): Map<string, Registe
         continue;
       }
 
-      registry.set(pageId, {
-        moduleRef,
-        pageType: normalizePageType(exportedValue['pageType']),
-      });
+      const pageType = normalizePageType(exportedValue['pageType']);
+      if (!pageType) throw new Error(`Invalid pageType for ${pageId}`);
+      if (++declaredPages > 1) throw new Error('Each config module must declare exactly one page');
+      if (registry.has(pageId)) throw new Error(`Duplicate pageId: ${pageId}`);
+      registry.set(pageId, { moduleRef, pageType });
     }
+    if (!declaredPages) throw new Error('Each config module must declare exactly one page');
   }
 
+  for (const [pageId, entry] of registry) {
+    const components = Object.entries(entry.moduleRef).filter(
+      ([name, value]) => name.endsWith('Page') && typeof value === 'function',
+    );
+    if (components.length !== 1) throw new Error('Page ' + pageId + ' must declare exactly one feature component.');
+  }
   return registry;
 }
 

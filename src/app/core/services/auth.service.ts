@@ -2,6 +2,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { runModalPageModules } from '../../features/run-modal-page-modules';
+import type { DataSourceConfig, ListPageConfig, LineConfig } from '../../platform/public-api';
 import { ApiAuthService } from './api-auth.service';
 import { RestService } from './rest.service';
 import { SessionContext, SessionService } from './session.service';
@@ -29,7 +31,7 @@ export type LoginResult = {
 type BackendLoginResponse = Record<string, unknown>;
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthService {
   private pendingLogin?: { token: string; user: Record<string, unknown>; companies: AuthorizedCompany[] };
@@ -37,7 +39,7 @@ export class AuthService {
     private readonly apiAuth: ApiAuthService,
     private readonly restService: RestService,
     private readonly sessionService: SessionService,
-    private readonly http: HttpClient
+    private readonly http: HttpClient,
   ) {}
 
   authenticate(): Observable<string> {
@@ -48,7 +50,7 @@ export class AuthService {
     return this.apiAuth.getToken().pipe(
       tap((token) => {
         this.sessionService.AccessToken = token;
-      })
+      }),
     );
   }
 
@@ -76,40 +78,45 @@ export class AuthService {
     this.pendingLogin = undefined;
     this.sessionService.clearSessionData();
 
-    return this.http.post<BackendLoginResponse>(this.buildAuthUrl('/auth/login'), {
-      login: request.email.trim(),
-      password: request.password,
-    }).pipe(
-      switchMap((response) => {
-        const data = this.toRecord(this.readValue(response, 'data'));
-        const token = data ? this.readFirstString(data, ['token']) : '';
-        const user = data ? this.toRecord(this.readValue(data, 'user')) : undefined;
-        const companies = data ? this.extractAuthorizedCompanies(this.readValue(data, 'companies')) : [];
-        if (!token || !user) {
-          return throwError(() => new Error('Login response is missing verified account details.'));
-        }
-        if (!companies.length) {
-          return throwError(() => new Error('No active ERP company is assigned to this account. Contact your administrator.'));
-        }
+    return this.http
+      .post<BackendLoginResponse>(this.buildAuthUrl('/auth/login'), {
+        login: request.email.trim(),
+        password: request.password,
+      })
+      .pipe(
+        switchMap((response) => {
+          const data = this.toRecord(this.readValue(response, 'data'));
+          const token = data ? this.readFirstString(data, ['token']) : '';
+          const user = data ? this.toRecord(this.readValue(data, 'user')) : undefined;
+          const companies = data ? this.extractAuthorizedCompanies(this.readValue(data, 'companies')) : [];
+          if (!token || !user) {
+            return throwError(() => new Error('Login response is missing verified account details.'));
+          }
+          if (!companies.length) {
+            return throwError(
+              () => new Error('No active ERP company is assigned to this account. Contact your administrator.'),
+            );
+          }
 
-        this.pendingLogin = { token, user, companies };
-        const defaultCompany = this.toRecord(data?.['defaultCompany']);
-        const defaultId = defaultCompany ? this.readFirstString(defaultCompany, ['systemId']) : '';
-        const selected = companies.find((company) => company.systemId === defaultId)
-          ?? (companies.length === 1 ? companies[0] : undefined);
-        if (!selected) {
-          return of({ user, companies, requiresCompanySelection: true });
-        }
-        return this.selectCompany(selected.systemId).pipe(
-          map((session) => ({ user, session, companies, requiresCompanySelection: false }))
-        );
-      }),
-      catchError((error: unknown) => {
-        this.pendingLogin = undefined;
-        this.sessionService.clearSessionData();
-        return throwError(() => error);
-      }),
-    );
+          this.pendingLogin = { token, user, companies };
+          const defaultCompany = this.toRecord(data?.['defaultCompany']);
+          const defaultId = defaultCompany ? this.readFirstString(defaultCompany, ['systemId']) : '';
+          const selected =
+            companies.find((company) => company.systemId === defaultId) ??
+            (companies.length === 1 ? companies[0] : undefined);
+          if (!selected) {
+            return of({ user, companies, requiresCompanySelection: true });
+          }
+          return this.selectCompany(selected.systemId).pipe(
+            map((session) => ({ user, session, companies, requiresCompanySelection: false })),
+          );
+        }),
+        catchError((error: unknown) => {
+          this.pendingLogin = undefined;
+          this.sessionService.clearSessionData();
+          return throwError(() => error);
+        }),
+      );
   }
 
   selectCompany(companyId: string): Observable<SessionContext> {
@@ -127,12 +134,16 @@ export class AuthService {
         if (!data || !verified || this.readFirstString(verified, ['systemId']) !== selected.systemId) {
           throw new Error('Could not verify the selected company.');
         }
-        const session = this.mapEngineToSessionContext(pending.user, {
-          email: this.readFirstString(pending.user, ['email']),
-          password: '',
-          companyId: selected.systemId,
-          companyName: selected.name,
-        }, data);
+        const session = this.mapEngineToSessionContext(
+          pending.user,
+          {
+            email: this.readFirstString(pending.user, ['email']),
+            password: '',
+            companyId: selected.systemId,
+            companyName: selected.name,
+          },
+          data,
+        );
         this.sessionService.applySessionContext(session);
         this.pendingLogin = undefined;
         return session;
@@ -157,19 +168,21 @@ export class AuthService {
   }
 
   getCurrentUser(): Observable<Record<string, unknown>> {
-    return this.http.get<BackendLoginResponse>(this.buildAuthUrl('/auth/me'), {
-      headers: this.createBearerHeaders()
-    }).pipe(
-      map((response) => {
-        const user = this.extractUser(response) ?? this.toRecord(response);
-
-        if (!user) {
-          throw new Error('Current user response did not include user details.');
-        }
-
-        return user;
+    return this.http
+      .get<BackendLoginResponse>(this.buildAuthUrl('/auth/me'), {
+        headers: this.createBearerHeaders(),
       })
-    );
+      .pipe(
+        map((response) => {
+          const user = this.extractUser(response) ?? this.toRecord(response);
+
+          if (!user) {
+            throw new Error('Current user response did not include user details.');
+          }
+
+          return user;
+        }),
+      );
   }
 
   isSuperAdmin(): boolean {
@@ -194,7 +207,7 @@ export class AuthService {
   private createBearerHeaders(): HttpHeaders {
     return new HttpHeaders({
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.sessionService.AccessToken}`
+      Authorization: `Bearer ${this.sessionService.AccessToken}`,
     });
   }
 
@@ -256,9 +269,7 @@ export class AuthService {
   }
 
   private toRecord(value: unknown): Record<string, unknown> | undefined {
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : undefined;
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
   }
 
   private getDeviceName(): string {
@@ -272,7 +283,7 @@ export class AuthService {
   private mapEngineToSessionContext(
     user: Record<string, unknown>,
     request: LoginRequest,
-    engineResponse: unknown
+    engineResponse: unknown,
   ): SessionContext {
     const engine = this.toRecord(engineResponse) ?? {};
     const isSuperAdmin = this.readBoolean(engine, 'isSuperAdmin');
@@ -288,7 +299,7 @@ export class AuthService {
       showAllAccessCenters: this.readBoolean(engine, 'showAllAccessCenters') || isSuperAdmin,
       showAccessCenterSelection: this.readBoolean(engine, 'showAccessCenterSelection') || accessCenters.length > 0,
       accessCenter,
-      defaultAccessCenter
+      defaultAccessCenter,
     });
   }
 
@@ -306,7 +317,39 @@ export class AuthService {
 
     const permissions: Record<string, unknown>[] = [];
 
-    rawPages.forEach((page) => {
+    const pages = rawPages.flatMap((page) => {
+      const record = this.toRecord(page);
+      const apiPath = record ? this.readFirstString(record, ['apiPath']) : '';
+      if (!apiPath) return [page]; // Preserve the established session format.
+      const normalizedPath = (value: string) => value.replace(/\{[^}]*\}/g, '{}').replace(/^\/+|\/+$/g, '');
+      const sourcePath = (source: DataSourceConfig) =>
+        source.navigation
+          ? source.navigation.parentEndpoint + '/{parentId}/' + source.navigation.childCollection
+          : source.endpoint;
+      const bindings: Record<string, unknown>[] = [];
+      for (const module of runModalPageModules) {
+        const config = Object.values(module).find(
+          (value) => value && typeof value === 'object' && 'pageId' in value,
+        ) as ListPageConfig | undefined;
+        if (!config?.dataSource) continue;
+        const sources: Array<{ ids: string[]; source: DataSourceConfig }> = [
+          { ids: [...new Set([config.permissionPageId ?? config.pageId!, config.pageId!])], source: config.dataSource },
+        ];
+        const lines = Object.entries(module).find(([key]) => key.endsWith('LineConfig'))?.[1] as LineConfig | undefined;
+        if (lines)
+          sources.push({ ids: [lines.permissionPageId ?? config.pageId! + '-lines'], source: lines.dataSource });
+        for (const binding of sources) {
+          if (normalizedPath(sourcePath(binding.source)) !== normalizedPath(apiPath)) continue;
+          for (const id of binding.ids) {
+            if (!bindings.some((value) => value['pageId'] === id))
+              bindings.push({ ...record, pageId: id, pageName: config.title ?? id });
+          }
+        }
+      }
+      return bindings.length ? bindings : [page];
+    });
+
+    pages.forEach((page) => {
       const pageRecord = this.toRecord(page);
       if (!pageRecord) {
         return;
@@ -321,6 +364,7 @@ export class AuthService {
       const canDelete = this.readBoolean(pageRecord, 'canDelete');
 
       permissions.push({
+        query: pageRecord['query'],
         PageId: pageId,
         pageId,
         ObjectName: pageCode,
@@ -328,12 +372,13 @@ export class AuthService {
         ReadPermission: canRead ? 'Yes' : 'No',
         InsertPermission: canCreate ? 'Yes' : 'No',
         ModifyPermission: canUpdate ? 'Yes' : 'No',
-        PostPermission: 'No',
+        PostPermission: this.readBoolean(pageRecord, 'canExecute') ? 'Yes' : 'No',
+        canExecute: this.readBoolean(pageRecord, 'canExecute'),
         DeletePermission: canDelete ? 'Yes' : 'No',
         canRead,
         canCreate,
         canUpdate,
-        canDelete
+        canDelete,
       });
 
       const actions = this.readValue(pageRecord, 'actions');
@@ -365,7 +410,7 @@ export class AuthService {
           canCreate,
           canUpdate,
           canDelete,
-          canExecute
+          canExecute,
         });
       });
     });
@@ -394,7 +439,7 @@ export class AuthService {
   private createSessionContext(
     user: Record<string, unknown>,
     request: LoginRequest,
-    overrides: Partial<SessionContext>
+    overrides: Partial<SessionContext>,
   ): SessionContext {
     const companyId = this.resolveCompanyId(user, request);
     const companyName = this.resolveCompanyName(user, request);
@@ -404,7 +449,7 @@ export class AuthService {
       company: companyId,
       companyName,
       accessToken: this.sessionService.AccessToken,
-      ...overrides
+      ...overrides,
     };
   }
 
@@ -483,18 +528,10 @@ export class AuthService {
 
     if (typeof value === 'object') {
       const record = value as Record<string, unknown>;
-      const result = this.readFirstString(record, [
-        'accessCenter',
-        'AccessCenter',
-        'code',
-        'Code',
-        'id',
-        'Id'
-      ]);
+      const result = this.readFirstString(record, ['accessCenter', 'AccessCenter', 'code', 'Code', 'id', 'Id']);
       return result === undefined || result === null ? '' : String(result);
     }
 
     return '';
   }
-
 }

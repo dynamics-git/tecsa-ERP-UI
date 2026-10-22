@@ -17,20 +17,26 @@ function literal(value: unknown, type?: string): string | undefined {
   return typeof value === 'string' || typeof value === 'number' ? "'" + String(value).replace(/'/g, "''") + "'" : undefined;
 }
 /** Builds one identical constraint for initial, searched and continuation requests. */
-export function lookupQuery(lookup: FieldLookupConfig, record: Record<string, unknown>, search = '', header: Record<string, unknown> = {}): {ready: boolean; filter?: string} {
+export function lookupQuery(lookup: FieldLookupConfig, record: Record<string, unknown>, search = '', header: Record<string, unknown> = {}): {ready: boolean; endpoint?: string; filter?: string} {
+  let endpoint = lookup.endpoint;
   const clauses: string[] = [];
   if (lookup.filter?.trim()) clauses.push(lookup.filter.trim());
   for (const dependency of lookup.dependsOn ?? []) {
     if (!/^[A-Za-z_]\w*(?:[./][A-Za-z_]\w*)*$/.test(dependency.field)) return {ready: false};
     const value = literal(read(dependency.source === 'header' ? header : record, dependency.valueFrom), dependency.valueType);
     if (value === undefined) return {ready: false};
-    clauses.push(dependency.field + ' eq ' + value);
+    if (dependency.in === 'path') {
+      const raw = read(dependency.source === 'header' ? header : record, dependency.valueFrom);
+      if (typeof raw !== 'string' || !/^[A-Za-z0-9_-]+$/.test(raw)) return {ready: false};
+      endpoint = endpoint.replaceAll('{' + dependency.field + '}', encodeURIComponent(raw));
+    } else clauses.push(dependency.field + ' eq ' + value);
   }
+  if (/[{}]/.test(endpoint)) return {ready: false};
   if (search.trim()) {
     const query = search.trim().replace(/'/g, "''");
     clauses.push((lookup.searchFields ?? [lookup.displayField]).map(field => "contains(" + field + ", '" + query + "')").join(' or '));
   }
-  return {ready: true, filter: clauses.length ? clauses.map(clause => '(' + clause + ')').join(' and ') : undefined};
+  return {ready: true, endpoint, filter: clauses.length ? clauses.map(clause => '(' + clause + ')').join(' and ') : undefined};
 }
 /** Called only after an actual edit; initial hydration never clears saved values. */
 export function clearDependentLookups(fields: LookupDependencyField[], changedFields: string[], record: Record<string, unknown>, source: 'record' | 'header' = 'record'): {updates: Record<string, unknown>; previous: Record<string, unknown>; invalidated: string[]} {

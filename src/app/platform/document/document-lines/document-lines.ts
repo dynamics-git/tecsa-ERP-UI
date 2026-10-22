@@ -70,7 +70,7 @@ export class DocumentLines {
     const bucket = column.optionsDataKey ?? `__options_${column.field ?? column.id}`;
     if (!nextPage) row[bucket] = [];
 
-    this.lookupRequests.set(row, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: column.lookup!.endpoint, paging: column.lookup!.paging, pageSize: 20,
+    this.lookupRequests.set(row, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: lookupFilter.endpoint!, paging: column.lookup!.paging, pageSize: 20,
       defaultFilter: lookupFilter.filter,
     }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({ next: response => {
       if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return;
@@ -149,7 +149,7 @@ export class DocumentLines {
         const context = lookupQuery(column.lookup, row, '', this.headerData).filter;
         const options = row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`];
         if (Array.isArray(options) && options.some(option => String(option?.value) === String(id))) continue;
-        this.lookupRequests.set(row, this.source.loadById({ endpoint: column.lookup.endpoint }, id, { useCache: true, maxAgeMs: 30000 }).subscribe({
+        this.lookupRequests.set(row, this.source.loadLookup(column.lookup, id, row, this.headerData).subscribe({
           next: value => {
             if (String(row[column.field ?? column.id]) !== String(id) || lookupQuery(column.lookup!, row, '', this.headerData).filter !== context) return;
             const record = value as Record<string, unknown>;
@@ -308,6 +308,9 @@ export class DocumentLines {
   inputType(column: LineColumnConfig): string { return fieldInputType(column.valueType); }
 
   getCellValue(row: Record<string, unknown>, column: LineColumnConfig): string {
+    // Filler rows are empty entry space, not records with default values.
+    // Keep defaults in the draft so they become visible when entry actually starts.
+    if (row['__entryPlaceholder'] === true) return '';
     const value = row[column.field ?? column.id];
     if (this.isLineNoColumn(column) && (value === 0 || value === '0')) {
       return '';
@@ -400,7 +403,7 @@ export class DocumentLines {
   isRequired(column: LineColumnConfig, row: Record<string,unknown>): boolean { return fieldIsRequired(column,row); }
 
   isReadonly(column: LineColumnConfig, row: Record<string, unknown>): boolean {
-    return fieldIsReadonly(column, row) || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) || (!!column.lookup && !lookupQuery(column.lookup, row, '', this.headerData).ready);
+    return row[`__lookupRestricted_${column.field ?? column.id}`] === true || fieldIsReadonly(column, row) || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) || (!!column.lookup && !lookupQuery(column.lookup, row, '', this.headerData).ready);
   }
 
   updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown): void {

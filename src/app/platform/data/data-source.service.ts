@@ -1,3 +1,5 @@
+import { FieldLookupConfig } from '../models/field-config.model';
+import { lookupQuery } from './lookup-dependencies';
 import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
 import { Observable, defer, firstValueFrom, from, of } from 'rxjs';
 import { finalize, map, shareReplay, catchError } from 'rxjs/operators';
@@ -105,6 +107,18 @@ export class DataSourceService {
       if (error?.status === 404 && key === this.key(endpoint) && generation === this.readGeneration) this.missingSingletons.add(key);
       throw error;
     })));
+  }
+  /** Selected lookup records follow the same company and parent scope as searches. */
+  loadLookup(lookup: FieldLookupConfig, id: unknown, record: Record<string, unknown>, header: Record<string, unknown> = {}): Observable<unknown> {
+    const query = lookupQuery({...lookup, filter: undefined}, record, '', header);
+    if (!query.ready || !query.endpoint) return of(undefined);
+    if (lookup.recordRead !== 'collection') return this.loadById({endpoint: query.endpoint}, id, {useCache: true, maxAgeMs: 30000});
+    const identity = lookup.valueField + " eq '" + String(id).replace(/'/g, "''") + "'";
+    return this.loadList({endpoint: query.endpoint, defaultFilter: [query.filter, identity].filter(Boolean).map(value => '(' + value + ')').join(' and ')}, {top: 1, useCache: true, maxAgeMs: 30000}).pipe(map(response => {
+      const selected = (response as DataPage).value[0];
+      if (!selected) throw new Error('The selected lookup record is unavailable in this company and parent scope.');
+      return selected;
+    }));
   }
   loadById(config: DataSourceConfig, id: unknown, options: DataSourceLoadOptions = {}): Observable<unknown> {
     const endpoint = config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);

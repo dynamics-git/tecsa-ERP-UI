@@ -11,6 +11,6 @@ export function fieldIsRequired(field: {required?:boolean;requiredWhen?:FieldCon
 export function fieldIsHidden(field: {hidden?:boolean;hiddenWhen?:FieldCondition},record:Record<string,unknown>):boolean {
  return field.hidden === true || matchesFieldCondition(field.hiddenWhen,record);
 }
-export function fieldIsReadonly(field: {readonly?:boolean;readonlyWhen?:FieldCondition},record:Record<string,unknown>):boolean {
- return field.readonly === true || matchesFieldCondition(field.readonlyWhen,record);
+export function fieldIsReadonly(field: {readonly?:boolean;readonlyAfterCreate?:boolean;readonlyWhen?:FieldCondition},record:Record<string,unknown>):boolean {
+ return field.readonly === true || (field.readonlyAfterCreate === true && !!(record['systemId'] ?? record['id'])) || matchesFieldCondition(field.readonlyWhen,record);
 }

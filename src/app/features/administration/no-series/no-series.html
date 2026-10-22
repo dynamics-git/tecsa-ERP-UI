@@ -1,6 +1,8 @@
-<app-document-page
-  [pageId]="pageConfig.pageId!"
-  [listConfig]="pageConfig"
+<app-list-page
+  [listConfig]="listConfig"
   [headerConfig]="headerConfig"
-  [lineConfig]="lineConfig">
-</app-document-page>
+  [lineConfig]="lineConfig"
+  [documentOnly]="!!runModal"
+  [initialRecord]="runModal?.record"
+  (closeRequested)="runModal?.close()">
+</app-list-page>

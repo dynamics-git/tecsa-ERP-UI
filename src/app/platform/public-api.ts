@@ -56,3 +56,5 @@ export * from './pages/standard-list-actions.service';
 export * from './models/record-identity.model';
 
 export * from './pages/unsaved-changes.service';
+
+export { headerDataSourceDefaults, listColumns } from './data/document-config-defaults';

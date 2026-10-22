@@ -1,13 +1,14 @@
 import { HeaderConfig, LineConfig, ListPageConfig, DataSourceConfig } from '../../../platform/public-api';
 
-export const noSeriesPageConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+export const noSeriesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  factBox: { enabled: true, sections: [{ id: 'setup', title: 'Setup', fields: [{"id":"code","field":"code","label":"Code"},{"id":"description","field":"description","label":"Description"},{"id":"defaultNos","field":"defaultNos","label":"Default Nos"},{"id":"manualNos","field":"manualNos","label":"Manual Nos"},{"id":"dateOrder","field":"dateOrder","label":"Date Order"},{"id":"isActive","field":"isActive","label":"Is Active"}] }] },
   pageId: 'no-series',
   pageType: 'document',
   autoSave: true,
   title: 'No. Series',
   identity: { primaryField: 'code', secondaryField: 'description' },
   module: 'Administration',
-  menu: { module: 'Administration', group: 'Setup', icon: 'ts-icon ts-icon-list', route: '/no-series' },
+  menu: { module: 'Administration', group: 'Setup', icon: 'ts-icon ts-icon-number-series', moduleIcon: 'ts-icon ts-icon-administration-module', route: '/no-series' },
   dataSource: {
     endpoint: '/numberSeries',
     keyField: 'systemId',

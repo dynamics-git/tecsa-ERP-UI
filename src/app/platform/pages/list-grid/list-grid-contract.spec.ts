@@ -1,12 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { describe,it,expect } from 'vitest';
-import { ListPage } from './list-page';
+import { ListGrid } from './list-grid';
 import { ListPageConfig } from '../../models/page-config.model';
 
 describe('Shared list workspace with synthetic records',()=>{
  const config:ListPageConfig={pageId:'fixture-list',title:'Fixture records',dataSource:{endpoint:'/fixtures',keyField:'id'},factBox:{enabled:false},personalization:{enabled:false},dataSurface:{columns:[{field:'code',label:'Code'},{field:'status',label:'Status'}]}};
- function create(rows:unknown[]){TestBed.configureTestingModule({imports:[ListPage],providers:[provideRouter([])]});const f=TestBed.createComponent(ListPage);f.componentRef.setInput('config',config);f.componentRef.setInput('data',rows);f.detectChanges();return f;}
+ function create(rows:unknown[]){TestBed.configureTestingModule({imports:[ListGrid],providers:[provideRouter([])]});const f=TestBed.createComponent(ListGrid);f.componentRef.setInput('config',config);f.componentRef.setInput('data',rows);f.detectChanges();return f;}
  it('bounds DOM rows for 10,000 records and supports scrollback without removing data',()=>{
   const rows=Array.from({length:10000},(_,id)=>({id:String(id),code:'ROW-'+id,status:'Open'}));const f=create(rows),page=f.componentInstance;
   expect(f.nativeElement.querySelectorAll('tbody tr[data-record-row]').length).toBeLessThanOrEqual(80);

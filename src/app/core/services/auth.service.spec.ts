@@ -17,7 +17,12 @@ describe('TecSA Laravel company-aware login', () => {
   let http: HttpTestingController;
   const companyA = { systemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Company A', code: 'A', isActive: true };
   const companyB = { systemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'Company B', code: 'B', isActive: true };
-  const user = { systemId: '11111111-1111-4111-8111-111111111111', userName: 'test-user', name: 'Test User', email: 'user@example.test' };
+  const user = {
+    systemId: '11111111-1111-4111-8111-111111111111',
+    userName: 'test-user',
+    name: 'Test User',
+    email: 'user@example.test',
+  };
   const apiBase = environment.apiBaseUrl.replace(/\/$/, '');
   const url = `${apiBase}/auth/login`;
   const contextUrl = (id: string) => `${apiBase}/auth/context?companyId=${id}`;
@@ -26,20 +31,23 @@ describe('TecSA Laravel company-aware login', () => {
       company,
       isSuperAdmin: superAdmin,
       accessCenters: [],
-      pages: [{
-        pageId: 'purchase-order',
-        pageName: 'Purchase Order',
-        pageCode: 'purchase_orders',
-        canRead,
-        canCreate: false,
-        canUpdate: false,
-        canDelete: false,
-        canExecute: false,
-      }],
+      pages: [
+        {
+          pageId: 'purchase-order',
+          pageName: 'Purchase Order',
+          pageCode: 'purchase_orders',
+          canRead,
+          canCreate: false,
+          canUpdate: false,
+          canDelete: false,
+          canExecute: false,
+        },
+      ],
     },
   });
-  const response = (companies = [companyA], defaultCompany: typeof companyA | null = companyA) =>
-    ({ data: { token: 'sanctum-test-token', user, companies, defaultCompany } });
+  const response = (companies = [companyA], defaultCompany: typeof companyA | null = companyA) => ({
+    data: { token: 'sanctum-test-token', user, companies, defaultCompany },
+  });
 
   beforeEach(() => {
     localStorage.clear();
@@ -87,7 +95,7 @@ describe('TecSA Laravel company-aware login', () => {
     http.expectOne(url).flush(response([companyA, companyB], null));
     const result = await operation;
     expect(result.requiresCompanySelection).toBe(true);
-    expect(result.companies.map(company => company.systemId)).toEqual([companyA.systemId, companyB.systemId]);
+    expect(result.companies.map((company) => company.systemId)).toEqual([companyA.systemId, companyB.systemId]);
     expect(session.isSessionValid()).toBe(false);
     expect(session.Company).toBe('');
     expect(permissions.canView('purchase-order')).toBe(false);
@@ -113,7 +121,16 @@ describe('TecSA Laravel company-aware login', () => {
 
   it('does not grant SUPER privileges merely because the username resembles an admin', async () => {
     const operation = firstValueFrom(auth.login({ email: 'admin@tecsa.com.my', password: 'pass' }));
-    http.expectOne(url).flush({ data: { token: 'token', user: { ...user, email: 'admin@tecsa.com.my', userName: 'admin@tecsa.com.my' }, companies: [companyA], defaultCompany: companyA } });
+    http
+      .expectOne(url)
+      .flush({
+        data: {
+          token: 'token',
+          user: { ...user, email: 'admin@tecsa.com.my', userName: 'admin@tecsa.com.my' },
+          companies: [companyA],
+          defaultCompany: companyA,
+        },
+      });
     http.expectOne(contextUrl(companyA.systemId)).flush(context(companyA, false, false));
     await operation;
     expect(permissions.isSuperAdmin()).toBe(false);
@@ -131,9 +148,58 @@ describe('TecSA Laravel company-aware login', () => {
   it('remains logged out when the backend denies company context', async () => {
     const operation = firstValueFrom(auth.login({ email: user.email, password: 'pass' }));
     http.expectOne(url).flush(response());
-    http.expectOne(contextUrl(companyA.systemId)).flush({ message: 'Company access denied' }, { status: 403, statusText: 'Forbidden' });
+    http
+      .expectOne(contextUrl(companyA.systemId))
+      .flush({ message: 'Company access denied' }, { status: 403, statusText: 'Forbidden' });
     await expect(operation).rejects.toBeTruthy();
     expect(session.isSessionValid()).toBe(false);
     expect(session.AccessToken).toBe('');
+  });
+  it('binds discovered entity endpoints to existing UI pages without a backend page registry', async () => {
+    const operation = firstValueFrom(auth.login({ email: 'user@example.test', password: 'correct-password' }));
+    http.expectOne(url).flush(response());
+    http.expectOne(contextUrl(companyA.systemId)).flush({
+      data: {
+        company: companyA,
+        isSuperAdmin: true,
+        accessCenters: [],
+        pages: [
+          {
+            pageId: 'items',
+            apiPath: '/items',
+            pageCode: 'items',
+            canRead: true,
+            canCreate: true,
+            canUpdate: true,
+            canDelete: true,
+          },
+          {
+            pageId: 'itemUnitsOfMeasure',
+            apiPath: '/items/{itemSystemId}/unitsOfMeasure',
+            pageCode: 'items',
+            canRead: true,
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+          },
+          {
+            pageId: 'numberSeries',
+            apiPath: '/numberSeries',
+            pageCode: 'number_series',
+            canRead: true,
+            canCreate: true,
+            canUpdate: true,
+            canDelete: true,
+          },
+        ],
+      },
+    });
+    await operation;
+    const entries = session.Permissions as Array<Record<string, unknown>>;
+    expect(entries.find((entry) => entry['pageId'] === 'items')?.['canDelete']).toBe(true);
+    expect(entries.find((entry) => entry['pageId'] === 'items-lines')?.['canDelete']).toBe(false);
+    expect(entries.find((entry) => entry['pageId'] === 'item-units-of-measure')?.['canUpdate']).toBe(false);
+    expect(entries.find((entry) => entry['pageId'] === 'no-series')?.['canDelete']).toBe(true);
+    expect(session.SuperAdmin).toBe(true);
   });
 });

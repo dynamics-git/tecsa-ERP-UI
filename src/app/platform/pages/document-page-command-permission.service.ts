@@ -3,7 +3,6 @@ import { Injectable } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
-
 // Extracted without changing the authorization rules or permission aliases.
 // This governs the visual availability of document commands, not API authorization.
 @Injectable({ providedIn: 'root' })
@@ -14,15 +13,19 @@ export class DocumentPageCommandPermissionService {
   ) {}
 
   apply(button: CommandConfig, pageId: string): CommandConfig {
-    if (button.hidden === true || this.sessionService.SuperAdmin) {
+    if (button.hidden === true) {
       return button;
     }
 
+    if (this.sessionService.SuperAdmin && !button.runModalPageId && !this.hasDeclaredPage(pageId)) return button;
     const permissions = this.resolvePagePermissionFlags(pageId);
     const action = this.normalizePopupCommandKey(button.actionKey);
 
     let allowed = true;
-    if (action === 'new' || action === 'line-new' || action === 'line-insert') {
+    if (button.runModalPageId) {
+      const matched = this.sessionService.Permissions.filter(permission => this.matchesPage(permission, button.permissionKey ?? button.runModalPageId!));
+      allowed = matched.length ? matched.some(permission => this.readPermissionFlag(permission, ['canRead', 'CanRead', 'ReadPermission'])) : this.sessionService.SuperAdmin;
+    } else if (action === 'new' || action === 'line-new' || action === 'line-insert') {
       allowed = permissions.canCreate;
     } else if (action === 'save' || action === 'apply' || action === 'edit') {
       allowed = permissions.canUpdate;
@@ -43,11 +46,22 @@ export class DocumentPageCommandPermissionService {
     };
   }
 
-  applyOperation(button: CommandConfig, pageId: string, operation: 'create' | 'modify' | 'delete'): CommandConfig {
-    if (button.hidden || this.sessionService.SuperAdmin) return button;
+  applyOperation(
+    button: CommandConfig,
+    pageId: string,
+    operation: 'create' | 'modify' | 'delete',
+  ): CommandConfig {
+    if (button.hidden || this.sessionService.SuperAdmin && !this.hasDeclaredPage(pageId)) return button;
     const flags = this.resolvePagePermissionFlags(pageId);
-    const allowed = operation === 'create' ? flags.canCreate : operation === 'modify' ? flags.canUpdate : flags.canDelete;
-    return allowed ? button : { ...button, disabled: true, tooltip: 'You do not have permission for this operation.' };
+    const allowed =
+      operation === 'create'
+        ? flags.canCreate
+        : operation === 'modify'
+          ? flags.canUpdate
+          : flags.canDelete;
+    return allowed
+      ? button
+      : { ...button, disabled: true, tooltip: 'You do not have permission for this operation.' };
   }
 
   private isCustomExecutableCommand(action: string): boolean {
@@ -78,12 +92,16 @@ export class DocumentPageCommandPermissionService {
       this.matchesPermissionKey(permission, normalizedPermissionKey),
     );
     if (!matched.length) {
-      return false;
+      return this.sessionService.SuperAdmin && fallbackCanExecute;
     }
 
     return matched.some((permission) =>
       this.readPermissionFlag(permission, ['canExecute', 'CanExecute', 'PostPermission']),
     );
+  }
+
+  private hasDeclaredPage(pageId: string): boolean {
+    return this.sessionService.Permissions.some(permission => this.matchesPage(permission, pageId));
   }
 
   private resolvePagePermissionFlags(pageId: string): {
@@ -93,7 +111,9 @@ export class DocumentPageCommandPermissionService {
     canExecute: boolean;
   } {
     const targetPage = this.valueMapper.toText(pageId).trim();
-    const matched = this.sessionService.Permissions.filter((permission) => this.matchesPage(permission, targetPage));
+    const matched = this.sessionService.Permissions.filter((permission) =>
+      this.matchesPage(permission, targetPage),
+    );
     if (!matched.length) {
       return { canCreate: false, canUpdate: false, canDelete: false, canExecute: false };
     }
@@ -124,9 +144,11 @@ export class DocumentPageCommandPermissionService {
     const declaredPageName = this.readPermissionValue(permission, ['pageName', 'PageName']);
     const declaredObjectName = this.readPermissionValue(permission, ['objectName', 'ObjectName']);
 
-    return this.normalizePermissionValue(declaredPageId) === normalizedPageId
-      || this.normalizePermissionValue(declaredPageName) === normalizedPageId
-      || this.normalizePermissionValue(declaredObjectName) === normalizedPageId;
+    return (
+      this.normalizePermissionValue(declaredPageId) === normalizedPageId ||
+      this.normalizePermissionValue(declaredPageName) === normalizedPageId ||
+      this.normalizePermissionValue(declaredObjectName) === normalizedPageId
+    );
   }
 
   private matchesPermissionKey(permission: unknown, normalizedPermissionKey: string): boolean {
@@ -135,10 +157,12 @@ export class DocumentPageCommandPermissionService {
     const pageName = this.readPermissionValue(permission, ['pageName', 'PageName']);
     const objectName = this.readPermissionValue(permission, ['objectName', 'ObjectName']);
 
-    return this.normalizePermissionValue(actionId) === normalizedPermissionKey
-      || this.normalizePermissionValue(actionCode) === normalizedPermissionKey
-      || this.normalizePermissionValue(pageName) === normalizedPermissionKey
-      || this.normalizePermissionValue(objectName) === normalizedPermissionKey;
+    return (
+      this.normalizePermissionValue(actionId) === normalizedPermissionKey ||
+      this.normalizePermissionValue(actionCode) === normalizedPermissionKey ||
+      this.normalizePermissionValue(pageName) === normalizedPermissionKey ||
+      this.normalizePermissionValue(objectName) === normalizedPermissionKey
+    );
   }
 
   private readPermissionValue(permission: unknown, keys: string[]): string {
@@ -165,10 +189,9 @@ export class DocumentPageCommandPermissionService {
   private readPermissionFlag(permission: unknown, keys: string[]): boolean {
     const value = this.readPermissionValue(permission, keys);
     const normalized = value.trim().toLowerCase();
-    return normalized === 'true'
-      || normalized === '1'
-      || normalized === 'yes'
-      || normalized === 'full';
+    return (
+      normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'full'
+    );
   }
 
   private normalizePermissionValue(value: unknown): string {
@@ -176,11 +199,7 @@ export class DocumentPageCommandPermissionService {
       return '';
     }
 
-    return String(value)
-      .trim()
-      .replace(/[_-]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .toUpperCase();
+    return String(value).trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toUpperCase();
   }
 
   normalizePopupCommandKey(actionKey: unknown): string {

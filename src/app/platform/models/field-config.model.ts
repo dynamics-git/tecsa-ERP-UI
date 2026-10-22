@@ -30,6 +30,8 @@ export interface FieldOptionConfig {
 export type FieldFillConfig = Record<string, string | string[]>;
 
 export interface LookupDependencyConfig {
+  /** Bind a parent identity into the declared REST path instead of a query filter. */
+  in?: 'path' | 'filter';
   /** Line lookups may explicitly depend on a field in their parent header. */
   source?: 'record' | 'header';
   /** Field on the lookup resource to constrain. */
@@ -40,6 +42,8 @@ export interface LookupDependencyConfig {
 }
 
 export interface FieldLookupConfig {
+  /** Child APIs may expose collection reads without a record GET. */
+  recordRead?: 'record' | 'collection';
   /** All dependencies must have values before a lookup can be searched. */
   dependsOn?: LookupDependencyConfig[];
   /** Fixed business filter combined with dependency and search clauses. */

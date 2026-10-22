@@ -24,7 +24,12 @@ export interface StandardCommandConfig {
 }
 
 export interface CommandConfig {
-  apiAction?: { name: string; payload?: Record<string, unknown>; inputFields?: FieldConfig[]; states?: { field: string; values: unknown[] } };
+  apiAction?: {
+    name: string;
+    payload?: Record<string, unknown>;
+    inputFields?: FieldConfig[];
+    states?: { field: string; values: unknown[] };
+  };
   id?: string;
   label: string;
   actionKey: string;
@@ -37,6 +42,8 @@ export interface CommandConfig {
   tone?: CommandTone;
   disabled?: boolean;
   hidden?: boolean;
+  /** Declarative record mapping for opening a related master from a selected row. */
+  runModalRecord?: { source: 'header' | 'activeLine'; fields: Record<string, string> };
   runModalPageId?: string;
   runModalTarget?: CommandRunModalTarget;
   runModalView?: CommandRunModalTarget;

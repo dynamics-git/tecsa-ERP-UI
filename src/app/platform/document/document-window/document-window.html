@@ -163,10 +163,12 @@
 
   <ng-template #lineStackTemplate>
     <section class="entry-section lines-section" [class.collapsed]="linesCollapsed" [style.--line-grid-height]="lineGridHeight + 'px'">
+      @if (!worksheet) {
       <div class="section-title">
         <h3><button class="section-toggle" type="button" [attr.aria-expanded]="!linesCollapsed" (click)="linesCollapsed = !linesCollapsed"><i class="ts-icon" [class.ts-icon-right]="linesCollapsed" [class.ts-icon-down]="!linesCollapsed"></i>Lines</button></h3>
         <span>{{ enteredLineCount }} {{ enteredLineCount === 1 ? 'line' : 'lines' }}</span>
       </div>
+      }
 
       @if (resolvedPrimaryLineToolbarButtons.length || resolvedGroupedLineToolbarButtons.length) {
         <div class="line-commandbar">

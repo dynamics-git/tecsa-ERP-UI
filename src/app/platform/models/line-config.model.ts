@@ -31,6 +31,7 @@ export interface LineColumnConfig extends DataSurfaceColumnConfig {
   required?: boolean;
   validation?: FieldConfig['validation'];
   readonly?: boolean;
+  readonlyAfterCreate?: boolean;
   options?: FieldOptionConfig[];
   api?: string | string[];
   optionsDataKey?: string;
@@ -46,6 +47,8 @@ export interface LineColumnConfig extends DataSurfaceColumnConfig {
 }
 
 export interface LineConfig {
+  /** Explicit permission scope for a child master with separate backend rights. */
+  permissionPageId?: string;
   commandBar?: CommandBarConfig;
   placement: LinePlacementConfig;
   dataSource: DataSourceConfig;

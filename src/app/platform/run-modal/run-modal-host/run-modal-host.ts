@@ -1,6 +1,7 @@
+import { DocumentPageCommandRoutingResolverService } from '../../pages/document-page-command-routing-resolver.service';
 import type { CommandConfig } from '../../models/command-config.model';
-import { AsyncPipe } from '@angular/common';
-import { Component, EventEmitter, Output, inject, forwardRef } from '@angular/core';
+import { AsyncPipe, NgComponentOutlet } from '@angular/common';
+import { Component, EventEmitter, Output, inject, Type } from '@angular/core';
 import { ConfirmationDialog } from '../../../shared/ui/confirmation-dialog/confirmation-dialog';
 import { ConfirmationDialogConfig } from '../../models/confirmation-dialog-config.model';
 import { DocumentWindowConfig } from '../../models/document-window-config.model';
@@ -11,35 +12,43 @@ import { DocumentWindowActionEvent, DocumentWindow } from '../../document/docume
 import { ConfirmationService } from '../../../shared/ui/confirmation.service';
 import { RunModalStackService } from '../run-modal-stack.service';
 import { RunModalService } from '../run-modal.service';
-import { ListPage } from '../../pages/list-page/list-page';
-import { DocumentPage } from '../../pages/document-page/document-page';
-import { RunModalConfigAssemblerService } from '../run-modal-config-assembler.service';
-import { HeaderConfig } from '../../models/document-window-config.model';
-import { LineConfig } from '../../models/line-config.model';
-import { DataSourceConfig } from '../../models/data-source-config.model';
+import { ListGrid } from '../../pages/list-grid/list-grid';
+import { RunModalPageWindow } from '../../models/run-modal-host-data.model';
 
 @Component({
   selector: 'app-run-modal-host',
   standalone: true,
-  imports: [AsyncPipe, DocumentWindow, ConfirmationDialog, ListPage, forwardRef(() => DocumentPage)],
+  imports: [AsyncPipe, DocumentWindow, ConfirmationDialog, ListGrid, NgComponentOutlet],
   templateUrl: './run-modal-host.html',
-  styleUrl: './run-modal-host.scss'
+  styleUrl: './run-modal-host.scss',
 })
 export class RunModalHost {
   private readonly confirmation = inject(ConfirmationService);
   private readonly popupStack = inject(RunModalStackService);
   private readonly runModal = inject(RunModalService);
-  private readonly assembler = inject(RunModalConfigAssemblerService);
+  private readonly commandRouting = inject(DocumentPageCommandRoutingResolverService);
 
-  getRuntimePage(popup: PopupConfig) { return this.getPopupData(popup).runtimePage; }
-  getRuntimeList(popup: PopupConfig): ListPageConfig & { dataSource: DataSourceConfig } {
-    return this.assembler.pickListPageConfig({ module: this.getRuntimePage(popup)!.module }) as ListPageConfig & { dataSource: DataSourceConfig };
+  getRuntimePage(popup: PopupConfig) {
+    return this.getPopupData(popup).runtimePage;
   }
-  getRuntimeHeader(popup: PopupConfig): HeaderConfig {
-    return (this.assembler.pickObject({ module: this.getRuntimePage(popup)!.module, suffix: 'HeaderConfig' }) as unknown as HeaderConfig) ?? {dialogTitle: '', toolbarButtons: [], sections: []};
+  private readonly runtimeInputs = new Map<string, { runModal: RunModalPageWindow }>();
+
+  getRuntimeComponent(popup: PopupConfig): Type<unknown> {
+    const module = this.getRuntimePage(popup)!.module;
+    const components = Object.entries(module).filter(
+      ([name, value]) => name.endsWith('Page') && typeof value === 'function',
+    );
+    if (components.length !== 1) throw new Error('A registered page must export exactly one feature component.');
+    return components[0][1] as Type<unknown>;
   }
-  getRuntimeLines(popup: PopupConfig): LineConfig | undefined {
-    return this.assembler.pickObject({ module: this.getRuntimePage(popup)!.module, suffix: 'LineConfig' }) as unknown as LineConfig | undefined;
+
+  getRuntimeInputs(popup: PopupConfig): { runModal: RunModalPageWindow } {
+    let inputs = this.runtimeInputs.get(popup.id);
+    if (!inputs) {
+      inputs = { runModal: { record: this.getRuntimePage(popup)!.record, close: () => this.closePopup(popup) } };
+      this.runtimeInputs.set(popup.id, inputs);
+    }
+    return inputs;
   }
   private readonly maximizedListPopups = new Set<string>();
 
@@ -49,6 +58,8 @@ export class RunModalHost {
   readonly popupStack$ = this.popupStack.stack$;
 
   getRenderablePopups(popups: PopupConfig[]): PopupConfig[] {
+    const active = new Set(popups.map((popup) => popup.id));
+    for (const id of this.runtimeInputs.keys()) if (!active.has(id)) this.runtimeInputs.delete(id);
     return popups.filter((popup) => popup.mode !== 'drawer');
   }
 
@@ -89,7 +100,11 @@ export class RunModalHost {
   }
 
   isDocumentPopup(popup: PopupConfig): boolean {
-    return !this.getRuntimePage(popup) && !!this.getDocumentWindowConfig(popup) && (popup.mode === 'page' || popup.size === 'full');
+    return (
+      !this.getRuntimePage(popup) &&
+      !!this.getDocumentWindowConfig(popup) &&
+      (popup.mode === 'page' || popup.size === 'full')
+    );
   }
 
   isListPopup(popup: PopupConfig): boolean {
@@ -121,10 +136,11 @@ export class RunModalHost {
     }
 
     this.maximizedListPopups.delete(popup.id);
+    this.runtimeInputs.delete(popup.id);
 
     this.closed.emit({
       popupId: popup.id,
-      documentWindowConfig: this.getDocumentWindowConfig(popup)
+      documentWindowConfig: this.getDocumentWindowConfig(popup),
     });
     this.runModal.releasePopup(popup.id);
     this.popupStack.close(popup.id);
@@ -155,8 +171,12 @@ export class RunModalHost {
     void this.runModal.handleListCommand(popup.id, event);
   }
 
-  onListLoadMore(popup: PopupConfig): void { void this.runModal.loadNextListPage(popup.id); }
-  listHasMore(popup: PopupConfig): boolean { return this.getPopupData(popup).runModalList?.hasMore === true; }
+  onListLoadMore(popup: PopupConfig): void {
+    void this.runModal.loadNextListPage(popup.id);
+  }
+  listHasMore(popup: PopupConfig): boolean {
+    return this.getPopupData(popup).runModalList?.hasMore === true;
+  }
 
   onDocumentWindowAction(popup: PopupConfig, event: DocumentWindowActionEvent): void {
     const actionKey = event.actionKey;
@@ -166,10 +186,12 @@ export class RunModalHost {
         return;
       }
 
-      if (this.runModal.handlePopupAction(popup.id, this.getDocumentWindowConfig(popup) ?? {}, {
-        actionKey,
-        payload: event.payload
-      })) {
+      if (
+        this.runModal.handlePopupAction(popup.id, this.getDocumentWindowConfig(popup) ?? {}, {
+          actionKey,
+          payload: event.payload,
+        })
+      ) {
         return;
       }
 
@@ -197,11 +219,7 @@ export class RunModalHost {
     }
 
     const nestedBehavior = this.getNestedPopupConfig(popup, action);
-    const nextEntryConfig = this.buildLayoutConfig(
-      sourceConfig,
-      layeredTitle,
-      nestedBehavior?.layout ?? actionLayout
-    );
+    const nextEntryConfig = this.buildLayoutConfig(sourceConfig, layeredTitle, nestedBehavior?.layout ?? actionLayout);
 
     this.popupStack.open({
       id: `entry-stack-${Date.now()}-${nextLevel}`,
@@ -212,8 +230,8 @@ export class RunModalHost {
       closeOnBackdrop: nestedBehavior?.closeOnBackdrop ?? popup.closeOnBackdrop,
       data: {
         ...this.getPopupData(popup),
-        documentWindowConfig: nextEntryConfig
-      }
+        documentWindowConfig: nextEntryConfig,
+      },
     });
   }
 
@@ -230,10 +248,10 @@ export class RunModalHost {
 
     const documentWindowConfig = this.getDocumentWindowConfig(popup);
     const payloadRecord = this.isRecord(event.payload) ? event.payload : undefined;
-    const context: Record<string, unknown> = {
+    let context: Record<string, unknown> = {
       headerData: documentWindowConfig?.headerData ?? {},
       lineRows: documentWindowConfig?.lineRows ?? [],
-      payload: payloadRecord ?? {}
+      payload: payloadRecord ?? {},
     };
 
     const activeLine = this.resolveRunModalActiveLine(documentWindowConfig, payloadRecord);
@@ -241,6 +259,17 @@ export class RunModalHost {
       context['activeLine'] = activeLine;
     }
 
+    if (button?.runModalRecord) {
+      context =
+        this.commandRouting.buildEntryRunModalRequest({
+          pageId,
+          headerData: documentWindowConfig?.headerData ?? {},
+          lineRows: documentWindowConfig?.lineRows ?? [],
+          payload: payloadRecord ?? {},
+          activeLine,
+          recordMapping: button.runModalRecord,
+        }).context ?? {};
+    }
     const target = button?.runModalTarget ?? button?.runModalView;
 
     void this.openRunModalWithLoader({
@@ -248,7 +277,7 @@ export class RunModalHost {
       context,
       target,
       // A related list must stack above its calling document, preserving unsaved state.
-      allowNested: true
+      allowNested: true,
     });
 
     return true;
@@ -282,7 +311,7 @@ export class RunModalHost {
 
   private resolveRunModalActiveLine(
     documentWindowConfig: DocumentWindowConfig | undefined,
-    payload: Record<string, unknown> | undefined
+    payload: Record<string, unknown> | undefined,
   ): Record<string, unknown> | undefined {
     if (payload && this.isRecord(payload['activeRow'])) {
       return payload['activeRow'];
@@ -345,11 +374,11 @@ export class RunModalHost {
   private buildLayoutConfig(
     source: DocumentWindowConfig,
     title: string,
-    layout: DocumentLayoutMode
+    layout: DocumentLayoutMode,
   ): DocumentWindowConfig {
     const next: DocumentWindowConfig = {
       ...source,
-      title
+      title,
     };
 
     if (layout === 'header-only') {
@@ -365,5 +394,4 @@ export class RunModalHost {
 
     return next;
   }
-
 }

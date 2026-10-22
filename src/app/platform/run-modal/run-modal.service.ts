@@ -59,10 +59,15 @@ export class RunModalService {
     if (!permitted) { this.failure = 'permission-denied'; return false; }
     const id = request.popupId ?? `run-modal-${definition.pageId}-${crypto.randomUUID()}`;
     const context = request.context ?? {};
+    if (context['recordMappingComplete'] === false) { this.failure = 'related-record-missing'; return false; }
     const target = config.pageType === 'worksheet' || config.dataSource.singleton ? 'entry' : request.target ?? 'list';
     if (target === 'entry') {
       const candidate = config.pageType === 'worksheet' ? context['activeLine'] ?? context['headerData'] : context['headerData'];
       const record = candidate && typeof candidate === 'object' ? candidate as Record<string, unknown> : {};
+      if (config.pageType === 'worksheet' && config.dataSource.navigation) {
+        try { this.data.relation(config.dataSource, record); }
+        catch { this.failure = 'parent-context-missing'; return false; }
+      }
       const opened = this.stack.open({ id, title: config.title, mode: request.mode ?? 'page', size: request.size ?? 'full', allowNested: request.allowNested ?? true, closeOnBackdrop: false,
         data: { runtimePage: { pageId: definition.pageId, module: definition.module, record } } satisfies RunModalHostData });
       if (opened && typeof context['parentPopupId'] === 'string') this.parents.set(id, context['parentPopupId']);

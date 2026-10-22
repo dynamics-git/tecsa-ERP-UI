@@ -20,7 +20,7 @@ export class MenuService {
         const menu = page.menu;
         let module = modules.get(menu.module);
         if (!module) {
-          module = { pageId: menu.module.toLowerCase(), label: menu.module, module: menu.module, icon: menu.icon, children: [] };
+          module = { pageId: menu.module.toLowerCase(), label: menu.module, module: menu.module, icon: menu.moduleIcon ?? menu.icon, children: [] };
           modules.set(menu.module, module);
         }
         module.children!.push({ pageId: page.pageId, label: page.title ?? page.pageId, module: menu.module, group: menu.group, route: menu.route, icon: menu.icon });

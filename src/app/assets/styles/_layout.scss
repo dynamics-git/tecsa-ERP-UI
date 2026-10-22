@@ -107,3 +107,10 @@
     display: none;
   }
 }
+
+// Routed pages share the workspace height; features need no host sizing styles.
+.main-content > router-outlet + * {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}

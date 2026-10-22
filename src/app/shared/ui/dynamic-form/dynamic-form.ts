@@ -66,7 +66,7 @@ export class DynamicForm {
       if (this.selectedLookups.has(selectedKey)) continue;
       this.selectedLookups.add(selectedKey);
       this.lookups.get(field.key)?.unsubscribe();
-      this.lookups.set(field.key, this.source.loadById({ endpoint: field.lookup.endpoint }, id).subscribe({
+      this.lookups.set(field.key, this.source.loadLookup(field.lookup, id, this.data).subscribe({
         next: record => {
           if (String(this.data[field.key]) !== String(id) || lookupQuery(field.lookup!, this.data).filter !== context) return;
           if (this.isRecord(record)) this.lookupLabels.set(field.key + ':' + id, this.resolveOptionLabel(field, record));
@@ -87,6 +87,7 @@ export class DynamicForm {
   private static nextId = 0;
   readonly lookupId = 'lookup-' + DynamicForm.nextId++;
   lookupLabel(field: FieldConfig): string {
+    if (this.data[`__lookupRestricted_${field.key}`]) return 'Restricted';
     return this.lookupLabels.get(field.key + ':' + this.getFieldValue(field)) ?? this.getFieldOptions(field).find(option => this.isOptionSelected(field, option.value))?.label ?? '';
   }
   openLookup(field: FieldConfig): void {
@@ -124,7 +125,7 @@ export class DynamicForm {
     const bucket = field.optionsDataKey ?? `__options_${field.key}`;
     if (!nextPage) this.data[bucket] = [];
     const filter = query.filter;
-    this.lookups.set(field.key, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: field.lookup!.endpoint, paging: field.lookup!.paging, defaultFilter: filter, pageSize: 20 }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({
+    this.lookups.set(field.key, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: query.endpoint!, paging: field.lookup!.paging, defaultFilter: filter, pageSize: 20 }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({
       next: response => {
         if (lookupQuery(field.lookup!, this.data, text).filter !== query.filter || this.lookupOpen !== field.key) return;
         const page = response as { value: unknown[]; meta: Record<string, unknown> };
@@ -239,7 +240,7 @@ export class DynamicForm {
   }
 
   isFieldDisabled(field: FieldConfig): boolean {
-    return field.disabled === true || fieldIsReadonly(field, this.data) || (!!field.lookup && !lookupQuery(field.lookup, this.data).ready);
+    return this.data[`__lookupRestricted_${field.key}`] === true || field.disabled === true || fieldIsReadonly(field, this.data) || (!!field.lookup && !lookupQuery(field.lookup, this.data).ready);
   }
 
   notifyFieldInteracted(field: FieldConfig): void {

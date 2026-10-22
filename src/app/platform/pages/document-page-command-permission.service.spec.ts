@@ -8,8 +8,11 @@ import { DocumentPageCommandPermissionService } from './document-page-command-pe
 describe('DocumentPage popup command permissions', () => {
   let session: { SuperAdmin: boolean; Permissions: unknown[] };
   let policy: DocumentPageCommandPermissionService;
-  const command = (actionKey: string, rest: Partial<CommandConfig> = {}): CommandConfig =>
-    ({ label: actionKey, actionKey, ...rest });
+  const command = (actionKey: string, rest: Partial<CommandConfig> = {}): CommandConfig => ({
+    label: actionKey,
+    actionKey,
+    ...rest,
+  });
   const apply = (button: CommandConfig, pageId = 'purchase-order') => policy.apply(button, pageId);
 
   beforeEach(() => {
@@ -21,19 +24,45 @@ describe('DocumentPage popup command permissions', () => {
   });
 
   it('denies write and custom commands without page permissions but preserves refresh', () => {
-    for (const action of ['cmd:new', 'cmd:line-new', 'cmd:line-insert', 'cmd:save', 'cmd:apply', 'cmd:edit', 'cmd:delete', 'cmd:line-delete', 'cmd:release']) {
-      expect(apply(command(action))).toMatchObject({ disabled: true, tooltip: 'You do not have permission for this command.' });
+    for (const action of [
+      'cmd:new',
+      'cmd:line-new',
+      'cmd:line-insert',
+      'cmd:save',
+      'cmd:apply',
+      'cmd:edit',
+      'cmd:delete',
+      'cmd:line-delete',
+      'cmd:release',
+    ]) {
+      expect(apply(command(action))).toMatchObject({
+        disabled: true,
+        tooltip: 'You do not have permission for this command.',
+      });
     }
     const refresh = command('cmd:refresh');
     expect(apply(refresh)).toBe(refresh);
   });
 
   it('accepts the existing BC-style permission aliases and normalizes page identifiers', () => {
-    session.Permissions = [{
-      PageId: 'Purchase_Order', InsertPermission: 'Yes', ModifyPermission: '1',
-      DeletePermission: 'Full', PostPermission: 'TRUE',
-    }];
-    for (const action of ['cmd:new', 'cmd:save', 'cmd:apply', 'cmd:edit', 'cmd:delete', 'cmd:line-delete', 'cmd:release']) {
+    session.Permissions = [
+      {
+        PageId: 'Purchase_Order',
+        InsertPermission: 'Yes',
+        ModifyPermission: '1',
+        DeletePermission: 'Full',
+        PostPermission: 'TRUE',
+      },
+    ];
+    for (const action of [
+      'cmd:new',
+      'cmd:save',
+      'cmd:apply',
+      'cmd:edit',
+      'cmd:delete',
+      'cmd:line-delete',
+      'cmd:release',
+    ]) {
       const button = command(action);
       expect(apply(button)).toBe(button);
     }
@@ -57,7 +86,7 @@ describe('DocumentPage popup command permissions', () => {
     expect(original.disabled).toBeUndefined();
   });
 
-  it('leaves hidden commands untouched and bypasses visual restrictions for SuperAdmin', () => {
+  it('keeps hidden commands and the legacy SuperAdmin fallback when no server page contract exists', () => {
     const hidden = command('cmd:new', { hidden: true });
     expect(apply(hidden)).toBe(hidden);
     session.SuperAdmin = true;
@@ -65,9 +94,33 @@ describe('DocumentPage popup command permissions', () => {
     expect(apply(restricted)).toBe(restricted);
   });
 
+  it('honors explicit server operation restrictions for SuperAdmin too', () => {
+    session.SuperAdmin = true;
+    session.Permissions = [{pageId: 'items', canRead: true, canCreate: true, canUpdate: true, canDelete: false, canExecute: false},
+      {pageId: 'items-lines', canRead: false}];
+    expect(policy.apply(command('delete'), 'items').disabled).toBe(true);
+    expect(policy.applyOperation(command('delete'), 'items', 'delete').disabled).toBe(true);
+    expect(policy.apply(command('save'), 'items').disabled).not.toBe(true);
+    expect(policy.apply(command('release'), 'items').disabled).toBe(true);
+    expect(policy.apply(command('related', {runModalPageId: 'item-units-of-measure', permissionKey: 'items-lines'}), 'items').disabled).toBe(true);
+  });
+
   it('normalizes command keys consistently for default and configured commands', () => {
     expect(policy.normalizePopupCommandKey('  CMD:Line-New  ')).toBe('line-new');
     expect(policy.normalizePopupCommandKey('Refresh')).toBe('refresh');
     expect(policy.normalizePopupCommandKey(undefined)).toBe('');
+  });
+  it('uses related-page read rights without granting write or business execute rights', () => {
+    const button = command('cmd:related', {
+      runModalPageId: 'item-units-of-measure',
+      permissionKey: 'items-lines',
+    });
+    session.Permissions = [
+      { pageId: 'items-lines', canRead: true, canUpdate: false, canExecute: false },
+    ];
+    expect(apply(button)).toBe(button);
+    expect(apply(command('cmd:save'), 'items-lines').disabled).toBe(true);
+    session.Permissions = [{ pageId: 'items', canRead: true, canExecute: true }];
+    expect(apply(button).disabled).toBe(true);
   });
 });

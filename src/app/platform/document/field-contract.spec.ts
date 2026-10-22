@@ -104,6 +104,19 @@ describe('Shared configurable field contract with synthetic records', () => {
     expect(form.data['quantity']).toBe(2);expect(form.getFieldValue(field)).toBe('2.5');expect(emitted).toBe(0);expect(fixture.nativeElement.querySelector('[role=alert]').textContent).toContain('whole number');
     form.updateFieldValue(field,3);fixture.detectChanges();expect(form.errors.size).toBe(0);expect(emitted).toBe(1);fixture.destroy();
   });
+  it('keeps configured defaults out of filler cells until a real row starts', () => {
+    TestBed.configureTestingModule({imports:[DocumentLines],providers:[{provide:DATA_REST_SERVICE,useValue:{get:()=>of([])}}]});
+    const fixture = TestBed.createComponent(DocumentLines);
+    const column = {id:'quantity',label:'Quantity',valueType:'decimal' as const,defaultValue:'1'};
+    const row: Record<string, unknown> = {quantity:'1',__entryPlaceholder:true};
+    fixture.componentRef.setInput('columns',[column]);
+    fixture.componentRef.setInput('rows',[row]); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody input').value).toBe('');
+    expect(row['quantity']).toBe('1');
+    delete row['__entryPlaceholder']; fixture.changeDetectorRef.markForCheck(); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('tbody input').value).toBe('1');
+    fixture.destroy();
+  });
   it('shows validation beside an edited grid cell',()=>{
     TestBed.configureTestingModule({imports:[DocumentLines],providers:[{provide:DATA_REST_SERVICE,useValue:{get:()=>of([])}}]});
     const f=TestBed.createComponent(DocumentLines),column={id:'quantity',label:'Quantity',valueType:'integer' as const},row={quantity:2};

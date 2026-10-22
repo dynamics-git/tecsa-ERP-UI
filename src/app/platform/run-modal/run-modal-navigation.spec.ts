@@ -1,3 +1,4 @@
+import { PurchaseOrderPage } from '../../features/purchasing/purchase-order/purchase-order';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { By } from '@angular/platform-browser';
@@ -27,36 +28,50 @@ describe('RunModal navigation', () => {
   let requests: string[];
   let fixture: ComponentFixture<RunModalHost>;
   const header = { systemId: 'PO-1', number: 'PO-1', buyFromVendorName: 'Fixture Vendor', status: 'Open' };
-  const line = { systemId: 'LINE-1', documentNo: 'PO-1', lineNo: 10000, description: 'Fixture line', quantity: 2, directUnitCost: 10 };
+  const line = {
+    systemId: 'LINE-1',
+    documentNo: 'PO-1',
+    lineNo: 10000,
+    description: 'Fixture line',
+    quantity: 2,
+    directUnitCost: 10,
+  };
 
   beforeEach(() => {
     requests = [];
     const rest: DataRestService = {
-      get: endpoint => {
+      get: (endpoint) => {
         requests.push(endpoint);
-        return of({ value: endpoint.startsWith('/purchaseOrderHeaders') ? [{ ...header }]
-          : endpoint.startsWith('/purchaseOrderLines') ? [{ ...line }] : [] });
+        return of({
+          value: endpoint.startsWith('/purchaseOrderHeaders')
+            ? [{ ...header }]
+            : endpoint.startsWith('/purchaseOrderLines')
+              ? [{ ...line }]
+              : [],
+        });
       },
-      post: () => of({}), patch: () => of({}), delete: () => of({}),
+      post: () => of({}),
+      patch: () => of({}),
+      delete: () => of({}),
     };
     TestBed.configureTestingModule({
       imports: [RunModalHost],
-      providers: [provideRouter([]), ...providePlatformGovernance(),
-        { provide: DATA_REST_SERVICE, useValue: rest }],
+      providers: [provideRouter([]), ...providePlatformGovernance(), { provide: DATA_REST_SERVICE, useValue: rest }],
     });
     stack = TestBed.inject(RunModalStackService);
     TestBed.inject(SessionService).SuperAdmin = true;
     runModal = TestBed.inject(RunModalService);
     fixture = TestBed.createComponent(RunModalHost);
     fixture.detectChanges();
-    stack.stack$.subscribe(value => popups = value);
+    stack.stack$.subscribe((value) => (popups = value));
   });
 
   const data = (popup: PopupConfig) => popup.data as RunModalHostData;
   const configFor = (popup: PopupConfig) => {
     fixture.detectChanges();
-    const index = popups.filter(item => data(item).runtimePage).indexOf(popup);
-    return (fixture.debugElement.queryAll(By.directive(DocumentPage))[index].componentInstance as DocumentPage).inlineDocumentWindowConfig!;
+    const index = popups.filter((item) => data(item).runtimePage).indexOf(popup);
+    return (fixture.debugElement.queryAll(By.directive(DocumentPage))[index].componentInstance as DocumentPage)
+      .inlineDocumentWindowConfig!;
   };
   const settle = async () => {
     fixture.detectChanges();
@@ -82,7 +97,9 @@ describe('RunModal navigation', () => {
     const child = popups[1];
     expect(configFor(child).headerData!['number']).toBe('PO-1');
     expect(configFor(child).lineRows![0]['description']).toBe('Fixture line');
-    expect(requests.some(endpoint => endpoint.startsWith('/purchaseOrderLines') && endpoint.includes('PO-1'))).toBe(true);
+    expect(requests.some((endpoint) => endpoint.startsWith('/purchaseOrderLines') && endpoint.includes('PO-1'))).toBe(
+      true,
+    );
     fixture.componentInstance.closePopup(child);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
@@ -94,7 +111,14 @@ describe('RunModal navigation', () => {
   });
 
   it('retains the mounted parent window, unsaved header/line edits and maximize state through three levels', async () => {
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
+    expect(
+      await runModal.open({
+        pageId: 'purchase-order',
+        target: 'entry',
+        context: { headerData: { ...header } },
+        popupId: 'parent',
+      }),
+    ).toBe(true);
     await settle();
     fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
@@ -105,7 +129,15 @@ describe('RunModal navigation', () => {
     const parentWindow = fixture.debugElement.query(By.directive(DocumentWindow)).componentInstance as DocumentWindow;
     parentWindow.toggleEntrySize();
     for (const id of ['child', 'grandchild']) {
-      expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: id, allowNested: true })).toBe(true);
+      expect(
+        await runModal.open({
+          pageId: 'purchase-order',
+          target: 'entry',
+          context: { headerData: { ...header } },
+          popupId: id,
+          allowNested: true,
+        }),
+      ).toBe(true);
       await settle();
     }
     fixture.detectChanges();
@@ -113,7 +145,7 @@ describe('RunModal navigation', () => {
     fixture.componentInstance.closePopup(popups[2]);
     fixture.componentInstance.closePopup(popups[1]);
     fixture.detectChanges();
-    expect(popups.map(popup => popup.id)).toEqual(['parent']);
+    expect(popups.map((popup) => popup.id)).toEqual(['parent']);
     expect(configFor(popups[0])).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
     expect(config.lineRows![0]['description']).toBe('Unsaved line');
@@ -124,7 +156,14 @@ describe('RunModal navigation', () => {
   it('keeps unsaved document and maximize state when a document command opens a related list', async () => {
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate');
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
+    expect(
+      await runModal.open({
+        pageId: 'purchase-order',
+        target: 'entry',
+        context: { headerData: { ...header } },
+        popupId: 'parent',
+      }),
+    ).toBe(true);
     await settle();
     const parent = popups[0];
     const config = configFor(parent);
@@ -133,8 +172,12 @@ describe('RunModal navigation', () => {
     fixture.changeDetectorRef.markForCheck();
     config.headerToolbarButtons = [
       ...(config.headerToolbarButtons ?? []),
-      { label: 'Related purchase orders', actionKey: 'cmd:related-list',
-        runModalPageId: 'purchase-order', runModalTarget: 'list' },
+      {
+        label: 'Related purchase orders',
+        actionKey: 'cmd:related-list',
+        runModalPageId: 'purchase-order',
+        runModalTarget: 'list',
+      },
     ];
 
     fixture.changeDetectorRef.markForCheck();
@@ -165,7 +208,14 @@ describe('RunModal navigation', () => {
   });
 
   it('preserves the edited parent when DocumentPage commands open a related list', async () => {
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
+    expect(
+      await runModal.open({
+        pageId: 'purchase-order',
+        target: 'entry',
+        context: { headerData: { ...header } },
+        popupId: 'parent',
+      }),
+    ).toBe(true);
     await settle();
     const parent = popups[0];
     const config = configFor(parent);
@@ -204,7 +254,14 @@ describe('RunModal navigation', () => {
   });
 
   it('opens global search over an existing document without replacing its parent', async () => {
-    expect(await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' })).toBe(true);
+    expect(
+      await runModal.open({
+        pageId: 'purchase-order',
+        target: 'entry',
+        context: { headerData: { ...header } },
+        popupId: 'parent',
+      }),
+    ).toBe(true);
     await settle();
     const config = configFor(popups[0]);
     config.headerData!['vendorOrderNumber'] = 'UNSAVED';
@@ -219,16 +276,21 @@ describe('RunModal navigation', () => {
   });
 
   it('keeps document, drawer and confirmation layers independent when closing back to the document', async () => {
-    await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } }, popupId: 'parent' });
+    await runModal.open({
+      pageId: 'purchase-order',
+      target: 'entry',
+      context: { headerData: { ...header } },
+      popupId: 'parent',
+    });
     await settle();
     const parent = popups[0];
     const host = TestBed.createComponent(RunModalHost).componentInstance;
     TestBed.inject(DrawerService).open({ id: 'drawer', viewId: 'profile', allowNested: true });
     const decision = TestBed.inject(ConfirmationService).confirm({ message: 'Continue?' });
-    expect(host.getRenderablePopups(popups).map(popup => popup.id)).toEqual(['parent', popups[2].id]);
+    expect(host.getRenderablePopups(popups).map((popup) => popup.id)).toEqual(['parent', popups[2].id]);
     host.closePopup(popups[2]);
     expect(await decision).toBe(false);
-    expect(popups.map(popup => popup.id)).toEqual(['parent', 'drawer']);
+    expect(popups.map((popup) => popup.id)).toEqual(['parent', 'drawer']);
     TestBed.inject(DrawerService).close('drawer');
     expect(popups).toEqual([parent]);
   });
@@ -237,7 +299,7 @@ describe('RunModal navigation', () => {
     stack.open({ id: 'parent', allowNested: true });
     expect(await runModal.open({ pageId: 'role-setup' })).toBe(false);
     expect(runModal.getLastOpenFailureReason()).toBe('config-not-found:role-setup');
-    expect(popups.map(popup => popup.id)).toEqual(['parent']);
+    expect(popups.map((popup) => popup.id)).toEqual(['parent']);
   });
 
   it('keeps the approved 50-level stack policy and permits an explicit unlimited policy', () => {
@@ -249,8 +311,25 @@ describe('RunModal navigation', () => {
     expect(popups.at(-1)!.id).toBe('overflow');
     const unlimited = new RunModalStackService({ maxDepth: 0, onOverflow: 'block' });
     let count = 0;
-    unlimited.stack$.subscribe(value => count = value.length);
+    unlimited.stack$.subscribe((value) => (count = value.length));
     for (let index = 0; index < 100; index++) expect(unlimited.open({ id: `${index}`, allowNested: true })).toBe(true);
     expect(count).toBe(100);
+  });
+  it('instantiates the feature component in a popup and dispatches business events to that component', async () => {
+    const handler = vi.spyOn(PurchaseOrderPage.prototype, 'handleBusinessCommand');
+    expect(
+      await runModal.open({ pageId: 'purchase-order', target: 'entry', context: { headerData: { ...header } } }),
+    ).toBe(true);
+    await settle();
+    expect(fixture.debugElement.query(By.directive(PurchaseOrderPage))).not.toBeNull();
+    const page = fixture.debugElement.query(By.directive(DocumentPage)).componentInstance as DocumentPage;
+    const event = {
+      actionKey: 'cmd:business-event',
+      payload: { verified: true },
+      context: { pageId: 'purchase-order', checkedRowKeys: [] },
+    };
+    page.businessCommand.emit(event);
+    expect(handler).toHaveBeenCalledWith(event);
+    handler.mockRestore();
   });
 });

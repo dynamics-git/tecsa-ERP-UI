@@ -281,6 +281,12 @@ export class ListFactBox {
 
   getFieldValue(field: FactBoxDisplayField): string {
     if (field.field) {
+      const caption = this.read(this.selectedRow, '__display_' + field.field);
+      if (typeof caption === 'string') return caption;
+      if (field.type === 'guid') return '';
+      const column = this.findColumnByField(field.field);
+      const option = column?.filter?.options?.find(option => String(option.value) === String(this.read(this.selectedRow, field.field!)));
+      if (option) return option.label;
       const formatted = detailValue(this.toRecord(this.selectedRow) ?? {}, field, {
         id: this.session.UserId,
         name: this.toText(this.read(this.session.User, 'name')) || this.session.UserName,

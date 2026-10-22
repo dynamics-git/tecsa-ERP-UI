@@ -1,1 +1,8 @@
-<app-document-page pageId="purchase-requisition" [listConfig]="listConfig" [headerConfig]="headerConfig" [lineConfig]="lineConfig"></app-document-page>
+<app-list-page
+  [listConfig]="listConfig"
+  [headerConfig]="headerConfig"
+  [lineConfig]="lineConfig"
+  [documentOnly]="!!runModal"
+  [initialRecord]="runModal?.record"
+  (closeRequested)="runModal?.close()">
+</app-list-page>

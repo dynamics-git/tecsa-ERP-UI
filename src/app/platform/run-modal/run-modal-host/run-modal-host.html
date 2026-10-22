@@ -1,94 +1,97 @@
-@if (popupStack$ | async; as popups) {
-  @if (getRenderablePopups(popups).length) {
-  <div class="app-run-modal-host">
-    @for (popup of getRenderablePopups(popups); track popup.id; let index = $index; let isTop = $last) {
-      <div
-        class="popup-layer"
-        [class.top-layer]="isTop"
-        [class.list-popup-layer]="isTop && isListPopup(popup)"
-        [style.z-index]="900 + index">
-        @if (isTop) {
-          <div class="popup-backdrop" (click)="onBackdropClick(popup)"></div>
-        }
-
-        <section
-          class="popup-shell"
-          [class.full-page]="isFullPagePopup(popup)"
-          [class.list-page-popup]="isListPopup(popup)"
-          [class.maximized]="isListPopup(popup) && isListPopupMaximized(popup)">
-          @if (getRuntimePage(popup); as runtime) {
-            <app-document-page [pageId]="runtime.pageId" [listConfig]="getRuntimeList(popup)"
-              [headerConfig]="getRuntimeHeader(popup)" [lineConfig]="getRuntimeLines(popup)"
-              [documentOnly]="true" [initialRecord]="runtime.record" (closeRequested)="closePopup(popup)">
-            </app-document-page>
-          }
-          @if (isDocumentPopup(popup)) {
-            <app-document-window
-              [overlayZIndex]="920 + (index * 4)"
-              [pageLabel]="getDocumentWindowConfig(popup)?.pageLabel"
-              [title]="getDocumentWindowConfig(popup)?.title"
-              [subtitle]="getDocumentWindowConfig(popup)?.subtitle"
-              [headerCommandBar]="getDocumentWindowConfig(popup)?.headerCommandBar"
-              [lineCommandBar]="getDocumentWindowConfig(popup)?.lineCommandBar"
-              [lineCommandPolicy]="getDocumentWindowConfig(popup)?.lineCommandPolicy"
-              [linePlacement]="getDocumentWindowConfig(popup)?.linePlacement"
-              [headerToolbarButtons]="getDocumentWindowConfig(popup)?.headerToolbarButtons"
-              [lineToolbarButtons]="getDocumentWindowConfig(popup)?.lineToolbarButtons"
-              [detailToolbarButtons]="getDocumentWindowConfig(popup)?.detailToolbarButtons"
-              [headerSections]="getDocumentWindowConfig(popup)?.headerSections"
-              [headerData]="getDocumentWindowConfig(popup)?.headerData"
-              [lineColumns]="getDocumentWindowConfig(popup)?.lineColumns"
-              [lineRows]="getDocumentWindowConfig(popup)?.lineRows"
-              [lineTotals]="getDocumentWindowConfig(popup)?.lineTotals"
-              [footerSections]="getDocumentWindowConfig(popup)?.footerSections"
-              [attachments]="getDocumentWindowConfig(popup)?.attachments"
-              [factBoxSections]="getDocumentWindowConfig(popup)?.factBoxSections"
-              [factBoxConfig]="getDocumentWindowConfig(popup)?.factBoxConfig"
-              [statusMessage]="getDocumentWindowConfig(popup)?.statusMessage"
-              [contentReady]="getDocumentWindowConfig(popup)?.contentReady !== false"
-              [interactionLocked]="getDocumentWindowConfig(popup)?.interactionLocked === true"
-              (action)="onDocumentWindowAction(popup, $event)"
-              (closed)="closePopup(popup)">
-            </app-document-window>
-          }
-
-          @if (isListPopup(popup)) {
-            <div class="list-popup-window-actions" aria-label="List popup actions">
-              <button
-                type="button"
-                class="list-popup-action-btn"
-                [title]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
-                [attr.aria-label]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
-                (click)="toggleListPopupMaximize(popup)">
-                <i [class]="isListPopupMaximized(popup) ? 'ts-icon ts-icon-collapse' : 'ts-icon ts-icon-expand'"></i>
-              </button>
-              <button type="button" class="list-popup-action-btn" title="Close" aria-label="Close" (click)="closePopup(popup)">
-                <i class="ts-icon ts-icon-close"></i>
-              </button>
-            </div>
-
-            <app-list-page
-              [config]="getListPageConfig(popup)"
-              [data]="getListRows(popup)"
-              [hasMore]="listHasMore(popup)"
-              [loading]="isListLoading(popup)"
-              [errorMessage]="getListErrorMessage(popup)"
-              [showCommandBar]="true"
-              (rowSelected)="onListRowOpen(popup, $event)"
-              (primaryAction)="onListRowOpen(popup, $event)"
-              (command)="onListCommand(popup, $event)" (loadMore)="onListLoadMore(popup)">
-            </app-list-page>
-          }
-
-          @if (isConfirmationPopup(popup)) {
-            <app-confirmation-dialog
-              [config]="getConfirmationDialogConfig(popup)"
-              (decided)="onConfirmationDecision(popup, $event)">
-            </app-confirmation-dialog>
-          }
-        </section>
-      </div>
+@if (popupStack$ | async; as popups) { @if (getRenderablePopups(popups).length) {
+<div class="app-run-modal-host">
+  @for (popup of getRenderablePopups(popups); track popup.id; let index = $index; let isTop = $last) {
+  <div
+    class="popup-layer"
+    [class.top-layer]="isTop"
+    [class.list-popup-layer]="isTop && isListPopup(popup)"
+    [style.z-index]="900 + index"
+  >
+    @if (isTop) {
+    <div class="popup-backdrop" (click)="onBackdropClick(popup)"></div>
     }
+
+    <section
+      class="popup-shell"
+      [class.full-page]="isFullPagePopup(popup)"
+      [class.list-page-popup]="isListPopup(popup)"
+      [class.maximized]="isListPopup(popup) && isListPopupMaximized(popup)"
+    >
+      @if (getRuntimePage(popup); as runtime) {
+      <ng-container *ngComponentOutlet="getRuntimeComponent(popup); inputs: getRuntimeInputs(popup)"></ng-container>
+      } @if (isDocumentPopup(popup)) {
+      <app-document-window
+        [overlayZIndex]="920 + (index * 4)"
+        [pageLabel]="getDocumentWindowConfig(popup)?.pageLabel"
+        [title]="getDocumentWindowConfig(popup)?.title"
+        [subtitle]="getDocumentWindowConfig(popup)?.subtitle"
+        [headerCommandBar]="getDocumentWindowConfig(popup)?.headerCommandBar"
+        [lineCommandBar]="getDocumentWindowConfig(popup)?.lineCommandBar"
+        [lineCommandPolicy]="getDocumentWindowConfig(popup)?.lineCommandPolicy"
+        [linePlacement]="getDocumentWindowConfig(popup)?.linePlacement"
+        [headerToolbarButtons]="getDocumentWindowConfig(popup)?.headerToolbarButtons"
+        [lineToolbarButtons]="getDocumentWindowConfig(popup)?.lineToolbarButtons"
+        [detailToolbarButtons]="getDocumentWindowConfig(popup)?.detailToolbarButtons"
+        [headerSections]="getDocumentWindowConfig(popup)?.headerSections"
+        [headerData]="getDocumentWindowConfig(popup)?.headerData"
+        [lineColumns]="getDocumentWindowConfig(popup)?.lineColumns"
+        [lineRows]="getDocumentWindowConfig(popup)?.lineRows"
+        [lineTotals]="getDocumentWindowConfig(popup)?.lineTotals"
+        [footerSections]="getDocumentWindowConfig(popup)?.footerSections"
+        [attachments]="getDocumentWindowConfig(popup)?.attachments"
+        [factBoxSections]="getDocumentWindowConfig(popup)?.factBoxSections"
+        [factBoxConfig]="getDocumentWindowConfig(popup)?.factBoxConfig"
+        [statusMessage]="getDocumentWindowConfig(popup)?.statusMessage"
+        [contentReady]="getDocumentWindowConfig(popup)?.contentReady !== false"
+        [interactionLocked]="getDocumentWindowConfig(popup)?.interactionLocked === true"
+        (action)="onDocumentWindowAction(popup, $event)"
+        (closed)="closePopup(popup)"
+      >
+      </app-document-window>
+      } @if (isListPopup(popup)) {
+      <div class="list-popup-window-actions" aria-label="List popup actions">
+        <button
+          type="button"
+          class="list-popup-action-btn"
+          [title]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
+          [attr.aria-label]="isListPopupMaximized(popup) ? 'Restore' : 'Maximize'"
+          (click)="toggleListPopupMaximize(popup)"
+        >
+          <i [class]="isListPopupMaximized(popup) ? 'ts-icon ts-icon-collapse' : 'ts-icon ts-icon-expand'"></i>
+        </button>
+        <button
+          type="button"
+          class="list-popup-action-btn"
+          title="Close"
+          aria-label="Close"
+          (click)="closePopup(popup)"
+        >
+          <i class="ts-icon ts-icon-close"></i>
+        </button>
+      </div>
+
+      <app-list-grid
+        [config]="getListPageConfig(popup)"
+        [data]="getListRows(popup)"
+        [hasMore]="listHasMore(popup)"
+        [loading]="isListLoading(popup)"
+        [errorMessage]="getListErrorMessage(popup)"
+        [showCommandBar]="true"
+        (rowSelected)="onListRowOpen(popup, $event)"
+        (primaryAction)="onListRowOpen(popup, $event)"
+        (command)="onListCommand(popup, $event)"
+        (loadMore)="onListLoadMore(popup)"
+      >
+      </app-list-grid>
+      } @if (isConfirmationPopup(popup)) {
+      <app-confirmation-dialog
+        [config]="getConfirmationDialogConfig(popup)"
+        (decided)="onConfirmationDecision(popup, $event)"
+      >
+      </app-confirmation-dialog>
+      }
+    </section>
   </div>
   }
-}
+</div>
+} }

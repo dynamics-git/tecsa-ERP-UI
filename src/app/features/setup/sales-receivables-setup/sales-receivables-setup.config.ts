@@ -219,7 +219,7 @@ export const salesReceivablesSetupListConfig: ListPageConfig & { dataSource: Dat
   autoSave: true,
   title: 'Sales & Receivables Setup',
   module: 'Sales',
-  menu: { module: 'Sales', group: 'Setup', icon: 'ts-icon ts-icon-settings', route: '/sales-receivables-setup' },
+  menu: { module: 'Sales', group: 'Setup', icon: 'ts-icon ts-icon-sales-module', moduleIcon: 'ts-icon ts-icon-sales-module', route: '/sales-receivables-setup' },
   tools: { filter: false, advancedFilter: false, export: false, columns: false },
   dataSource: {
     endpoint: '/salesReceivablesSetup',

@@ -31,3 +31,9 @@ export interface RunModalHostData {
   nestedDocumentWindowConfigs?: Record<string, DocumentWindowConfig>;
   nestedPopupConfigs?: Record<string, NestedPopupConfig>;
 }
+
+/** Passed by the existing popup host to the same feature component used by routing. */
+export interface RunModalPageWindow {
+  record: Record<string, unknown>;
+  close: () => void;
+}

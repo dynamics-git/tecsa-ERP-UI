@@ -48,6 +48,7 @@ export interface ListCommandSelectionPolicyConfig {
 
 export interface BasePageConfig extends Record<string, unknown> {
   pageId?: string;
+  /** Entry surface: card/document pages browse a list before opening a record; setup/worksheet open directly. */
   pageType?: PageType;
   /** Explicit save policy. New page configurations should use true for autosave. */
   autoSave?: boolean;
@@ -63,7 +64,7 @@ export interface BasePageConfig extends Record<string, unknown> {
   tools?: PageToolsConfig;
   filterConfig?: ListFilterConfig;
   commands?: CommandConfig[];
-  menu?: { module: string; group: string; icon: string; route: string };
+  menu?: { module: string; group: string; icon: string; moduleIcon?: string; route: string };
   popup?: PopupConfig;
   dataSource?: DataSourceConfig;
 }

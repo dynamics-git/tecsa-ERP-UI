@@ -1,1 +1,7 @@
-<app-document-page pageId="purchases-payables-setup" [listConfig]="listConfig" [headerConfig]="headerConfig"></app-document-page>
+<app-list-page
+  [listConfig]="listConfig"
+  [headerConfig]="headerConfig"
+  [documentOnly]="!!runModal"
+  [initialRecord]="runModal?.record"
+  (closeRequested)="runModal?.close()">
+</app-list-page>

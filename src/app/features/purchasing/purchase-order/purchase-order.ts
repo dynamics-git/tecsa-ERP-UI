@@ -1,26 +1,22 @@
-import { Component } from '@angular/core';
-import { DocumentPageCommandEvent, DocumentPage } from '../../../platform/public-api';
-import {
-  purchaseOrderHeaderConfig,
-  purchaseOrderLineConfig,
-  purchaseOrderListConfig,
-} from './purchase-order.config';
+import { Component, Input } from '@angular/core';
+import { ListPage, RunModalPageWindow, DocumentPageCommandEvent } from '../../../platform/public-api';
+import { purchaseOrderListConfig, purchaseOrderHeaderConfig, purchaseOrderLineConfig } from './purchase-order.config';
+export * from './purchase-order.config';
 
 @Component({
   selector: 'app-purchase-order',
   standalone: true,
-  imports: [DocumentPage],
+  imports: [ListPage],
   templateUrl: './purchase-order.html',
 })
 export class PurchaseOrderPage {
-  readonly pageId = 'purchase-order';
+  @Input() runModal?: RunModalPageWindow;
   readonly listConfig = purchaseOrderListConfig;
   readonly headerConfig = purchaseOrderHeaderConfig;
   readonly lineConfig = purchaseOrderLineConfig;
+  readonly pageId = purchaseOrderListConfig.pageId!;
 
- handleBusinessCommand(event: DocumentPageCommandEvent): void {
+handleBusinessCommand(event: DocumentPageCommandEvent): void {
     // Only add code here for real business processes.
   }
 }
-
-

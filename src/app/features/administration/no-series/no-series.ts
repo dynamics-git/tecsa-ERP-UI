@@ -1,16 +1,17 @@
-import { Component } from '@angular/core';
-import { DocumentPage } from '../../../platform/public-api';
-import { noSeriesPageConfig, noSeriesHeaderConfig, noSeriesLineConfig } from './no-series.config';
-export { noSeriesPageConfig, noSeriesHeaderConfig, noSeriesLineConfig } from './no-series.config';
+import { Component, Input } from '@angular/core';
+import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
+import { noSeriesListConfig, noSeriesHeaderConfig, noSeriesLineConfig } from './no-series.config';
+export * from './no-series.config';
 
 @Component({
   selector: 'app-no-series',
   standalone: true,
-  imports: [DocumentPage],
+  imports: [ListPage],
   templateUrl: './no-series.html',
 })
 export class NoSeriesPage {
-  readonly pageConfig = noSeriesPageConfig;
+  @Input() runModal?: RunModalPageWindow;
+  readonly listConfig = noSeriesListConfig;
   readonly headerConfig = noSeriesHeaderConfig;
   readonly lineConfig = noSeriesLineConfig;
 }

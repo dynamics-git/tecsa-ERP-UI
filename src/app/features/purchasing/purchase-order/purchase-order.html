@@ -1,7 +1,9 @@
-<app-document-page
-  [pageId]="pageId"
+<app-list-page
   [listConfig]="listConfig"
   [headerConfig]="headerConfig"
   [lineConfig]="lineConfig"
+  [documentOnly]="!!runModal"
+  [initialRecord]="runModal?.record"
+  (closeRequested)="runModal?.close()"
   (businessCommand)="handleBusinessCommand($event)">
-</app-document-page>
+</app-list-page>

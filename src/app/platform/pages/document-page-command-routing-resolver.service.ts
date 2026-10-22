@@ -1,7 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 
 import { CommandConfig } from '../models/command-config.model';
-import { ListCommandSelectionMode, ListCommandSelectionPolicyConfig } from '../models/page-config.model';
+import {
+  ListCommandSelectionMode,
+  ListCommandSelectionPolicyConfig,
+} from '../models/page-config.model';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 import type { RunModalRequest } from '../run-modal/run-modal.service';
 import type { RunModalContext } from '../run-modal/run-modal-config.token';
@@ -40,8 +43,9 @@ export class DocumentPageCommandRoutingResolverService {
       return 'none';
     }
 
-    const commandOverride =
-      params.command.actionKey ? params.policy?.commands?.[params.command.actionKey] : undefined;
+    const commandOverride = params.command.actionKey
+      ? params.policy?.commands?.[params.command.actionKey]
+      : undefined;
     if (commandOverride) {
       return commandOverride;
     }
@@ -110,6 +114,7 @@ export class DocumentPageCommandRoutingResolverService {
     lineRows: Record<string, unknown>[];
     payload: Record<string, unknown>;
     activeLine?: Record<string, unknown>;
+    recordMapping?: CommandConfig['runModalRecord'];
   }): RunModalRequest {
     const context: RunModalContext = {
       headerData: params.headerData,
@@ -120,6 +125,32 @@ export class DocumentPageCommandRoutingResolverService {
       context['activeLine'] = params.activeLine;
     }
 
+    if (params.recordMapping) {
+      const source =
+        params.recordMapping.source === 'activeLine'
+          ? (params.activeLine ?? {})
+          : params.headerData;
+      const mapped = Object.fromEntries(
+        Object.entries(params.recordMapping.fields).map(([target, path]) => [
+          target,
+          path
+            .split('.')
+            .reduce<unknown>(
+              (value, key) =>
+                value && typeof value === 'object'
+                  ? (value as Record<string, unknown>)[key]
+                  : undefined,
+              source,
+            ),
+        ]),
+      );
+      context['headerData'] = mapped;
+      context['recordMappingComplete'] =
+        Object.keys(mapped).length > 0 &&
+        Object.values(mapped).every(
+          (value) => value !== undefined && value !== null && value !== '',
+        );
+    }
     return {
       pageId: params.pageId,
       context,
@@ -169,7 +200,9 @@ export class DocumentPageCommandRoutingResolverService {
     const selectedIndexes = Array.isArray(params.payload['selectedIndexes'])
       ? params.payload['selectedIndexes']
           .map((value) => Number(value))
-          .filter((value) => Number.isInteger(value) && value >= 0 && value < params.lineRows.length)
+          .filter(
+            (value) => Number.isInteger(value) && value >= 0 && value < params.lineRows.length,
+          )
       : [];
 
     const selectedIndex = selectedIndexes[0] ?? params.selectedLineIndexes[0];
