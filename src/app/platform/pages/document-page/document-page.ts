@@ -1,3 +1,4 @@
+import { RecordDeleteService } from '../../data/record-delete.service';
 import { UnsavedChangesService } from '../unsaved-changes.service';
 import { clearDependentLookups } from '../../data/lookup-dependencies';
 import { fieldIsRequired } from '../../models/field-state';
@@ -9,7 +10,7 @@ import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/documen
 // autosave, and command handling into smaller services.
 // Do not change behavior during this cleanup.
 import { HostListener, ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject, forwardRef, ViewChild } from '@angular/core';
-import { Observable, Subscription, forkJoin, from, of, firstValueFrom } from 'rxjs';
+import { Observable, Subscription, from, of, firstValueFrom } from 'rxjs';
 import { catchError, map, timeout } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
@@ -100,6 +101,8 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly apiError = inject(ApiErrorService);
   private readonly lineMasters = inject(LineMasterService);
   private readonly lineCommands = inject(LineCommandService);
+  private readonly deletes = inject(RecordDeleteService);
+  private deleting = false;
   private readonly listFilterState = inject(ListFilterStateService);
   private readonly masterData = inject(MasterDataService);
   private readonly pageCommands = inject(PageCommandService);
@@ -117,7 +120,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private readonly subscriptions = new Subscription();
   private readonly unsavedNavigation = inject(UnsavedChangesService);
   get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0; }
-  get hasPendingWrites(): boolean { return this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0; }
+  get hasPendingWrites(): boolean { return this.deleting || this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0; }
   private readonly commandPermission = inject(DocumentPageCommandPermissionService);
   private readonly worksheetChangedRows = new Set<Record<string, unknown>>();
   private worksheetPending = 0;
@@ -392,6 +395,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   handleCommand(event: { actionKey: string; payload?: unknown }): void {
+    if (this.deleting) return;
     if (this.isWorksheetPage) { this.handleEntryCommand(this.normalizeCommandAction(event.actionKey), event.payload); return; }
     if (this.listConfig.dataSource.singleton) {
       if (event.actionKey === 'refresh') this.refreshActiveEntry();
@@ -422,6 +426,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   openRecord(row: unknown, preserveLoader = false): void {
+    if (this.deleting) return;
     if (!this.documentOnly && !this.listConfig.dataSource.singleton) {
       void this.runModal.open({ pageId: this.pageId, target: 'entry', context: { headerData: this.isRecord(row) ? row : {} }, allowNested: true }).then(opened => {
         if (!opened) { this.error = this.runModal.getLastOpenFailureReason(); this.changeDetector.detectChanges(); }
@@ -677,7 +682,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   async requestClose(): Promise<void> {
-    if (this.savingEntry || this.popupLoading || this.worksheetPending || this.autosavePending) return;
+    if (this.hasPendingWrites || this.popupLoading) return;
     if (this.invalidHeaderDrafts.size || (this.isWorksheetPage ? this.dirtyWorksheet : this.dirty)) {
       const confirmed = await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and close this page?' });
       if (!confirmed) return;
@@ -692,6 +697,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private async saveEntry(): Promise<boolean> {
+    if (this.deleting) return false;
     if (this.isWorksheetPage) { this.saveWorksheet(); return !this.dirtyWorksheet; }
     const config = this.activeDocumentWindowConfig;
     if (!config?.headerData || this.savingEntry) return false;
@@ -1161,7 +1167,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   private resolvePopupHeaderToolbarButtons(): CommandConfig[] {
     if (this.isWorksheetPage) {
       const commands = [...this.headerConfig.toolbarButtons, ...(this.listConfig.commands ?? []), ...(this.lineConfig?.toolbarButtons ?? [])];
-      return this.documentOnly ? this.commandAssembler.resolveHeaderToolbarButtons({dataSource: this.listConfig.dataSource, toolbarButtons: commands, pageId: this.permissionPageId}) : [];
+      return this.documentOnly ? this.commandAssembler.resolveHeaderToolbarButtons({dataSource: this.lineConfig?.dataSource ?? this.listConfig.dataSource, toolbarButtons: commands, pageId: this.permissionPageId}) : [];
     }
     return this.commandAssembler.resolveHeaderToolbarButtons({
       dataSource: this.listConfig.dataSource,
@@ -1196,12 +1202,18 @@ export class DocumentPage implements OnInit, OnDestroy {
     entry.headerSections = this.headerConfig.sections.map(section => ({ ...section, fields: section.fields.map(field => ({ ...field, readonly: field.readonly || !editable || (!!field.readonlyAfterCreate && this.hasPersistedIdentity(entry.headerData)) })) }));
     entry.lineColumns = this.lineConfig?.columns.map(column => ({ ...column, readonly: column.readonly || !editable })) ?? [];
     entry.headerToolbarButtons = this.resolvePopupHeaderToolbarButtons().map(button => ({ ...button,
-      hidden: button.hidden || (this.listConfig.dataSource.singleton && ['cmd:new', 'cmd:delete'].includes(button.actionKey)),
+      hidden: button.hidden || (this.listConfig.dataSource.singleton && (
+        (this.normalizeCommandAction(button.actionKey) === 'new' && this.listConfig.dataSource.supportsCreate === false) ||
+        (this.normalizeCommandAction(button.actionKey) === 'delete' && this.listConfig.dataSource.supportsDelete === false))),
       disabled: button.disabled || (['cmd:save', 'cmd:apply'].includes(button.actionKey) && !editable) ||
+        (this.normalizeCommandAction(button.actionKey) === 'delete' && (!persisted || !this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {}))) ||
         (!!button.apiAction && !persisted) ||
         (!!button.apiAction?.states && !button.apiAction.states.values.includes(entry.headerData?.[button.apiAction.states.field])),
     }));
-    entry.lineToolbarButtons = this.resolvePopupLineToolbarButtons().map(button => ({ ...button, disabled: button.disabled || !editable }));
+    entry.lineToolbarButtons = this.resolvePopupLineToolbarButtons().map(button => ({ ...button,
+      disabled: button.disabled || (this.normalizeCommandAction(button.actionKey) === 'line-delete'
+        ? !this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {}) : !editable),
+    }));
   }
 
   private async executeConfiguredAction(button: CommandConfig): Promise<void> {
@@ -1425,6 +1437,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleLineChanged(payload: unknown): void {
+    if (this.deleting) return;
     if (!this.lineConfig) {
       return;
     }
@@ -1490,6 +1503,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleHeaderChanged(payload: unknown): void {
+    if (this.deleting) return;
     if (!this.isRecord(payload) || !this.activeDocumentWindowConfig?.headerData) {
       return;
     }
@@ -1922,6 +1936,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private queueLocalAutosave(): void {
+    if (this.deleting) return;
     if (this.isWorksheetPage) { this.saveWorksheet(); return; }
     if (this.usesManualSaveMode() || this.listConfig.dataSource.singleton) {
       void this.saveEntry();
@@ -1990,6 +2005,7 @@ export class DocumentPage implements OnInit, OnDestroy {
   }
 
   private handleEntryCommand(command: string, payload: unknown): void {
+    if (this.deleting) return;
     if (this.isWorksheetPage) {
       if (command === 'new') { this.appendNewLine('append'); return; }
       if (command === 'delete') { void this.deleteLine(payload); return; }
@@ -2251,167 +2267,95 @@ export class DocumentPage implements OnInit, OnDestroy {
     });
   }
 
+  private deleteAllowed(source: DataSourceConfig, records: Record<string, unknown>[]): boolean {
+    if (source.supportsDelete === false || this.hasPendingWrites || this.popupLoading) return false;
+    if (this.commandPermission.applyOperation({label: 'Delete', actionKey: 'delete'}, this.permissionPageId, source.permissions?.delete ?? 'delete').disabled) return false;
+    return records.every(row => this.dataSource.canWrite(source, row));
+  }
+
+  private setDeleting(value: boolean): void {
+    this.deleting = value;
+    if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.interactionLocked = value;
+    this.changeDetector.detectChanges();
+  }
+
+  private showDeleteFailures(failures: Array<{error: unknown}>, deleted: number): void {
+    if (!failures.length) return;
+    this.error = (deleted ? deleted + ' deleted; ' : '') + failures.length + ' failed. ' + (this.getErrorMessage(failures[0].error) || GENERIC_MESSAGES.deleteFailedMessage);
+    this.setEntryStatus({tone: 'error', title: GENERIC_MESSAGES.deleteFailedTitle, message: this.error});
+  }
+
   private async deleteSelectedRows(): Promise<void> {
-    if (this.listConfig.dataSource.supportsDelete === false) return;
     const targets = this.resolveDeleteTargets();
-    if (!targets.length) {
-      return;
-    }
-
-    const confirmed = await this.confirmation.confirmIntent({
-      intent: 'delete',
-      count: targets.length,
-      entityLabel: this.documentLabel,
-    });
-    if (!confirmed) {
-      return;
-    }
-
-    const operations = targets.map((target) => {
-      if (!this.hasValue(target.id)) {
-        return of({ key: target.key, success: true, error: undefined as unknown });
-      }
-
-      return this.dataSource.delete(this.listConfig.dataSource, target.id, target.rowVersion).pipe(
-        map(() => ({ key: target.key, success: true, error: undefined as unknown })),
-        catchError((error: unknown) => of({ key: target.key, success: false, error })),
-      );
-    });
-
-    this.subscriptions.add(
-      forkJoin(operations).subscribe((results) => {
-        const deletedKeys = results.filter((result) => result.success).map((result) => result.key);
-        if (deletedKeys.length) {
-          this.removeRowsFromList(deletedKeys);
-        }
-
-        const failed = results.find((result) => !result.success);
-        if (failed) {
-          this.error = this.getErrorMessage(failed.error);
-          this.setEntryStatus({
-            tone: 'error',
-            title: GENERIC_MESSAGES.deleteFailedTitle,
-            message: this.error || GENERIC_MESSAGES.deleteFailedMessage,
-          });
-        } else {
-          this.error = undefined;
-        }
-
-        this.changeDetector.detectChanges();
-      }),
-    );
+    if (!targets.length || !this.deleteAllowed(this.listConfig.dataSource, targets.map(target => target.row))) return;
+    const canContinue = this.dataSource.captureWriteScope();
+    this.setDeleting(true);
+    try {
+      if (!await this.confirmation.confirmIntent({intent: 'delete', count: targets.length, entityLabel: this.documentLabel})) return;
+      const result = await this.deletes.execute({
+        targets, canContinue, resolveId: target => target.id,
+        deleteById: (id, target) => this.dataSource.delete(this.listConfig.dataSource, id, target.rowVersion),
+      });
+      this.removeRowsFromList(result.deleted.map(target => target.key));
+      this.error = undefined;
+      this.showDeleteFailures(result.failures, result.deleted.length);
+    } finally { this.setDeleting(false); }
   }
 
   private async deleteActiveHeaderFromPopup(): Promise<void> {
-    if (this.listConfig.dataSource.supportsDelete === false) return;
-    const headerData = this.activeDocumentWindowConfig?.headerData;
-    if (!this.isRecord(headerData)) {
-      return;
-    }
-
-    const key = this.getRowKey(headerData);
-    const id = this.resolveRecordId(headerData, this.listConfig.dataSource);
-    if (!this.hasValue(id)) {
-      this.setEntryStatus({
-        tone: 'warning',
-        title: 'Delete skipped',
-        message: 'Only persisted records can be deleted.',
+    const header = this.activeDocumentWindowConfig?.headerData;
+    if (!header || !this.deleteAllowed(this.listConfig.dataSource, [header])) return;
+    const id = this.resolvePersistedRecordId(header, this.listConfig.dataSource);
+    if (!this.hasValue(id)) return;
+    const canContinue = this.dataSource.captureWriteScope();
+    this.setDeleting(true);
+    try {
+      if (!await this.confirmation.confirmIntent({intent: 'delete', count: 1, entityLabel: this.documentLabel})) return;
+      const result = await this.deletes.execute({
+        targets: [header], canContinue, resolveId: () => id,
+        deleteById: () => this.dataSource.delete(this.listConfig.dataSource, id, header['systemRowVersion']),
       });
-      this.changeDetector.detectChanges();
-      return;
-    }
-
-    const confirmed = await this.confirmation.confirmIntent({
-      intent: 'delete',
-      count: 1,
-      entityLabel: this.documentLabel,
-    });
-    if (!confirmed) {
-      return;
-    }
-
-    this.subscriptions.add(
-      this.dataSource.delete(this.listConfig.dataSource, id, headerData['systemRowVersion'])
-        .pipe(
-          map(() => ({ success: true, error: undefined as unknown })),
-          catchError((error: unknown) => of({ success: false, error })),
-        )
-        .subscribe((result) => {
-          if (!result.success) {
-            this.setEntryStatus({
-              tone: 'error',
-              title: GENERIC_MESSAGES.deleteFailedTitle,
-              message: this.getErrorMessage(result.error) || GENERIC_MESSAGES.deleteFailedMessage,
-            });
-            this.changeDetector.detectChanges();
-            return;
-          }
-
-          if (key.length) {
-            this.removeRowsFromList([key]);
-            return;
-          }
-
-          this.activeDocumentWindowConfig = undefined;
-          this.popupStack.close(this.entryPopupId);
-          this.loadFirstPage(true);
-          this.changeDetector.detectChanges();
-        }),
-    );
+      this.showDeleteFailures(result.failures, result.deleted.length);
+      if (!result.deleted.length) return;
+      this.removeRowsFromList([this.getRowKey(header)]);
+      this.unsavedFields.clear(); this.invalidHeaderDrafts.clear(); this.dirty = false;
+      this.activeDocumentWindowConfig = undefined;
+      if (this.documentOnly) this.closeRequested.emit(); else this.popupStack.close(this.entryPopupId);
+    } finally { this.setDeleting(false); }
   }
 
   private async deleteLine(payload: unknown): Promise<void> {
-    if (this.lineConfig?.dataSource.supportsDelete === false || !this.dataSource.canWrite(this.listConfig.dataSource, this.activeDocumentWindowConfig?.headerData ?? {})) return;
-    if (!this.activeDocumentWindowConfig || !this.lineConfig) {
-      return;
+    const entry = this.activeDocumentWindowConfig;
+    const config = this.lineConfig;
+    if (!entry || !config || !this.deleteAllowed(config.dataSource, []) ||
+      (!this.isWorksheetPage && !this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {}))) return;
+    const lineRows = entry.lineRows ?? [];
+    const plan = this.lineCommands.planDeleteRequest({lineRows, payload, activeRow: this.activeLineRow, selectedIndexes: this.selectedLineIndexes});
+    if (!plan.targetRows.length || !plan.targetRows.every(row => this.dataSource.canWrite(config.dataSource, row))) return;
+    const persisted = plan.targetRows.some(row => this.hasValue(this.documentRecord.resolvePersistedRecordId(row, config.dataSource)));
+    const resolved = this.isWorksheetPage && this.worksheetSource
+      ? {dataSource: this.worksheetSource, lineContextReady: true}
+      : this.resolveLineDataSourceForHeader(entry.headerData ?? {});
+    if (persisted && !resolved.lineContextReady) {
+      this.setEntryStatus({tone: 'error', title: 'Delete failed', message: resolved.reason ?? 'Save the header before deleting persisted lines.'});
+      this.changeDetector.detectChanges(); return;
     }
-
-    const lineRows = this.activeDocumentWindowConfig.lineRows ?? [];
-    if (!lineRows.length) {
-      return;
-    }
-
-    const resolved = this.resolveLineDataSourceForHeader(this.activeDocumentWindowConfig.headerData ?? {});
-    if (!resolved.lineContextReady) {
-      this.setEntryStatus({
-        tone: 'error',
-        title: 'Header not ready for line save',
-        message: resolved.reason ?? 'Line datasource is not ready.',
-      });
-      this.changeDetector.detectChanges();
-      return;
-    }
-
+    const canContinue = this.dataSource.captureWriteScope();
+    this.setDeleting(true);
     try {
       const result = await this.lineCommands.deleteRows({
-        lineRows,
-        payload,
-        activeRow: this.activeLineRow,
-        selectedIndexes: this.selectedLineIndexes,
-        resolveId: (row) => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource),
-        deleteById: (id) => this.dataSource.delete(resolved.dataSource, id, lineRows.find(row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource) === id)?.['systemRowVersion']),
-        confirmDelete: (count) =>
-          this.confirmation.confirmIntent({
-            intent: 'delete',
-            count,
-            entityLabel: 'line',
-          }),
+        lineRows, canContinue, payload: {selectedIndexes: plan.targetRows.map(row => lineRows.indexOf(row))},
+        resolveId: row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource),
+        deleteById: id => this.dataSource.delete(resolved.dataSource, id, lineRows.find(row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource) === id)?.['systemRowVersion']),
+        confirmDelete: count => this.confirmation.confirmIntent({intent: 'delete', count, entityLabel: 'line'}),
       });
-
-      if (!result.deleted) {
-        return;
+      if (result.deleted) {
+        for (const row of result.targetRows) { this.unsavedFields.delete(row); this.worksheetChangedRows.delete(row); }
+        this.dirty = this.unsavedFields.size > 0;
+        this.applyLineDeletionResult((entry.lineRows ?? []).filter(row => !result.targetRows.includes(row)));
       }
-
-      const latestRows = this.activeDocumentWindowConfig?.lineRows ?? [];
-      this.applyLineDeletionResult(latestRows.filter((row) => !result.targetRows.includes(row)));
-    } catch (error: unknown) {
-      this.setEntryStatus({
-        tone: 'error',
-        title: GENERIC_MESSAGES.deleteFailedTitle,
-        message: this.getErrorMessage(error) || GENERIC_MESSAGES.lineDeleteFailedMessage,
-      });
-      this.changeDetector.detectChanges();
-    }
+      this.showDeleteFailures(result.failures, result.targetRows.length);
+    } finally { this.setDeleting(false); }
   }
 
   private appendNewLine(mode: 'append' | 'prepend'): void {
@@ -2691,14 +2635,15 @@ export class DocumentPage implements OnInit, OnDestroy {
     );
   }
 
-  private resolveDeleteTargets(): Array<{ key: string; id: unknown; rowVersion?: unknown }> {
+  private resolveDeleteTargets(): Array<{ key: string; id: unknown; rowVersion?: unknown; row: Record<string, unknown> }> {
     const selectedTargets = this.rows
       .filter((row) => this.checkedRowKeys.has(this.getRowKey(row)))
       .filter((row): row is Record<string, unknown> => this.isRecord(row))
       .map((row) => ({
         key: this.getRowKey(row),
-        id: this.documentRecord.resolveRecordId(row, this.listConfig.dataSource),
+        id: this.documentRecord.resolvePersistedRecordId(row, this.listConfig.dataSource),
         rowVersion: row['systemRowVersion'],
+        row,
       }))
       .filter((target) => target.key.length > 0);
 
@@ -2712,7 +2657,7 @@ export class DocumentPage implements OnInit, OnDestroy {
 
     const key = this.getRowKey(this.selectedRow);
     return key
-      ? [{ key, id: this.documentRecord.resolveRecordId(this.selectedRow, this.listConfig.dataSource), rowVersion: this.selectedRow['systemRowVersion'] }]
+      ? [{ key, id: this.documentRecord.resolvePersistedRecordId(this.selectedRow, this.listConfig.dataSource), rowVersion: this.selectedRow['systemRowVersion'], row: this.selectedRow }]
       : [];
   }
 
@@ -2723,9 +2668,7 @@ export class DocumentPage implements OnInit, OnDestroy {
       this.checkedRowKeys.delete(key);
     }
 
-    this.selectedRow = this.rows[0];
-    this.activeDocumentWindowConfig = undefined;
-    this.popupStack.close(this.entryPopupId);
+    if (!this.rows.includes(this.selectedRow)) this.selectedRow = this.rows[0];
     this.changeDetector.detectChanges();
   }
 

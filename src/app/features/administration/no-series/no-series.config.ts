@@ -14,7 +14,6 @@ export const noSeriesPageConfig: ListPageConfig & { dataSource: DataSourceConfig
     documentNoField: 'code',
     defaultSort: 'code asc',
     pageSize: 25,
-    supportsDelete: false,
   },
   dataSurface: {
     idField: 'systemId',
@@ -82,7 +81,6 @@ export const noSeriesLineConfig: LineConfig = {
       parentIdFields: ['systemId'],
       childCollection: 'lines',
     },
-    supportsDelete: false,
   },
   toolbarButtons: [],
   columns: [

@@ -115,3 +115,16 @@ Run `npm run verify:ui` for fixture tests, import/token guards and the productio
 All page/resource/lookup declarations belong in the feature .config.ts file. Component TypeScript binds configs to DocumentPage and contains only optional domain hooks. Feature HTML hosts the shared engine. New page configurations still need their own resource/permission contract checked; passing platform fixtures does not certify arbitrary future configurations.
 
 The Number Series API also normalizes its declared Starting No., Ending No. and Warning No. Code values on incoming create/update requests. This changes no existing stored rows and does not imply that every Code field is unique. Database keys and uniqueness constraints remain separate declarations.
+
+## Shared deletion
+
+Header records, checked list records, document lines and worksheet rows use the shared delete flow and existing ConfirmationService.confirmIntent dialog. No feature component needs a delete handler.
+
+- dataSource.supportsDelete: false disables deletion and blocks direct command dispatch. Omitting it permits the operation subject to permissions, writableStates and a real backend DELETE route. Singleton addressing does not override this capability; singleton setup configs explicitly set supportsDelete: false.
+- A configured toolbar override cannot re-enable an unsupported delete. permissions.delete may explicitly map a child operation to its backend permission (for example modify).
+- Multi-selection confirms once with the target count. Successful responses remove only their rows. Failed or stale records stay visible with an error and are not automatically retried.
+- Requests retain each record's systemRowVersion as If-Match and use the configured keyField and parent navigation. Up to four independent delete requests run at a time. Remaining requests stop if the company, user or workspace changes.
+- Unsaved local lines can be removed without an API request. An absent selection never implicitly deletes the last line.
+- Number Series uses the same shared flow with header and line DELETE routes. Issued-number history and existing references are enforced by the backend. Singleton setup pages retain supportsDelete: false.
+
+Synthetic coverage: record-delete.service.spec.ts, delete-contract.spec.ts, and command-assembler capability tests. Backend DeleteCorsContractTest verifies preflight support while authentication remains enforced.

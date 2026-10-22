@@ -35,6 +35,14 @@ describe('Shared data lifecycle with controlled synthetic API responses',()=>{
   const cached:any=await firstValueFrom(source.loadList(config,{useCache:true}));
   expect(cached.value[0].code).toBe('PR');expect(get).toHaveBeenCalledTimes(1);
  });
+ it('uses only explicit supportsDelete false to block deletion, including singleton resources',async()=>{
+  await expect(firstValueFrom(source.delete({...config,singleton:true,supportsDelete:false},'1',1))).rejects.toThrow('does not support delete');
+  await expect(firstValueFrom(source.delete({...config,singleton:true,supportsDelete:undefined},'1',1))).resolves.toBeDefined();
+ });
+ it('captures a stable write scope for the duration of batch mutations',()=>{
+  const unchanged=source.captureWriteScope();expect(unchanged()).toBe(true);
+  session.Company='B';expect(unchanged()).toBe(false);
+ });
  it('separates company caches and rejects responses from a previous company',async()=>{
   await firstValueFrom(source.loadList(config,{useCache:true})); session.Company='B';
   await firstValueFrom(source.loadList(config,{useCache:true}));expect(get).toHaveBeenCalledTimes(2);

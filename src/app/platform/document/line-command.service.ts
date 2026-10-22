@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
-import { Observable, firstValueFrom, forkJoin, of } from 'rxjs';
+import { RecordDeleteService } from '../data/record-delete.service';
+import { Injectable, inject } from '@angular/core';
+import { Observable, defer, from } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 export interface LineDeletePlan {
@@ -12,12 +13,14 @@ export interface LineDeletePlan {
 export interface LineDeleteResult extends LineDeletePlan {
   deleted: boolean;
   confirmed: boolean;
+  failures: Array<{target: Record<string, unknown>; error: unknown}>;
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class LineCommandService {
+  private readonly deletes = inject(RecordDeleteService);
   planDeleteRequest(options: {
     lineRows: Record<string, unknown>[];
     payload: unknown;
@@ -35,8 +38,8 @@ export class LineCommandService {
       targetRows = lineRows.filter((_row, index) => indexSet.has(index));
     } else {
       const payloadRow = this.resolvePayloadRow(options.payload);
-      const targetRow = payloadRow ?? options.activeRow ?? lineRows[lineRows.length - 1];
-      if (targetRow) {
+      const targetRow = payloadRow ?? options.activeRow;
+      if (targetRow && lineRows.includes(targetRow)) {
         targetRows = [targetRow];
       }
     }
@@ -56,11 +59,9 @@ export class LineCommandService {
     persistedIds: unknown[],
     deleteById: (id: unknown) => Observable<unknown>
   ): Observable<void> {
-    if (!persistedIds.length) {
-      return of(void 0);
-    }
-
-    return forkJoin(persistedIds.map((id) => deleteById(id))).pipe(map(() => void 0));
+    return defer(() => from(this.deletes.execute({targets: persistedIds, resolveId: id => id, deleteById}))).pipe(map(result => {
+      if (result.failures.length) throw result.failures[0].error;
+    }));
   }
 
   async deleteRows(options: {
@@ -71,6 +72,7 @@ export class LineCommandService {
     resolveId: (row: Record<string, unknown>) => unknown;
     deleteById: (id: unknown) => Observable<unknown>;
     confirmDelete?: (count: number) => Promise<boolean>;
+    canContinue?: () => boolean;
   }): Promise<LineDeleteResult> {
     const plan = this.planDeleteRequest({
       lineRows: options.lineRows,
@@ -82,7 +84,8 @@ export class LineCommandService {
     const resultBase = {
       ...plan,
       deleted: false,
-      confirmed: false
+      confirmed: false,
+      failures: [] as LineDeleteResult['failures']
     };
 
     if (!plan.targetRows.length) {
@@ -100,15 +103,21 @@ export class LineCommandService {
         .filter((id) => id !== null && id !== undefined && String(id).trim().length > 0)
     );
 
-    if (persistedIds.length) {
-      await firstValueFrom(this.executePersistedDeletes(persistedIds, options.deleteById));
-    }
-
+    const result = await this.deletes.execute({
+      targets: plan.targetRows,
+      resolveId: options.resolveId,
+      deleteById: options.deleteById,
+      allowLocal: true,
+      canContinue: options.canContinue,
+    });
     return {
       ...plan,
+      targetRows: result.deleted,
+      remainingRows: options.lineRows.filter(row => !result.deleted.includes(row)),
       persistedIds,
-      deleted: true,
-      confirmed: true
+      deleted: result.deleted.length > 0,
+      confirmed: true,
+      failures: result.failures,
     };
   }
 

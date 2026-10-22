@@ -1,3 +1,6 @@
+import { TestBed } from '@angular/core/testing';
+import { SessionService } from '../../core/services/session.service';
+import { StandardListActionsService } from './standard-list-actions.service';
 import type { CommandConfig } from '../models/command-config.model';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataSourceConfig } from '../models/data-source-config.model';
@@ -91,6 +94,20 @@ describe('DocumentPage command assembly', () => {
     expect(lineConfig.toolbarButtons?.[0].disabled).toBeUndefined();
   });
 
+  it('defaults deletion to enabled regardless of singleton addressing unless explicitly false',()=>{
+    for(const dataSource of [{...source},{...source,supportsDelete:true},{...source,singleton:true}]){
+      const buttons=assembler.resolveHeaderToolbarButtons({dataSource,pageId});
+      expect(buttons.find(button=>button.actionKey==='cmd:delete')?.disabled).not.toBe(true);
+    }
+  });
+
+  it('cannot re-enable unsupported deletion through toolbar overrides', () => {
+    const result = assembler.resolveHeaderToolbarButtons({dataSource: {...source, supportsDelete:false}, pageId, toolbarButtons:[button('cmd:delete',{disabled:false})]});
+    expect(result.find(button=>button.actionKey==='cmd:delete')?.disabled).toBe(true);
+    const line = assembler.resolveLineToolbarButtons({lineConfig:{placement:{mode:'end'},dataSource:{...source,supportsDelete:false},toolbarButtons:[button('cmd:line-delete',{disabled:false})],columns:[]} as LineConfig,pageId});
+    expect(line.find(button=>button.actionKey==='cmd:line-delete')?.disabled).toBe(true);
+  });
+
   it('preserves undefined/empty detail arrays and clones populated details before permissions', () => {
     expect(assembler.resolveDetailToolbarButtons({ pageId })).toBeUndefined();
     const empty: CommandConfig[] = [];
@@ -110,5 +127,14 @@ describe('DocumentPage command assembly', () => {
     const result = assembler.resolveHeaderToolbarButtons({ dataSource: source, toolbarButtons: configured, pageId });
     expect(result.map(item => item.actionKey)).toEqual(['cmd:new', 'cmd:delete', 'REFRESH']);
     expect(result[2].label).toBe('Final refresh');
+  });
+
+  it('uses configured delete permission mapping on the shared list toolbar',()=>{
+    TestBed.configureTestingModule({providers:[{provide:SessionService,useValue:{SuperAdmin:false,Permissions:[{pageId,canUpdate:true,canDelete:false}]}}]});
+    const actions=TestBed.inject(StandardListActionsService);
+    const mapped=actions.resolve({pageId,dataSource:{permissions:{delete:'modify'}}});
+    expect((mapped.delete as {disabled?:boolean}).disabled).toBe(false);
+    const blocked=actions.resolve({pageId,dataSource:{supportsDelete:false,permissions:{delete:'modify'}}});
+    expect((blocked.delete as {disabled?:boolean}).disabled).toBe(true);
   });
 });

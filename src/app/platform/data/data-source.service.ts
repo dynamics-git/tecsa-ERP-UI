@@ -31,6 +31,11 @@ export class DataSourceService {
   private readonly conflictedRecords = new WeakSet<Record<string, unknown>>();
   private readonly records = new Map<string, { value: Record<string, unknown>; at: number }>();
   private readGeneration = 0;
+  /** Keep a multi-request mutation within its original company, user and workspace. */
+  captureWriteScope(): () => boolean {
+    const original = this.context();
+    return () => this.context() === original;
+  }
   invalidateReadCache(): void { this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
   private cacheRecord(key: string, value: Record<string, unknown>): void {
     if (this.records.size >= 100) this.records.delete(this.records.keys().next().value!);
@@ -151,7 +156,7 @@ export class DataSourceService {
   }
   private mutate(config: DataSourceConfig, id: unknown, body: unknown, operation: 'create' | 'update' | 'delete', rowVersion?: unknown, editor?: Record<string, unknown>): Observable<unknown> {
     return defer(() => {
-      if ((operation === 'create' && config.supportsCreate === false) || (operation === 'update' && config.supportsUpdate === false) || (operation === 'delete' && (config.supportsDelete === false || config.singleton))) throw new Error(`This resource does not support ${operation}.`);
+      if ((operation === 'create' && config.supportsCreate === false) || (operation === 'update' && config.supportsUpdate === false) || (operation === 'delete' && config.supportsDelete === false)) throw new Error(`This resource does not support ${operation}.`);
       const endpoint = operation === 'create' || config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);
       const identity = this.key(endpoint);
       return this.enqueue(endpoint, async () => {

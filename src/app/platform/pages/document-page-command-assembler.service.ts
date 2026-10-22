@@ -47,7 +47,13 @@ export class DocumentPageCommandAssemblerService {
     const configured = (params.toolbarButtons ?? []).map((button) => ({ ...button }));
     return this
       .mergePopupDefaultCommands(defaults, configured)
-      .map((button) => this.applyPopupCommandPermission(button, params.pageId));
+      .map((button) => {
+        const action = this.normalizePopupCommandKey(button.actionKey);
+        const unsupported = (action === 'new' && !supportsCreate) || (action === 'delete' && !supportsDelete);
+        const guarded = unsupported ? {...button, disabled: true} : button;
+        const operation = action === 'new' ? params.dataSource.permissions?.create : action === 'delete' ? params.dataSource.permissions?.delete : undefined;
+        return operation ? this.popupCommandPermission.applyOperation(guarded, params.pageId, operation) : this.applyPopupCommandPermission(guarded, params.pageId);
+      });
   }
 
   resolveLineToolbarButtons(params: { lineConfig?: LineConfig; pageId: string }): CommandConfig[] {
@@ -92,6 +98,7 @@ export class DocumentPageCommandAssemblerService {
       .mergePopupDefaultCommands(defaults, configured)
       .map((button) => {
         const action = this.normalizePopupCommandKey(button.actionKey);
+        button = ((action === 'line-new' || action === 'line-insert') && !supportsCreate) || (action === 'line-delete' && !supportsDelete) ? {...button, disabled: true} : button;
         const override = action === 'line-new' || action === 'line-insert' ? params.lineConfig?.dataSource.permissions?.create
           : action === 'line-delete' ? params.lineConfig?.dataSource.permissions?.delete : undefined;
         return override ? this.popupCommandPermission.applyOperation(button, params.pageId, override) : this.applyPopupCommandPermission(button, params.pageId);
