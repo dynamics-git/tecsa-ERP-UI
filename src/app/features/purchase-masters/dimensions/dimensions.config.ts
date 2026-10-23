@@ -79,5 +79,5 @@ export const dimensionsListConfig: ListPageConfig & { dataSource: DataSourceConf
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

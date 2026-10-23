@@ -31,7 +31,7 @@ export const currencyExchangeRatesListConfig: ListPageConfig & {
     export: false,
   },
   factBox: {
-    enabled: false,
+    enabled: true,
   },
 };
 export const currencyExchangeRatesHeaderConfig: HeaderConfig = {

@@ -31,7 +31,7 @@ export const vendorDefaultDimensionsListConfig: ListPageConfig & {
     export: false,
   },
   factBox: {
-    enabled: false,
+    enabled: true,
   },
 };
 export const vendorDefaultDimensionsHeaderConfig: HeaderConfig = {

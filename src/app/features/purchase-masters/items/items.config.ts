@@ -203,5 +203,5 @@ export const itemsListConfig: ListPageConfig & { dataSource: DataSourceConfig } 
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

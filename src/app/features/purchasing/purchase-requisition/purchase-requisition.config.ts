@@ -57,6 +57,7 @@ const actions = actionDefinitions.map((action, index) => ({
 }));
 
 export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  factBox: { enabled: true },
   pageId: 'purchase-requisition',
   pageType: 'document',
   title: 'Purchase Requisition',

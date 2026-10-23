@@ -582,6 +582,7 @@ export const purchaseOrderListCommandsConfig: CommandConfig[] = [
 ];
 
 export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  factBox: { enabled: true },
   pageId: 'purchase-order',
   pageType: 'document',
   title: 'Purchase Order',

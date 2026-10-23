@@ -315,5 +315,5 @@ export const vendorsListConfig: ListPageConfig & { dataSource: DataSourceConfig 
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

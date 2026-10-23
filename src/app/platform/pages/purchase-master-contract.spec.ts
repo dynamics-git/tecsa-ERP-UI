@@ -58,7 +58,7 @@ describe('Purchase master configuration integration', () => {
     expect(pages).toHaveLength(28);
     for (const page of pages) {
       expect(page).toBeDefined();
-      expect(page.factBox?.enabled).toBe(false);
+      expect(page.factBox?.enabled).toBe(true);
       expect(page.dataSource?.supportsDelete).toBeUndefined();
       expect(page.dataSource?.keyField).toBe('systemId');
       expect(page.dataSource?.endpoint).toMatch(/^\/[A-Za-z]+$/);
@@ -75,6 +75,13 @@ describe('Purchase master configuration integration', () => {
         }
       }
     }
+  });
+
+  it('enables the shared FactBox for every registered page type', () => {
+    const allPages = registered.filter(value => value && typeof value === 'object' && 'pageId' in value && 'dataSource' in value) as ListPageConfig[];
+    expect(allPages.length).toBeGreaterThanOrEqual(41);
+    expect(new Set(allPages.map(page => page.pageType))).toEqual(new Set(['card', 'document', 'setup', 'worksheet']));
+    for (const page of allPages) expect(page.factBox?.enabled, page.pageId).toBe(true);
   });
 
   it('places shared prerequisites in their owning modules and gives every master a distinct icon', () => {
@@ -126,7 +133,8 @@ describe('Purchase master configuration integration', () => {
         expect(fixture.nativeElement.querySelector('app-list-grid')).not.toBeNull();
         expect(fixture.nativeElement.querySelector('app-document-window')).toBeNull();
       }
-      expect(fixture.nativeElement.querySelector('app-fact-box')).toBeNull();
+      expect(fixture.nativeElement.querySelectorAll('app-fact-box').length).toBe(page.pageType === 'setup' ? 1 : 0);
+      expect(fixture.nativeElement.querySelectorAll('app-list-fact-box').length).toBe(page.pageType === 'setup' ? 0 : 1);
       fixture.destroy();
     });
 

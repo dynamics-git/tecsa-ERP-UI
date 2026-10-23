@@ -214,6 +214,7 @@ export const salesReceivablesSetupHeaderConfig: HeaderConfig = {
 };
 
 export const salesReceivablesSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  factBox: { enabled: true },
   pageId: 'sales-receivables-setup',
   pageType: 'setup',
   autoSave: true,

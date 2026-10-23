@@ -31,7 +31,7 @@ export const dimensionValuesListConfig: ListPageConfig & {
     export: false,
   },
   factBox: {
-    enabled: false,
+    enabled: true,
   },
 };
 export const dimensionValuesHeaderConfig: HeaderConfig = {

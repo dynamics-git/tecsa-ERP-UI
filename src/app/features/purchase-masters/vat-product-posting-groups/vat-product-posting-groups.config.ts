@@ -68,5 +68,5 @@ export const vatProductPostingGroupsListConfig: ListPageConfig & { dataSource: D
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

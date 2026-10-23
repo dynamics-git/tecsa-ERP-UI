@@ -85,10 +85,11 @@ describe('Page lifecycle with synthetic data, no operational records',()=>{
   expect(f.nativeElement.querySelector('.entry-work').style.visibility).toBe('hidden');
   expect(f.nativeElement.textContent).toContain('Retry');expect(f.nativeElement.textContent).toContain('Fixture unavailable');f.destroy();
  });
- it('renders worksheet lines under the same document workspace and excludes the automatic document FactBox',async()=>{
-  const {f,get}=create('worksheet');await f.whenStable();f.detectChanges();
+ it('renders worksheet lines and the shared selected-row FactBox fallback',async()=>{
+  const {f,get}=create('worksheet');await vi.waitFor(()=>expect(f.componentInstance.inlineDocumentWindowConfig?.lineRows?.some(row=>row['quantity']===2)).toBe(true));await f.whenStable();f.detectChanges();
   expect(f.nativeElement.querySelector('app-document-lines')).not.toBeNull();
   expect(get.mock.calls.some(call=>call[0].includes('/fixtures/fixture-1/lines'))).toBe(true);
-  expect(f.nativeElement.querySelector('.entry-factbox')).toBeNull();f.destroy();
+  const details=f.nativeElement.querySelector('.entry-info');
+  expect(details).not.toBeNull();expect(details.textContent).toContain('Row details');expect(details.textContent).toContain('Quantity');f.destroy();
  });
 });

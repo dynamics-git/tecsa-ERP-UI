@@ -111,5 +111,5 @@ export const dimensionCombinationsListConfig: ListPageConfig & { dataSource: Dat
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

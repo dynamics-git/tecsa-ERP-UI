@@ -232,5 +232,5 @@ export const vendorPostingGroupsListConfig: ListPageConfig & { dataSource: DataS
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

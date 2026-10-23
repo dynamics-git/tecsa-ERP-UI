@@ -136,5 +136,5 @@ export const paymentMethodsListConfig: ListPageConfig & { dataSource: DataSource
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

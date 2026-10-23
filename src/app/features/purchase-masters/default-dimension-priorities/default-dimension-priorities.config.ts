@@ -31,7 +31,7 @@ export const defaultDimensionPrioritiesListConfig: ListPageConfig & {
     export: false,
   },
   factBox: {
-    enabled: false,
+    enabled: true,
   },
 };
 export const defaultDimensionPrioritiesHeaderConfig: HeaderConfig = {

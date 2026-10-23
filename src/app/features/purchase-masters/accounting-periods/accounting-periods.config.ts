@@ -67,5 +67,5 @@ export const accountingPeriodsListConfig: ListPageConfig & { dataSource: DataSou
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

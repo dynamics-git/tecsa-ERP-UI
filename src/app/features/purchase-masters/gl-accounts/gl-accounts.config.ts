@@ -182,5 +182,5 @@ export const glAccountsListConfig: ListPageConfig & { dataSource: DataSourceConf
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

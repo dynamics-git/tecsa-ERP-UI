@@ -254,5 +254,5 @@ export const vatPostingSetupListConfig: ListPageConfig & { dataSource: DataSourc
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

@@ -134,5 +134,5 @@ export const warehouseBinsListConfig: ListPageConfig & { dataSource: DataSourceC
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

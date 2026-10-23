@@ -68,5 +68,5 @@ export const inventoryPostingGroupsListConfig: ListPageConfig & { dataSource: Da
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

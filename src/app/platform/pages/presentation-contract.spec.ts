@@ -73,6 +73,21 @@ describe('Shared filters, exports, details and document layout',()=>{
   expect(names).toEqual(['General','Lines','Totals','Shipping']);expect(f.nativeElement.querySelectorAll('app-fact-box-toggle').length).toBe(1);
   f.componentRef.setInput('factBoxConfig',{enabled:false});f.detectChanges();expect(f.nativeElement.querySelectorAll('app-fact-box-toggle').length).toBe(0);f.destroy();
  });
+ it('uses shared worksheet row details without per-page sections and follows the selected row',()=>{
+  TestBed.configureTestingModule({imports:[DocumentWindow],providers:[provideRouter([]),{provide:DATA_REST_SERVICE,useValue:{get:()=>of([])}}]});
+  const f=TestBed.createComponent(DocumentWindow);
+  const rows=[{description:'First row',amount:'12.340000',category:'C1',private:'Hidden value',accessToken:'Secret value'}, {description:'Second row',amount:'56.780000',category:'C1'}];
+  f.componentRef.setInput('worksheet',true);f.componentRef.setInput('factBoxConfig',{enabled:true});
+  f.componentRef.setInput('lineColumns',[{id:'description',label:'Description'}, {id:'amount',label:'Amount',valueType:'decimal'}, {id:'category',label:'Category',cellType:'select',options:[{value:'C1',label:'Category one'}]}, {id:'private',label:'Private',hidden:true}]);
+  f.componentRef.setInput('lineRows',rows);f.detectChanges();
+  const details=()=>f.nativeElement.querySelector('.entry-info')?.textContent ?? '';
+  expect(details()).toContain('Row details');expect(details()).toContain('First row');expect(details()).toContain('12.340000');expect(details()).toContain('Category one');
+  expect(details()).not.toContain('Hidden value');expect(details()).not.toContain('Secret value');
+  f.componentInstance.handleLineSelectionChanged({activeRow:rows[1],selectedRows:[rows[1]],selectedIndexes:[1]});f.changeDetectorRef.markForCheck();f.detectChanges();
+  expect(details()).toContain('Second row');expect(details()).not.toContain('First row');
+  f.componentRef.setInput('lineRows',[]);f.detectChanges();expect(details()).toContain('Select a row');
+  f.componentRef.setInput('factBoxConfig',{enabled:false});f.detectChanges();expect(f.nativeElement.querySelector('.entry-info')).toBeNull();f.destroy();
+ });
  it('exports CSV with formula protection, quoting and leading zeros without fetching more data',async()=>{
   const service=new ListExportService();let captured:Blob|undefined;
   const original=URL.createObjectURL;URL.createObjectURL=(blob:any)=>{captured=blob;return 'blob:fixture';};

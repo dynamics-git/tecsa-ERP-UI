@@ -311,11 +311,31 @@ export class DocumentWindow {
     }));
     const configured = this.buildFactBoxSectionsFromDocumentConfig();
     const hasSelectedFields = this.resolvedHeaderSections.some(section => section.fields.some(field => this.resolveFieldFactBoxConfig(field)));
-    if (hasSelectedFields || this.worksheet || !Object.keys(this.resolvedHeaderData).length) return configured;
+    if (hasSelectedFields) return configured;
+    if (this.worksheet) {
+      if (this.resolvedLineColumns.some(column => this.resolveLineFactBoxConfig(column))) return configured;
+      const rows = this.resolvedLineRows.filter(row => !row['__entryPlaceholder']);
+      const row = this.activeLineRow && rows.includes(this.activeLineRow) ? this.activeLineRow : rows[0];
+      const fields = automaticDetailFields(this.resolvedLineColumns.map(column => ({
+        ...column, field: column.field ?? column.id, type: column.valueType ?? column.type,
+      })), row ?? {});
+      const user = this.session.User as Record<string, unknown> | undefined;
+      return [{id: 'row-details', title: 'Row details', rows: fields.length ? fields.map(field => {
+        const column = this.resolvedLineColumns.find(candidate => (candidate.field ?? candidate.id) === field.field);
+        let value = detailValue(row!, field, {id: this.session.UserId, name: String(user?.['name'] ?? this.session.UserName)});
+        if (column && (column.lookup || column.options?.length)) {
+          const options = row![column.optionsDataKey ?? '__options_' + field.field];
+          const candidates: unknown[] = Array.isArray(options) ? options : column.options ?? [];
+          const selected = candidates.find((option): option is Record<string, unknown> => this.isRecord(option) && String(option['value']) === String(row![field.field!]));
+          value = this.toText(selected?.['label'] ?? 'Display value unavailable');
+        }
+        return {label: field.label, value};
+      }) : [{label: 'Details', value: 'Select a row to view details.'}]}, ...configured];
+    }
     const fields = automaticDetailFields(this.resolvedHeaderSections.flatMap(section => section.fields.map(field => ({
       field: field.key, label: field.label, type: field.valueType ?? field.type, hidden: field.hidden, factBox: field.factBox,
     }))), this.resolvedHeaderData);
-    return [...(fields.length ? [{id: 'record-details', title: 'Record details', rows: fields.map(field => ({label: field.label, value: this.formatDetail(field)}))}] : []), ...configured];
+    return [{id: 'record-details', title: 'Record details', rows: fields.length ? fields.map(field => ({label: field.label, value: this.formatDetail(field)})) : [{label: 'Details', value: 'Record details will appear here.'}]}, ...configured];
   }
 
   private formatDetail(field: {field?: string; label: string; type?: string}): string {

@@ -106,5 +106,5 @@ export const paymentTermsListConfig: ListPageConfig & { dataSource: DataSourceCo
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

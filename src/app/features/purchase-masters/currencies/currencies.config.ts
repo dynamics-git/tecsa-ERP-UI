@@ -210,5 +210,5 @@ export const currenciesListConfig: ListPageConfig & { dataSource: DataSourceConf
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

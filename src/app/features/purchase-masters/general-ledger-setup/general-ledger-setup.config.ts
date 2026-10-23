@@ -257,7 +257,7 @@ export const generalLedgerSetupListConfig: ListPageConfig & { dataSource: DataSo
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
   tools: {
     filter: false,
     advancedFilter: false,

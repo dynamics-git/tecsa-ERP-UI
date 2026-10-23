@@ -68,5 +68,5 @@ export const reasonCodesListConfig: ListPageConfig & { dataSource: DataSourceCon
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

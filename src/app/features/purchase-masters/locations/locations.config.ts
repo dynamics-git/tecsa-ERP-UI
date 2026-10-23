@@ -134,5 +134,5 @@ export const locationsListConfig: ListPageConfig & { dataSource: DataSourceConfi
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

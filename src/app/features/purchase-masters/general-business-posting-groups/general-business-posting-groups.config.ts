@@ -89,5 +89,5 @@ export const generalBusinessPostingGroupsListConfig: ListPageConfig & { dataSour
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

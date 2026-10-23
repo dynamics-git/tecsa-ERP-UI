@@ -284,5 +284,5 @@ export const generalPostingSetupListConfig: ListPageConfig & { dataSource: DataS
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

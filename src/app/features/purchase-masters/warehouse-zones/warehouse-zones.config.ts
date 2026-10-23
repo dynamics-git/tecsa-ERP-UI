@@ -91,5 +91,5 @@ export const warehouseZonesListConfig: ListPageConfig & { dataSource: DataSource
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

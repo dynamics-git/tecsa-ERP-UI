@@ -89,5 +89,5 @@ export const itemChargesListConfig: ListPageConfig & { dataSource: DataSourceCon
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
 };

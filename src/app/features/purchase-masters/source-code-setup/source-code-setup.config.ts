@@ -146,7 +146,7 @@ export const sourceCodeSetupListConfig: ListPageConfig & { dataSource: DataSourc
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
   tools: {
     filter: false,
     advancedFilter: false,

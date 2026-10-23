@@ -166,7 +166,7 @@ export const inventorySetupListConfig: ListPageConfig & { dataSource: DataSource
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: false },
+  factBox: { enabled: true },
   tools: {
     filter: false,
     advancedFilter: false,
