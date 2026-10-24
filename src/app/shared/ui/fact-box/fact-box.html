@@ -1,25 +1,94 @@
-@for (section of sections; track section.id) {
-  <section>
-    <h3>{{ section.title }}</h3>
-
-    @for (button of section.buttons ?? []; track button.label + '-' + button.actionKey) {
-      <button type="button" [disabled]="button.disabled" (click)="runAction(button.actionKey)">
-        @if (button.icon) {
-          <i [class]="button.icon"></i>
+@if (config?.enabled !== false) {
+  @if (label || title || subtitle) {
+    <header class="factbox-header">
+      <span>{{ label }}</span>
+      <h3>{{ title }}</h3>
+      <p>{{ subtitle }}</p>
+    </header>
+  }
+  @if (config) {
+    <div class="factbox-tabs" role="tablist" aria-label="Record information">
+      @for (panel of panels; track panel.id; let index = $index) {
+        <button
+          type="button"
+          role="tab"
+          [id]="id + '-tab-' + index"
+          [attr.aria-controls]="id + '-panel-' + index"
+          [attr.aria-selected]="panel.id === activeId"
+          [attr.tabindex]="panel.id === activeId ? 0 : -1"
+          (click)="select(panel.id)"
+          (keydown)="navigate($event, index)"
+        >
+          {{ panel.title }}
+        </button>
+      }
+    </div>
+    <div class="factbox-content">
+      @for (panel of panels; track panel.id; let index = $index) {
+        @if (mounted(panel.id)) {
+          <section
+            [hidden]="panel.id !== activeId"
+            role="tabpanel"
+            [id]="id + '-panel-' + index"
+            [attr.aria-labelledby]="id + '-tab-' + index"
+          >
+            @if (panel.component) {
+              <ng-container
+                *ngComponentOutlet="
+                  panel.component;
+                  inputs: { context: partContext, data: panel.data ?? {} }
+                "
+              ></ng-container>
+            } @else {
+              @switch (panel.kind) {
+                @case ('overview') {
+                  <app-factbox-overview
+                    [sections]="sections"
+                    [context]="partContext"
+                  ></app-factbox-overview>
+                }
+                @case ('notes') {
+                  <app-notes [context]="partContext"></app-notes>
+                }
+                @case ('attachments') {
+                  <app-attachments [context]="partContext"></app-attachments>
+                }
+              }
+            }
+            <ng-container
+              [ngTemplateOutlet]="buttons"
+              [ngTemplateOutletContext]="{ $implicit: panel.buttons }"
+            ></ng-container>
+          </section>
         }
-        {{ button.label }}
-      </button>
-    }
-
-    @for (row of section.rows ?? []; track row.label + '-' + row.value) {
-      <div>
-        <span>{{ row.label }}</span>
-        <strong>{{ row.value }}</strong>
-      </div>
-    }
-
-    @if (section.customComponentKey) {
-        
-    }
-  </section>
+      }
+    </div>
+  } @else {
+    <app-factbox-overview [sections]="sections" [context]="partContext"></app-factbox-overview>
+  }
+  <ng-container
+    [ngTemplateOutlet]="buttons"
+    [ngTemplateOutletContext]="{ $implicit: config?.buttons }"
+  ></ng-container>
 }
+<ng-template #buttons let-items>
+  @if (items?.length) {
+    <div class="factbox-actions">
+      @for (button of items; track button.actionKey + '-' + button.label) {
+        @if (!button.hidden) {
+          <button
+            type="button"
+            [disabled]="buttonState(button).disabled"
+            [title]="buttonState(button).tooltip ?? button.label"
+            (click)="runAction(button.actionKey)"
+          >
+            @if (button.icon) {
+              <i [class]="button.icon" aria-hidden="true"></i>
+            }
+            {{ button.label }}
+          </button>
+        }
+      }
+    </div>
+  }
+</ng-template>

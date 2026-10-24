@@ -58,3 +58,5 @@ export * from './models/record-identity.model';
 export * from './pages/unsaved-changes.service';
 
 export { headerDataSourceDefaults, listColumns } from './data/document-config-defaults';
+
+export * from './models/fact-box-context.model';

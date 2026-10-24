@@ -1,0 +1,55 @@
+@for (section of sections; track section.id) {
+  @if (section.collapsed) {
+    <details class="overview-section">
+      <summary>{{ section.title }}</summary>
+      <ng-container
+        [ngTemplateOutlet]="content"
+        [ngTemplateOutletContext]="{ $implicit: section }"
+      ></ng-container>
+    </details>
+  } @else {
+    <section class="overview-section">
+      <h4>{{ section.title }}</h4>
+      <ng-container
+        [ngTemplateOutlet]="content"
+        [ngTemplateOutletContext]="{ $implicit: section }"
+      ></ng-container>
+    </section>
+  }
+}
+<ng-template #content let-section>
+  @if (section.subtitle) {
+    <p class="subtitle">{{ section.subtitle }}</p>
+  }
+  <dl [class.metrics]="section.layout === 'metrics'">
+    @for (row of section.rows ?? []; track $index) {
+      <div [class.wide]="row.value.length > 36">
+        <dt>{{ row.label }}</dt>
+        <dd [class.badge]="row.badge" [attr.title]="row.tooltip || null">{{ row.value }}</dd>
+      </div>
+    }
+  </dl>
+  @if (section.customComponent) {
+    <ng-container
+      *ngComponentOutlet="
+        section.customComponent;
+        inputs: { context: context, data: section.customData ?? {} }
+      "
+    ></ng-container>
+  }
+  @for (button of section.buttons ?? []; track button.actionKey + '-' + button.label) {
+    @if (!button.hidden) {
+      <button
+        type="button"
+        [disabled]="buttonState(button).disabled"
+        [title]="buttonState(button).tooltip ?? button.label"
+        (click)="context.action?.(button.actionKey)"
+      >
+        @if (button.icon) {
+          <i [class]="button.icon" aria-hidden="true"></i>
+        }
+        {{ button.label }}
+      </button>
+    }
+  }
+</ng-template>

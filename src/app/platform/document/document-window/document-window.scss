@@ -270,7 +270,7 @@
   flex: 1;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr) var(--ts-factbox-width);
   gap: 0;
   padding: 0;
 }
@@ -372,7 +372,7 @@
   padding: var(--ts-space-3) var(--ts-space-4);
   background: var(--ts-surface-soft);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
+  grid-template-columns: minmax(0, 1fr) var(--ts-factbox-width);
   gap: 8px 18px;
 
   div {

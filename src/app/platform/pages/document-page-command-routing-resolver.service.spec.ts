@@ -38,4 +38,8 @@ describe('DocumentPage related RunModal requests', () => {
     const withLine = resolver.buildEntryRunModalRequest({ ...params(), target: 'list', activeLine: lines[0] });
     expect(withLine.context?.['activeLine']).toBe(lines[0]);
   });
+  it('finds FactBox commands through the same entry command lookup', () => {
+    const button = {label:'Related',actionKey:'cmd:factbox-related',runModalPageId:'items'};
+    expect(resolver.findEntryCommandButton({command:'factbox-related',factBoxButtons:[button]})).toBe(button);
+  });
 });

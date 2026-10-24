@@ -1,0 +1,100 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.overview-section {
+  padding: var(--ts-space-4);
+  border-bottom: 1px solid var(--ts-border-soft);
+  &:last-child {
+    border-bottom: 0;
+  }
+  h4 {
+    margin: 0 0 var(--ts-space-4);
+    font-size: var(--ts-font-body);
+    font-weight: 600;
+  }
+}
+.subtitle {
+  color: var(--ts-text-soft);
+  font-size: var(--ts-font-caption);
+  margin-bottom: var(--ts-space-3);
+}
+dl {
+  margin: 0;
+  display: grid;
+  gap: var(--ts-space-3);
+  > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: var(--ts-space-3);
+    align-items: start;
+  }
+  dt {
+    color: var(--ts-text-soft);
+    font-size: var(--ts-font-caption);
+    overflow-wrap: anywhere;
+  }
+  dd {
+    margin: 0;
+    color: var(--ts-text);
+    font-size: var(--ts-font-body);
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+  > .wide {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ts-space-1);
+  }
+}
+.metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ts-space-4);
+  > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ts-space-2);
+  }
+  dd {
+    font-size: var(--ts-font-section);
+    font-weight: 500;
+  }
+}
+summary {
+  color: var(--ts-text-soft);
+  cursor: pointer;
+  font-size: var(--ts-font-body);
+}
+details[open] summary {
+  margin-bottom: var(--ts-space-4);
+}
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ts-space-2);
+  min-height: var(--ts-control-h);
+  padding: var(--ts-space-1) var(--ts-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ts-text);
+  font: inherit;
+  cursor: pointer;
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  &:hover:not(:disabled) {
+    background: var(--ts-surface-hover);
+  }
+}
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--ts-border-focus);
+  outline-offset: 2px;
+}
+
+.badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: var(--ts-space-1) var(--ts-space-2);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-sm);
+}

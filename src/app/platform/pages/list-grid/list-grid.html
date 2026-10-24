@@ -22,7 +22,7 @@
     </app-command-bar>
   }
 
-  <section class="workspace-layout" [style.--list-details-width]="config?.factBox?.width ?? '280px'" [class.factbox-closed]="!factboxOpen || !factBoxEnabled || filterPanel.visible" [class.filters-open]="filterPanel.visible">
+  <section class="workspace-layout" [style.--list-details-width]="config?.factBox?.width ?? 'var(--ts-factbox-width)'" [class.factbox-closed]="!factboxOpen || !factBoxEnabled || filterPanel.visible" [class.filters-open]="filterPanel.visible">
 
     <div class="workspace-grid">
 
@@ -289,11 +289,12 @@
 
     </div>
 
-    @if (factboxOpen && factBoxEnabled && !filterPanel.visible) {
+    @if (factBoxEnabled) {
       <app-list-fact-box
+        [style.display]="factboxOpen && !filterPanel.visible ? null : 'none'"
         [config]="config"
         [selectedRow]="selectedRow"
-        (closeRequested)="toggleFactbox()">
+        (closeRequested)="toggleFactbox()" (action)="command.emit({actionKey: $event})">
       </app-list-fact-box>
     }
     <app-list-filter-panel #filterPanel [embedded]="true" [enabled]="advancedFilterEnabled"

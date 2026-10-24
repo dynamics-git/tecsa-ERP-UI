@@ -1,8 +1,13 @@
+import { viewChild } from '@angular/core';
+import { FactBox } from '../../../shared/ui/fact-box/fact-box';
+import { DataSourceService } from '../../data/data-source.service';
+import type { FactBoxSectionConfig } from '../../models/document-window-config.model';
+import type { FactBoxContext } from '../../models/fact-box-context.model';
 import { resolvePageIdentity } from '../../data/record-identity';
 import { automaticDetailFields, detailValue } from '../fact-box-display';
 import { SessionService } from '../../../core/services/session.service';
 import { formatRecordValue } from '../record-value-formatter';
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnChanges, inject } from '@angular/core';
 import { FieldFactBoxConfig } from '../../models/field-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
 
@@ -18,15 +23,39 @@ type FactBoxDisplayField = {
 @Component({
   selector: 'app-list-fact-box',
   standalone: true,
-  imports: [],
+  imports: [FactBox],
   templateUrl: './list-fact-box.html',
   styleUrl: './list-fact-box.scss',
 })
-export class ListFactBox {
+export class ListFactBox implements OnChanges {
+  recordWasSelected = false;
+  ngOnChanges(): void { if (this.hasRecord) this.recordWasSelected = true; }
   private readonly session = inject(SessionService);
+  private readonly factBox = viewChild(FactBox);
+  canLeave(): Promise<boolean> { return this.factBox()?.canLeave() ?? Promise.resolve(true); }
+  private readonly source = inject(DataSourceService);
   @Input() config?: ListPageConfig;
   @Input() selectedRow?: unknown;
+  @Output() action = new EventEmitter<string>();
   @Output() closeRequested = new EventEmitter<void>();
+
+  get context(): FactBoxContext {
+    const row = this.toRecord(this.selectedRow), source = this.config?.dataSource;
+    const id = row?.[source?.keyField ?? 'systemId'];
+    return {companyId: this.session.Company, pageId: this.config?.pageId, record: row,
+      recordEndpoint: source && id ? (source.singleton ? source.endpoint : this.source.recordEndpoint(source, id)) : undefined};
+  }
+  get displaySections(): FactBoxSectionConfig[] {
+    const sections = this.sections.map((section, index) => ({
+      ...section, id: this.config?.factBox?.sections?.[index]?.id ?? 'section-' + index,
+      rows: section.fields.filter(field => this.hasFieldValue(field)).map(field => ({label: field.label, value: this.getFieldValue(field), tooltip: this.getFieldTooltip(field), badge: field.type === 'badge'})),
+    }));
+    if (this.hasSummary || this.hasStatus) sections.unshift({id: 'summary', title: 'Overview', rows: [
+      ...(this.hasSummary ? [{label: this.summaryLabel, value: this.summaryValue}] : []),
+      ...(this.hasStatus ? [{label: 'Status', value: this.status}] : []),
+    ]} as typeof sections[number]);
+    return sections;
+  }
 
   collapsed = false;
 
@@ -139,11 +168,11 @@ export class ListFactBox {
     return this.status.trim().length > 0;
   }
 
-  get sections(): Array<{ title: string; fields: FactBoxDisplayField[] }> {
+  get sections(): Array<{ title: string; subtitle?: string; collapsed?: boolean; layout?: 'details' | 'metrics'; buttons?: FactBoxSectionConfig['buttons']; fields: FactBoxDisplayField[] }> {
     const factBox = this.config?.factBox;
     if (factBox?.sections?.length) {
       return factBox.sections.map((section) => ({
-        title: section.title,
+        title: section.title, subtitle: section.subtitle, collapsed: section.collapsed, layout: section.layout, buttons: section.buttons,
         fields: (section.fields ?? []).map((field) => ({
           ...field,
           ...this.pickColumnFormat(field.field),

@@ -121,13 +121,53 @@ describe('Related master pages use the shared navigation stack', () => {
       await settle();
       expect(requests.some((url) => url.startsWith(endpoint + '?'))).toBe(true);
       expect(page(0).inlineDocumentWindowConfig?.headerSections).toEqual([]);
-      expect(page(0).inlineDocumentWindowConfig?.factBoxConfig?.enabled).toBe(false);
+      expect(page(0).inlineDocumentWindowConfig?.factBoxConfig?.enabled).toBe(true);
       expect(fixture.nativeElement.querySelector('app-dynamic-form')).toBeNull();
-      expect(fixture.nativeElement.querySelector('app-fact-box')).toBeNull();
+      expect(fixture.nativeElement.querySelectorAll('app-fact-box').length).toBe(1);
       expect(write).not.toHaveBeenCalled();
     });
   }
 
+  it('opens a FactBox-configured command through the existing resolver from a selected List record', async () => {
+    await modal.open({pageId: 'items', target: 'entry', context: {headerData: {...item}}}); await settle();
+    const parent = page(0), config = parent.listConfig;
+    parent.listConfig = {...config, factBox: {...config.factBox, buttons: [{label: 'Dimensions from FactBox', actionKey: 'cmd:factbox-dimensions', runModalPageId: 'item-default-dimensions', runModalTarget: 'entry', permissionKey: 'item-default-dimensions-lines'}]}};
+    parent.selectedRow = {...item};
+    parent.handleCommand({actionKey: 'cmd:factbox-dimensions'}); await vi.waitFor(() => expect({count: popups.length, error: parent.error, reason: modal.getLastOpenFailureReason()}).toMatchObject({count: 2})); await settle();
+    expect(popups).toHaveLength(2); expect(data(popups[1]).runtimePage?.pageId).toBe('item-default-dimensions');
+    expect(requests.some(url => url.startsWith('/items/item-1/defaultDimensions'))).toBe(true);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('executes a configured FactBox API action through the same executor from List and Card', async () => {
+    await modal.open({pageId: 'items', target: 'entry', context: {headerData: {...item}}}); await settle();
+    const parent = page(0), button = {label: 'Recalculate', actionKey: 'cmd:factbox-recalculate', apiAction: { name: 'recalculate', payload: { mode: 'full' } }};
+    parent.listConfig = {...parent.listConfig, factBox: {...parent.listConfig.factBox, buttons: [button]}};
+    parent.selectedRow = {...item}; write.mockReturnValue(of({data: {...item, systemRowVersion: 2}}));
+    parent.handleCommand({actionKey: button.actionKey});
+    await vi.waitFor(() => expect(write).toHaveBeenCalledWith('/items/item-1/recalculate', {mode: 'full'}));
+    await settle(); write.mockClear();
+    await modal.open({pageId: 'items', target: 'entry', context: {headerData: {...item}}}); await settle();
+    const card = page(1);
+    card.listConfig = {...card.listConfig, factBox: {...card.listConfig.factBox, buttons: [button]}};
+    card.handleInlineAction({actionKey: button.actionKey});
+    await vi.waitFor(() => expect({calls: write.mock.calls, status: card.inlineDocumentWindowConfig?.statusMessage, header: card.inlineDocumentWindowConfig?.headerData}).toMatchObject({calls: [['/items/item-1/recalculate', {mode: 'full'}]]}));
+    await settle();
+  });
+  it('rejects configured List actions for disallowed state, permission or multiple selection', async () => {
+    await modal.open({pageId: 'items', target: 'entry', context: {headerData: {...item}}}); await settle();
+    const parent = page(0), button = {label: 'Recalculate', actionKey: 'cmd:factbox-recalculate', apiAction: { name: 'recalculate', states: { field: 'state', values: ['Open'] } }};
+    parent.listConfig = {...parent.listConfig, factBox: {...parent.listConfig.factBox, buttons: [button]}};
+    parent.selectedRow = {...item, state: 'Closed'};
+    parent.handleCommand({actionKey: button.actionKey}); await settle();
+    expect(parent.error).toContain('state'); expect(write).not.toHaveBeenCalled();
+    parent.handleCheckedKeysChanged(['item-1', 'item-2']);
+    parent.handleCommand({actionKey: button.actionKey}); await settle();
+    expect(parent.error).toContain('Select one'); expect(write).not.toHaveBeenCalled();
+    parent.handleCheckedKeysChanged([]); parent.selectedRow = {...item, state: 'Open'};
+    const session = TestBed.inject(SessionService); session.SuperAdmin = false; session.Permissions = [];
+    parent.handleCommand({actionKey: button.actionKey}); await settle(); expect(write).not.toHaveBeenCalled();
+  });
   it('keeps the Item card clean and returns through three levels without losing parent state or writing', async () => {
     expect(
       await modal.open({ pageId: 'items', target: 'entry', context: { headerData: { ...item } } }),
@@ -137,7 +177,7 @@ describe('Related master pages use the shared navigation stack', () => {
     const parentState = parent.inlineDocumentWindowConfig!;
     expect(parentState.lineColumns).toEqual([]);
     expect(requests.some((url) => url.startsWith('/items/item-1/unitsOfMeasure'))).toBe(false);
-    expect(fixture.nativeElement.querySelector('app-fact-box')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('app-fact-box').length).toBe(1);
     parentState.headerData!['description'] = 'Retained local parent state';
     fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();

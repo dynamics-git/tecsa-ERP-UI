@@ -35,6 +35,11 @@ describe('Shared data lifecycle with controlled synthetic API responses',()=>{
   const cached:any=await firstValueFrom(source.loadList(config,{useCache:true}));
   expect(cached.value[0].code).toBe('PR');expect(get).toHaveBeenCalledTimes(1);
  });
+ it('accepts a successful empty PATCH response without inventing a record',async()=>{
+  patch.mockReturnValue(of(null));
+  await expect(firstValueFrom(source.update(config,'1',{code:'Changed'},1))).resolves.toBeNull();
+  expect(patch).toHaveBeenCalledWith('/fixtureHeaders/1',{code:'Changed'},'"1"');
+ });
  it('uses only explicit supportsDelete false to block deletion, including singleton resources',async()=>{
   await expect(firstValueFrom(source.delete({...config,singleton:true,supportsDelete:false},'1',1))).rejects.toThrow('does not support delete');
   await expect(firstValueFrom(source.delete({...config,singleton:true,supportsDelete:undefined},'1',1))).resolves.toBeDefined();

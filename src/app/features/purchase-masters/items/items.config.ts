@@ -1,3 +1,4 @@
+import { itemsFactBoxConfig } from './items.factbox.config';
 import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
 export const itemsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Items',
@@ -203,5 +204,5 @@ export const itemsListConfig: ListPageConfig & { dataSource: DataSourceConfig } 
       'systemModifiedAt',
     ]),
   },
-  factBox: { enabled: true },
+  factBox: itemsFactBoxConfig,
 };

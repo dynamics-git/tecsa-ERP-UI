@@ -93,6 +93,8 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
 
   private readonly personalization = inject(ListPersonalizationService);
   @ViewChild('filterPanel') private filterPanel?: ListFilterPanel;
+  @ViewChild(ListFactBox) private factBox?: ListFactBox;
+  canLeaveFactBox(): Promise<boolean> { return this.factBox?.canLeave() ?? Promise.resolve(true); }
   savedViews: ListSavedView[] = [];
   appliedFilters: ListAppliedFilter[] = [];
   columnOrder: string[] = [];

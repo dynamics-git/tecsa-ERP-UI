@@ -1,7 +1,7 @@
 import { DocumentPageCommandRoutingResolverService } from '../../pages/document-page-command-routing-resolver.service';
 import type { CommandConfig } from '../../models/command-config.model';
 import { AsyncPipe, NgComponentOutlet } from '@angular/common';
-import { Component, EventEmitter, Output, inject, Type } from '@angular/core';
+import { Component, EventEmitter, Output, inject, Type, viewChildren } from '@angular/core';
 import { ConfirmationDialog } from '../../../shared/ui/confirmation-dialog/confirmation-dialog';
 import { ConfirmationDialogConfig } from '../../models/confirmation-dialog-config.model';
 import { DocumentWindowConfig } from '../../models/document-window-config.model';
@@ -27,6 +27,8 @@ export class RunModalHost {
   private readonly popupStack = inject(RunModalStackService);
   private readonly runModal = inject(RunModalService);
   private readonly commandRouting = inject(DocumentPageCommandRoutingResolverService);
+  private readonly documentWindows = viewChildren(DocumentWindow);
+  private readonly listGrids = viewChildren(ListGrid);
 
   getRuntimePage(popup: PopupConfig) {
     return this.getPopupData(popup).runtimePage;
@@ -129,12 +131,15 @@ export class RunModalHost {
     }
   }
 
-  closePopup(popup: PopupConfig): void {
+  async closePopup(popup: PopupConfig): Promise<void> {
     if (this.isConfirmationPopup(popup)) {
       this.confirmation.dismissDialog(popup.id);
       return;
     }
 
+    const document = this.documentWindows().find(window => window.resolvedHeaderData === this.getDocumentWindowConfig(popup)?.headerData);
+    const grid = this.listGrids().find(grid => grid.config === this.getListPageConfig(popup));
+    if (document && !await document.canLeaveFactBox() || grid && !await grid.canLeaveFactBox()) return;
     this.maximizedListPopups.delete(popup.id);
     this.runtimeInputs.delete(popup.id);
 
@@ -331,13 +336,19 @@ export class RunModalHost {
   }
 
   private resolveCommandButton(popup: PopupConfig, actionKey: string): CommandConfig | undefined {
-    const documentWindowConfig = this.getDocumentWindowConfig(popup);
-    const headerButton = documentWindowConfig?.headerToolbarButtons?.find((item) => item.actionKey === actionKey);
-    if (headerButton) {
-      return headerButton;
-    }
-
-    return documentWindowConfig?.lineToolbarButtons?.find((item) => item.actionKey === actionKey);
+    const config = this.getDocumentWindowConfig(popup);
+    return this.commandRouting.findEntryCommandButton({
+      command: actionKey,
+      headerToolbarButtons: config?.headerToolbarButtons,
+      lineToolbarButtons: config?.lineToolbarButtons,
+      detailToolbarButtons: config?.detailToolbarButtons,
+      factBoxButtons: [
+        ...(config?.factBoxConfig?.buttons ?? []),
+        ...(config?.factBoxConfig?.panels ?? []).flatMap(panel => panel.enabled === false || panel.kind && config?.factBoxConfig?.[panel.kind] === false ? [] : panel.buttons ?? []),
+        ...(config?.factBoxConfig?.sections ?? []).flatMap(section => section.buttons ?? []),
+        ...(config?.factBoxSections ?? []).flatMap(section => section.buttons ?? []),
+      ],
+    });
   }
 
   private getPopupData(popup: PopupConfig): RunModalHostData {

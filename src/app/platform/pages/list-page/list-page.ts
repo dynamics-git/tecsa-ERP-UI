@@ -1149,6 +1149,7 @@ export class ListPage implements OnInit, OnDestroy {
 
     return {
       factBoxConfig: this.listConfig.factBox,
+      factBoxDataSource: this.isWorksheetPage ? this.worksheetSource : this.listConfig.dataSource,
       pageLabel: this.documentLabel,
       title: this.getDocumentTitle(record),
       subtitle: this.isWorksheetPage ? recordIdentityText(resolvePageIdentity(this.initialRecord, this.listConfig)) : '',
@@ -1231,29 +1232,47 @@ export class ListPage implements OnInit, OnDestroy {
     }));
   }
 
-  private async executeConfiguredAction(button: CommandConfig): Promise<void> {
+  private async executeConfiguredAction(button: CommandConfig, listRecord?: Record<string, unknown>): Promise<void> {
     const action = button.apiAction;
-    const header = this.activeDocumentWindowConfig?.headerData;
-    if (!action || !header || button.disabled) return;
-    if (this.dirty) {
+    const header = listRecord ?? this.activeDocumentWindowConfig?.headerData;
+    const source = this.listConfig.dataSource;
+    if (!action || !header || button.hidden || button.disabled || this.popupLoading || this.hasPendingWrites || this.commandPermission.apply(button, this.permissionPageId).disabled) return;
+    if (!this.hasValue(this.resolvePersistedRecordId(header, source))) {
+      if (listRecord) this.error = 'Select one saved record before running this action.';
+      return;
+    }
+    if (action.states && !action.states.values.includes(header[action.states.field])) {
+      if (listRecord) this.error = 'This action is not available for the selected record state.';
+      else this.setEntryStatus({tone: 'warning', title: 'Action unavailable', message: 'This action is not available for the current record state.'});
+      this.changeDetector.detectChanges(); return;
+    }
+    if (!listRecord && this.dirty) {
       this.setEntryStatus({ tone: 'warning', title: 'Save changes', message: 'Save your changes before running this action.' });
       this.changeDetector.detectChanges();
       return;
     }
+    const canContinue = this.dataSource.captureWriteScope();
     const input = action.inputFields?.length ? await this.confirmation.prompt(button.label, action.inputFields) : {};
-    if (!input) return;
+    if (!input || !canContinue() || this.popupLoading || this.hasPendingWrites) return;
     this.startPopupLoading('Processing...');
     try {
       const record = await firstValueFrom(this.dataSource.execute(this.listConfig.dataSource, this.resolvePersistedRecordId(header, this.listConfig.dataSource), action.name, { ...action.payload, ...input }));
-      if (this.isRecord(record)) this.applyHydratedHeaderRecord(record);
+      if (!canContinue()) return;
       this.stopPopupLoading();
-      this.stageListSyncFromActiveHeader();
-      this.refreshEntryPolicy();
+      if (listRecord) { this.error = undefined; this.loadFirstPage(true); }
+      else {
+        if (this.isRecord(record)) this.applyHydratedHeaderRecord(record);
+        this.stageListSyncFromActiveHeader();
+        this.refreshEntryPolicy();
+      }
       this.setEntryStatus({ tone: 'success', title: 'Completed', message: `${button.label} completed.` });
     } catch (error) {
       this.stopPopupLoading();
-      this.setEntryStatus({ tone: 'error', title: 'Action failed', message: this.getErrorMessage(error) });
-    }
+      if (canContinue()) {
+        if (listRecord) this.error = this.getErrorMessage(error);
+        this.setEntryStatus({ tone: 'error', title: 'Action failed', message: this.getErrorMessage(error) });
+      }
+    } finally { this.stopPopupLoading(); }
     this.changeDetector.detectChanges();
   }
 
@@ -2174,10 +2193,23 @@ export class ListPage implements OnInit, OnDestroy {
 
     this.error = undefined;
     this.changeDetector.detectChanges();
+    const button = this.findEntryCommandButton(actionKey);
+    if (button?.runModalPageId || button?.apiAction) {
+      const record = this.checkedRowKeys.size ? this.rows.find(row => this.checkedRowKeys.has(this.getRowKey(row))) : this.selectedRow;
+      const permitted = this.commandPermission.apply(button, this.permissionPageId);
+      if (button.hidden || button.disabled || permitted.disabled) return;
+      if (this.checkedRowKeys.size > 1 || !this.isRecord(record) || !this.hasPersistedIdentity(record)) {
+        this.error = 'Select one saved record before running this command.';
+        this.changeDetector.detectChanges(); return;
+      }
+      if (button.apiAction && !button.runModalPageId) void this.executeConfiguredAction(button, record);
+      else this.tryOpenEntryRunModal(actionKey, payload, record);
+      return;
+    }
     this.emitBusinessCommand(actionKey, payload);
   }
 
-  private tryOpenEntryRunModal(command: string, payload: unknown): boolean {
+  private tryOpenEntryRunModal(command: string, payload: unknown, listRecord?: Record<string, unknown>): boolean {
     const button = this.findEntryCommandButton(command);
     if (this.isWorksheetPage && button?.requireSelection && (!this.activeLineRow || !this.hasValue(this.resolvePersistedRecordId(this.activeLineRow, this.listConfig.dataSource)) || this.dirtyWorksheet)) {
       this.setEntryStatus({tone: 'error', title: 'Select a saved row', message: 'Complete your changes and select a saved record first.'}); return true;
@@ -2191,10 +2223,10 @@ export class ListPage implements OnInit, OnDestroy {
     const request = this.commandRoutingResolver.buildEntryRunModalRequest({
       pageId,
       target: button?.runModalTarget ?? button?.runModalView,
-      headerData: this.activeDocumentWindowConfig?.headerData ?? {},
-      lineRows: this.activeDocumentWindowConfig?.lineRows ?? [],
+      headerData: listRecord ?? this.activeDocumentWindowConfig?.headerData ?? {},
+      lineRows: listRecord ? [] : this.activeDocumentWindowConfig?.lineRows ?? [],
       payload: payloadRecord,
-      activeLine: this.resolveRunModalActiveLine(payloadRecord),
+      activeLine: listRecord ? undefined : this.resolveRunModalActiveLine(payloadRecord),
       recordMapping: button?.runModalRecord,
     });
 
@@ -2214,9 +2246,15 @@ export class ListPage implements OnInit, OnDestroy {
   private findEntryCommandButton(command: string): CommandConfig | undefined {
     return this.commandRoutingResolver.findEntryCommandButton({
       command,
-      headerToolbarButtons: this.isWorksheetPage ? [...(this.listConfig.commands ?? []), ...(this.lineConfig?.toolbarButtons ?? []), ...this.headerConfig.toolbarButtons] : this.activeDocumentWindowConfig?.headerToolbarButtons,
+      headerToolbarButtons: this.isWorksheetPage ? [...(this.listConfig.commands ?? []), ...(this.lineConfig?.toolbarButtons ?? []), ...this.headerConfig.toolbarButtons] : this.activeDocumentWindowConfig?.headerToolbarButtons ?? [...(this.listConfig.commands ?? []), ...this.headerConfig.toolbarButtons],
       lineToolbarButtons: this.activeDocumentWindowConfig?.lineToolbarButtons,
       detailToolbarButtons: this.activeDocumentWindowConfig?.detailToolbarButtons,
+      factBoxButtons: [
+        ...(this.listConfig.factBox?.buttons ?? []),
+        ...(this.listConfig.factBox?.panels ?? []).flatMap(panel => panel.enabled === false || panel.kind && this.listConfig.factBox?.[panel.kind] === false ? [] : panel.buttons ?? []),
+        ...(this.listConfig.factBox?.sections ?? []).flatMap(section => section.buttons ?? []),
+        ...(this.activeDocumentWindowConfig?.factBoxSections ?? []).flatMap(section => section.buttons ?? []),
+      ],
     });
   }
 

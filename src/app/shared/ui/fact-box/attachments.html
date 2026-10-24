@@ -1,0 +1,83 @@
+<section class="record-panel" aria-label="Record attachments">
+  <header>
+    <h4>Files &amp; attachments</h4>
+    @if (result) {
+      <span>{{ result.meta.total }}</span>
+    }
+    <button
+      type="button"
+      [disabled]="loading || busy || !context.recordEndpoint"
+      (click)="load()"
+      aria-label="Refresh attachments"
+    >
+      <i class="ts-icon ts-icon-refresh" aria-hidden="true"></i>
+    </button>
+  </header>
+  @if (!context.recordEndpoint) {
+    <p class="empty">Save or select a record to attach files.</p>
+  }
+  @if (error) {
+    <p class="error" role="alert">{{ error }}</p>
+    <button type="button" [disabled]="busy || loading" (click)="load()">Retry</button>
+  }
+  @if (loading) {
+    <p class="empty" role="status">Loading attachments…</p>
+  }
+  @if (result?.capabilities?.create) {
+    <label class="file-picker"
+      ><i class="ts-icon ts-icon-upload" aria-hidden="true"></i
+      ><strong>{{ busy ? 'Working…' : 'Attach a file' }}</strong
+      ><small>Select a file for this record</small
+      ><input
+        type="file"
+        aria-label="Attach a file"
+        [disabled]="busy || loading"
+        (change)="upload($event)"
+    /></label>
+  }
+  @for (entry of result?.data ?? []; track entry.systemId) {
+    <article class="file">
+      <i class="ts-icon ts-icon-clip" aria-hidden="true"></i>
+      <div>
+        <button type="button" class="file-name" [disabled]="busy" (click)="saveFile(entry)">
+          {{ entry.fileName }}</button
+        ><small>{{ (entry.byteSize ?? 0) / 1024 | number: '1.0-1' }} KB · {{ entry.author }}</small
+        ><time [attr.datetime]="entry.systemCreatedAt">{{
+          entry.systemCreatedAt | date: 'medium'
+        }}</time>
+      </div>
+      @if (result?.capabilities?.delete) {
+        <button
+          type="button"
+          [disabled]="busy"
+          (click)="remove(entry)"
+          [attr.aria-label]="'Delete ' + entry.fileName"
+        >
+          <i class="ts-icon ts-icon-trash" aria-hidden="true"></i>
+        </button>
+      }
+    </article>
+  } @empty {
+    @if (result && !loading) {
+      <p class="empty">No attachments yet.</p>
+    }
+  }
+  @if (result && result.meta.lastPage > 1) {
+    <nav aria-label="Attachment pages">
+      <button
+        type="button"
+        [disabled]="loading || result.meta.currentPage === 1"
+        (click)="load(result.meta.currentPage - 1)"
+      >
+        Previous</button
+      ><span>{{ result.meta.currentPage }} / {{ result.meta.lastPage }}</span
+      ><button
+        type="button"
+        [disabled]="loading || result.meta.currentPage === result.meta.lastPage"
+        (click)="load(result.meta.currentPage + 1)"
+      >
+        Next
+      </button>
+    </nav>
+  }
+</section>

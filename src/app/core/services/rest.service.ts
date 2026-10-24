@@ -83,6 +83,21 @@ export class RestService {
     );
   }
 
+  /** Multipart/binary requests reuse the existing auth/company/workspace boundary. */
+  upload(endpoint: string, body: FormData): Observable<unknown> {
+    return this.getAuthorizationToken().pipe(
+      switchMap(token => this.http.post(this.buildUrl(endpoint), body, {headers: {Authorization: 'Bearer ' + token}})),
+      catchError((error: HttpErrorResponse) => this.handleError(error, {suppressGlobalErrorDialog: true})),
+    );
+  }
+
+  download(endpoint: string): Observable<Blob> {
+    return this.getAuthorizationToken().pipe(
+      switchMap(token => this.http.get(this.buildUrl(endpoint), {headers: {Authorization: 'Bearer ' + token}, responseType: 'blob'})),
+      catchError((error: HttpErrorResponse) => this.handleError(error, {suppressGlobalErrorDialog: true})),
+    );
+  }
+
   private buildUrl(endpoint: string): string {
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const base = environment.apiBaseUrl.replace(/\/$/, '');

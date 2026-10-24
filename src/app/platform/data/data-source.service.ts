@@ -189,7 +189,7 @@ export class DataSourceService {
           if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
           this.recordMutation(endpoint);
           this.lists.clear();
-          if (operation === 'delete') { this.versions.delete(identity); return response; }
+          if (operation === 'delete' || response == null) { this.versions.delete(identity); return response; }
           const record = this.record(response, endpoint);
           if (editor) editor['systemRowVersion'] = record['systemRowVersion'];
           this.missingSingletons.delete(identity);
@@ -242,7 +242,7 @@ export class DataSourceService {
     const version = Number(record['systemRowVersion']);
     if (Number.isSafeInteger(version) && version > 0) this.versions.set(this.key(endpoint), `"${version}"`);
   }
-  private recordEndpoint(config: DataSourceConfig, id: unknown): string {
+  recordEndpoint(config: DataSourceConfig, id: unknown): string {
     if (!this.present(id)) throw new Error('ERP record identifier is missing.');
     const endpoint = this.endpoint(config);
     return config.addressStyle === 'odata' ? `${endpoint}(${String(id)})` : `${endpoint}/${encodeURIComponent(String(id))}`;

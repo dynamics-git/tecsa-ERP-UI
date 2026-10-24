@@ -167,6 +167,7 @@ export class DocumentPageCommandRoutingResolverService {
     headerToolbarButtons?: CommandConfig[];
     lineToolbarButtons?: CommandConfig[];
     detailToolbarButtons?: CommandConfig[];
+    factBoxButtons?: CommandConfig[];
   }): CommandConfig | undefined {
     const normalized = this.normalizeCommandAction({ actionKey: params.command });
     if (!normalized.length) {
@@ -177,6 +178,7 @@ export class DocumentPageCommandRoutingResolverService {
       ...(params.headerToolbarButtons ?? []),
       ...(params.lineToolbarButtons ?? []),
       ...(params.detailToolbarButtons ?? []),
+      ...(params.factBoxButtons ?? []),
     ];
 
     return allButtons.find(

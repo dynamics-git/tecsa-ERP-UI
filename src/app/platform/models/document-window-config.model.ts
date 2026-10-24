@@ -1,3 +1,5 @@
+import type { Type } from '@angular/core';
+import type { DataSourceConfig } from './data-source-config.model';
 import type { ListFactBoxConfig } from './list-fact-box-config.model';
 import { FormSectionConfig } from './field-config.model';
 import type { LineColumnConfig } from './line-config.model';
@@ -85,6 +87,8 @@ export interface HeaderConfig {
 }
 
 export interface FactBoxRowConfig {
+  tooltip?: string;
+  badge?: boolean;
   label: string;
   value: string;
 }
@@ -95,6 +99,10 @@ export interface FactBoxSectionConfig {
   rows?: FactBoxRowConfig[];
   buttons?: CommandConfig[];
   customComponentKey?: string;
+  customComponent?: Type<unknown>;
+  layout?: 'details' | 'metrics';
+  collapsed?: boolean;
+  subtitle?: string;
   customData?: Record<string, unknown>;
 }
 
@@ -127,6 +135,7 @@ export interface DocumentWindowConfig {
   attachments?: AttachmentsConfig;
   factBoxSections?: FactBoxSectionConfig[];
   factBoxConfig?: ListFactBoxConfig;
+  factBoxDataSource?: DataSourceConfig;
   statusMessage?: DocumentStatusMessage;
   contentReady?: boolean;
   interactionLocked?: boolean;

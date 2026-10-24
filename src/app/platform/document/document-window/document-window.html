@@ -44,7 +44,7 @@
         >
           <i [class]="maximized ? 'ts-icon ts-icon-collapse' : 'ts-icon ts-icon-expand'"></i>
         </button>
-        <button type="button" title="Close" (click)="closed.emit()">
+        <button type="button" title="Close" (click)="requestClose()">
           <i class="ts-icon ts-icon-close"></i>
         </button>
       }
@@ -150,10 +150,11 @@
 
     </div>
 
-    @if (resolvedFactBoxSections.length && factBoxOpen) {
-      <aside class="entry-info">
+    @if (resolvedFactBoxSections.length) {
+      <aside class="entry-info" [style.display]="factBoxOpen ? null : 'none'">
         <app-fact-box
-          [sections]="resolvedFactBoxSections"
+          [sections]="resolvedFactBoxSections" [config]="factBoxConfig" [context]="factBoxContext"
+          [label]="factBoxConfig?.label ?? pageLabel ?? 'Record information'" [title]="title ?? ''" [subtitle]="subtitle ?? ''"
           (action)="handleFactBoxAction($event)">
         </app-fact-box>
       </aside>

@@ -1,3 +1,7 @@
+import { viewChild } from '@angular/core';
+import { DataSourceService } from '../../data/data-source.service';
+import type { DataSourceConfig } from '../../models/data-source-config.model';
+import type { FactBoxContext } from '../../models/fact-box-context.model';
 import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
 import { automaticDetailFields, detailValue } from '../../pages/fact-box-display';
 import { SessionService } from '../../../core/services/session.service';
@@ -26,6 +30,7 @@ type FactBoxDraftSection = {
 
 @Component({
   selector: 'app-document-window',
+  host: {'[style.--ts-factbox-width]': 'factBoxConfig?.width ?? null'},
   standalone: true,
   imports: [FactBoxToggle, LoadingIndicator, DynamicForm, DocumentLines, FactBox, NgTemplateOutlet],
   templateUrl: './document-window.html',
@@ -35,6 +40,9 @@ export class DocumentWindow {
   readonly collapsedSections = new Set<string>();
   linesCollapsed = false;
   factBoxOpen = true;
+  private readonly factBox = viewChild(FactBox);
+  canLeaveFactBox(): Promise<boolean> { return this.factBox()?.canLeave() ?? Promise.resolve(true); }
+  async requestClose(): Promise<void> { if (await this.canLeaveFactBox()) this.closed.emit(); }
   lineGridHeight = 240;
   private lineResize?: { y: number; height: number };
   toggleSection(id: string): void {
@@ -85,6 +93,8 @@ export class DocumentWindow {
   validateHeaderForms(): boolean { return this.forms().map(form => form.validate()).every(Boolean); }
   @Input() preferenceKey = '';
   @Input() factBoxConfig?: ListFactBoxConfig;
+  @Input() factBoxDataSource?: DataSourceConfig;
+  private readonly factBoxSource = inject(DataSourceService);
   @Input() factBoxSections?: FactBoxSectionConfig[];
   @Input() statusMessage?: DocumentStatusMessage;
   @Input() contentReady = true;
@@ -300,6 +310,20 @@ export class DocumentWindow {
     return this.attachments ?? this.emptyAttachments;
   }
 
+  private get factBoxRecord(): Record<string, unknown> | undefined {
+    if (!this.worksheet) return this.resolvedHeaderData;
+    const rows = this.resolvedLineRows.filter(row => !row['__entryPlaceholder']);
+    return this.activeLineRow && rows.includes(this.activeLineRow) ? this.activeLineRow : rows[0];
+  }
+
+  get factBoxContext(): FactBoxContext {
+    const source = this.factBoxDataSource;
+    const record = this.factBoxRecord;
+    const id = record?.[source?.keyField ?? 'systemId'];
+    return {companyId: this.session.Company, pageId: this.preferenceKey, record,
+      recordEndpoint: source && id ? (source.singleton ? source.endpoint : this.factBoxSource.recordEndpoint(source, id)) : undefined};
+  }
+
   get resolvedFactBoxSections(): FactBoxSectionConfig[] {
     if (this.factBoxConfig?.enabled === false) return [];
     if (this.factBoxSections?.length) {
@@ -307,30 +331,18 @@ export class DocumentWindow {
     }
 
     if (this.factBoxConfig?.sections?.length) return this.factBoxConfig.sections.map(section => ({
-      id: section.id, title: section.title, rows: (section.fields ?? []).map(field => ({label: field.label, value: this.formatDetail(field)})),
+      id: section.id, title: section.title, layout: section.layout, collapsed: section.collapsed, subtitle: section.subtitle, buttons: section.buttons, rows: (section.fields ?? []).map(field => ({label: field.label, value: this.formatDetail(field)})),
     }));
     const configured = this.buildFactBoxSectionsFromDocumentConfig();
     const hasSelectedFields = this.resolvedHeaderSections.some(section => section.fields.some(field => this.resolveFieldFactBoxConfig(field)));
     if (hasSelectedFields) return configured;
     if (this.worksheet) {
       if (this.resolvedLineColumns.some(column => this.resolveLineFactBoxConfig(column))) return configured;
-      const rows = this.resolvedLineRows.filter(row => !row['__entryPlaceholder']);
-      const row = this.activeLineRow && rows.includes(this.activeLineRow) ? this.activeLineRow : rows[0];
+      const row = this.factBoxRecord;
       const fields = automaticDetailFields(this.resolvedLineColumns.map(column => ({
         ...column, field: column.field ?? column.id, type: column.valueType ?? column.type,
       })), row ?? {});
-      const user = this.session.User as Record<string, unknown> | undefined;
-      return [{id: 'row-details', title: 'Row details', rows: fields.length ? fields.map(field => {
-        const column = this.resolvedLineColumns.find(candidate => (candidate.field ?? candidate.id) === field.field);
-        let value = detailValue(row!, field, {id: this.session.UserId, name: String(user?.['name'] ?? this.session.UserName)});
-        if (column && (column.lookup || column.options?.length)) {
-          const options = row![column.optionsDataKey ?? '__options_' + field.field];
-          const candidates: unknown[] = Array.isArray(options) ? options : column.options ?? [];
-          const selected = candidates.find((option): option is Record<string, unknown> => this.isRecord(option) && String(option['value']) === String(row![field.field!]));
-          value = this.toText(selected?.['label'] ?? 'Display value unavailable');
-        }
-        return {label: field.label, value};
-      }) : [{label: 'Details', value: 'Select a row to view details.'}]}, ...configured];
+      return [{id: 'row-details', title: 'Row details', rows: fields.length ? fields.map(field => ({label: field.label, value: this.formatDetail(field)})) : [{label: 'Details', value: 'Select a row to view details.'}]}, ...configured];
     }
     const fields = automaticDetailFields(this.resolvedHeaderSections.flatMap(section => section.fields.map(field => ({
       field: field.key, label: field.label, type: field.valueType ?? field.type, hidden: field.hidden, factBox: field.factBox,
@@ -339,6 +351,21 @@ export class DocumentWindow {
   }
 
   private formatDetail(field: {field?: string; label: string; type?: string}): string {
+    if (this.worksheet) {
+      const row = this.factBoxRecord;
+      if (!row) return '';
+      const column = this.resolvedLineColumns.find(candidate => (candidate.field ?? candidate.id) === field.field);
+      if (column && (column.lookup || column.options?.length)) {
+        const value = row[field.field!];
+        if (value === null || value === undefined || value === '') return '';
+        const options = row[column.optionsDataKey ?? '__options_' + field.field];
+        const candidates: unknown[] = Array.isArray(options) ? options : column.options ?? [];
+        const selected = candidates.find((option): option is Record<string, unknown> => this.isRecord(option) && String(option['value']) === String(value));
+        return this.toText(selected?.['label'] ?? 'Display value unavailable');
+      }
+      const user = this.session.User as Record<string, unknown> | undefined;
+      return detailValue(row, {...field, type: column?.valueType ?? column?.type ?? field.type}, {id: this.session.UserId, name: String(user?.['name'] ?? this.session.UserName)});
+    }
     const definition = this.resolvedHeaderSections.flatMap(section => section.fields).find(candidate => candidate.key === field.field);
     if (definition && (definition.lookup || definition.options?.length || ['select', 'dropdown', 'lookup'].includes(definition.type ?? ''))) {
       const value = this.resolvedHeaderData[definition.key];
@@ -350,7 +377,7 @@ export class DocumentWindow {
       return definition.options?.find(option => String(option.value) === String(value))?.label ?? 'Display value unavailable';
     }
     const user = this.session.User as Record<string, unknown> | undefined;
-    return detailValue(this.resolvedHeaderData, field, {id: this.session.UserId, name: String(user?.['name'] ?? this.session.UserName)});
+    return detailValue(this.resolvedHeaderData, {...field, type: definition?.valueType ?? definition?.type ?? field.type}, {id: this.session.UserId, name: String(user?.['name'] ?? this.session.UserName)});
   }
 
   get resolvedStatusMessage(): DocumentStatusMessage | undefined {
