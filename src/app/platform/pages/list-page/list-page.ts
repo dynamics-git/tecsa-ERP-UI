@@ -46,7 +46,7 @@ import { DocumentPageCommandAssemblerService } from '../document-page-command-as
 import { DocumentPageListLifecycleContext, DocumentPageListLifecycleService } from '../document-page-list-lifecycle.service';
 import { RuntimeValueMapperService } from '../../data/runtime-value-mapper.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
-import { RunModalService } from '../../run-modal/run-modal.service';
+import { RunModalService, SavedEntryChange } from '../../run-modal/run-modal.service';
 import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
 import { DocumentWindow } from '../../document/document-window/document-window';
 
@@ -154,6 +154,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.ensureTrailingEmptyRows();
       this.stopPopupLoading(); this.clearEntryStatus();
     } catch (error) {
+      this.unknownSaveOutcome ||= this.isUncertainSave(error);
       this.stopPopupLoading();
       this.setEntryStatus({tone: 'error', title: 'Load failed', message: this.getErrorMessage(error)});
     }
@@ -197,6 +198,7 @@ export class ListPage implements OnInit, OnDestroy {
   private filterReloadTimer?: ReturnType<typeof setTimeout>;
   private pendingFirstPageReload = false;
   private savingEntry = false;
+  private unknownSaveOutcome = false;
   private dirty = false;
   private readonly invalidHeaderDrafts = new Set<string>();
   private autosavePending = 0;
@@ -216,6 +218,7 @@ export class ListPage implements OnInit, OnDestroy {
 
   private finishAutosave(record: Record<string, unknown>, sent: Map<string, number>, success: boolean): void {
     this.autosavePending = Math.max(0, this.autosavePending - 1);
+    this.runModal.notifyBackground(this.initialRecord);
     if (!success) return;
     const edits = this.unsavedFields.get(record);
     for (const [field, revision] of sent) if (edits?.get(field) === revision) edits.delete(field);
@@ -330,8 +333,8 @@ export class ListPage implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.actionDispatcher.action$.subscribe((event) => this.handleCommand(event)),
     );
-    this.subscriptions.add(this.runModal.entriesChanged$.subscribe(pageId => {
-      if (pageId === this.pageId && !this.listConfig.dataSource.singleton) this.loadFirstPage(true);
+    this.subscriptions.add(this.runModal.entriesChanged$.subscribe(change => {
+      if (!this.documentOnly && change.pageId===this.pageId && !this.isInlineEntryPage) void this.synchronizeSavedEntry(change).catch(error=>{this.error=this.getErrorMessage(error);this.changeDetector.detectChanges();});
     }));
   }
 
@@ -401,6 +404,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   handleCommand(event: { actionKey: string; payload?: unknown }): void {
+    if (this.runModal.isRecordBackground(this.initialRecord)) return;
     if (this.deleting) return;
     if (this.isWorksheetPage) { this.handleEntryCommand(this.normalizeCommandAction(event.actionKey), event.payload); return; }
     if (this.listConfig.dataSource.singleton) {
@@ -696,6 +700,23 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   async requestClose(): Promise<void> {
+    if (this.hasPendingWrites && !this.deleting) {
+      if (this.runModal.keepSaving(this.initialRecord,{
+        state:()=>({pending:this.hasPendingWrites,dirty:this.hasUnsavedChanges,record:this.activeDocumentWindowConfig?.headerData ?? {},message:this.activeDocumentWindowConfig?.statusMessage?.message,uncertain:this.unknownSaveOutcome}),
+        resumed:()=>{if(this.activeDocumentWindowConfig)this.activeDocumentWindowConfig.interactionLocked=this.hasPendingWrites || this.popupLoading;},
+        verify:async()=>{
+          const header=this.activeDocumentWindowConfig?.headerData ?? {};
+          const id=this.resolvePersistedRecordId(header,this.listConfig.dataSource);
+          if(!this.hasValue(id) && !this.listConfig.dataSource.singleton)return 'The new record has no confirmed identifier yet. Your edits are retained; do not submit it again.';
+          const result=await firstValueFrom(this.dataSource.loadById(this.listConfig.dataSource,id,{forceRefresh:true}).pipe(timeout(this.timeoutPolicy.hydrationTimeoutMs)));
+          const current=this.resolveHeaderRecordResponse(result,{});
+          const edits=this.unsavedFields.get(header);
+          const matches=!!edits?.size && [...edits.keys()].every(field=>JSON.stringify(current[field])===JSON.stringify(header[field]));
+          return matches?'The server currently matches these edits. The original save confirmation has not arrived.':'Server record checked. These edits are not confirmed saved; no save was retried.';
+        },
+      }))this.closeRequested.emit();
+      return;
+    }
     if (this.hasPendingWrites || this.popupLoading) return;
     if (this.invalidHeaderDrafts.size || (this.isWorksheetPage ? this.dirtyWorksheet : this.dirty)) {
       const confirmed = await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and close this page?' });
@@ -793,7 +814,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.setEntryStatus({ tone: 'error', title: 'Save failed', message: this.getErrorMessage(error) });
       this.changeDetector.detectChanges();
       return false;
-    } finally { this.savingEntry = false; }
+    } finally { this.savingEntry = false; this.runModal.notifyBackground(this.initialRecord); }
   }
 
   private get documentLabel(): string {
@@ -1644,6 +1665,7 @@ export class ListPage implements OnInit, OnDestroy {
         .updateRecord(this.listConfig.dataSource, headerId, updatePayload, headerData)
         .pipe(
           catchError((error: unknown) => {
+            if (this.hasPendingWrites) this.unknownSaveOutcome ||= this.isUncertainSave(error);
             // Keep the user's edits available for correction or conflict reconciliation.
             this.setEntryStatus({
               tone: 'error',
@@ -1747,6 +1769,7 @@ export class ListPage implements OnInit, OnDestroy {
         .updateRecord(resolved.dataSource, rowId, payload, row)
         .pipe(
           catchError((error: unknown) => {
+            if (this.hasPendingWrites) this.unknownSaveOutcome ||= this.isUncertainSave(error);
             this.setEntryStatus({
               tone: 'error',
               title: 'Save failed',
@@ -1832,6 +1855,7 @@ export class ListPage implements OnInit, OnDestroy {
         .create(lineDataSource, payload)
         .pipe(
           catchError((error: unknown) => {
+            if (this.hasPendingWrites) this.unknownSaveOutcome ||= this.isUncertainSave(error);
             this.setEntryStatus({
               tone: 'error',
               title: 'Save failed',
@@ -2649,6 +2673,23 @@ export class ListPage implements OnInit, OnDestroy {
     }
   }
 
+  private async synchronizeSavedEntry(change: SavedEntryChange): Promise<void> {
+    const source=this.listConfig.dataSource,saved=change.saved;
+    if(!saved || change.source.endpoint!==source.endpoint || !this.documentConfigData.canSynchronizeListRecord(this.rows,change.before,saved,source,this.listFilterState.buildFilter(this.listFilterScope))){this.loadFirstPage(true);return;}
+    const valid=this.dataSource.captureWriteScope(),revision=this.dataSource.getResourceRevision(source),generation=this.dataSource.getReadGeneration();
+    const query=JSON.stringify([this.listFilterState.buildFilter(this.listFilterScope),source.defaultSort]);
+    const record=this.buildListSyncRecord(saved),fields=this.headerConfig.sections.flatMap(section=>section.fields);
+    for(const field of fields)if(field.lookup && !Object.is(change.before[field.key],saved[field.key])){
+      for(const prefix of ['__display_','__lookupStamp_','__lookupFailed_','__lookupRestricted_'])delete record[prefix+field.key];
+      record[field.optionsDataKey ?? '__options_'+field.key]=[];
+    }
+    const prepared=await this.documentHydration.resolveHeaderLookups(record,fields);
+    if(!valid() || revision!==this.dataSource.getResourceRevision(source) || generation!==this.dataSource.getReadGeneration() || query!==JSON.stringify([this.listFilterState.buildFilter(this.listFilterScope),this.listConfig.dataSource.defaultSort]))return;
+    const current=this.rows.find(row=>this.getRowKey(row)===this.getRowKey(saved));
+    if(!this.isRecord(current) || Number(current['systemRowVersion'])>Number(saved['systemRowVersion']))return;
+    this.pendingListSyncRecord=prepared;this.applyDeferredListSync();
+  }
+
   private stageListSyncFromActiveHeader(): void {
     if (
       !this.activeDocumentWindowConfig?.headerData ||
@@ -3087,6 +3128,10 @@ export class ListPage implements OnInit, OnDestroy {
     };
   }
 
+  private isUncertainSave(error: unknown): boolean {
+    return this.isRecord(error) && (error['status']===0 || error['name']==='TimeoutError');
+  }
+
   private setEntryStatus(message: DocumentStatusMessage): void {
     if (!this.activeDocumentWindowConfig) {
       return;
@@ -3099,6 +3144,7 @@ export class ListPage implements OnInit, OnDestroy {
     }
 
     this.activeDocumentWindowConfig.statusMessage = message;
+    this.runModal.notifyBackground(this.initialRecord);
   }
 
   private clearEntryStatus(): void {

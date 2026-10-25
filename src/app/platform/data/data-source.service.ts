@@ -265,6 +265,7 @@ export class DataSourceService {
           if (operation === 'create' && config.autoGenerateNumber) this.invalidateReadCache();
           if (operation === 'delete' || response == null) { this.versions.delete(identity); return response; }
           const record = this.record(response, endpoint);
+          if (Number.isSafeInteger(Number(record['systemRowVersion'])) && Number(record['systemRowVersion'])>0) this.cacheRecord(this.key(operation==='create' && !config.singleton ? this.recordEndpoint(config,record[config.keyField ?? 'systemId']) : endpoint),record);
           if (editor) editor['systemRowVersion'] = record['systemRowVersion'];
           this.missingSingletons.delete(identity);
           if (operation === 'create' && !config.singleton) this.remember(this.recordEndpoint(config, record[config.keyField ?? 'systemId']), record);

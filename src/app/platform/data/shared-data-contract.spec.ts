@@ -127,7 +127,7 @@ describe('Shared data lifecycle with controlled synthetic API responses',()=>{
   expect(record.code).toBe('PR');expect(record.systemRowVersion).toBe(1);expect(get).toHaveBeenCalledTimes(1);expect(loading).not.toHaveBeenCalled();
   record.code='LOCAL';expect(source.getCachedRecord(config,'1')?.['code']).toBe('PR');
   await firstValueFrom(source.update(config,'1',{code:'Changed'}));expect(patch.mock.calls[0][2]).toBe('"1"');
-  expect(source.getCachedRecord(config,'1')).toBeUndefined();
+  expect(source.getCachedRecord(config,'1')).toMatchObject({id:'1',code:'CHANGED',systemRowVersion:2});
  });
  it('does not treat summary collection rows as complete header records',async()=>{
   await firstValueFrom(source.loadList(config,{useCache:true}));expect(source.getCachedRecord(config,'1')).toBeUndefined();

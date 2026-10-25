@@ -1,4 +1,5 @@
 <div class="app-workspace">
+
   @if (showCommandBar) {
     <app-command-bar
       [standardActions]="resolvedStandardActions"
@@ -20,6 +21,18 @@
       </div>
       @if (factBoxEnabled) { <div app-command-tools><app-fact-box-toggle [expanded]="factboxOpen" (toggled)="toggleFactbox()"></app-fact-box-toggle></div> }
     </app-command-bar>
+  }
+  @for (save of saves.backgroundFor(config?.pageId ?? ''); track save.id) {
+    <div class="save-status" [attr.role]="save.state === 'error' || save.state === 'unknown' ? 'alert' : 'status'" aria-live="polite">
+      @if (save.state === 'saving') { <app-loading-indicator label="Saving changes…" [compact]="true"></app-loading-indicator> }
+      @else { <span>{{ save.message }}</span> }
+      <span class="save-record">{{ save.label }}</span>
+      @if (save.state === 'error' || save.state === 'unknown') {
+        @if (save.state === 'unknown') { <button type="button" [disabled]="save.checking" (click)="saves.verifySave(save.id)">{{ save.checking ? 'Checking…' : 'Check status' }}</button> }
+        <button type="button" (click)="saves.resumeSave(save.id)">Open record</button>
+      }
+      @if (save.state === 'saved') { <button type="button" aria-label="Dismiss saved message" (click)="saves.dismissSaveNotice(save.id)">Dismiss</button> }
+    </div>
   }
 
   <section class="workspace-layout" [style.--list-details-width]="config?.factBox?.width ?? 'var(--ts-factbox-width)'" [class.factbox-closed]="!factboxOpen || !factBoxEnabled || filterPanel.visible" [class.filters-open]="filterPanel.visible">

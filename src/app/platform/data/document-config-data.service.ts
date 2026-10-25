@@ -1,3 +1,4 @@
+import type { DataSourceConfig } from '../models/data-source-config.model';
 import { normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { FormSectionConfig } from '../models/field-config.model';
@@ -11,6 +12,17 @@ export type DocumentSelectOption = { label: string; value: unknown };
 })
 export class DocumentConfigDataService {
   constructor(private readonly lineMasters: LineMasterService) {}
+
+  canSynchronizeListRecord(rows: unknown[], before: Record<string,unknown>, saved: Record<string,unknown>, source: DataSourceConfig, filter=''): boolean {
+    const key=source.keyField ?? 'systemId';
+    const existing=rows.find(row=>this.isRecord(row) && saved[key]!=null && String(row[key])===String(saved[key]));
+    if(!this.isRecord(existing) || String(saved[key])!==String(before[key]))return false;
+    const version=Number(saved['systemRowVersion']);
+    if(!Number.isSafeInteger(version) || !Number.isSafeInteger(Number(before['systemRowVersion'])) || version<=Number(before['systemRowVersion']) || version<Number(existing['systemRowVersion']))return false;
+    if(Object.keys(existing).some(field=>!field.startsWith('__') && !(field in saved)))return false;
+    const queryFields=new Set(((filter+' '+(source.defaultSort ?? '')).match(/[A-Za-z_]\w*/g)??[]).map(field=>field.toLowerCase()));
+    return !Object.keys(saved).some(field=>!field.startsWith('__') && queryFields.has(field.toLowerCase()) && JSON.stringify(saved[field])!==JSON.stringify(before[field]));
+  }
 
   buildHeaderData(
     record: Record<string, unknown>,

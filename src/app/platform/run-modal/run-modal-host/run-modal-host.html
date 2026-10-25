@@ -1,8 +1,10 @@
 @if (popupStack$ | async; as popups) { @if (getRenderablePopups(popups).length) {
 <div class="app-run-modal-host">
-  @for (popup of getRenderablePopups(popups); track popup.id; let index = $index; let isTop = $last) {
+  @for (popup of getRenderablePopups(popups); track popup.id; let index = $index) {
+  @let isTop = runModal.isVisibleTop(popup.id);
   <div
     class="popup-layer"
+    [style.display]="runModal.isBackground(popup.id) ? 'none' : null"
     [class.top-layer]="isTop"
     [class.list-popup-layer]="isTop && isListPopup(popup)"
     [style.z-index]="900 + index"

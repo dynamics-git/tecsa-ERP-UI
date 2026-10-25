@@ -3,6 +3,7 @@
   position: fixed;
   inset: var(--erp-popup-top-offset) 0 0 0;
   z-index: 900;
+  pointer-events: none;
 }
 
 .popup-layer {

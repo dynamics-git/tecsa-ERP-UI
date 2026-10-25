@@ -1,3 +1,11 @@
+.save-status {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--ts-space-2);
+  padding: var(--ts-space-2); border-bottom: 1px solid var(--ts-border);
+  background: var(--ts-surface); color: var(--ts-text); font-size: var(--ts-text-13);
+  .save-record { color: var(--ts-muted); }
+  button { border: 0; background: transparent; color: var(--ts-text); font: inherit; cursor: pointer; text-decoration: underline; }
+}
+
 :host {
   display: block;
 }

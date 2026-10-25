@@ -1,3 +1,4 @@
+import { RunModalService } from '../../run-modal/run-modal.service';
 import { FactBoxHostService } from '../../../shared/ui/fact-box-toggle/fact-box-host.service';
 import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
 import { LoadingIndicator } from '../../../shared/ui/loading-indicator/loading-indicator';
@@ -59,6 +60,7 @@ type ListDensity = 'compact' | 'comfortable' | 'spacious';
   styleUrl: './list-grid.scss',
 })
 export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
+  readonly saves = inject(RunModalService);
   private readonly factBoxHost = inject(FactBoxHostService);
   private readonly sessionService = inject(SessionService);
   private readonly standardActions = inject(StandardListActionsService);

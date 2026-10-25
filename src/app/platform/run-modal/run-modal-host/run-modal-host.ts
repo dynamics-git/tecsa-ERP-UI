@@ -25,7 +25,7 @@ import { RunModalPageWindow } from '../../models/run-modal-host-data.model';
 export class RunModalHost {
   private readonly confirmation = inject(ConfirmationService);
   private readonly popupStack = inject(RunModalStackService);
-  private readonly runModal = inject(RunModalService);
+  readonly runModal = inject(RunModalService);
   private readonly commandRouting = inject(DocumentPageCommandRoutingResolverService);
   private readonly documentWindows = viewChildren(DocumentWindow);
   private readonly listGrids = viewChildren(ListGrid);
@@ -140,6 +140,7 @@ export class RunModalHost {
     const document = this.documentWindows().find(window => window.resolvedHeaderData === this.getDocumentWindowConfig(popup)?.headerData);
     const grid = this.listGrids().find(grid => grid.config === this.getListPageConfig(popup));
     if (document && !await document.canLeaveFactBox() || grid && !await grid.canLeaveFactBox()) return;
+    if (this.runModal.detachSavingWindow(popup.id)) return;
     this.maximizedListPopups.delete(popup.id);
     this.runtimeInputs.delete(popup.id);
 

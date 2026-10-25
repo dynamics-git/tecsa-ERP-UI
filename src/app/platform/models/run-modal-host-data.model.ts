@@ -24,6 +24,7 @@ export interface RunModalListState {
 }
 
 export interface RunModalHostData {
+  backgroundSave?: boolean;
   runtimePage?: { pageId: string; module: RunModalConfigModule; record: Record<string, unknown> };
   documentWindowConfig?: DocumentWindowConfig;
   runModalList?: RunModalListState;

@@ -1,4 +1,5 @@
-import { Injectable, inject } from '@angular/core';
+import { DocumentConfigDataService } from '../data/document-config-data.service';
+import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom, Subject } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { DataSourceConfig } from '../models/data-source-config.model';
@@ -20,6 +21,14 @@ export interface RunModalRequest {
   pageId: string; context?: RunModalContext; mode?: PopupMode; size?: PopupSize;
   target?: 'entry' | 'list'; allowNested?: boolean; popupId?: string;
 }
+export interface SavedEntryChange { pageId: string; source: DataSourceConfig; before: Record<string, unknown>; saved?: Record<string, unknown>; }
+export interface BackgroundSaveOwner {
+  state(): {pending: boolean; dirty: boolean; record: Record<string, unknown>; message?: string; uncertain: boolean};
+  verify(): Promise<string>;
+  resumed(): void;
+}
+interface SaveNotice { id: string; pageId: string; label: string; state: 'saving'|'saved'|'error'|'unknown'; message: string; checking?: boolean; valid(): boolean; }
+
 type ListBinding = { pageId: string; module: RunModalConfigModule; source: DataSourceConfig; context: RunModalContext; rows: unknown[]; loading: boolean; hasMore: boolean; cursor?: string; generation: number };
 
 /** Window navigation only. DocumentPage owns editing for every entry window. */
@@ -29,6 +38,7 @@ export class RunModalService {
   private readonly definitions = inject(RunModalPageDefinitionResolverService);
   private readonly assembler = inject(RunModalConfigAssemblerService);
   private readonly data = inject(DataSourceService);
+  private readonly configData = inject(DocumentConfigDataService);
   private readonly filters = inject(ListFilterStateService);
   private readonly errors = inject(ApiErrorService);
   private readonly policy = inject(RUNTIME_TIMEOUT_POLICY);
@@ -38,12 +48,83 @@ export class RunModalService {
   private readonly parents = new Map<string, string>();
   private failure = '';
   private readonly entryPages = new Map<string, string>();
-  private readonly entryRevisions = new Map<string, { source: DataSourceConfig; revision: number }>();
-  readonly entriesChanged$ = new Subject<string>();
+  private readonly entryRevisions = new Map<string, { source: DataSourceConfig; revision: number; before: Record<string, unknown> }>();
+  readonly entriesChanged$ = new Subject<SavedEntryChange>();
+  private windows: import('../models/popup-config.model').PopupConfig[] = [];
+  private readonly deferredSaves = new Map<string, {record: Record<string, unknown>; owner: BackgroundSaveOwner; hidden: boolean; timer: ReturnType<typeof setTimeout>; valid(): boolean}>();
+  private readonly notices = signal<SaveNotice[]>([]);
+  backgroundFor(pageId: string): SaveNotice[] { return this.notices().filter(item => item.pageId === pageId && item.valid()); }
+  isRecordBackground(record: Record<string,unknown> | undefined): boolean { return [...this.deferredSaves.values()].some(save=>save.record===record && save.hidden); }
+  isBackground(id: string): boolean { return this.deferredSaves.get(id)?.hidden === true; }
+  isVisibleTop(id: string): boolean { return this.windows.filter(window => !this.isBackground(window.id)).at(-1)?.id === id; }
+  private notice(id: string, patch: Partial<SaveNotice>): void { this.notices.update(items => items.map(item => item.id === id ? {...item,...patch} : item)); }
+  dismissSaveNotice(id: string): void { this.notices.update(items => items.filter(item => item.id !== id)); }
+
+  keepSaving(record: Record<string, unknown> | undefined, owner: BackgroundSaveOwner): boolean {
+    const window = this.windows.find(window => (window.data as RunModalHostData)?.runtimePage?.record === record);
+    if (!window || !record) return false;
+    const valid = this.data.captureWriteScope();
+    const initial = this.entryRevisions.get(window.id);
+    if (!initial) return false;
+    const timer = setTimeout(() => {
+      if (!valid()) { this.entryPages.delete(window.id); this.entryRevisions.delete(window.id); this.parents.delete(window.id); this.releaseDeferred(window.id); this.dismissSaveNotice(window.id); this.stack.close(window.id); return; }
+      if (this.deferredSaves.get(window.id)?.hidden && owner.state().pending) this.notice(window.id,{state:'unknown',message:'Save confirmation is taking longer than expected. Check the server status before retrying.'});
+    }, this.policy.requestTimeoutMs);
+    this.deferredSaves.set(window.id,{record,owner,hidden:false,timer,valid});
+    const label = String(owner.state().record[initial.source.documentNoField ?? 'number'] ?? owner.state().record['code'] ?? window.title ?? initial.before[initial.source.keyField ?? 'systemId'] ?? 'Record');
+    this.notices.update(items => [...items.filter(item => item.id !== window.id),{id:window.id,pageId:this.entryPages.get(window.id)!,label,state:'saving',message:'Saving changes…',valid}]);
+    return true;
+  }
+  detachSavingWindow(id: string): boolean {
+    const save = this.deferredSaves.get(id);
+    if (!save) return false;
+    save.hidden = true;
+    this.stack.update(id, window => ({...window,data:{...(window.data as RunModalHostData),backgroundSave:true}}));
+    this.notifyBackground(save.record);
+    return true;
+  }
+  notifyBackground(record: Record<string, unknown> | undefined): void {
+    // Finish the existing response/merge handler before evaluating its final state.
+    queueMicrotask(() => {
+      for (const [id,save] of this.deferredSaves) {
+        if (save.record !== record) continue;
+        if (!save.valid()) { this.releaseDeferred(id); this.entryPages.delete(id); this.entryRevisions.delete(id); this.parents.delete(id); this.dismissSaveNotice(id); this.stack.close(id); continue; }
+        if (!save.hidden) { save.owner.resumed(); continue; }
+        const state = save.owner.state();
+        if (state.pending) continue;
+        clearTimeout(save.timer);
+        if (state.dirty) {
+          this.notice(id,{state:state.uncertain?'unknown':'error',message:state.uncertain?'Save outcome is unknown. Check the server status before retrying.':state.message || 'Changes could not be saved.'});
+        } else {
+          this.notice(id,{state:'saved',message:'Changes saved'});
+          this.releasePopup(id, structuredClone(state.record));
+          this.stack.close(id);
+          setTimeout(() => this.dismissSaveNotice(id),6000);
+        }
+      }
+    });
+  }
+  resumeSave(id: string): void {
+    const save=this.deferredSaves.get(id);if(!save || !save.valid())return;
+    clearTimeout(save.timer);save.hidden=false;save.owner.resumed();this.dismissSaveNotice(id);
+    this.stack.update(id,window=>({...window,data:{...(window.data as RunModalHostData),backgroundSave:false}}));
+  }
+  async verifySave(id: string): Promise<void> {
+    const save=this.deferredSaves.get(id);if(!save || !save.valid() || this.notices().find(item=>item.id===id)?.checking)return;
+    this.notice(id,{checking:true});
+    try { const message=await save.owner.verify();if(save.valid())this.notice(id,{message}); }
+    catch { if(save.valid())this.notice(id,{message:'Server status could not be checked. Your edits are retained; no save was retried.'}); }
+    finally { this.notice(id,{checking:false}); }
+  }
+  private releaseDeferred(id: string): void { const save=this.deferredSaves.get(id);if(save)clearTimeout(save.timer);this.deferredSaves.delete(id); }
 
   constructor() {
     this.stack.stack$.subscribe(stack => {
+      this.windows = stack;
       const ids = new Set(stack.map(popup => popup.id));
+      for (const id of this.deferredSaves.keys()) if (!ids.has(id)) {
+        this.releaseDeferred(id); this.entryPages.delete(id); this.entryRevisions.delete(id); this.parents.delete(id); this.dismissSaveNotice(id);
+      }
       for (const id of this.lists.keys()) if (!ids.has(id)) { this.lists.delete(id); this.filters.release(id); }
     });
   }
@@ -68,12 +149,14 @@ export class RunModalService {
         try { this.data.relation(config.dataSource, record); }
         catch { this.failure = 'parent-context-missing'; return false; }
       }
+      const existing = [...this.deferredSaves].find(([key,save]) => this.entryRevisions.get(key)?.source.endpoint === config.dataSource!.endpoint && save.valid() && String(save.record[config.dataSource!.keyField ?? 'systemId']) === String(record[config.dataSource!.keyField ?? 'systemId']) && record[config.dataSource!.keyField ?? 'systemId'] != null);
+      if (existing) { if (!existing[1].owner.state().pending) this.resumeSave(existing[0]); return true; }
       const opened = this.stack.open({ id, title: config.title, mode: request.mode ?? 'page', size: request.size ?? 'full', allowNested: request.allowNested ?? true, closeOnBackdrop: false,
         data: { runtimePage: { pageId: definition.pageId, module: definition.module, record } } satisfies RunModalHostData });
       if (opened && typeof context['parentPopupId'] === 'string') this.parents.set(id, context['parentPopupId']);
       if (opened) {
         this.entryPages.set(id, definition.pageId);
-        this.entryRevisions.set(id, { source: config.dataSource, revision: this.data.getResourceRevision(config.dataSource) });
+        this.entryRevisions.set(id, { source: config.dataSource, revision: this.data.getResourceRevision(config.dataSource), before: structuredClone(record) });
       }
       this.failure = opened ? '' : 'popup-open-blocked';
       return opened;
@@ -109,7 +192,8 @@ export class RunModalService {
     if (this.lists.get(id)?.hasMore) await this.loadList(id, false);
   }
   handlePopupAction(_id: string, _config: DocumentWindowConfig, _event: { actionKey: string; payload?: unknown }): boolean { return false; }
-  releasePopup(id: string): void {
+  releasePopup(id: string, confirmed?: Record<string, unknown>): void {
+    this.releaseDeferred(id);
     this.state.releasePopup(id);
     this.lists.delete(id);
     this.filters.release(id);
@@ -120,8 +204,17 @@ export class RunModalService {
     const initial = this.entryRevisions.get(id);
     this.entryRevisions.delete(id);
     const changed = initial && this.data.getResourceRevision(initial.source) !== initial.revision;
-    if (page && changed) this.entriesChanged$.next(page);
-    if (parent && changed) void this.loadList(parent, true);
+    if (!page || !changed || !initial) return;
+    const key=initial.source.keyField ?? 'systemId';
+    const saved=confirmed ?? (initial.before[key] == null ? undefined : this.data.getCachedRecord(initial.source,initial.before[key],Infinity));
+    this.entriesChanged$.next({pageId:page,source:initial.source,before:initial.before,saved});
+    const binding=parent ? this.lists.get(parent) : undefined;
+    if(parent && binding){
+      if(saved && binding.source.endpoint===initial.source.endpoint && this.configData.canSynchronizeListRecord(binding.rows,initial.before,saved,binding.source,this.filters.buildFilter(parent))){
+        binding.rows=binding.rows.map(row=>row && typeof row==='object' && String((row as Record<string,unknown>)[key])===String(saved[key]) ? this.configData.mergeListRecord(saved,row as Record<string,unknown>) : row);
+        this.patch(parent,{rows:binding.rows});
+      }else void this.loadList(parent,true);
+    }
   }
   getLastOpenFailureReason(): string { return this.failure; }
 
