@@ -81,4 +81,77 @@ describe('Shared data lifecycle with controlled synthetic API responses',()=>{
   const contracts=TestBed.inject(EntityContractService);
   expect(contracts.sanitizePayload({...config,updateFields:[]},'update',{code:'WRONG',__options_code:[]})).toEqual({});
  });
+ it('preserves unrelated master caches across note writes and invalidates only a changed master family',async()=>{
+  post.mockReturnValue(of({data:{systemId:'2',systemRowVersion:1}}));
+  const lookup={endpoint:'/unitsOfMeasure'};
+  await firstValueFrom(source.loadList(lookup,{useCache:true,count:false}));
+  await firstValueFrom(source.create({endpoint:'/companies/A/items/item-id/notes'},{body:'Note'}));
+  await firstValueFrom(source.loadList(lookup,{useCache:true,count:false}));expect(get).toHaveBeenCalledTimes(1);
+  await firstValueFrom(source.update(lookup,'1',{code:'BOX'},1));
+  await firstValueFrom(source.loadList(lookup,{useCache:true,count:false}));expect(get).toHaveBeenCalledTimes(2);
+  expect(new URL(get.mock.calls[0][0],'http://fixture').searchParams.get('$count')).toBe('false');
+ });
+ it('invalidates declared dependent resources and keeps commands conservative',async()=>{
+  await firstValueFrom(source.loadList({endpoint:'/dependent'},{useCache:true}));
+  await firstValueFrom(source.create({...config,invalidates:['/dependent']},{code:'New'}));
+  await firstValueFrom(source.loadList({endpoint:'/dependent'},{useCache:true}));expect(get).toHaveBeenCalledTimes(2);
+  await firstValueFrom(source.execute(config,'1','post'));
+  await firstValueFrom(source.loadList({endpoint:'/dependent'},{useCache:true}));expect(get).toHaveBeenCalledTimes(3);
+ });
+ it('rejects stale same-resource reads after mutation but lets unrelated in-flight reads finish',async()=>{
+  const pending=new Subject<unknown>();get.mockReturnValue(pending);
+  const same=firstValueFrom(source.loadList(config,{useCache:true}));
+  const other=firstValueFrom(source.loadList({endpoint:'/other'},{useCache:true}));
+  const failed=expect(same).rejects.toThrow('Data changed while loading');
+  await firstValueFrom(source.create(config,{code:'New'}));
+  pending.next({data:[]});pending.complete();await failed;await expect(other).resolves.toMatchObject({value:[]});
+ });
+ it('clears cached reads after access changes and after token changes',async()=>{
+  post.mockReturnValue(of({data:{systemId:'2',systemRowVersion:1}}));
+  await firstValueFrom(source.loadList(config,{useCache:true}));
+  await firstValueFrom(source.create({endpoint:'/permissionSets'},{code:'Access'}));
+  await firstValueFrom(source.loadList(config,{useCache:true}));expect(get).toHaveBeenCalledTimes(2);
+  session.AccessToken='new-token';await firstValueFrom(source.loadList(config,{useCache:true}));expect(get).toHaveBeenCalledTimes(3);
+ });
+
+ it('invalidates numbering side effects when the existing automatic numbering flag is set',async()=>{
+  await firstValueFrom(source.loadList({endpoint:'/numberSeries'},{useCache:true}));
+  await firstValueFrom(source.create({...config,autoGenerateNumber:true},{code:'New'}));
+  await firstValueFrom(source.loadList({endpoint:'/numberSeries'},{useCache:true}));expect(get).toHaveBeenCalledTimes(2);
+ });
+
+ it('reuses complete collection records for detail reads without a request or a loading notification',async()=>{
+  get.mockReturnValue(of({data:[{id:'1',code:'PR',systemRowVersion:1}],meta:{total:1,recordShape:'complete'}}));
+  await firstValueFrom(source.loadList(config,{useCache:true}));
+  const loading=vi.fn();const record:any=await firstValueFrom(source.loadById(config,'1',{useCache:true,onRequest:loading}));
+  expect(record.code).toBe('PR');expect(record.systemRowVersion).toBe(1);expect(get).toHaveBeenCalledTimes(1);expect(loading).not.toHaveBeenCalled();
+  record.code='LOCAL';expect(source.getCachedRecord(config,'1')?.['code']).toBe('PR');
+  await firstValueFrom(source.update(config,'1',{code:'Changed'}));expect(patch.mock.calls[0][2]).toBe('"1"');
+  expect(source.getCachedRecord(config,'1')).toBeUndefined();
+ });
+ it('does not treat summary collection rows as complete header records',async()=>{
+  await firstValueFrom(source.loadList(config,{useCache:true}));expect(source.getCachedRecord(config,'1')).toBeUndefined();
+  get.mockReturnValue(of({data:{id:'1',code:'FULL',systemRowVersion:1}}));
+  const loading=vi.fn();await firstValueFrom(source.loadById(config,'1',{useCache:true,onRequest:loading}));
+  expect(get).toHaveBeenCalledTimes(2);expect(loading).toHaveBeenCalledOnce();
+ });
+ it('retains the original collection freshness deadline and supports explicit refresh',async()=>{
+  const now=vi.spyOn(Date,'now');
+  try{
+   now.mockReturnValue(1000);get.mockReturnValue(of({data:[{id:'1',code:'PR',systemRowVersion:1}],meta:{recordShape:'complete'}}));
+   await firstValueFrom(source.loadList(config,{useCache:true}));
+   now.mockReturnValue(2000);expect(source.getCachedRecord(config,'1')?.['code']).toBe('PR');
+   now.mockReturnValue(31001);expect(source.getCachedRecord(config,'1')).toBeUndefined();
+   get.mockReturnValue(of({data:{id:'1',code:'NEW',systemRowVersion:2}}));const loading=vi.fn();
+   await firstValueFrom(source.loadById(config,'1',{useCache:true,onRequest:loading}));expect(loading).toHaveBeenCalledOnce();
+   await firstValueFrom(source.loadById(config,'1',{useCache:true,forceRefresh:true,onRequest:loading}));expect(loading).toHaveBeenCalledTimes(2);
+  }finally{now.mockRestore();}
+ });
+ it('reuses an evicted complete record from its fresh scoped collection page',async()=>{
+  get.mockReturnValue(of({data:Array.from({length:120},(_,id)=>({id:String(id),systemRowVersion:1})),meta:{recordShape:'complete'}}));
+  await firstValueFrom(source.loadList(config,{useCache:true}));
+  expect(source.getCachedRecord(config,'0')?.['id']).toBe('0');expect(get).toHaveBeenCalledTimes(1);
+  session.Company='B';expect(source.getCachedRecord(config,'0')).toBeUndefined();
+ });
+
 });

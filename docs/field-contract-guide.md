@@ -128,3 +128,21 @@ Header records, checked list records, document lines and worksheet rows use the 
 - Number Series uses the same shared flow with header and line DELETE routes. Issued-number history and existing references are enforced by the backend. Singleton setup pages retain supportsDelete: false.
 
 Synthetic coverage: record-delete.service.spec.ts, delete-contract.spec.ts, and command-assembler capability tests. Backend DeleteCorsContractTest verifies preflight support while authentication remains enforced.
+
+
+## Lookup loading and cache scope
+
+The existing DynamicForm, DocumentLines and LookupSelect remain the shared editors. Opening a lookup reads a bounded page of 20 choices immediately. Only uncached typed searches wait for the 250 ms debounce; cached searches and opening have no artificial delay. Existing cursor declarations continue to work; offset is still the default.
+
+The page host prepares selected captions before publishing rows or marking the entry ready. Standalone editors show an explicit pending caption when a selected ID needs resolving. Captions never change stored SystemIds or emit field edits. Lists and line editors reuse the shared selected-ID hydrator: at most 40 distinct IDs per request and six simultaneous requests per hydration. A failed caption displays an explicit local message; a denied lookup displays Restricted. Main-record/line request failures still use the existing blocking error flow. Search subscriptions cannot cancel caption hydration or have their choices replaced by late caption responses.
+
+Lookup pages request count: false through DataSourceService, which sends $count=false. The backend returns meta.hasMore instead of computing an exact total. Normal list pages keep their existing total-count contract. The footer's loaded row count is rows.length and does not send an additional query.
+
+CRUD invalidates its resource family, including nested children. Unrelated master caches survive note writes. Business policies that change additional resources must declare them on the existing data source, for example invalidates: ['/numberSeries']. Numbered record creation, domain commands, access configuration writes, explicit Refresh and company/user/workspace/token changes retain conservative invalidation. Cache entries remain bounded and selected lookup reads retain the existing 30-second freshness window; cross-user updates are not push notifications.
+
+These changes do not make arbitrary contains searches index-backed. Large deployments must check their real search predicates, PostgreSQL indexes, network topology and concurrent load. The focused fixtures cover a 100,000-row PostgreSQL page and 100,000 synthetic UI options; they are not production throughput certification.
+
+
+Complete shared API collections now declare meta.recordShape = 'complete', because their rows and detail reads use the same resource serializer. DataSourceService seeds bounded detail-cache entries from those rows, retaining the returned systemRowVersion and access context. An unchanged row in the still-open page reuses its version-matched snapshot beyond the ordinary HTTP TTL when all configured header fields are present. Null means no selection; a missing configured field requires a detail read. Summary/unmarked collections do not qualify. Invalidation and explicit Refresh require current server data. No per-page duplicate field declarations or extra partner component is needed.
+
+Read onRequest notifications indicate that a server response is actually needed. Card/setup loading and child-row loading begin from that signal, not merely because a saved record or a line configuration exists. A cached empty child collection remains a valid completed result. Cached selected masters also supply line captions immediately; filter-dependent collection-only lookups retain their constrained read. An unchanged parent can reuse loaded child pages, including empty results, beyond the ordinary HTTP TTL. Scope changes and explicit invalidation revoke those snapshots.

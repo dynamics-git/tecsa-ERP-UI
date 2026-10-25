@@ -146,7 +146,7 @@ export class ListPage implements OnInit, OnDestroy {
       const existing = reset ? [] : (this.activeDocumentWindowConfig?.lineRows ?? []).filter(row => this.hasValue(this.resolvePersistedRecordId(row, this.worksheetSource)));
       const size = this.worksheetSource.pageSize ?? 25;
       const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
-      const records = await this.documentHydration.resolveLineLookups(page.value, this.lineConfig.columns, this.initialRecord ?? {});
+      const records = await this.documentHydration.resolveLineLookups(page.value, this.lineConfig.columns, this.initialRecord ?? {}, () => true, () => this.startPopupLoading('Loading selected values...'));
       this.nextCursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
       this.hasMore = this.worksheetSource.paging === 'cursor' ? !!this.nextCursor : typeof page.meta['total'] === 'number' ? existing.length + records.length < page.meta['total'] : records.length === size;
       this.activeDocumentWindowConfig!.lineRows = this.buildLineRows(this.initialRecord ?? {}, [...existing, ...records]);
@@ -447,8 +447,8 @@ export class ListPage implements OnInit, OnDestroy {
     this.pendingListSyncRecord = undefined;
     this.openDocumentPopup(record, []);
     if (!persisted) { this.stopPopupLoading(); return; }
-    if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.lineRows = [];
-    this.startPopupLoading('Loading document...');
+    if (this.activeDocumentWindowConfig) { this.activeDocumentWindowConfig.lineRows = []; this.activeDocumentWindowConfig.contentReady = false; }
+    // Loading starts only when the shared read actually has to await the server.
     // Header, selected labels and child rows each retain their own request deadline.
     // Do not cut off a healthy multi-request hydration with one aggregate request timeout.
     this.subscriptions.add(this.loadHeaderRecord(record).subscribe({
@@ -612,15 +612,25 @@ export class ListPage implements OnInit, OnDestroy {
       return of(row);
     }
 
-    return from(this.documentHydration.loadHeaderById(
-      this.listConfig.dataSource,
-      recordId,
-      row,
-      this.timeoutPolicy.hydrationTimeoutMs,
-    )).pipe(
-      map((response) => this.resolveHeaderRecordResponse(response, row)),
-      switchMap(record => from(this.documentHydration.resolveHeaderLookups(record, this.headerConfig.sections.flatMap(section => section.fields)))),
-    );
+    // An unchanged row already belongs to this open page's trusted read snapshot.
+    // Closing its card does not discard that snapshot merely because a short HTTP TTL elapsed.
+    const cached = this.dataSource.getCachedRecord(this.listConfig.dataSource, recordId, Infinity);
+    const hasHeaderFields = cached && this.headerConfig.sections.flatMap(section => section.fields).every(field => Object.prototype.hasOwnProperty.call(cached, field.key));
+    const sameSnapshot = cached && hasHeaderFields && row['systemRowVersion'] !== undefined
+      && String(cached['systemRowVersion']) === String(row['systemRowVersion']);
+    const header: Observable<Record<string, unknown>> = sameSnapshot
+      ? of({...cached, ...Object.fromEntries(Object.entries(row).filter(([key]) => key.startsWith('__'))), ...Object.fromEntries(Object.entries(cached).filter(([key]) => key.startsWith('__'))), __fromReadSnapshot: true})
+      : from(this.documentHydration.loadHeaderById(
+          this.listConfig.dataSource, recordId, row, this.timeoutPolicy.hydrationTimeoutMs,
+          () => this.startPopupLoading('Loading document...'),
+        )).pipe(map(response => this.resolveHeaderRecordResponse(response, row)));
+    return header.pipe(switchMap(record => from(this.documentHydration.resolveHeaderLookups(
+      record, this.headerConfig.sections.flatMap(section => section.fields),
+      () => this.startPopupLoading('Loading selected values...'),
+    ))), map(prepared => {
+      this.dataSource.cachePreparedRecord(this.listConfig.dataSource, recordId, prepared, this.headerConfig.sections.flatMap(section => section.fields));
+      return prepared;
+    }));
   }
 
   private resolveHeaderRecordResponse(
@@ -651,15 +661,12 @@ export class ListPage implements OnInit, OnDestroy {
     const initialLoad = !this.activeDocumentWindowConfig;
     if (initialLoad) this.openDocumentPopup(this.buildNewHeaderSeed(), []);
     if (initialLoad && this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
-    this.startPopupLoading('Loading setup...');
     let setupRecordLoaded = false;
-    this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource, { useCache: true, maxAgeMs: 30000 }).pipe(
+    this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource, { useCache: true, maxAgeMs: 30000, onRequest: () => this.startPopupLoading('Loading setup...') }).pipe(
       timeout(this.timeoutPolicy.hydrationTimeoutMs),
       switchMap(record => {
         setupRecordLoaded = true;
-        return from(this.documentHydration.resolveHeaderLookups(
-          this.isRecord(record) ? record : {}, this.headerConfig.sections.flatMap(section => section.fields),
-        ));
+        return from(this.documentHydration.resolveHeaderLookups(this.isRecord(record) ? record : {}, this.headerConfig.sections.flatMap(section => section.fields), () => this.startPopupLoading('Loading selected values...')));
       }),
     ).subscribe({
       next: record => {
@@ -1068,8 +1075,10 @@ export class ListPage implements OnInit, OnDestroy {
         fallbackDocumentNoField: this.listConfig.dataSource.documentNoField,
         defaultTop: initialTop,
         allowWithoutParentKey: pageType === 'worksheet',
+        onRequest: () => this.startCardLineLoading(),
+        reuseSnapshot: header['__fromReadSnapshot'] === true,
       },
-    )).pipe(switchMap(rows => from(this.documentHydration.resolveLineLookups(rows, this.lineConfig!.columns, header))));
+    )).pipe(switchMap(rows => from(this.documentHydration.resolveLineLookups(rows, this.lineConfig!.columns, header, () => true, () => this.startCardLineLoading()))));
   }
 
   private expandLineRowsInBackground(
@@ -3056,12 +3065,16 @@ export class ListPage implements OnInit, OnDestroy {
       buildFilter: (scope) => this.listFilterState.buildFilter(scope),
       hydrateTargetsFromRecords: (scope, records) => this.listFilterState.hydrateTargetsFromRecords(scope, records),
       loadList: (dataSource, options) => this.dataSource.loadList(dataSource, { ...options, useCache: true, maxAgeMs: 30000 }).pipe(switchMap(response => {
-        // Only configured relationship columns need captions; do not load unrelated card fields.
-        const keys = new Set(this.listConfig.dataSurface?.columns.filter(column => !column.hidden).map(column => column.field ?? column.id));
-        const fields = this.headerConfig.sections.flatMap(section => section.fields).filter(field => field.lookup && keys.has(field.key));
+        const fields = this.headerConfig.sections.flatMap(section => section.fields).filter(field => field.lookup);
         if (!fields.length) return of(response);
         const page = response as DataPage;
-        return from(this.documentHydration.resolveListLookups(page.value, fields)).pipe(map(value => ({...page, value})));
+        return from(this.documentHydration.resolveListLookups(page.value, fields)).pipe(map(value => {
+          for (const record of value) {
+            const id = this.resolvePersistedRecordId(record, dataSource);
+            if (this.hasValue(id)) this.dataSource.cachePreparedRecord(dataSource, id, record, fields);
+          }
+          return {...page, value};
+        }));
       })),
       toRecords: (response) => this.toRecords(response),
       getErrorMessage: (error) => this.getErrorMessage(error),

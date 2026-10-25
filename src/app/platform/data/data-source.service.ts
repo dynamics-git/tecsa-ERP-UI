@@ -1,4 +1,4 @@
-import { FieldLookupConfig } from '../models/field-config.model';
+import { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
 import { lookupQuery } from './lookup-dependencies';
 import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
 import { Observable, defer, firstValueFrom, from, of } from 'rxjs';
@@ -18,6 +18,10 @@ export interface DataRestService {
 export const DATA_REST_SERVICE = new InjectionToken<DataRestService>('RestService');
 export interface DataSourceLoadOptions {
   maxAgeMs?: number;
+  /** Called only when this read must await the server rather than a fresh cache hit. */
+  onRequest?: () => void;
+  /** Lookups need continuation, not an exact count of an entire master table. */
+  count?: boolean;
   skip?: number; top?: number; cursor?: string; forceRefresh?: boolean; useCache?: boolean;
 }
 export interface DataPage { value: Record<string, unknown>[]; meta: Record<string, unknown>; }
@@ -38,18 +42,34 @@ export class DataSourceService {
     const original = this.context();
     return () => this.context() === original;
   }
+  /** Identifies the current read/access generation for prepared view snapshots. */
+  getReadGeneration(): number { this.key('/'); return this.readGeneration; }
   invalidateReadCache(): void { this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
-  private cacheRecord(key: string, value: Record<string, unknown>): void {
+  private cacheRecord(key: string, value: Record<string, unknown>, at = Date.now()): void {
     if (this.records.size >= 100) this.records.delete(this.records.keys().next().value!);
-    this.records.set(key, { value: structuredClone(value), at: Date.now() });
+    this.records.set(key, { value: structuredClone(value), at });
   }
   private readonly resourceRevisions = new Map<string, number>();
-  private revisionKey(endpoint: string): string { return this.key('/' + endpoint.split('/').filter(Boolean)[0]); }
+  private resourcePath(endpoint: string): string {
+    const path = endpoint.split('?')[0].replace(/^\/companies\/[^/]+/, '');
+    // Collaboration changes do not modify the parent master or its lookup captions.
+    const collaboration = path.match(/^(.+\/(?:notes|attachments))(?:\/[^/]+)?$/);
+    return collaboration?.[1] ?? '/' + path.split('/').filter(Boolean)[0].split('(')[0];
+  }
+  private revisionKey(endpoint: string): string { return this.key(this.resourcePath(endpoint)); }
   getResourceRevision(config: DataSourceConfig): number { return this.resourceRevisions.get(this.revisionKey(config.endpoint)) ?? 0; }
-  private recordMutation(endpoint: string): void {
-    this.invalidateReadCache();
-    const key = this.revisionKey(endpoint);
-    this.resourceRevisions.set(key, (this.resourceRevisions.get(key) ?? 0) + 1);
+  private recordMutation(endpoint: string, related: string[] = []): void {
+    // Access configuration changes must revoke every cached read immediately.
+    if (/permission|user|role/i.test(this.resourcePath(endpoint))) this.invalidateReadCache();
+    if (this.resourceRevisions.size >= 1000) { this.invalidateReadCache(); this.resourceRevisions.clear(); }
+    for (const resource of [endpoint, ...related]) {
+      const path = this.resourcePath(resource);
+      const revision = this.revisionKey(resource);
+      this.resourceRevisions.set(revision, (this.resourceRevisions.get(revision) ?? 0) + 1);
+      for (const cache of [this.records, this.lists, this.requests])
+        for (const key of cache.keys())
+          if (this.resourcePath(key.slice(this.scope.length + 1)) === path) cache.delete(key);
+    }
   }
   private readonly missingSingletons = new Set<string>();
 
@@ -65,18 +85,26 @@ export class DataSourceService {
     const endpoint = this.listEndpoint(config, options);
     const key = this.key(endpoint);
     const generation = this.readGeneration;
+    const revision = this.getResourceRevision(config);
     const cached = this.getCachedList(config, options, options.maxAgeMs ?? 300000);
     if (options.useCache && !options.forceRefresh && cached !== undefined) return of(structuredClone(cached));
+    options.onRequest?.();
     return this.read(key, () => this.client.get(endpoint).pipe(map(response => {
       if (key !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
-      if (generation !== this.readGeneration) throw new Error('Data changed while loading. Refresh to load the current record.');
+      if (generation !== this.readGeneration || revision !== this.getResourceRevision(config)) throw new Error('Data changed while loading. Refresh to load the current record.');
       const outer = this.asRecord(response);
       const rows = Array.isArray(response) ? response : outer?.['data'] ?? outer?.['value'];
       if (!Array.isArray(rows)) throw new Error('Unexpected ERP collection response.');
       const page: DataPage = { value: rows.filter((row): row is Record<string, unknown> => !!this.asRecord(row)), meta: this.asRecord(outer?.['meta']) ?? {} };
       page.value.forEach(row => {
         const id = row[config.keyField ?? 'systemId'];
-        if (this.present(id)) this.remember(this.recordEndpoint(config, id), row);
+        if (this.present(id)) {
+          const recordKey = this.recordEndpoint(config, id);
+          this.remember(recordKey, row);
+          // Only the trusted API's explicit complete-record contract may seed detail reads.
+          if (options.useCache && page.meta['recordShape'] === 'complete' && Number.isSafeInteger(Number(row['systemRowVersion'])) && Number(row['systemRowVersion']) > 0)
+            this.cacheRecord(this.key(recordKey), row);
+        }
       });
       if (options.useCache) {
         if (this.lists.size >= 100) this.lists.delete(this.lists.keys().next().value!);
@@ -90,15 +118,49 @@ export class DataSourceService {
     const cached = this.lists.get(this.key(this.listEndpoint(config, options)));
     return cached && Date.now() - cached.at <= maxAgeMs ? cached.response : undefined;
   }
+  /** Reuse a fresh detail read or an explicitly complete collection row in the same access scope. */
+  getCachedRecord(config: DataSourceConfig, id: unknown, maxAgeMs = 30000): Record<string, unknown> | undefined {
+    const endpoint = config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);
+    const key = this.key(endpoint);
+    const cached = this.records.get(key);
+    if (cached && Date.now() - cached.at < maxAgeMs) return structuredClone(cached.value);
+    if (config.singleton) return undefined;
+    // Detail entries are bounded. The current collection page may still contain an evicted row.
+    const prefix = this.key(this.endpoint(config)) + '?';
+    for (const [pageKey, entry] of this.lists) {
+      if (!pageKey.startsWith(prefix) || Date.now() - entry.at >= maxAgeMs) continue;
+      const page = entry.response as DataPage;
+      if (page.meta['recordShape'] !== 'complete') continue;
+      const row = page.value.find(value => String(value[config.keyField ?? 'systemId']) === String(id));
+      if (!row || !Number.isSafeInteger(Number(row['systemRowVersion'])) || !(Number(row['systemRowVersion']) > 0)) continue;
+      this.cacheRecord(key, row, entry.at);
+      return structuredClone(row);
+    }
+    return undefined;
+  }
+  /** Retain derived view values on the existing trusted record entry, without changing its business data or age. */
+  cachePreparedRecord(config: DataSourceConfig, id: unknown, prepared: Record<string, unknown>, fields: FieldConfig[]): void {
+    const current = this.getCachedRecord(config, id, Infinity);
+    if (!current || String(current['systemRowVersion']) !== String(prepared['systemRowVersion'])) return;
+    const key = this.key(this.recordEndpoint(config, id));
+    const entry = this.records.get(key);
+    if (!entry) return;
+    for (const field of fields) if (field.lookup)
+      for (const name of [field.optionsDataKey ?? '__options_' + field.key, '__display_' + field.key, '__lookupStamp_' + field.key, '__lookupFailed_' + field.key, '__lookupRestricted_' + field.key])
+        if (Object.prototype.hasOwnProperty.call(prepared, name)) current[name] = prepared[name];
+    this.cacheRecord(key, current, entry.at);
+  }
   loadSingleton(config: DataSourceConfig, options: DataSourceLoadOptions = {}): Observable<unknown> {
     const endpoint = this.endpoint(config);
     const key = this.key(endpoint);
     const generation = this.readGeneration;
+    const revision = this.getResourceRevision(config);
     const cached = this.records.get(key);
     if (options.useCache && !options.forceRefresh && cached && Date.now() - cached.at < (options.maxAgeMs ?? 30000)) return of(structuredClone(cached.value));
+    options.onRequest?.();
     return this.read(key, () => this.client.get(endpoint).pipe(map(response => {
       if (key !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
-      if (generation !== this.readGeneration) throw new Error('Data changed while loading. Refresh to load the current record.');
+      if (generation !== this.readGeneration || revision !== this.getResourceRevision(config)) throw new Error('Data changed while loading. Refresh to load the current record.');
       this.missingSingletons.delete(key);
       const record = this.record(response, endpoint);
       if (options.useCache) this.cacheRecord(key, record);
@@ -108,13 +170,22 @@ export class DataSourceService {
       throw error;
     })));
   }
+  getCachedLookup(lookup: FieldLookupConfig, id: unknown, record: Record<string, unknown>, header: Record<string, unknown> = {}): Record<string, unknown> | undefined {
+    const query = lookupQuery({...lookup, filter: undefined}, record, '', header);
+    if (!this.present(id) || !query.ready || !query.endpoint) return undefined;
+    // Collection-only lookups with filter dependencies must retain their constrained collection read.
+    if (lookup.recordRead === 'collection' && query.filter) return undefined;
+    return this.getCachedRecord({endpoint: query.endpoint, keyField: lookup.valueField}, id);
+  }
   /** Selected lookup records follow the same company and parent scope as searches. */
   loadLookup(lookup: FieldLookupConfig, id: unknown, record: Record<string, unknown>, header: Record<string, unknown> = {}): Observable<unknown> {
     const query = lookupQuery({...lookup, filter: undefined}, record, '', header);
     if (!query.ready || !query.endpoint) return of(undefined);
+    const cached = this.getCachedLookup(lookup, id, record, header);
+    if (cached) return of(cached);
     if (lookup.recordRead !== 'collection') return this.loadById({endpoint: query.endpoint}, id, {useCache: true, maxAgeMs: 30000});
     const identity = lookup.valueField + " eq '" + String(id).replace(/'/g, "''") + "'";
-    return this.loadList({endpoint: query.endpoint, defaultFilter: [query.filter, identity].filter(Boolean).map(value => '(' + value + ')').join(' and ')}, {top: 1, useCache: true, maxAgeMs: 30000}).pipe(map(response => {
+    return this.loadList({endpoint: query.endpoint, defaultFilter: [query.filter, identity].filter(Boolean).map(value => '(' + value + ')').join(' and ')}, {top: 1, useCache: true, maxAgeMs: 30000, count: false}).pipe(map(response => {
       const selected = (response as DataPage).value[0];
       if (!selected) throw new Error('The selected lookup record is unavailable in this company and parent scope.');
       return selected;
@@ -124,11 +195,13 @@ export class DataSourceService {
     const endpoint = config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);
     const key = this.key(endpoint);
     const generation = this.readGeneration;
-    const cached = this.records.get(key);
-    if (options.useCache && !options.forceRefresh && cached && Date.now() - cached.at < (options.maxAgeMs ?? 30000)) return of(structuredClone(cached.value));
+    const revision = this.getResourceRevision(config);
+    const cached = options.useCache && !options.forceRefresh ? this.getCachedRecord(config, id, options.maxAgeMs) : undefined;
+    if (cached) return of(cached);
+    options.onRequest?.();
     return this.read(key, () => this.client.get(endpoint).pipe(map(response => {
       if (key !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
-      if (generation !== this.readGeneration) throw new Error('Data changed while loading. Refresh to load the current record.');
+      if (generation !== this.readGeneration || revision !== this.getResourceRevision(config)) throw new Error('Data changed while loading. Refresh to load the current record.');
       const record = this.record(response, endpoint);
       if (options.useCache) this.cacheRecord(key, record);
       return record;
@@ -152,7 +225,7 @@ export class DataSourceService {
         const response = await firstValueFrom(this.client.post(`${endpoint}/${command}`, payload));
         if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
         this.recordMutation(endpoint);
-        this.lists.clear();
+        this.invalidateReadCache();
         return this.record(response, endpoint);
       });
     });
@@ -187,8 +260,9 @@ export class DataSourceService {
         try {
           const response = await firstValueFrom(request);
           if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
-          this.recordMutation(endpoint);
-          this.lists.clear();
+          this.recordMutation(endpoint, config.invalidates);
+          // Number allocation can change a separate series resource through server business policies.
+          if (operation === 'create' && config.autoGenerateNumber) this.invalidateReadCache();
           if (operation === 'delete' || response == null) { this.versions.delete(identity); return response; }
           const record = this.record(response, endpoint);
           if (editor) editor['systemRowVersion'] = record['systemRowVersion'];
@@ -258,6 +332,7 @@ export class DataSourceService {
     if (config.defaultFilter) params.set('$filter', config.defaultFilter);
     if (config.defaultSort && config.paging !== 'cursor') params.set('$orderby', config.defaultSort);
     params.set('$top', String(options.top ?? config.pageSize ?? 20));
+    if (options.count !== undefined) params.set('$count', String(options.count));
     if (config.paging === 'cursor') params.set('cursor', options.cursor ?? 'start');
     else if (options.skip) params.set('$skip', String(options.skip));
     return `${this.endpoint({ ...config, endpoint: path })}?${params}`;
@@ -268,7 +343,7 @@ export class DataSourceService {
     if (this.scope !== context) {
       this.scope = context;
       this.invalidateReadCache();
-      this.versions.clear(); this.requests.clear(); this.writes.clear(); this.missingSingletons.clear();
+      this.resourceRevisions.clear(); this.versions.clear(); this.requests.clear(); this.writes.clear(); this.missingSingletons.clear();
     }
     return `${context}|${endpoint}`;
   }

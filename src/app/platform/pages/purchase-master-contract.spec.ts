@@ -1,12 +1,13 @@
+import { itemsHeaderConfig } from '../../features/purchase-masters/items/items.config';
 import { By } from '@angular/platform-browser';
-import { delay } from 'rxjs/operators';
+import { delay, finalize } from 'rxjs/operators';
 import { ListPage } from './list-page/list-page';
 
 import { RUNTIME_TIMEOUT_POLICY } from '../data/runtime-timeout-policy.token';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { describe, it, expect, vi } from 'vitest';
-import { firstValueFrom, of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError, Subject } from 'rxjs';
 import { routes } from '../../app.routes';
 import { runModalPageModules } from '../../features/run-modal-page-modules';
 import { SessionService } from '../../core/services/session.service';
@@ -192,6 +193,74 @@ describe('Purchase master configuration integration', () => {
     expect(rows[0]['__lookupRestricted_paymentTermsId']).toBe(true);
   });
 
+  it('opens a complete list item immediately without another header or selected-UOM request or a document loader',async()=>{
+    const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
+    const item={...Object.fromEntries(itemsHeaderConfig.sections.flatMap(section=>section.fields).map(field=>[field.key,null])),systemId:'item-reused',number:'REUSE',description:'Reuse',baseUnitOfMeasureId:'unit-reused',systemRowVersion:1};
+    const get=vi.fn((url:string)=>url.startsWith('/items?') ? of({data:[item],meta:{total:1,recordShape:'complete'}}) : url.startsWith('/unitsOfMeasure?') ? of({data:[{systemId:'unit-reused',code:'EA',description:'Each',systemRowVersion:1}],meta:{total:1,recordShape:'complete'}}) : of({data:[],meta:{total:0}}));
+    TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
+    TestBed.inject(SessionService).SuperAdmin=true;
+    const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
+    const page=fixture.debugElement.query(By.directive(ListPage)).componentInstance as ListPage;
+    await vi.waitFor(()=>expect((page.rows[0] as any)?.__display_baseUnitOfMeasureId).toBe('EA — Each'));
+    get.mockClear();page.openRecord(page.rows[0]);
+    await fixture.whenStable();fixture.detectChanges();
+    let card!:ListPage;
+    await vi.waitFor(()=>{
+      fixture.detectChanges();
+      card=fixture.debugElement.queryAll(By.directive(ListPage)).map(element=>element.componentInstance as ListPage).find(runtime=>runtime.documentOnly)!;
+      expect(card?.inlineDocumentWindowConfig?.headerData?.['description']).toBe('Reuse');
+    });
+    expect(card.popupLoading).toBe(false);expect(get).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).not.toContain('Loading document...');
+    expect(fixture.debugElement.query(By.directive(ListPage))).toBeTruthy();fixture.destroy();
+  });
+
+  it('reuses all selected card fields across close/open and row changes beyond the HTTP cache TTL',async()=>{
+    const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
+    const empty=Object.fromEntries(itemsHeaderConfig.sections.flatMap(section=>section.fields).map(field=>[field.key,null]));
+    const rows=['a','b'].map(id=>({...empty,systemId:id,number:id,description:id,baseUnitOfMeasureId:'unit',generalProductPostingGroupId:'group',systemRowVersion:1}));
+    const get=vi.fn((url:string)=>url.startsWith('/items?') ? of({data:rows,meta:{total:2,recordShape:'complete'}})
+      : url.startsWith('/unitsOfMeasure?') ? of({data:[{systemId:'unit',code:'EA',description:'Each',systemRowVersion:1}],meta:{recordShape:'complete'}})
+      : url.startsWith('/generalProductPostingGroups?') ? of({data:[{systemId:'group',code:'TRADE',description:'Trade',systemRowVersion:1}],meta:{recordShape:'complete'}})
+      : of({data:[],meta:{total:0}}));
+    TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
+    TestBed.inject(SessionService).SuperAdmin=true;
+    const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
+    const page=fixture.debugElement.query(By.directive(ListPage)).componentInstance as ListPage;
+    await vi.waitFor(()=>expect(page.rows).toHaveLength(2));
+    const now=vi.spyOn(Date,'now');const later=Date.now()+120000;now.mockReturnValue(later);get.mockClear();
+    try {
+      for(const index of [0,1,0]){
+        page.openRecord(page.rows[index]);await fixture.whenStable();fixture.detectChanges();
+        let card!:ListPage;
+        await vi.waitFor(()=>{fixture.detectChanges();card=fixture.debugElement.queryAll(By.directive(ListPage)).map(e=>e.componentInstance as ListPage).find(p=>p.documentOnly)!;expect(card?.inlineDocumentWindowConfig?.contentReady).toBe(true);});
+        expect(card.inlineDocumentWindowConfig!.headerData!['__display_generalProductPostingGroupId']).toBe('TRADE — Trade');
+        expect(card.popupLoading).toBe(false);expect(get).not.toHaveBeenCalled();
+        await card.requestClose();await fixture.whenStable();fixture.detectChanges();
+      }
+      expect(get).not.toHaveBeenCalled();
+    }finally{now.mockRestore();fixture.destroy();}
+  });
+
+  it('keeps a cold header visibly loading until its selected values are prepared', async () => {
+    const route = routes.find(route => route.path === '')!.children!.find(route => route.path === 'items')!;
+    const caption = new Subject<unknown>();
+    const get = vi.fn((url: string) => url.includes('/items/saved-item')
+      ? of({data:{systemId:'saved-item',number:'ITEM-1',description:'Item',baseUnitOfMeasureId:'saved-unit'}})
+      : url.startsWith('/unitsOfMeasure?') ? caption : of({data:[],meta:{total:0}}));
+    TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
+    TestBed.inject(SessionService).SuperAdmin=true;
+    const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
+    const page=fixture.debugElement.query(By.directive(ListPage)).componentInstance as ListPage;
+    page.documentOnly=true;page.openRecord({systemId:'saved-item',number:'ITEM-1'});
+    await vi.waitFor(()=>expect(caption.observers.length).toBeGreaterThan(0));
+    fixture.detectChanges();expect(page.inlineDocumentWindowConfig?.contentReady).toBe(false);expect(page.popupLoading).toBe(true);
+    caption.next({data:[{systemId:'saved-unit',code:'EA',description:'Each'}],meta:{total:1}});caption.complete();
+    await vi.waitFor(()=>{fixture.detectChanges();expect(page.inlineDocumentWindowConfig?.contentReady).toBe(true);expect(page.popupLoading).toBe(false);});
+    expect(fixture.nativeElement.querySelector('app-dynamic-form').textContent).toBeTruthy();
+    fixture.destroy();
+  });
+
   for (const slowRequest of [false, true])
     it(
       slowRequest
@@ -248,6 +317,73 @@ describe('Purchase master configuration integration', () => {
         }
       },
     );
+
+  it('caps caption batches at six concurrent requests and 40 IDs per request', async () => {
+    let active=0,peak=0;
+    const pending:Subject<unknown>[]=[];
+    const get=vi.fn(()=>{active++;peak=Math.max(peak,active);const request=new Subject<unknown>();pending.push(request);return request.pipe(finalize(()=>active--));});
+    TestBed.configureTestingModule({providers:[...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
+    const fields=[{key:'unit',label:'Unit',lookup:{endpoint:'/unitsOfMeasure',valueField:'systemId',displayField:'code'}}];
+    const rows=Array.from({length:250},(_,index)=>({unit:'unit-'+index}));
+    const result=TestBed.inject(DocumentHydrationOrchestratorService).resolveListLookups(rows,fields);
+    expect(get).toHaveBeenCalledTimes(6);
+    pending.slice().forEach(request=>{request.next({data:[]});request.complete();});
+    await vi.waitFor(()=>expect(get).toHaveBeenCalledTimes(7));
+    pending[6].next({data:[]});pending[6].complete();await result;
+    expect(peak).toBe(6);expect(active).toBe(0);
+    for(const [url] of get.mock.calls as unknown as [string][]){
+      const params=new URL(url,'http://fixture').searchParams;
+      expect(Number(params.get('$top'))).toBeLessThanOrEqual(40);expect(params.get('$count')).toBe('false');
+    }
+  });
+
+  it('prepares selected header values before publishing a new list-page snapshot', async () => {
+    const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
+    const caption=new Subject<unknown>();
+    const get=vi.fn((url:string)=>url.startsWith('/unitsOfMeasure?') ? caption : of({data:[{systemId:'item-1',number:'ITEM-1',description:'Item',baseUnitOfMeasureId:'unit-1'}],meta:{total:1}}));
+    TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
+    TestBed.inject(SessionService).SuperAdmin=true;
+    const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
+    const page=fixture.debugElement.query(By.directive(ListPage)).componentInstance as ListPage;
+    await vi.waitFor(()=>expect(caption.observers.length).toBeGreaterThan(0));
+    expect(page.rows).toHaveLength(0);expect(page.loading).toBe(true);
+    caption.next({data:[{systemId:'unit-1',code:'EA',description:'Each'}],meta:{total:1}});caption.complete();
+    await vi.waitFor(()=>expect((page.rows[0] as any)?.__display_baseUnitOfMeasureId).toBe('EA — Each'));
+    fixture.destroy();
+  });
+
+  it('reuses an already loaded empty child collection without a request or a loading notification',async()=>{
+    const get=vi.fn(()=>of({data:[],meta:{total:0}}));
+    TestBed.configureTestingModule({providers:[...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
+    const hydrate=TestBed.inject(DocumentHydrationOrchestratorService),loading=vi.fn();
+    const source={endpoint:'/lines',navigation:{parentEndpoint:'/items',parentIdFields:['systemId'],childCollection:'lines'}};
+    await hydrate.loadLineRowsForHeader(source,{systemId:'item-1'},{onRequest:loading});
+    expect(get).toHaveBeenCalledTimes(1);expect(loading).toHaveBeenCalledOnce();
+    loading.mockClear();
+    expect(await hydrate.loadLineRowsForHeader(source,{systemId:'item-1'},{onRequest:loading})).toEqual([]);
+    expect(get).toHaveBeenCalledTimes(1);expect(loading).not.toHaveBeenCalled();
+  });
+
+  it('retains unchanged empty line snapshots past the HTTP TTL and still honors explicit invalidation',async()=>{
+    const get=vi.fn(()=>of({data:[],meta:{total:0}}));
+    TestBed.configureTestingModule({providers:[...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
+    const hydrate=TestBed.inject(DocumentHydrationOrchestratorService),source=TestBed.inject(DataSourceService),loading=vi.fn();
+    const config={endpoint:'/lines',navigation:{parentEndpoint:'/items',parentIdFields:['systemId'],childCollection:'lines'}};
+    await hydrate.loadLineRowsForHeader(config,{systemId:'item-1'},{onRequest:loading,reuseSnapshot:true});
+    const now=vi.spyOn(Date,'now'),later=Date.now()+120000;now.mockReturnValue(later);loading.mockClear();
+    try{
+      expect(await hydrate.loadLineRowsForHeader(config,{systemId:'item-1'},{onRequest:loading,reuseSnapshot:true})).toEqual([]);
+      expect(get).toHaveBeenCalledTimes(1);expect(loading).not.toHaveBeenCalled();
+      source.invalidateReadCache();await hydrate.loadLineRowsForHeader(config,{systemId:'item-1'},{onRequest:loading,reuseSnapshot:true});
+      expect(get).toHaveBeenCalledTimes(2);expect(loading).toHaveBeenCalledOnce();
+    }finally{now.mockRestore();}
+  });
+
+  it('keeps records available with an explicit caption error when a lookup request fails',async()=>{
+    TestBed.configureTestingModule({providers:[...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get:()=>throwError(()=>({status:503}))}}]});
+    const rows=await TestBed.inject(DocumentHydrationOrchestratorService).resolveListLookups([{unit:'unit-1'}],[{key:'unit',label:'Unit',lookup:{endpoint:'/unitsOfMeasure',valueField:'systemId',displayField:'code'}}]);
+    expect(rows[0]['unit']).toBe('unit-1');expect(rows[0]['__display_unit']).toBe('Unable to load selected value');
+  });
 
   it('batches only selected relationship IDs and reuses repeated values across rows', async () => {
     const get = vi.fn(() => of({ data: [], meta: { total: 0 } }));

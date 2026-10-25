@@ -9,7 +9,7 @@
     [attr.aria-label]="'Show choices for ' + label" (mousedown)="$event.preventDefault()"
     (click)="toggle(editor)"><i class="ts-icon ts-icon-down" aria-hidden="true"></i></button>
   @if (expanded) {
-    <span class="lookup-popup" (mousedown)="$event.preventDefault()">
+    <span #popup class="lookup-popup" popover="manual" (mousedown)="$event.preventDefault()">
       @if (error) { <span role="alert">{{ error }}</span><button type="button" (click)="retried.emit()">Retry</button> }
         <span #list role="listbox" [id]="id" [attr.aria-label]="label" (scroll)="loadMoreOnScroll($event)">
           <span aria-hidden="true" [style.height.px]="beforeHeight" style="flex-shrink: 0"></span>

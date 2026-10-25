@@ -38,8 +38,8 @@ input {
   &:focus { outline: none; box-shadow: none; }
 }
 .lookup-popup {
-  position: absolute;
-  top: 100%; left: 0; right: 0; z-index: 20;
+  position: fixed;
+  inset: auto; margin: 0; box-sizing: border-box;
   display: flex; flex-direction: column;
   padding: var(--ts-space-1);
   border: 1px solid var(--ts-border);
@@ -47,7 +47,7 @@ input {
   color: var(--ts-text);
   font-size: var(--ts-text-13);
   font-weight: 650;
-  [role="listbox"] { display: flex; flex-direction: column; max-height: 220px; overflow: auto; }
+  [role="listbox"] { display: flex; flex-direction: column; max-height: 220px; min-height: 0; overflow: auto; }
   button {
     border: 0; background: transparent; color: inherit; text-align: left;
     padding: var(--ts-space-2); font: inherit; cursor: pointer;

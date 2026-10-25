@@ -1,3 +1,4 @@
+import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { ListPersonalizationService } from '../../pages/list-personalization.service';
 import { FieldValidationService } from '../field-validation.service';
 import { fieldIsRequired, fieldIsReadonly } from '../../models/field-state';
@@ -19,7 +20,7 @@ import {
 } from '@angular/core';
 import { LineColumnConfig } from '../../models/line-config.model';
 import { DataSourceService } from '../../data/data-source.service';
-import { Subscription, timer, switchMap } from 'rxjs';
+import { Subscription, timer, switchMap, from } from 'rxjs';
 
 type LineOption = { label: string; value: unknown; record?: Record<string, unknown> };
 
@@ -32,7 +33,10 @@ type LineOption = { label: string; value: unknown; record?: Record<string, unkno
 })
 export class DocumentLines {
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
-  private readonly lookupRequests = new Map<Record<string, unknown>, Subscription>();
+  private readonly hydration = inject(DocumentHydrationOrchestratorService);
+  private captionRequest?: Subscription;
+  private captionGeneration = 0;
+  private lookupSearch?: Subscription;
   private readonly selectedLookupLabels = new WeakMap<Record<string, unknown>, Map<string, string>>();
   lookupLoading = false;
   lookupError = '';
@@ -44,7 +48,9 @@ export class DocumentLines {
   activeLookupRow?: Record<string, unknown>;
   activeLookupColumn = '';
   lookupDisplay(column: LineColumnConfig, row: Record<string, unknown>): string {
-    return this.getOptions(column, row).find(option => String(option.value) === this.getCellValue(row, column))?.label ?? this.selectedLookupLabels.get(row)?.get(column.id + ':' + this.getCellValue(row, column)) ?? (column.lookup ? '' : this.getCellValue(row, column));
+    if (!this.getCellValue(row, column)) return ''; // A cleared ID must never reuse an old caption.
+    if (row['__lookupRestricted_' + (column.field ?? column.id)]) return 'Restricted';
+    return this.getOptions(column, row).find(option => String(option.value) === this.getCellValue(row, column))?.label ?? this.selectedLookupLabels.get(row)?.get(column.id + ':' + this.getCellValue(row, column)) ?? (column.lookup ? String(row['__display_' + (column.field ?? column.id)] ?? '') : this.getCellValue(row, column));
   }
   searchLookup(column: LineColumnConfig, row: Record<string, unknown>, text: string, nextPage = false): void {
     if (!column.lookup || this.isReadonly(column, row)) return;
@@ -61,32 +67,34 @@ export class DocumentLines {
       labels.set(column.id + ':' + this.getCellValue(row, column), label);
       this.selectedLookupLabels.set(row, labels);
     }
-    this.lookupRequests.forEach(request => request.unsubscribe());
+    this.lookupSearch?.unsubscribe();
     this.activeLookupRow = row;
     this.activeLookupColumn = column.id;
     this.lookupLoading = true;
     this.lookupError = '';
-    this.lookupRequests.get(row)?.unsubscribe();
     const bucket = column.optionsDataKey ?? `__options_${column.field ?? column.id}`;
     if (!nextPage) row[bucket] = [];
 
-    this.lookupRequests.set(row, timer(250).pipe(switchMap(() => this.source.loadList({ endpoint: lookupFilter.endpoint!, paging: column.lookup!.paging, pageSize: 20,
-      defaultFilter: lookupFilter.filter,
-    }, { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor }))).subscribe({ next: response => {
+    const config = { endpoint: lookupFilter.endpoint!, paging: column.lookup.paging, pageSize: 20, defaultFilter: lookupFilter.filter };
+    const options = { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor, count: false };
+    const load = () => this.source.loadList(config, options);
+    const cached = this.source.getCachedList?.(config, options, options.maxAgeMs) !== undefined;
+    const request = cached || (!text.trim() && !nextPage) ? load() : timer(nextPage ? 0 : 250).pipe(switchMap(load));
+    this.lookupSearch = request.subscribe({ next: response => {
       if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return;
       const page = response as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
       this.lookupOffset += page.value.length;
       this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
-      this.lookupHasMore = column.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
+      this.lookupHasMore = typeof page.meta?.['hasMore'] === 'boolean' ? page.meta['hasMore'] : column.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
       const options = page.value.map(record => ({
         value: record[column.lookup!.valueField], label: this.resolveLookupLabel(column, record), record,
       }));
       row[bucket] = nextPage ? [...(Array.isArray(row[bucket]) ? row[bucket] as unknown[] : []), ...options] : options;
       this.lookupLoading = false;
       this.changes.markForCheck();
-    }, error: () => { if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); } }));
+    }, error: () => { if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); } });
   }
-  ngOnDestroy(): void { this.lookupRequests.forEach(request => request.unsubscribe()); }
+  ngOnDestroy(): void { this.captionGeneration++; this.lookupSearch?.unsubscribe(); this.captionRequest?.unsubscribe(); }
   private static nextEditorId = 0;
   readonly editorId = 'line-editor-' + DocumentLines.nextEditorId++;
   private readonly preferences = inject(ListPersonalizationService);
@@ -141,23 +149,50 @@ export class DocumentLines {
       this.loadPersistedColumnWidths();
     }
 
-    if ('rows' in changes) {
-      this.reconcileRows(changes['rows'].previousValue as Record<string, unknown>[] | undefined);
-      for (const row of this.rows) for (const column of this.columns) {
+    if ('rows' in changes || 'headerData' in changes || 'columns' in changes) {
+      const generation = ++this.captionGeneration;
+      this.captionRequest?.unsubscribe();
+      this.lookupSearch?.unsubscribe(); this.lookupLoading = false;
+      for (const row of this.rows) if ('headerData' in changes) this.selectedLookupLabels.delete(row);
+      this.reconcileRows(changes['rows']?.previousValue as Record<string, unknown>[] | undefined);
+      // The shared hydrator batches distinct selected IDs (40 per request, six requests at a time).
+      // Caption work is independent of document readiness and choice search subscriptions.
+      const rows = this.rows;
+      const columns = this.columns.filter(column => column.lookup);
+      // A fresh selected master is already usable; do not wait for an async hydration cycle.
+      for (const row of rows) for (const column of columns) {
         const id = row[column.field ?? column.id];
-        if (!column.lookup || !id || !lookupQuery(column.lookup, row, '', this.headerData).ready) continue;
-        const context = lookupQuery(column.lookup, row, '', this.headerData).filter;
-        const options = row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`];
-        if (Array.isArray(options) && options.some(option => String(option?.value) === String(id))) continue;
-        this.lookupRequests.set(row, this.source.loadLookup(column.lookup, id, row, this.headerData).subscribe({
-          next: value => {
-            if (String(row[column.field ?? column.id]) !== String(id) || lookupQuery(column.lookup!, row, '', this.headerData).filter !== context) return;
-            const record = value as Record<string, unknown>;
-            row[column.optionsDataKey ?? `__options_${column.field ?? column.id}`] = [{ value: id, label: this.resolveLookupLabel(column, record), record }];
-            this.changes.markForCheck();
-          }, error: () => {},
-        }));
+        const selected = this.source.getCachedLookup?.(column.lookup!, id, row, this.headerData);
+        if (selected) row[column.optionsDataKey ?? '__options_' + (column.field ?? column.id)] = [
+          { value: id, label: this.resolveLookupLabel(column, selected), record: selected },
+        ];
       }
+      const snapshots = rows.map(row => columns.map(column => ({
+        id: row[column.field ?? column.id],
+        context: JSON.stringify(lookupQuery(column.lookup!, row, '', this.headerData)),
+      })));
+      this.captionRequest = from(this.hydration.resolveLineLookups(rows, columns, this.headerData, () => this.captionGeneration === generation)).subscribe({
+        next: resolved => {
+          if (this.rows !== rows) return;
+          rows.forEach((row, index) => columns.forEach((column, columnIndex) => {
+            const key = column.field ?? column.id;
+            const snapshot = snapshots[index][columnIndex];
+            if (row[key] !== snapshot.id || JSON.stringify(lookupQuery(column.lookup!, row, '', this.headerData)) !== snapshot.context) return;
+            const bucket = column.optionsDataKey ?? '__options_' + key;
+            const options = resolved[index][bucket] as LineOption[] | undefined;
+            const labels = this.selectedLookupLabels.get(row) ?? new Map<string, string>();
+            const selected = options?.find(option => String(option.value) === String(row[key]));
+            if (selected) labels.set(column.id + ':' + row[key], selected.label);
+            else labels.delete(column.id + ':' + row[key]);
+            this.selectedLookupLabels.set(row, labels);
+            if (this.activeLookupRow !== row || this.activeLookupColumn !== column.id) row[bucket] = options ?? [];
+            row['__display_' + key] = resolved[index]['__display_' + key];
+            row['__lookupRestricted_' + key] = resolved[index]['__lookupRestricted_' + key];
+          }));
+          this.changes.markForCheck();
+        },
+        error: () => { this.changes.markForCheck(); },
+      });
     }
   }
 
@@ -473,10 +508,9 @@ export class DocumentLines {
 
   private invalidateLookupRows(row: Record<string, unknown>, fields: string[]): void {
     if (!fields.length) return;
-    this.lookupRequests.get(row)?.unsubscribe();
     this.selectedLookupLabels.delete(row);
     if (this.activeLookupRow === row && fields.some(field => this.columns.find(column => (column.field ?? column.id) === field)?.id === this.activeLookupColumn)) {
-      this.activeLookupRow = undefined; this.activeLookupColumn = ''; this.lookupLoading = false; this.lookupHasMore = false;
+      this.lookupSearch?.unsubscribe(); this.activeLookupRow = undefined; this.activeLookupColumn = ''; this.lookupLoading = false; this.lookupHasMore = false;
     }
   }
 

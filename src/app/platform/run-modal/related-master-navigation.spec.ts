@@ -218,7 +218,7 @@ describe('Related master pages use the shared navigation stack', () => {
     const rows = runtime.inlineDocumentWindowConfig!.lineRows!;
     const column = runtime.inlineDocumentWindowConfig!.lineColumns!.find(c => c.id === 'unitOfMeasureId')!;
     const quantity = runtime.inlineDocumentWindowConfig!.lineColumns!.find(c => c.id === 'qtyPerUnitOfMeasure')!;
-    expect(grid.lookupDisplay(column, rows[0])).toBe('PCS — Piece');
+    await vi.waitFor(() => expect(grid.lookupDisplay(column, rows[0])).toBe('PCS — Piece'));
     expect(grid.getCellValue(rows[0], quantity)).toBe('1');
     expect(rows[1]['qtyPerUnitOfMeasure']).toBe('1');
     expect(grid.getCellValue(rows[1], quantity)).toBe('');
@@ -234,7 +234,7 @@ describe('Related master pages use the shared navigation stack', () => {
     expect(await modal.open({ pageId: 'item-units-of-measure', context: { headerData: { ...item } } })).toBe(true);
     await settle();
     const reopened = fixture.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
-    expect(reopened.lookupDisplay(column, reopened.rows[0])).toBe('PCS — Piece');
+    await vi.waitFor(() => expect(reopened.lookupDisplay(column, reopened.rows[0])).toBe('PCS — Piece'));
     expect(write).not.toHaveBeenCalled();
   });
   it('saves an edited conversion through its parent-scoped API without updating the Item', async () => {

@@ -1,5 +1,5 @@
 import { LoadingIndicator } from '../loading-indicator/loading-indicator';
-import { Component, EventEmitter, Input, Output, ElementRef, ViewChild } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ElementRef, ViewChild, HostListener } from '@angular/core';
 @Component({
   selector: 'app-lookup-select', standalone: true, imports: [LoadingIndicator],
   templateUrl: './lookup-select.html', styleUrl: './lookup-select.scss',
@@ -23,6 +23,44 @@ export class LookupSelect {
   @Output() searched = new EventEmitter<string>();
   @Output() selected = new EventEmitter<unknown>();
   @ViewChild('list') private list?: ElementRef<HTMLElement>;
+  @ViewChild('editor') private editor?: ElementRef<HTMLInputElement>;
+  private popup?: HTMLElement;
+  private readonly repositionOnScroll = (event: Event) => {
+    if (!this.popup?.contains(event.target as Node)) this.positionPopup();
+  };
+  @ViewChild('popup') set popupElement(ref: ElementRef<HTMLElement> | undefined) {
+    this.popup = ref?.nativeElement;
+    if (!this.popup) return;
+    // Keep Angular ownership and inherited theme tokens, but escape all ancestor clipping.
+    this.popup.showPopover?.();
+    this.positionPopup();
+    this.popup.ownerDocument.addEventListener('scroll', this.repositionOnScroll, true);
+  }
+  ngAfterViewChecked(): void { this.positionPopup(); }
+  ngOnDestroy(): void { this.detachPopup(); }
+  @HostListener('window:resize') onResize(): void { this.positionPopup(); }
+  private detachPopup(): void {
+    this.popup?.ownerDocument.removeEventListener('scroll', this.repositionOnScroll, true);
+    this.popup?.hidePopover?.();
+  }
+  private positionPopup(): void {
+    const popup = this.popup;
+    const editor = this.editor?.nativeElement;
+    if (!this.expanded || !popup || !editor) return;
+    const rect = editor.getBoundingClientRect();
+    const view = editor.ownerDocument.defaultView;
+    if (!view) return;
+    const gap = 4, edge = 8;
+    const below = Math.max(0, view.innerHeight - rect.bottom - gap - edge);
+    const above = Math.max(0, rect.top - gap - edge);
+    const opensAbove = below < 280 && above > below;
+    popup.style.maxHeight = Math.max(0, opensAbove ? above : below) + 'px';
+    const width = Math.min(rect.width, Math.max(0, view.innerWidth - edge * 2));
+    popup.style.width = width + 'px';
+    popup.style.left = Math.max(edge, Math.min(rect.left, view.innerWidth - width - edge)) + 'px';
+    const height = popup.getBoundingClientRect().height;
+    popup.style.top = Math.max(edge, opensAbove ? rect.top - gap - height : rect.bottom + gap) + 'px';
+  }
   readonly windowSize = 60;
   windowStart = 0;
   rowHeight = 36;
@@ -56,7 +94,7 @@ export class LookupSelect {
     this.windowStart = Math.max(0, Math.min(Math.floor(list.scrollTop / this.rowHeight) - 10, this.options.length - this.windowSize));
     if (this.hasMore && !this.loading && !this.error && list.scrollHeight - list.scrollTop - list.clientHeight <= 40) this.nextPage.emit();
   }
-  close(): void { this.expanded = false; this.active = -1; }
+  close(): void { this.detachPopup(); this.expanded = false; this.active = -1; }
   search(value: string): void { this.resetViewport(); this.query = value; this.active = -1; this.searched.emit(value); }
   choose(value: unknown): void { this.selected.emit(value); this.close(); }
   key(event: KeyboardEvent): void {

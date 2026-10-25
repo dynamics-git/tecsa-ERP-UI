@@ -1,5 +1,7 @@
 export interface DataSourceConfig {
   endpoint: string;
+  /** Additional resource families changed by business policies during CRUD. Commands invalidate all reads. */
+  invalidates?: string[];
   /** REST is the ERP contract. Legacy syntax is an explicit compatibility option. */
   addressStyle?: 'rest' | 'odata';
   singleton?: boolean;
