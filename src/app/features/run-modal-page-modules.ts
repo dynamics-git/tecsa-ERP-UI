@@ -1,3 +1,4 @@
+import * as notificationRules from './administration/notification-rules/notification-rules';
 import * as dimensionValueCombinations from './purchase-masters/dimension-value-combinations/dimension-value-combinations';
 import * as glAccountDefaultDimensions from './purchase-masters/gl-account-default-dimensions/gl-account-default-dimensions';
 import * as defaultDimensionPriorities from './purchase-masters/default-dimension-priorities/default-dimension-priorities';
@@ -83,4 +84,5 @@ export const runModalPageModules: RunModalConfigModule[] = [
   purchaseRequisition,
   purchasesPayablesSetup,
   salesReceivablesSetup,
+  notificationRules,
 ];

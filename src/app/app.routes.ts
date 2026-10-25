@@ -26,6 +26,7 @@ import { GeneralLedgerSetupPage } from './features/purchase-masters/general-ledg
 import { SourceCodeSetupPage } from './features/purchase-masters/source-code-setup/source-code-setup';
 import { AccountingPeriodsPage } from './features/purchase-masters/accounting-periods/accounting-periods';
 import { DimensionCombinationsPage } from './features/purchase-masters/dimension-combinations/dimension-combinations';
+import { NotificationRulesPage } from './features/administration/notification-rules/notification-rules';
 import { Routes } from '@angular/router';
 import { MainLayout } from './layout/main-layout/main-layout';
 import { DashboardPage } from './features/dashboard/dashboard-page/dashboard-page';
@@ -48,6 +49,7 @@ export const routes: Routes = [
     canActivate: [authGuard],
     canActivateChild: [authChildGuard, unsavedChangesGuard],
     children: [
+      {path:'notification-rules',component:NotificationRulesPage,data:{pageId:'notification-rules'}},
       { path: '', component: DashboardPage },
       { path: 'vendors', component: VendorsPage, data: { pageId: 'vendors' } },
       { path: 'items', component: ItemsPage, data: { pageId: 'items' } },

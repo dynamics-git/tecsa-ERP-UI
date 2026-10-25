@@ -16,6 +16,7 @@
             </header>
 
             <div class="drawer-content">
+              @if (isNotificationDrawer(popup)) { <app-notification-inbox (recordOpened)="close(popup.id)"></app-notification-inbox> }
               @if (isProfileDrawer(popup)) {
                 <app-profile-drawer></app-profile-drawer>
               }

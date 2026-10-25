@@ -30,10 +30,13 @@
         rows="4"
         [disabled]="busy"
         [value]="draft"
-        (input)="changeDraft($event)"
+        (input)="changeDraft($event)" (keydown)="mentionKey($event)" [attr.aria-controls]="mentionControl?.expanded ? mentionControl?.id : null" [attr.aria-activedescendant]="mentionControl?.expanded && (mentionControl?.active ?? -1) >= 0 ? mentionControl?.id + '-' + mentionControl?.active : null"
         placeholder="Write an internal note…"
       ></textarea>
     </label>
+    <app-lookup-select label="Mention a user" placeholder="Mention someone…" [display]="''" [options]="mentionOptions" [loading]="mentionLoading" [error]="mentionError" [hasMore]="mentionHasMore" [disabled]="busy" (opened)="openMentionChoices()" (searched)="searchMentions($event)" (selected)="addMention($event)" (nextPage)="searchMentions(mentionQuery,true)" (retried)="searchMentions(mentionQuery)"></app-lookup-select>
+    @for(user of mentions;track user.systemId){<button type="button" [disabled]="busy" (click)="removeMention(user.systemId)" [attr.aria-label]="'Remove mention for '+user.name">@{{user.name}} ×</button>}
+    <small>Notifications follow enabled Notification Setup rules.</small>
     <div class="tools">
       <span>Visible to authorized users</span
       ><button type="button" [disabled]="busy || !draft.trim()" (click)="save()">

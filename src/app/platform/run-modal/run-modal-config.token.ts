@@ -9,5 +9,6 @@ export type RunModalConfigModule = {
 export type RunModalConfigResolver = (pageId: string) => Promise<RunModalConfigModule | undefined>;
 
 export const RUN_MODAL_CONFIG_RESOLVER = new InjectionToken<RunModalConfigResolver>(
-  'RUN_MODAL_CONFIG_RESOLVER'
+  'RUN_MODAL_CONFIG_RESOLVER',
+  {providedIn:'root',factory:()=>async()=>undefined}
 );

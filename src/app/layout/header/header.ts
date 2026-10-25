@@ -213,6 +213,7 @@ export class Header {
   }
 
   openNotifications(): void {
+    this.drawerService.open({id:'notification-inbox',title:'Notifications',viewId:'notifications',size:'md',allowNested:true});
   }
 
   openUserMenu(): void {

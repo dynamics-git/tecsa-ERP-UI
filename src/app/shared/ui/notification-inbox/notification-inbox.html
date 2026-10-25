@@ -1,0 +1,44 @@
+<section aria-label="Notifications">
+  <div class="inbox-tools">
+    <label
+      ><input
+        type="checkbox"
+        [checked]="unread"
+        [disabled]="loading"
+        (change)="unread = $any($event.target).checked; load()"
+      />
+      Unread only</label
+    ><button type="button" [disabled]="loading" (click)="load()">Refresh</button>
+  </div>
+  @if (error) {
+    <p role="alert">{{ error }}</p>
+  }
+  @if (loading) {
+    <p role="status">Loading notifications…</p>
+  }
+  @for (entry of visibleRows; track entry.systemId) {
+    <article [class.unread]="!entry.readAt">
+      <button
+        class="notification-title"
+        type="button"
+        [disabled]="working.has(entry.systemId)"
+        (click)="open(entry)"
+      >
+        {{ entry.title }}
+      </button>
+      <p>{{ entry.message }}</p>
+      <time>{{ entry.systemCreatedAt | date: 'medium' }}</time>
+      @if (!entry.readAt) {
+        <button type="button" [disabled]="working.has(entry.systemId)" (click)="read(entry)">
+          Mark read
+        </button>
+      }
+    </article>
+  }
+  @if (!loading && !visibleRows.length && !error) {
+    <p>No notifications.</p>
+  }
+  @if (hasMore) {
+    <button type="button" [disabled]="loading" (click)="load(true)">Load more</button>
+  }
+</section>

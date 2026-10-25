@@ -1,0 +1,162 @@
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+export const notificationRulesHeaderConfig: HeaderConfig = {
+  dialogTitle: 'Notification Setup',
+  toolbarButtons: [{ label: 'Save', actionKey: 'cmd:save', isPrimary: true, order: 5 }],
+  sections: [
+    {
+      id: 'general',
+      title: 'General',
+      fields: [
+        {
+          key: 'code',
+          label: 'Code',
+          valueType: 'code',
+          required: true,
+          readonlyAfterCreate: true,
+        },
+        { key: 'name', label: 'Name', required: true },
+        { key: 'enabled', label: 'Enabled', type: 'boolean', defaultValue: true },
+        {
+          key: 'eventKey',
+          label: 'Event',
+          type: 'lookup',
+          required: true,
+          valueField: 'code',
+          labelField: 'name',
+          lookup: {
+            endpoint: '/notificationEvents',
+            valueField: 'code',
+            displayField: 'name',
+            searchFields: ['code', 'name'],
+          },
+        },
+        {
+          key: 'channel',
+          label: 'Channel',
+          type: 'select',
+          defaultValue: 'in_app',
+          options: [{ value: 'in_app', label: 'In-app' }],
+        },
+      ],
+    },
+    {
+      id: 'recipients',
+      title: 'Recipients',
+      fields: [
+        {
+          key: 'recipientMode',
+          label: 'Send to',
+          type: 'select',
+          defaultValue: 'event',
+          options: [
+            { value: 'event', label: 'Recipients supplied by the event' },
+            { value: 'user', label: 'Specific user' },
+            { value: 'permission_set', label: 'Users with a permission set' },
+          ],
+        },
+        {
+          key: 'recipientUserId',
+          label: 'User',
+          type: 'lookup',
+          defaultValue: null,
+          valueField: 'systemId',
+          labelField: 'name',
+          hiddenWhen: { field: 'recipientMode', values: ['user'], negate: true },
+          requiredWhen: { field: 'recipientMode', values: ['user'] },
+          lookup: {
+            endpoint: '/notificationRecipients',
+            valueField: 'systemId',
+            displayField: 'name',
+            searchFields: ['name', 'userName'],
+          },
+        },
+        {
+          key: 'recipientPermissionSetId',
+          label: 'Permission set',
+          type: 'lookup',
+          defaultValue: null,
+          valueField: 'systemId',
+          labelField: 'code',
+          hiddenWhen: { field: 'recipientMode', values: ['permission_set'], negate: true },
+          requiredWhen: { field: 'recipientMode', values: ['permission_set'] },
+          lookup: {
+            endpoint: '/notificationPermissionSets',
+            valueField: 'systemId',
+            displayField: 'code',
+            searchFields: ['code', 'name'],
+          },
+        },
+      ],
+    },
+    {
+      id: 'message',
+      title: 'Message template',
+      fields: [
+        {
+          key: 'titleTemplate',
+          label: 'Title',
+          defaultValue: '{{actorName}} mentioned you',
+          required: true,
+        },
+        {
+          key: 'messageTemplate',
+          label: 'Message',
+          type: 'textarea',
+          width: 'wide',
+          placeholder:
+            'Use registered event tokens, for example {{actorName}} and {{recordLabel}}.',
+          defaultValue: 'Open {{recordLabel}} to view the note.',
+          required: true,
+        },
+      ],
+    },
+  ],
+};
+export const notificationRulesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  pageId: 'notification-rules',
+  pageType: 'card',
+  autoSave: false,
+  title: 'Notification Setup',
+  module: 'Administration',
+  identity: { primaryField: 'code', secondaryField: 'name' },
+  menu: {
+    module: 'Administration',
+    group: 'Collaboration',
+    route: '/notification-rules',
+    icon: 'ts-icon ts-icon-bell',
+    moduleIcon: 'ts-icon ts-icon-administration-module',
+  },
+  dataSource: {
+    endpoint: '/notificationRules',
+    keyField: 'systemId',
+    documentNoField: 'code',
+    defaultSort: 'code asc',
+    supportsDelete: false,
+    lazyCreateOnFirstInput: true,
+    requiredCreateFields: ['code', 'name', 'eventKey'],
+    newRecordDefaults: {
+      enabled: true,
+      channel: 'in_app',
+      recipientMode: 'event',
+      titleTemplate: '{{actorName}} mentioned you',
+      messageTemplate: 'Open {{recordLabel}} to view the note.',
+    },
+  },
+  dataSurface: {
+    idField: 'systemId',
+    columns: listColumns(notificationRulesHeaderConfig, [
+      'code',
+      'name',
+      'eventKey',
+      'enabled',
+      'channel',
+      'recipientMode',
+    ]),
+  },
+  factBox: { enabled: true },
+};

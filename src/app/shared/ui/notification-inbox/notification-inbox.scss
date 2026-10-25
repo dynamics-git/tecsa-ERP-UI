@@ -1,0 +1,35 @@
+section {
+  color: var(--ts-text);
+  font-family: var(--ts-font);
+  font-size: var(--ts-text-13);
+}
+.inbox-tools {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ts-space-2);
+}
+article {
+  padding: var(--ts-space-4) 0;
+  border-bottom: 1px solid var(--ts-border);
+}
+button {
+  font: inherit;
+  color: var(--ts-text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: var(--ts-space-1);
+}
+.notification-title {
+  text-align: start;
+}
+.unread .notification-title {
+  font-weight: 700;
+}
+p {
+  white-space: pre-wrap;
+}
+time {
+  color: var(--ts-muted);
+  display: block;
+}

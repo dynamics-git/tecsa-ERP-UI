@@ -79,6 +79,7 @@ function setup(superAdmin = true) {
     path: vi.fn((c: FactBoxContext, k: string) => c.recordEndpoint + '/' + k),
     list: vi.fn(() => of(page)),
     saveNote: vi.fn(() => of({})),
+    mentionUsers: vi.fn(() => of({data:[{systemId:'colleague',name:'Colleague'}],meta:{hasMore:false,nextSkip:20}})),
     remove: vi.fn(() => of({})),
     upload: vi.fn(() => of({})),
     download: vi.fn(() => of(new Blob(['file']))),
@@ -409,6 +410,13 @@ describe('Config-driven master FactBox', () => {
   });
 });
 describe('Real Notes and Attachments lifecycle', () => {
+  it('keeps selected mention identities with the note and sends them through the existing save flow',async()=>{
+    const {api}=setup();const f=TestBed.createComponent(Notes);f.componentRef.setInput('context',context);f.detectChanges();
+    const notes=f.componentInstance;notes.changeDraft({target:{value:'Please review'}} as unknown as Event);
+    notes.searchMentions();notes.addMention('colleague');expect(notes.draft).toContain('@Colleague');
+    notes.save();await f.whenStable();
+    expect(api.saveNote).toHaveBeenCalledWith('/items/item-a/notes','Please review @Colleague',undefined,['colleague']);f.destroy();
+  });
   it('saves/edits through the existing API with row versions and keeps drafts per record', async () => {
     const { api } = setup(),
       f = TestBed.createComponent(Notes);

@@ -1,3 +1,4 @@
+import { NotificationInbox } from '../notification-inbox/notification-inbox';
 import { AsyncPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { PopupConfig } from '../../../platform/models/popup-config.model';
@@ -12,7 +13,7 @@ type DrawerPopupData = {
 @Component({
   selector: 'app-drawer-host',
   standalone: true,
-  imports: [AsyncPipe, ProfileDrawer],
+  imports: [AsyncPipe, ProfileDrawer, NotificationInbox],
   templateUrl: './drawer-host.html',
   styleUrl: './drawer-host.scss'
 })
@@ -24,6 +25,8 @@ export class DrawerHost {
   getDrawers(popups: PopupConfig[]): PopupConfig[] {
     return popups.filter((popup) => popup.mode === 'drawer');
   }
+
+  isNotificationDrawer(popup: PopupConfig): boolean { return this.drawerViewId(popup)==='notifications'; }
 
   isProfileDrawer(popup: PopupConfig): boolean {
     return this.drawerViewId(popup) === 'profile';

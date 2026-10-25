@@ -13,6 +13,7 @@ export interface CollaborationEntry {
   systemCreatedAt: string;
   systemModifiedAt: string;
   body?: string;
+  mentions?: Array<{systemId:string;name:string}>;
   fileName?: string;
   byteSize?: number;
   mediaType?: string;
@@ -42,11 +43,13 @@ export class RecordCollaborationService {
   list(path: string, page: number): Observable<unknown> {
     return this.rest.get(path + '?page=' + page, { suppressGlobalErrorDialog: true });
   }
-  saveNote(path: string, body: string, entry?: CollaborationEntry): Observable<unknown> {
+  saveNote(path: string, body: string, entry?: CollaborationEntry, mentionedUserIds?:string[]): Observable<unknown> {
+    const payload={body,...(mentionedUserIds ? {mentionedUserIds} : {})};
     return entry
-      ? this.source.update({ endpoint: path }, entry.systemId, { body }, entry.systemRowVersion)
-      : this.source.create({ endpoint: path }, { body });
+      ? this.source.update({ endpoint: path }, entry.systemId, payload, entry.systemRowVersion)
+      : this.source.create({ endpoint: path }, payload);
   }
+  mentionUsers(path:string,query:string,skip=0):Observable<unknown>{return this.rest.get(path+'/mentionUsers?q='+encodeURIComponent(query)+'&skip='+skip,{suppressGlobalErrorDialog:true});}
   remove(path: string, entry: CollaborationEntry): Observable<unknown> {
     return this.source.delete({ endpoint: path }, entry.systemId, entry.systemRowVersion);
   }
