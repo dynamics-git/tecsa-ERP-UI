@@ -117,7 +117,7 @@ export class ConfirmationService {
         .toLowerCase() || this.entityLabels['record'];
   }
 
-  message(text: string, title = this.labels.messageTitle): Promise<void> {
+  message(text: string, title: string = this.labels.messageTitle): Promise<void> {
     const value = text.trim();
     if (!value.length) {
       return Promise.resolve();
