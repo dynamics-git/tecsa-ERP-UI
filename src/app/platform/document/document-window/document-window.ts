@@ -44,7 +44,18 @@ export class DocumentWindow {
   private readonly factBox = viewChild(FactBox);
   canLeaveFactBox(): Promise<boolean> { return this.factBox()?.canLeave() ?? Promise.resolve(true); }
   async requestClose(): Promise<void> { if (await this.canLeaveFactBox()) this.closed.emit(); }
-  lineGridHeight = 240;
+  private preferredLineGridHeight?: number;
+  readonly minLineGridHeight = 96;
+  readonly maxLineGridHeight = 640;
+  get lineGridHeight(): number {
+    // Size to entered rows, not the empty entry placeholders. Long documents scroll inside the grid.
+    const automatic = 36 + Math.max(2, Math.min(this.enteredLineCount, 12)) * 33 + 16;
+    return Math.max(this.minLineGridHeight, Math.min(this.maxLineGridHeight, this.preferredLineGridHeight ?? automatic));
+  }
+  set lineGridHeight(value: number) {
+    if (Number.isFinite(value)) this.preferredLineGridHeight = Math.max(this.minLineGridHeight, Math.min(this.maxLineGridHeight, value));
+  }
+  resetLineGridHeight(): void { this.preferredLineGridHeight = undefined; }
   private lineResize?: { y: number; height: number };
   toggleSection(id: string): void {
     if (this.collapsedSections.has(id)) this.collapsedSections.delete(id); else this.collapsedSections.add(id);
@@ -55,13 +66,14 @@ export class DocumentWindow {
     this.lineResize = { y: event.clientY, height: this.lineGridHeight };
   }
   moveLineResize(event: PointerEvent): void {
-    if (this.lineResize) this.lineGridHeight = Math.max(96, Math.min(640, this.lineResize.height + event.clientY - this.lineResize.y));
+    if (this.lineResize) this.lineGridHeight = this.lineResize.height + event.clientY - this.lineResize.y;
   }
   stopLineResize(): void { this.lineResize = undefined; }
   resizeLinesByKeyboard(event: KeyboardEvent): void {
+    if (event.key === 'Home') { event.preventDefault(); this.resetLineGridHeight(); return; }
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
-    this.lineGridHeight = Math.max(96, Math.min(640, this.lineGridHeight + (event.key === 'ArrowDown' ? 32 : -32)));
+    this.lineGridHeight = this.lineGridHeight + (event.key === 'ArrowDown' ? 32 : -32);
   }
 
   private static readonly GLOBAL_LINE_PRIMARY_COMMANDS = new Set(['cmd:line-new', 'line-new', 'cmd:line-delete', 'line-delete']);
@@ -128,7 +140,7 @@ export class DocumentWindow {
   }
 
   get resolvedHeaderToolbarButtons(): CommandConfig[] {
-    return (this.headerToolbarButtons ?? []).filter((button) => button.hidden !== true);
+    return (this.headerToolbarButtons ?? []).filter((button) => button.hidden !== true && !this.isRowTool(button));
   }
 
   get resolvedPrimaryHeaderToolbarButtons(): CommandConfig[] {
@@ -183,8 +195,17 @@ export class DocumentWindow {
     return result;
   }
 
+  private isRowTool(button: CommandConfig): boolean {
+    return ['line-copy', 'line-copy-rows', 'line-paste'].includes(button.actionKey.replace(/^cmd:/i, '').toLowerCase());
+  }
+
+  get resolvedLineRowCommands(): CommandConfig[] {
+    const commands = this.worksheet ? this.headerToolbarButtons : this.lineToolbarButtons;
+    return (commands ?? []).filter(button => !button.hidden && this.isRowTool(button));
+  }
+
   get resolvedLineToolbarButtons(): CommandConfig[] {
-    const configured = [...(this.lineToolbarButtons ?? [])].filter((button) => button.hidden !== true);
+    const configured = [...(this.lineToolbarButtons ?? [])].filter((button) => button.hidden !== true && !this.isRowTool(button));
     const injectLineNew = this.lineCommandPolicy?.injectDefaultLineNew === true;
     const injectLineDelete = this.lineCommandPolicy?.injectDefaultLineDelete === true;
 

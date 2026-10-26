@@ -94,7 +94,7 @@ export class DocumentPageCommandAssemblerService {
     ];
 
     if (supportsCreate && params.lineConfig.editable !== false && params.lineConfig.dataSource.createFields?.length && params.lineConfig.columns?.length) {
-      defaults.push({label:'Paste Lines',actionKey:'cmd:line-paste',order:50,tooltip:'Preview Excel cells as new lines before applying.'});
+      defaults.push({label:'Paste',actionKey:'cmd:line-paste',order:50,tooltip:'Paste clipboard values at the selected line cell.'});
       defaults.push({label: 'Copy Line', actionKey: 'cmd:line-copy', order: 40,
         tooltip: 'Copy selected lines as new lines. Identity and line numbering are assigned by the server.'});
     }

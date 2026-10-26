@@ -13,7 +13,6 @@
 .app-workspace {
   height: 100%;
   min-height: 0;
-  padding: 0 10px 10px 16px;
   background: var(--ts-bg);
   color: var(--ts-text);
   font-family: var(--ts-font);
@@ -62,8 +61,6 @@
 }
 
 .dataset-strip {
-  min-height: 40px;
-  padding: 0 10px 0 11px;
 
   background: var(--ts-surface);
   border: 0;
@@ -73,8 +70,6 @@
 
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
 }
 
 .grid-region {
@@ -113,7 +108,6 @@
 }
 
 .dataset-search {
-  width: 300px;
   height: var(--ts-control-h);
   padding: 0 10px;
 
@@ -136,29 +130,19 @@
     outline: 0;
     background: transparent;
     color: var(--ts-text-soft);
-    font-size: var(--ts-font-label);
-    font-weight: 500;
   }
 }
 
 .dataset-tools {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
 
   button {
-    width: 28px;
-    height: 28px;
     border: 0;
     border-radius: var(--ts-radius-sm);
     background: transparent;
-    color: var(--ts-muted);
     cursor: pointer;
 
-    &.active {
-      color: var(--ts-text);
-      background: var(--ts-surface-hover);
-    }
 
     &:hover {
       background: var(--ts-surface-hover);
@@ -183,8 +167,7 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.workspace-grid,
-.workspace-factbox {
+.workspace-grid {
   min-height: 0;
   background: var(--ts-surface);
   border: 0;
@@ -219,15 +202,15 @@
   }
 
   th {
+    height: var(--ts-table-head-h);
+    font-size: var(--ts-font-label);
+    font-weight: 600;
+    text-transform: none;
     position: relative;
-    height: var(--ts-control-h);
     padding: 0 8px;
     border-bottom: 1px solid var(--ts-border);
     color: var(--ts-muted);
-    font-size: var(--ts-font-caption);
-    font-weight: 700;
     letter-spacing: 0;
-    text-transform: none;
     text-align: left;
     overflow: hidden;
   }
@@ -292,8 +275,6 @@
     padding: 0 8px;
     border-bottom: 1px solid var(--ts-border-soft);
     color: var(--ts-text);
-    font-size: var(--ts-font-body);
-    font-weight: 600;
     vertical-align: middle;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -439,7 +420,6 @@
   background: transparent;
   color: var(--ts-brand-950);
   font: inherit;
-  font-weight: 700;
   text-align: left;
   cursor: pointer;
   overflow: hidden;
@@ -506,9 +486,6 @@
 @media (max-width: 1180px) {
   .dataset-strip {
     align-items: stretch;
-  }
-
-  .dataset-strip {
     flex-direction: column;
   }
 
@@ -520,9 +497,6 @@
     grid-template-columns: 1fr;
   }
 
-  .workspace-factbox {
-    display: none;
-  }
 }
 
 /* List hierarchy: page actions, list tools/criteria, stable headers, records/status. */
@@ -535,7 +509,7 @@
 }
 .dataset-search { width: min(340px, 100%); flex: 1 1 220px; max-width: 420px; }
 .dataset-search button { border: 0; background: transparent; color: var(--ts-muted); padding: 0; cursor: pointer; }
-.dataset-tools { margin-left: auto; flex-wrap: wrap; gap: var(--ts-space-1); }
+.dataset-tools { margin-left: auto; flex-wrap: wrap; }
 .dataset-tools button {
   width: auto; height: var(--ts-control-h); padding: 0 9px; display: inline-flex; align-items: center; gap: 6px;
   color: var(--ts-text-soft); font-size: var(--ts-font-body); white-space: nowrap;
@@ -549,8 +523,7 @@
 .list-column-panel button, .list-save-view button, .list-statusbar button {
   border: 1px solid var(--ts-border); border-radius: var(--ts-radius-sm); padding: 4px 8px; background: var(--ts-surface); color: var(--ts-text-soft); font: inherit; cursor: pointer;
 }
-.column-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; max-height: 220px; overflow: auto; }
-.column-option { display: flex; align-items: center; gap: 4px; }
+.column-options { display: grid; gap: 6px 16px; max-height: 220px; overflow: auto; }
 .column-option label { display: inline-flex; align-items: center; gap: 8px; flex: 1; }
 .column-option input { width: 16px; height: 16px; accent-color: var(--ts-brand-900); }
 .list-save-view { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -560,7 +533,6 @@
 .list-preference-message { padding: 6px 10px; color: var(--ts-text-soft); font-size: var(--ts-font-caption); background: var(--ts-surface-soft); }
 .list-preference-message button { border: 0; background: transparent; color: inherit; cursor: pointer; }
 .list-loading-state.initial-loading { inset: var(--ts-table-head-h) 0 0; }
-.app-grid th { height: var(--ts-table-head-h); font-size: var(--ts-font-label); text-transform: none; }
 .app-grid tbody tr:focus-visible { outline: 2px solid var(--ts-border-focus); outline-offset: -2px; }
 .column-resizer:focus-visible { background: var(--ts-surface-selected); outline: 2px solid var(--ts-border-focus); }
 .list-statusbar { flex: 0 0 auto; min-height: 32px; padding: 4px 10px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ts-border-soft); color: var(--ts-muted); font-size: var(--ts-font-caption); }
@@ -623,7 +595,6 @@ button:disabled { cursor: default; opacity: 0.45; }
   > button:disabled { color: var(--ts-muted); cursor: default; }
 }
 .dataset-search input { font-size: var(--ts-font-body); font-weight: 400; }
-.app-grid th { font-size: var(--ts-font-label); font-weight: 600; }
 .app-grid td { font-size: var(--ts-font-body); font-weight: 400; }
 .app-grid .cell-link { font-weight: 600; }
 

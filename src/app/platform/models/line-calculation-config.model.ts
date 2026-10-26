@@ -10,10 +10,12 @@ export type LineTotalExpressionConfig =
   | { formula: string; precision?: number };
 
 export interface LineTotalsCalculationConfig {
-  defaults: LineTotalsConfig;
+  defaults: Record<string, string>;
   totals: Partial<Record<LineTotalKey, LineTotalExpressionConfig>>;
   format?: {
     type?: 'number' | 'currency';
+    /** Display precision only; backend amounts remain authoritative. Defaults to 2. */
+    precision?: number;
     currencyCodeHeaderField?: string;
     currencyCodeFallback?: string;
   };

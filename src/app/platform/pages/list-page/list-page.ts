@@ -2464,7 +2464,8 @@ export class ListPage implements OnInit, OnDestroy {
       activeRow: this.activeLineRow, selectedIndexes: this.selectedLineIndexes}).targetRows
       .filter(row => !row['__entryPlaceholder'] && !this.isLineRowMeaningfullyEmpty(row));
     if (!selected.length) { this.setEntryStatus({tone:'info', title:'Select a line', message:'Select a populated line to copy.'}); return; }
-    if (selected.length > 20) { this.setEntryStatus({tone:'error', title:'Too many lines', message:'Copy at most 20 selected lines at a time.'}); return; }
+    const limit = paste ? 100 : 20;
+    if (selected.length > limit) { this.setEntryStatus({tone:'error', title:'Too many lines', message:(paste ? 'Paste' : 'Copy') + ' at most ' + limit + ' lines at a time.'}); return; }
     const copies = selected.map(source => {
       const draft = this.documentConfigData.createEmptyLineRow(config, entry.headerData ?? {}, this.getLineMasterRegistry(), this.optionFieldMap);
       const values = this.lineCommands.copyEditableValues(source, draft, config);

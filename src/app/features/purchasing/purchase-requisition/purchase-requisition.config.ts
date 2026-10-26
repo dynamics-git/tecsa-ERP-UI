@@ -117,6 +117,12 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           defaultValue: null,
           validation: { maxLength: 250 },
         },
+      ],
+    },
+    {
+      id: 'request-details',
+      title: 'Request Details',
+      fields: [
         {
           key: 'locationId',
           label: 'Location',
@@ -131,7 +137,27 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'name'],
           },
         },
-
+      ],
+    },
+    {
+      id: 'processing',
+      title: 'Processing',
+      fields: [
+        { key: 'conversionStatus', label: 'Conversion Status', type: 'select', readonly: true, options: [
+          { value: 'not_converted', label: 'Not Converted' },
+          { value: 'partially_converted', label: 'Partially Converted' },
+          { value: 'fully_converted', label: 'Fully Converted' },
+        ] },
+        { key: 'purchaseOrderCount', label: 'Purchase Orders', valueType: 'integer', readonly: true },
+        { key: 'statusChangedAt', label: 'Status Changed At', type: 'datetime', readonly: true },
+      ],
+    },
+    {
+      id: 'record-information',
+      title: 'Record Information',
+      fields: [
+        { key: 'systemCreatedAt', label: 'Created At', type: 'datetime', readonly: true },
+        { key: 'systemModifiedAt', label: 'Modified At', type: 'datetime', readonly: true },
       ],
     },
   ],
@@ -166,9 +192,7 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     omitEmptyFields: ['number'],
     defaultSort: 'number desc',
     pageSize: 25,
-    supportsCreate: true,
-    supportsUpdate: true,
-    supportsDelete: true,
+    supportsDelete: false, // Header API supports cancellation, not deletion.
     writableStates: { field: 'status', values: ['open'] },
     newRecordDefaults: { status: 'open' },
   },
@@ -207,7 +231,7 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   },
 };
 export const purchaseRequisitionLineConfig: LineConfig = {
-  placement: { mode: 'end' },
+  placement: { mode: 'after-section', afterSectionId: 'general' },
   toolbarButtons: [],
   lineKeyField: 'lineNo',
   dataSource: {
@@ -221,9 +245,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       parentIdFields: ['systemId'],
       childCollection: 'lines',
     },
-    supportsCreate: true,
-    supportsUpdate: true,
-    supportsDelete: true,
     permissions: { create: 'modify', update: 'modify', delete: 'modify' },
     omitEmptyFields: ['description'],
     meaningfulFields: ['itemId', 'glAccountId', 'description'],
@@ -269,6 +290,15 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     },
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 } },
     {
+      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown',
+      lookup: { endpoint: '/unitsOfMeasure', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'description'] },
+    },
+    { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', readonly: true, align: 'end' },
+    {
+      id: 'locationId', label: 'Location', cellType: 'dropdown',
+      lookup: { endpoint: '/locations', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'name'] },
+    },
+    {
       id: 'quantity',
       label: 'Quantity',
       valueType: 'decimal',
@@ -293,6 +323,8 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       align: 'end',
     },
     { id: 'requiredDate', label: 'Required Date', valueType: 'date' },
+    { id: 'convertedQuantity', label: 'Converted Quantity', valueType: 'decimal', readonly: true, align: 'end' },
+    { id: 'remainingQuantity', label: 'Remaining Quantity', valueType: 'decimal', readonly: true, align: 'end' },
   ],
   calculation: [
     { target: 'estimatedAmount', formula: 'quantity * estimatedUnitCost', precision: 6 },
@@ -306,7 +338,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'document-totals',
       rows: [
-        { id: 'estimated-total', label: 'Estimated Total', source: 'total', totalKey: 'total', emphasis: true },
+        { id: 'subtotal', label: 'Subtotal', source: 'total', totalKey: 'total', order: 10 },
+        // PR has no confirmed SST amounts yet; placeholders must not imply zero tax.
+        { id: 'sst', label: 'SST', source: 'literal', value: '—', order: 20 },
+        { id: 'total-incl-sst', label: 'Total Incl. SST', source: 'literal', value: '—', emphasis: true, order: 30 },
       ],
     },
   ],};

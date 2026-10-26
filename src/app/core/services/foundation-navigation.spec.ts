@@ -26,6 +26,7 @@ describe('F1 navigation registrations', () => {
       'items',
       'locations',
       'no-series',
+      'notification-rules',
       'payment-methods',
       'payment-terms',
       'purchase-order',

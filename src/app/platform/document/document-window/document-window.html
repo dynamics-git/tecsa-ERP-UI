@@ -229,13 +229,13 @@
       <app-document-lines
         [preferenceKey]="preferenceKey || pageLabel || 'document'" [worksheet]="worksheet" [headerData]="resolvedHeaderData" [columns]="resolvedLineColumns"
         [rows]="resolvedLineRows" [disabled]="interactionLocked"
-        [showSelection]="true"
+        [showSelection]="true" [rowCommands]="resolvedLineRowCommands"
         (action)="handleLineAction($event)"
         (dropdownOpened)="handleLineDropdownOpened($event)"
         (selectionChanged)="handleLineSelectionChanged($event)"
         (rowChanged)="handleLineRowChanged($event)">
       </app-document-lines>
-      <div class="line-height-handle" role="separator" tabindex="0" aria-label="Resize line grid" aria-orientation="horizontal" [attr.aria-valuenow]="lineGridHeight" aria-valuemin="96" aria-valuemax="640" (pointerdown)="resizeLines($event)" (pointermove)="moveLineResize($event)" (pointerup)="stopLineResize()" (pointercancel)="stopLineResize()" (keydown)="resizeLinesByKeyboard($event)"></div>
+      <div class="line-height-handle" role="separator" tabindex="0" aria-label="Resize line grid" aria-orientation="horizontal" [attr.aria-valuenow]="lineGridHeight" [attr.aria-valuemin]="minLineGridHeight" [attr.aria-valuemax]="maxLineGridHeight" (dblclick)="resetLineGridHeight()" (pointerdown)="resizeLines($event)" (pointermove)="moveLineResize($event)" (pointerup)="stopLineResize()" (pointercancel)="stopLineResize()" (keydown)="resizeLinesByKeyboard($event)"></div>
     </section>
 
     @if (resolvedFooterSections.length) {

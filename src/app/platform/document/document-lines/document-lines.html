@@ -1,4 +1,4 @@
-<div class="line-grid-wrap" [class.worksheet-grid]="worksheet" tabindex="0" (keydown)="handleGridKeydown($event)" (copy)="handleCopy($event)">
+<div class="line-grid-wrap" [class.worksheet-grid]="worksheet" tabindex="0" (keydown)="handleGridKeydown($event)" (copy)="handleCopy($event)" (scroll)="closeRowMenu()">
   <table class="line-grid" [class.with-selection]="showSelection">
     <thead>
       <tr>
@@ -37,6 +37,7 @@
         <tr [class.is-active-row]="isActiveRow(rowIndex)" (click)="activateRow(rowIndex)">
           @if (showSelection) {
             <td class="row-pointer-col">
+              <div class="row-controls">
               <button
                 type="button"
                 class="row-pointer"
@@ -44,6 +45,10 @@
                 (click)="$event.stopPropagation(); activateRow(rowIndex)">
                 <i class="ts-icon ts-icon-right"></i>
               </button>
+              @if (visibleRowCommands.length) {
+                <button type="button" class="row-actions-trigger" aria-label="Line actions" aria-haspopup="menu" [attr.aria-controls]="editorId + '-row-menu'" [attr.aria-expanded]="rowMenuIndex === rowIndex" (click)="showRowMenu($event, rowIndex)">…</button>
+              }
+              </div>
             </td>
             <td class="row-check-col">
               <input
@@ -57,7 +62,7 @@
             <td
               [attr.data-quick-entry]="column.quickEntry !== false && !isReadonly(column, row) && column.cellType !== 'icon'"
               (keydown)="handleCellKeydown($event, column, row, rowIndex)"
-              (focusin)="focusCell(column, rowIndex)" (paste)="handlePaste($event, column)"
+              (focusin)="focusCell(column, rowIndex)" (paste)="handlePaste($event, column, rowIndex)"
               [class.amount]="column.align === 'end' || column.type === 'currency'"
               [class.line-icon-col]="column.cellType === 'icon'"
               [style.width]="getColumnWidthStyle(column)">
@@ -100,11 +105,10 @@
 </div>
 
 @if (clipboardMessage) { <div class="line-clipboard-message" role="status">{{ clipboardMessage }} <button type="button" aria-label="Dismiss clipboard message" (click)="clipboardMessage=''">×</button></div> }
-@if (pastePreview; as preview) {
-  <section class="line-paste-preview" aria-label="Excel paste preview">
-    <header><strong>Paste {{ preview.rows.length }} new lines</strong><button type="button" (click)="pastePreview=undefined">Cancel</button><button type="button" [disabled]="preview.errors.length>0 || disabled" (click)="applyPaste()">Apply paste</button></header>
-    <p>New line identities and numbering are assigned by the server. Existing lines are preserved.</p>
-    @if (preview.errors.length) { <ul role="alert">@for (error of preview.errors; track $index) { <li>{{ error }}</li> }</ul> }
-    <div class="line-paste-scroll"><table><thead><tr>@for (label of preview.labels; track $index) { <th>{{ label }}</th> }</tr></thead><tbody>@for (cells of preview.cells; track $index) { <tr>@for (cell of cells; track $index) { <td>{{ cell }}</td> }</tr> }</tbody></table></div>
-  </section>
+@if (visibleRowCommands.length) {
+  <div [id]="editorId + '-row-menu'" class="line-row-menu" popover="auto" role="menu" aria-label="Line actions" [style.left.px]="rowMenuLeft" [style.top.px]="rowMenuTop" (toggle)="rowMenuIndex = $any($event).newState === 'closed' ? -1 : rowMenuIndex" (keydown)="rowMenuKeydown($event)">
+    @for (command of visibleRowCommands; track command.actionKey) {
+      <button type="button" role="menuitem" [disabled]="rowCommandDisabled(command)" [title]="command.tooltip ?? command.label" (click)="runRowCommand(command)">{{ command.label }}</button>
+    }
+  </div>
 }

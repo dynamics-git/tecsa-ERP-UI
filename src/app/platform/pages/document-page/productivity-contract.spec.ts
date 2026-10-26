@@ -1,3 +1,5 @@
+import { By } from '@angular/platform-browser';
+import { DocumentLines } from '../../document/document-lines/document-lines';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -91,4 +93,31 @@ describe('Shared document and worksheet line productivity integration',()=>{
   const {f}=await create(true);const commands=f.componentInstance.inlineDocumentWindowConfig!.headerToolbarButtons?.map(button=>button.actionKey);
   expect(commands).toContain('cmd:line-copy');expect(commands).toContain('cmd:line-paste');expect(commands).toContain('cmd:line-copy-rows');f.destroy();
  });
+
+
+ it('direct cell paste updates an existing line through normal PATCH with its version and retains failed edits',async()=>{
+  const {f}=await create(false,true,true),page=f.componentInstance;
+  const rest=TestBed.inject(DATA_REST_SERVICE),patch=vi.spyOn(rest,'patch').mockReturnValue(throwError(()=>({status:422,error:{message:'Rejected test change'}})));
+  f.detectChanges();const grid=f.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
+  const index=grid.columns.findIndex(column=>column.id==='quantity');
+  await grid.pasteText('7.123456',0,index);
+  await vi.waitFor(()=>expect(patch).toHaveBeenCalledTimes(1));
+  expect(patch.mock.calls[0][0]).toContain('/lines/line-a');expect(patch.mock.calls[0][1]).toEqual({quantity:'7.123456'});expect(patch.mock.calls[0][2]).toBe('"5"');
+  expect(page.inlineDocumentWindowConfig!.lineRows![0]['quantity']).toBe('7.123456');expect(page.hasUnsavedChanges).toBe(true);
+  expect(f.nativeElement.querySelector('.line-paste-preview')).toBeNull();f.destroy();
+ });
+ it('direct blank-line paste uses the existing serial create queue and stops on failed saves',async()=>{
+  const {f,post}=await create(false,true,true),page=f.componentInstance;const response=new Subject<{data:{id:string;lineNo:number;systemRowVersion:number;description:string;quantity:string}}>();
+  post.mockImplementationOnce(()=>response).mockImplementation(()=>throwError(()=>({status:422,error:{message:'Rejected second line'}})));
+  f.detectChanges();const grid=f.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
+  const start=grid.rows.findIndex(row=>row['__entryPlaceholder']);
+  await grid.pasteText('Paste A\t4\nPaste B\t5\nPaste C\t6',start,grid.columns.findIndex(column=>column.id==='description'));
+  await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(1));expect(post.mock.calls[0][1]).toEqual({description:'Paste A',quantity:'4'});
+  response.next({data:{id:'created-a',lineNo:30000,description:'Paste A',quantity:'4',systemRowVersion:1}});response.complete();
+  await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(2));await f.whenStable();
+  expect(post).toHaveBeenCalledTimes(2);expect(page.hasUnsavedChanges).toBe(true);
+  expect(page.inlineDocumentWindowConfig!.lineRows!.filter(row=>String(row['description']).startsWith('Paste'))).toHaveLength(3);
+  expect(f.nativeElement.querySelector('.line-paste-preview')).toBeNull();f.destroy();
+ });
+
 });

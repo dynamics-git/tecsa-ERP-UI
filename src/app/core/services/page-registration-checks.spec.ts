@@ -30,7 +30,7 @@ describe('One shared ERP page declaration pattern', () => {
   });
 
   it('checks every registered master, setup, document and related worksheet against the same contracts', () => {
-    expect(buildPageRegistry(runModalPageModules).size).toBe(41);
+    expect(buildPageRegistry(runModalPageModules).size).toBe(42);
     for (const module of runModalPageModules) {
       const declarations = Object.entries(module).filter(
         ([, value]) => value && typeof value === 'object' && 'pageId' in value,
