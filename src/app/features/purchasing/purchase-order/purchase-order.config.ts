@@ -125,11 +125,7 @@ export const purchaseOrderHeaderConfig: HeaderConfig = {
       order: 140,
       icon: 'ts-icon ts-icon-close-circle',
     },
-  ].map((action) => ({
-    ...action,
-    disabled: true,
-    tooltip: 'Purchase Order processing is not implemented yet.',
-  })),
+  ],
   sections: [
     {
       id: 'header-main',
@@ -583,11 +579,7 @@ export const purchaseOrderListCommandsConfig: CommandConfig[] = [
     group: 'more',
     icon: 'ts-icon ts-icon-more',
   },
-].map((action) => ({
-  ...action,
-  disabled: true,
-  tooltip: 'Purchase Order list action is not implemented yet.',
-}));
+];
 
 export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   factBox: { enabled: true },
