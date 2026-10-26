@@ -157,7 +157,7 @@ describe('PR document field layout follows its existing API', () => {
     fixture.componentRef.setInput('factBoxConfig', { enabled: false });
     fixture.detectChanges();
     const titles = [...fixture.nativeElement.querySelectorAll('.entry-work > .entry-section > .section-title h3')].map((element: any) => element.textContent.trim());
-    expect(titles).toEqual(['General', 'Lines', 'Request Details', 'Processing', 'Record Information']);
+    expect(titles).toEqual(['General', 'Lines', 'Request Details', 'Processing']);
     const source = headerDataSourceDefaults(purchaseRequisitionListConfig.dataSource, purchaseRequisitionHeaderConfig);
     expect(source.updateFields).toContain('locationId');
     for (const field of ['status', 'conversionStatus', 'purchaseOrderCount', 'statusChangedAt', 'systemCreatedAt', 'systemModifiedAt']) {

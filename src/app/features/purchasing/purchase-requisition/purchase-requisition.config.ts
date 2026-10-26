@@ -152,14 +152,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
         { key: 'statusChangedAt', label: 'Status Changed At', type: 'datetime', readonly: true },
       ],
     },
-    {
-      id: 'record-information',
-      title: 'Record Information',
-      fields: [
-        { key: 'systemCreatedAt', label: 'Created At', type: 'datetime', readonly: true },
-        { key: 'systemModifiedAt', label: 'Modified At', type: 'datetime', readonly: true },
-      ],
-    },
   ],
 };
 export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {

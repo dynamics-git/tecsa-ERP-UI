@@ -36,15 +36,13 @@
     </label>
     <app-lookup-select label="Mention a user" placeholder="Mention someone…" [display]="''" [options]="mentionOptions" [loading]="mentionLoading" [error]="mentionError" [hasMore]="mentionHasMore" [disabled]="busy" (opened)="openMentionChoices()" (searched)="searchMentions($event)" (selected)="addMention($event)" (nextPage)="searchMentions(mentionQuery,true)" (retried)="searchMentions(mentionQuery)"></app-lookup-select>
     @for(user of mentions;track user.systemId){<button type="button" [disabled]="busy" (click)="removeMention(user.systemId)" [attr.aria-label]="'Remove mention for '+user.name">@{{user.name}} ×</button>}
-    <small>Notifications follow enabled Notification Setup rules.</small>
-    <div class="tools">
-      <span>Visible to authorized users</span
-      ><button type="button" [disabled]="busy || !draft.trim()" (click)="save()">
-        <i class="ts-icon ts-icon-send" aria-hidden="true"></i>{{ busy ? 'Saving…' : 'Save note' }}
-      </button>
+    <div class="tools composer-actions">
       @if (draft) {
         <button type="button" [disabled]="busy" (click)="cancel()">Cancel</button>
       }
+      <button type="button" class="save-note" [disabled]="busy || !draft.trim()" (click)="save()">
+        <i class="ts-icon ts-icon-send" aria-hidden="true"></i>{{ busy ? 'Saving…' : 'Save note' }}
+      </button>
     </div>
   }
   @for (entry of result?.data ?? []; track entry.systemId) {
