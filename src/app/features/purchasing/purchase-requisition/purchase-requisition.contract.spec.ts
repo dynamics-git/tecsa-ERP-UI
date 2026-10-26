@@ -49,6 +49,7 @@ describe('Purchase Requisition server contract', () => {
     expect(purchaseRequisitionListConfig.dataSource.endpoint).toBe('/purchaseRequisitions');
     expect(purchaseRequisitionHeaderConfig.sections.flatMap(s => s.fields).map(f => f.key)).toContain('conversionStatus');
     expect(purchaseRequisitionFactBoxConfig.sections?.flatMap(s => s.fields?.map(f => f.field) ?? [])).toContain('purchaseOrderCount');
+    expect(purchaseRequisitionFactBoxConfig.sections?.flatMap(s => s.fields ?? []).find(f => f.field === 'estimatedTotal')?.type).toBe('currency');
     expect(line.columns.filter(c => Boolean(c.factBox)).map(c => c.id)).toEqual(['description','quantity','estimatedAmount']);
   });
 });
