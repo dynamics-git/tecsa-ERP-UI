@@ -17,7 +17,11 @@ export interface ListCommandHandlers {
 })
 export class PageCommandService {
   handleListCommand(event: ListCommandEvent, handlers: ListCommandHandlers): boolean {
-    switch (event.actionKey) {
+    // The shell uses plain keys; configured commands may use cmd: prefixes.
+    // Normalize only the standard operations, preserving custom action keys unchanged.
+    const rawKey = event.actionKey.trim().toLowerCase();
+    const command = rawKey.startsWith('cmd:') ? rawKey.slice(4) : rawKey;
+    switch (command) {
       case 'refresh':
         handlers.refresh?.(event.payload);
         return handlers.refresh !== undefined;
