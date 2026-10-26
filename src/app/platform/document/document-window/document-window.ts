@@ -353,9 +353,20 @@ export class DocumentWindow {
       return this.factBoxSections;
     }
 
-    if (this.factBoxConfig?.sections?.length) return this.factBoxConfig.sections.map(section => ({
-      id: section.id, title: section.title, layout: section.layout, collapsed: section.collapsed, subtitle: section.subtitle, buttons: section.buttons, rows: (section.fields ?? []).map(field => ({label: field.label, value: this.formatDetail(field)})),
-    }));
+    if (this.factBoxConfig?.sections?.length) {
+      const sections: FactBoxSectionConfig[] = this.factBoxConfig.sections.map(section => ({
+        id: section.id, title: section.title, layout: section.layout, collapsed: section.collapsed,
+        subtitle: section.subtitle, buttons: section.buttons,
+        rows: (section.fields ?? []).map(field => ({label: field.label, value: this.formatDetail(field)})),
+      }));
+      // Explicit header summaries must not suppress configured active-line details.
+      const lineSections = new Map<string, FactBoxDraftSection>();
+      this.appendLineFactBoxSections(lineSections);
+      return [...sections, ...[...lineSections.values()].map(section => ({
+        id: section.id, title: section.title, buttons: section.buttons,
+        rows: section.rows.sort((a, b) => a.order - b.order).map(row => ({label: row.label, value: row.value})),
+      }))];
+    }
     const configured = this.buildFactBoxSectionsFromDocumentConfig();
     const hasSelectedFields = this.resolvedHeaderSections.some(section => section.fields.some(field => this.resolveFieldFactBoxConfig(field)));
     if (hasSelectedFields) return configured;

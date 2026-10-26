@@ -1525,6 +1525,16 @@ export class ListPage implements OnInit, OnDestroy {
     const typeField = this.getLineTypeField();
     const numberField = this.getLineNumberField();
 
+    if (typeField && field === typeField && this.lineConfig.typeField) {
+      // The grid already applied the configured dependent-field clears. Wait for
+      // the required master selection, then persist type + ID + cleared values
+      // in a single PATCH. Never reset server-owned line numbering or quantities.
+      this.clearEntryStatus();
+      this.recalculateActiveLineTotals();
+      this.changeDetector.detectChanges();
+      return;
+    }
+
     if (!typeField || field !== typeField) {
       const fieldsToPersist = new Set<string>([field, ...(change.calculatedFields ?? [])]);
       if (numberField && field === numberField) {
@@ -1730,7 +1740,11 @@ export class ListPage implements OnInit, OnDestroy {
       this.changeDetector.detectChanges();
       options.onSettled?.(false); return;
     }
-    const uniqueFields = [...new Set(fields.map((field) => field.trim()).filter(Boolean))];
+    const pendingTypeEdits = this.lineConfig.typeField && !this.isWorksheetPage
+      ? [...(this.unsavedFields.get(row) ?? [])]
+      : [];
+    const writeable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
+    const uniqueFields = [...new Set([...fields, ...pendingTypeEdits].map((field) => field.trim()).filter(field => field && (!writeable || writeable.has(field))))];
     if (!uniqueFields.length) {
       options.onSettled?.(false); return;
     }

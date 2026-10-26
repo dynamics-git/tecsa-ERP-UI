@@ -6,6 +6,7 @@ import {
   ListPageConfig,
   listColumns,
 } from '../../../platform/public-api';
+import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
 
 const actionDefinitions: CommandConfig[] = [
   {
@@ -155,7 +156,7 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
   ],
 };
 export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
-  factBox: { enabled: true },
+  factBox: purchaseRequisitionFactBoxConfig,
   pageId: 'purchase-requisition',
   pageType: 'document',
   autoSave: true,
@@ -223,6 +224,7 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   },
 };
 export const purchaseRequisitionLineConfig: LineConfig = {
+  typeField: 'lineType',
   placement: { mode: 'after-section', afterSectionId: 'general' },
   toolbarButtons: [],
   lineKeyField: 'lineNo',
@@ -239,6 +241,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     },
     permissions: { create: 'modify', update: 'modify', delete: 'modify' },
     omitEmptyFields: ['description'],
+    updateBlockedFields: ['estimatedAmount', 'qtyPerUnitOfMeasure', 'convertedQuantity', 'remainingQuantity'],
     meaningfulFields: ['itemId', 'glAccountId', 'description'],
   },
   columns: [
@@ -250,7 +253,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       required: true,
       cellType: 'dropdown',
       defaultValue: 'item',
-      clearFieldsOnChange: ['itemId', 'glAccountId'],
+      clearFieldsOnChange: ['itemId', 'glAccountId', 'unitOfMeasureId', 'locationId'],
       options: [
         { label: 'Item', value: 'item' },
         { label: 'G/L Account', value: 'gl_account' },
@@ -259,10 +262,14 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'itemId',
       label: 'Item',
+      valueType: 'guid',
+      defaultValue: null,
+      requiredWhen: { field: 'lineType', values: ['item'] },
       cellType: 'dropdown',
       editableWhen: { field: 'lineType', values: ['item'] },
       lookup: {
         endpoint: '/items',
+        filter: 'blocked eq false',
         valueField: 'systemId',
         displayField: 'number',
         searchFields: ['number', 'description'],
@@ -271,28 +278,35 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'glAccountId',
       label: 'G/L Account',
+      valueType: 'guid',
+      defaultValue: null,
+      requiredWhen: { field: 'lineType', values: ['gl_account'] },
       cellType: 'dropdown',
       editableWhen: { field: 'lineType', values: ['gl_account'] },
       lookup: {
         endpoint: '/glAccounts',
+        filter: "accountType eq 'posting' and blocked eq false",
         valueField: 'systemId',
         displayField: 'number',
         searchFields: ['number', 'name'],
       },
     },
-    { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 } },
+    { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
-      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown',
+      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
+      editableWhen: { field: 'lineType', values: ['item'] },
       lookup: { endpoint: '/unitsOfMeasure', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'description'] },
     },
     { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', readonly: true, align: 'end' },
     {
-      id: 'locationId', label: 'Location', cellType: 'dropdown',
+      id: 'locationId', label: 'Location', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
+      editableWhen: { field: 'lineType', values: ['item'] },
       lookup: { endpoint: '/locations', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'name'] },
     },
     {
       id: 'quantity',
       label: 'Quantity',
+      factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 20 },
       valueType: 'decimal',
       required: true,
       validation: { pattern: '^[0-9]{1,14}(?:[.][0-9]{1,6})?$' },
@@ -310,6 +324,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'estimatedAmount',
       label: 'Estimated Amount',
+      factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 30 },
       valueType: 'decimal',
       readonly: true,
       align: 'end',

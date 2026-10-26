@@ -274,7 +274,9 @@ export class DocumentConfigDataService {
     return this.toText(column?.field ?? column?.id).trim();
   }
 
-  private resolveLineTypeColumn(lineConfig: Pick<LineConfig, 'columns'>): LineColumnConfig | undefined {
+  private resolveLineTypeColumn(lineConfig: Pick<LineConfig, 'columns' | 'typeField'>): LineColumnConfig | undefined {
+    const explicit = lineConfig.typeField?.trim();
+    if (explicit) return lineConfig.columns.find(column => this.getColumnField(column) === explicit);
     return lineConfig.columns.find((column) =>
       (column.options ?? []).some((option) => this.resolveApiEndpoints(option.api).length > 0)
     );
