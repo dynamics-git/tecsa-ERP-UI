@@ -17,7 +17,7 @@ nav {
   flex-wrap: wrap;
 }
 header {
-  margin-bottom: var(--ts-space-4);
+  margin-bottom: var(--ts-space-3);
   h4 {
     margin: 0;
     font-size: var(--ts-font-body);
@@ -75,7 +75,7 @@ input:focus-visible {
 }
 .tools {
   margin-top: var(--ts-space-2);
-  margin-bottom: var(--ts-space-4);
+  margin-bottom: var(--ts-space-3);
   > span {
     font-size: var(--ts-font-caption);
     color: var(--ts-text-soft);

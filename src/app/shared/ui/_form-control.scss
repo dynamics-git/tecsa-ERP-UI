@@ -1,7 +1,7 @@
-// Shared appearance extracted unchanged from the existing dynamic form controls.
+// Shared appearance for form and lookup controls.
 @mixin appearance {
     width: 100%;
-    height: 30px;
+    height: var(--ts-control-h);
     margin-top: 4px;
     padding: 0 9px;
     border: 1px solid var(--ts-border);

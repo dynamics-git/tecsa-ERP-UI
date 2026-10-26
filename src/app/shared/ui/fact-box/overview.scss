@@ -9,7 +9,7 @@
     border-bottom: 0;
   }
   h4 {
-    margin: 0 0 var(--ts-space-4);
+    margin: 0 0 var(--ts-space-3);
     font-size: var(--ts-font-body);
     font-weight: 600;
   }
@@ -22,11 +22,11 @@
 dl {
   margin: 0;
   display: grid;
-  gap: var(--ts-space-3);
+  gap: var(--ts-space-2);
   > div {
     display: grid;
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    gap: var(--ts-space-3);
+    gap: var(--ts-space-2);
     align-items: start;
   }
   dt {

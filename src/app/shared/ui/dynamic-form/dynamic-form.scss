@@ -1,13 +1,13 @@
 @use '../form-control' as form-control;
 
 .header-form {
-  padding: var(--ts-space-3) var(--ts-space-4);
+  padding: var(--ts-space-5) var(--ts-6);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px 10px;
+  gap: var(--ts-space-5) var(--ts-6);
 
   label {
-    color: var(--ts-muted);
+    color: var(--ts-text-soft);
     font-size: var(--ts-font-label);
     font-weight: 500;
   }
@@ -15,12 +15,12 @@
   input:not([type="checkbox"]),
   select {
     @include form-control.appearance;
-    margin-top: 4px;
+    margin-top: var(--ts-space-2);
   }
 
   textarea {
     width: 100%;
-    margin-top: 4px;
+    margin-top: var(--ts-space-2);
     padding: 7px 9px;
     border: 1px solid var(--ts-border);
     border-radius: 6px;
@@ -75,6 +75,6 @@
 }
 
 
-app-lookup-select { margin-top: 4px; }
+app-lookup-select { margin-top: var(--ts-space-1); }
 
 .field-error { display: block; color: var(--ts-danger); font-size: var(--ts-font-label); margin-top: var(--ts-space-1); }
