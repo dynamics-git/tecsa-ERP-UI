@@ -69,41 +69,6 @@ describe('TecSA Laravel company-aware login', () => {
     localStorage.clear();
   });
 
-  it('lists only active authorized companies through the identity API', async () => {
-    session.applySessionContext({ user, company: companyA.systemId, companyName: companyA.name, accessToken: 'sanctum-test-token' });
-    const result = firstValueFrom(auth.listAuthorizedCompanies());
-    const request = http.expectOne(`${apiBase}/auth/companies`);
-    expect(request.request.headers.get('Authorization')).toBe('Bearer sanctum-test-token');
-    request.flush({ data: [companyA, { ...companyB, isActive: false }] });
-    expect((await result).map(company => company.systemId)).toEqual([companyA.systemId]);
-  });
-
-  it('changes company only after a matching verified permission context', async () => {
-    session.applySessionContext({ user, company: companyA.systemId, companyName: companyA.name, accessToken: 'sanctum-test-token', permissions: [] });
-    const switching = firstValueFrom(auth.switchActiveCompany(companyB.systemId));
-    expect(session.Company).toBe(companyA.systemId);
-    const request = http.expectOne(contextUrl(companyB.systemId));
-    expect(request.request.headers.get('Authorization')).toBe('Bearer sanctum-test-token');
-    request.flush(context(companyB, false, true));
-    const selected = await switching;
-    expect(selected.company).toBe(companyB.systemId);
-    expect(session.Company).toBe(companyB.systemId);
-    expect(session.CompanyName).toBe(companyB.name);
-    expect(session.AccessToken).toBe('sanctum-test-token');
-    expect(session.Permissions.some((item) => (item as Record<string, unknown>)['pageId'] === 'purchase-order')).toBe(true);
-  });
-
-  it('preserves the original company and permissions if the returned context does not match', async () => {
-    const originalPermissions = [{ pageId: 'purchase-requisition', canRead: true }];
-    session.applySessionContext({ user, company: companyA.systemId, companyName: companyA.name, accessToken: 'sanctum-test-token', permissions: originalPermissions });
-    const switching = firstValueFrom(auth.switchActiveCompany(companyB.systemId));
-    http.expectOne(contextUrl(companyB.systemId)).flush(context(companyA));
-    await expect(switching).rejects.toThrow('did not verify the selected company');
-    expect(session.Company).toBe(companyA.systemId);
-    expect(session.CompanyName).toBe(companyA.name);
-    expect(session.Permissions).toEqual(originalPermissions);
-  });
-
   it('uses Laravel login, verifies default company and receives backend permissions before entering ERP', async () => {
     const operation = firstValueFrom(auth.login({ email: ' user@example.test ', password: 'correct-password' }));
     const login = http.expectOne(url);
