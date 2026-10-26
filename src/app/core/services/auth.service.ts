@@ -66,6 +66,49 @@ export class AuthService {
     return this.restService.get('/companies');
   }
 
+  /** Account-wide membership lookup: never derive this from the active company's business collection. */
+  listAuthorizedCompanies(): Observable<AuthorizedCompany[]> {
+    return this.http.get<BackendLoginResponse>(this.buildAuthUrl('/auth/companies'), {
+      headers: this.createBearerHeaders(),
+    }).pipe(map((response) => {
+      const body = this.toRecord(response) ?? {};
+      return this.extractAuthorizedCompanies(this.readValue(body, 'data'));
+    }));
+  }
+
+  /** Retain the old session until the backend verifies the new company and its permissions. */
+  switchActiveCompany(companyId: string): Observable<SessionContext> {
+    const requestedId = companyId.trim();
+    const user = this.toRecord(this.sessionService.User);
+    if (!requestedId || !user || !this.sessionService.isSessionValid()) {
+      return throwError(() => new Error('Sign in and choose an authorized company.'));
+    }
+    if (requestedId === this.sessionService.Company) {
+      return throwError(() => new Error('This company is already active.'));
+    }
+    return this.getPermissionEngine(requestedId).pipe(map((response) => {
+      const body = this.toRecord(response) ?? {};
+      const engine = this.toRecord(this.readValue(body, 'data'));
+      const verified = this.toRecord(engine?.['company']);
+      if (!engine || !verified || this.readFirstString(verified, ['systemId']) !== requestedId) {
+        throw new Error('The server did not verify the selected company.');
+      }
+      const companyName = this.readFirstString(verified, ['displayName', 'name']);
+      const context = {
+        ...this.mapEngineToSessionContext(user, {
+          email: this.readFirstString(user, ['email']),
+          password: '',
+          companyId: requestedId,
+          companyName,
+        }, engine),
+        company: requestedId,
+        companyName,
+      };
+      this.sessionService.applySessionContext(context);
+      return context;
+    }));
+  }
+
   getPermissionEngine(companyId: string): Observable<unknown> {
     return this.http.get(this.buildAuthUrl('/auth/context'), {
       headers: this.createBearerHeaders(),
