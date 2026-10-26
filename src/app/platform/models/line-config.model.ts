@@ -19,6 +19,7 @@ export type LineCellType = 'text' | 'select' | 'dropdown' | 'icon';
 export type LineValueType = import('./field-value').FieldValueType;
 
 export interface LineColumnConfig extends DataSurfaceColumnConfig {
+  quickEntry?: boolean;
   requiredWhen?: FieldConfig['requiredWhen'];
   readonlyWhen?: FieldConfig['readonlyWhen'];
   lookup?: FieldLookupConfig;

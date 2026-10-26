@@ -631,3 +631,8 @@ button:disabled { cursor: default; opacity: 0.45; }
 .dataset-tools > details > summary.export-trigger { width: var(--ts-control-h); padding: 0; }
 
 .virtual-spacer td { padding: 0; border: 0; pointer-events: none; }
+
+.app-grid { th.frozen-column {position:sticky;z-index:3;background:var(--ts-surface);} td.frozen-column {position:sticky;z-index:1;background:var(--ts-surface);} tbody tr.selected td.frozen-column {background:var(--ts-row-selected-bg);} tbody tr:hover td.frozen-column {background:var(--ts-row-hover-bg);} tbody tr.selected:hover td.frozen-column {background:var(--ts-row-selected-bg);} }
+
+.column-options { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+.column-option { display: grid; grid-template-columns: minmax(80px, 1fr) auto auto 28px 28px; gap: var(--ts-space-1); align-items: center; min-width: 0; label { min-width: 0; overflow-wrap: anywhere; } button { white-space: nowrap; } }

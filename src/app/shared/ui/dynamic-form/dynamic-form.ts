@@ -1,3 +1,4 @@
+import { moveQuickEntry } from '../quick-entry';
 import { FieldValidationService } from '../../../platform/document/field-validation.service';
 import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../../../platform/models/field-state';
 import { lookupQuery, clearDependentLookups } from '../../../platform/data/lookup-dependencies';
@@ -34,6 +35,7 @@ type FieldDropdownOpenEvent = {
   styleUrl: './dynamic-form.scss',
 })
 export class DynamicForm {
+  readonly moveQuickEntry = moveQuickEntry;
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
   readonly errors = new Map<string,string>();
   private readonly drafts = new Map<string,unknown>();

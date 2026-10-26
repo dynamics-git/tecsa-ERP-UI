@@ -1,4 +1,4 @@
-<div class="line-grid-wrap" [class.worksheet-grid]="worksheet" tabindex="0" (keydown)="handleGridKeydown($event)">
+<div class="line-grid-wrap" [class.worksheet-grid]="worksheet" tabindex="0" (keydown)="handleGridKeydown($event)" (copy)="handleCopy($event)">
   <table class="line-grid" [class.with-selection]="showSelection">
     <thead>
       <tr>
@@ -11,7 +11,7 @@
               (change)="toggleAllRowsSelection($any($event.target).checked)" />
           </th>
         }
-        @for (column of columns; track column.id) {
+        @for (column of visibleColumns; track column.id) {
           <th
             #headerCell
             [class.amount]="column.align === 'end' || column.type === 'currency'"
@@ -53,8 +53,11 @@
                 (change)="toggleRowSelection(rowIndex, $any($event.target).checked)" />
             </td>
           }
-          @for (column of columns; track column.id) {
+          @for (column of visibleColumns; track column.id) {
             <td
+              [attr.data-quick-entry]="column.quickEntry !== false && !isReadonly(column, row) && column.cellType !== 'icon'"
+              (keydown)="handleCellKeydown($event, column, row, rowIndex)"
+              (focusin)="focusCell(column, rowIndex)" (paste)="handlePaste($event, column)"
               [class.amount]="column.align === 'end' || column.type === 'currency'"
               [class.line-icon-col]="column.cellType === 'icon'"
               [style.width]="getColumnWidthStyle(column)">
@@ -95,3 +98,13 @@
     </tbody>
   </table>
 </div>
+
+@if (clipboardMessage) { <div class="line-clipboard-message" role="status">{{ clipboardMessage }} <button type="button" aria-label="Dismiss clipboard message" (click)="clipboardMessage=''">×</button></div> }
+@if (pastePreview; as preview) {
+  <section class="line-paste-preview" aria-label="Excel paste preview">
+    <header><strong>Paste {{ preview.rows.length }} new lines</strong><button type="button" (click)="pastePreview=undefined">Cancel</button><button type="button" [disabled]="preview.errors.length>0 || disabled" (click)="applyPaste()">Apply paste</button></header>
+    <p>New line identities and numbering are assigned by the server. Existing lines are preserved.</p>
+    @if (preview.errors.length) { <ul role="alert">@for (error of preview.errors; track $index) { <li>{{ error }}</li> }</ul> }
+    <div class="line-paste-scroll"><table><thead><tr>@for (label of preview.labels; track $index) { <th>{{ label }}</th> }</tr></thead><tbody>@for (cells of preview.cells; track $index) { <tr>@for (cell of cells; track $index) { <td>{{ cell }}</td> }</tr> }</tbody></table></div>
+  </section>
+}

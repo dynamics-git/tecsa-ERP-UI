@@ -29,6 +29,7 @@ import { DocumentHydrationOrchestratorService } from '../../data/document-hydrat
 import { DocumentResponseNormalizerService } from '../../data/document-response-normalizer.service';
 import { DocumentStateService } from '../../data/document-state.service';
 import { FieldValidationService } from '../../document/field-validation.service';
+import { LineCalculationService } from '../../document/line-calculation.service';
 import { LineCommandService } from '../../document/line-command.service';
 import { LineMasterRegistry, LineMasterService } from '../../data/line-master.service';
 import { ListFilterStateService } from '../list-filter-state.service';
@@ -60,6 +61,7 @@ type ResolvedLineDataSource = {
 
 type CreateLineOptions = {
   ensureTrailingEmpty?: boolean;
+  onSettled?: (success: boolean) => void;
 };
 
 export interface DocumentPageCommandEvent {
@@ -96,6 +98,7 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly apiError = inject(ApiErrorService);
   private readonly lineMasters = inject(LineMasterService);
   private readonly lineCommands = inject(LineCommandService);
+  private readonly lineCalculations = inject(LineCalculationService);
   private readonly deletes = inject(RecordDeleteService);
   private deleting = false;
   private readonly listFilterState = inject(ListFilterStateService);
@@ -115,7 +118,7 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly subscriptions = new Subscription();
   private readonly unsavedNavigation = inject(UnsavedChangesService);
   get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0; }
-  get hasPendingWrites(): boolean { return this.deleting || this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0; }
+  get hasPendingWrites(): boolean { return this.deleting || this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0 || this.lineBatchPending; }
   private readonly commandPermission = inject(DocumentPageCommandPermissionService);
   private readonly worksheetChangedRows = new Set<Record<string, unknown>>();
   private worksheetPending = 0;
@@ -202,6 +205,7 @@ export class ListPage implements OnInit, OnDestroy {
   private dirty = false;
   private readonly invalidHeaderDrafts = new Set<string>();
   private autosavePending = 0;
+  private lineBatchPending = false;
   private editSequence = 0;
   private readonly unsavedFields = new Map<Record<string, unknown>, Map<string, number>>();
 
@@ -1191,7 +1195,7 @@ export class ListPage implements OnInit, OnDestroy {
       },
       linePlacement: this.lineConfig?.placement,
       headerToolbarButtons: this.resolvePopupHeaderToolbarButtons(),
-      lineToolbarButtons: this.resolvePopupLineToolbarButtons(),
+      lineToolbarButtons: this.isWorksheetPage ? [] : this.resolvePopupLineToolbarButtons(),
       detailToolbarButtons: this.resolvePopupDetailToolbarButtons(),
       headerSections: this.headerConfig.sections,
       headerData,
@@ -1205,7 +1209,8 @@ export class ListPage implements OnInit, OnDestroy {
 
   private resolvePopupHeaderToolbarButtons(): CommandConfig[] {
     if (this.isWorksheetPage) {
-      const commands = [...this.headerConfig.toolbarButtons, ...(this.listConfig.commands ?? []), ...(this.lineConfig?.toolbarButtons ?? [])];
+      const productivity = this.resolvePopupLineToolbarButtons().filter(button=>['line-copy','line-paste','line-copy-rows'].includes(this.normalizeCommandAction(button.actionKey)));
+      const commands = [...this.headerConfig.toolbarButtons, ...(this.listConfig.commands ?? []), ...(this.lineConfig?.toolbarButtons ?? []), ...productivity];
       return this.documentOnly ? this.commandAssembler.resolveHeaderToolbarButtons({dataSource: this.lineConfig?.dataSource ?? this.listConfig.dataSource, toolbarButtons: commands, pageId: this.permissionPageId}) : [];
     }
     return this.commandAssembler.resolveHeaderToolbarButtons({
@@ -1257,7 +1262,7 @@ export class ListPage implements OnInit, OnDestroy {
         (!!button.apiAction?.states && !button.apiAction.states.values.includes(entry.headerData?.[button.apiAction.states.field])),
     }));
     entry.lineToolbarButtons = this.resolvePopupLineToolbarButtons().map(button => ({ ...button,
-      disabled: button.disabled || (this.normalizeCommandAction(button.actionKey) === 'line-delete'
+      disabled: button.disabled || (this.normalizeCommandAction(button.actionKey) === 'line-copy-rows' ? false : this.normalizeCommandAction(button.actionKey) === 'line-delete'
         ? !this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {}) : !lineEditable),
     }));
   }
@@ -1307,7 +1312,6 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private resolvePopupLineToolbarButtons(): CommandConfig[] {
-    if (this.isWorksheetPage) return [];
     return this.commandAssembler.resolveLineToolbarButtons({
       lineConfig: this.lineConfig,
       pageId: this.lineConfig?.permissionPageId ?? this.listConfig.pageId ?? this.pageId,
@@ -1698,9 +1702,9 @@ export class ListPage implements OnInit, OnDestroy {
     );
   }
 
-  private saveLineFields(row: Record<string, unknown>, fields: string[]): void {
+  private saveLineFields(row: Record<string, unknown>, fields: string[], options: CreateLineOptions = {}): void {
     if (!this.lineConfig || !this.activeDocumentWindowConfig?.headerData) {
-      return;
+      options.onSettled?.(false); return;
     }
 
     if (!this.isWorksheetPage && (
@@ -1709,31 +1713,31 @@ export class ListPage implements OnInit, OnDestroy {
       !this.hasPersistedIdentity(this.activeDocumentWindowConfig.headerData)
     )) {
       this.autosaveDeferredUntilDraftCreate = true;
-      return;
+      options.onSettled?.(false); return;
     }
 
     if (this.isWorksheetPage && this.lineCreateInProgress.has(row)) {
-      this.deferLineSaveFields(row, fields); return;
+      this.deferLineSaveFields(row, fields); options.onSettled?.(false); return;
     }
     if (this.isWorksheetPage) {
-      if (!this.worksheetAllowed(row)) { this.setEntryStatus({tone: 'error', title: 'Cannot save', message: 'You do not have permission to change this row.'}); return; }
+      if (!this.worksheetAllowed(row)) { this.setEntryStatus({tone: 'error', title: 'Cannot save', message: 'You do not have permission to change this row.'}); options.onSettled?.(false); return; }
       const errors = (this.lineConfig.fields ?? []).flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
-      if (errors.length) { this.setEntryStatus({tone: 'error', title: 'Complete row', message: errors.join('. ')}); return; }
+      if (errors.length) { this.setEntryStatus({tone: 'error', title: 'Complete row', message: errors.join('. ')}); options.onSettled?.(false); return; }
     }
     const lineErrors = this.validateLineRow(row);
     if (lineErrors.length) {
       this.setEntryStatus({ tone: 'error', title: 'Check line fields', message: lineErrors.join('. ') });
       this.changeDetector.detectChanges();
-      return;
+      options.onSettled?.(false); return;
     }
     const uniqueFields = [...new Set(fields.map((field) => field.trim()).filter(Boolean))];
     if (!uniqueFields.length) {
-      return;
+      options.onSettled?.(false); return;
     }
 
     if (this.lineCreateInProgress.has(row)) {
       this.deferLineSaveFields(row, uniqueFields);
-      return;
+      options.onSettled?.(false); return;
     }
 
     this.applyParentFieldsToLine(row);
@@ -1745,12 +1749,12 @@ export class ListPage implements OnInit, OnDestroy {
         message: resolved.reason ?? 'Line datasource is not ready.',
       });
       this.changeDetector.detectChanges();
-      return;
+      options.onSettled?.(false); return;
     }
 
     const rowId = this.resolvePersistedRecordId(row, resolved.dataSource);
     if (!this.hasValue(rowId)) {
-      this.createLine(row, resolved.dataSource);
+      this.createLine(row, resolved.dataSource, options);
       return;
     }
 
@@ -1812,7 +1816,7 @@ export class ListPage implements OnInit, OnDestroy {
     options: CreateLineOptions = {},
   ): void {
     if (!this.lineConfig) {
-      return;
+      options.onSettled?.(false); return;
     }
 
     if (lineDataSource.supportsCreate === false) {
@@ -1822,11 +1826,11 @@ export class ListPage implements OnInit, OnDestroy {
         message: 'Create is not supported for this page.',
       });
       this.changeDetector.detectChanges();
-      return;
+      options.onSettled?.(false); return;
     }
 
     if (this.lineCreateInProgress.has(row)) {
-      return;
+      options.onSettled?.(false); return;
     }
 
     const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
@@ -1837,7 +1841,7 @@ export class ListPage implements OnInit, OnDestroy {
         message: 'Required line fields are missing. Complete required values before saving line.',
       });
       this.changeDetector.detectChanges();
-      return;
+      options.onSettled?.(false); return;
     }
 
     const savedEdits = this.beginAutosave(row);
@@ -1870,7 +1874,7 @@ export class ListPage implements OnInit, OnDestroy {
           this.lineCreateInProgress.delete(row);
           this.worksheetSaveFinished(row, created);
 
-          if (!created) return;
+          if (!created) { options.onSettled?.(false); return; }
           const createdRecord = this.toCreatedRecord(created);
           if (createdRecord) {
             const deferred = this.isWorksheetPage ? Object.fromEntries([...(this.deferredLineSaveFields.get(row) ?? [])].map(field => [field, row[field]])) : {};
@@ -1893,6 +1897,7 @@ export class ListPage implements OnInit, OnDestroy {
             message: 'Line autosaved.',
           });
           this.changeDetector.detectChanges();
+          options.onSettled?.(true);
         }),
     );
   }
@@ -2108,6 +2113,8 @@ export class ListPage implements OnInit, OnDestroy {
       void this.refreshEntrySafely();
       return;
     }
+
+    if (command === 'line-copy' || command === 'line-paste') { this.copySelectedLines(payload, command === 'line-paste'); return; }
 
     if (command === 'line-delete') {
       void this.deleteLine(payload);
@@ -2441,6 +2448,62 @@ export class ListPage implements OnInit, OnDestroy {
       }
       this.showDeleteFailures(result.failures, result.targetRows.length);
     } finally { this.setDeleting(false); }
+  }
+
+  private copySelectedLines(payload: unknown, paste = false): void {
+    const entry = this.activeDocumentWindowConfig, config = this.lineConfig;
+    if (!entry || !config || config.editable === false || config.dataSource.supportsCreate === false ||
+        this.deleting || this.hasPendingWrites || this.popupLoading || entry.interactionLocked || !this.canModifyLines('create') ||
+        !this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {}) ||
+        this.isWorksheetPage && !this.worksheetAllowed({})) return;
+    const button = this.resolvePopupLineToolbarButtons().find(button => this.normalizeCommandAction(button.actionKey) === (paste?'line-paste':'line-copy'));
+    if (!button || button.disabled || button.hidden) return;
+    const rows = entry.lineRows ?? [];
+    const pasted = paste && this.isRecord(payload) && Array.isArray(payload['rows']) ? payload['rows'].filter((row):row is Record<string,unknown>=>this.isRecord(row)) : [];
+    const selected = paste ? pasted : this.lineCommands.planDeleteRequest({lineRows: rows, payload,
+      activeRow: this.activeLineRow, selectedIndexes: this.selectedLineIndexes}).targetRows
+      .filter(row => !row['__entryPlaceholder'] && !this.isLineRowMeaningfullyEmpty(row));
+    if (!selected.length) { this.setEntryStatus({tone:'info', title:'Select a line', message:'Select a populated line to copy.'}); return; }
+    if (selected.length > 20) { this.setEntryStatus({tone:'error', title:'Too many lines', message:'Copy at most 20 selected lines at a time.'}); return; }
+    const copies = selected.map(source => {
+      const draft = this.documentConfigData.createEmptyLineRow(config, entry.headerData ?? {}, this.getLineMasterRegistry(), this.optionFieldMap);
+      const values = this.lineCommands.copyEditableValues(source, draft, config);
+      Object.assign(draft, values);
+      this.lineCalculations.applyCalculations(draft, config.calculation, structuredClone(entry.headerData));
+      return {draft, fields:Object.keys(values)};
+    });
+    if (copies.some(copy => !copy.fields.length || this.validateLineRow(copy.draft).length)) {
+      this.setEntryStatus({tone:'error', title:'Cannot copy lines', message:'The copied values do not satisfy the current line rules. No lines were copied.'}); return;
+    }
+    // The server assigns new line numbers at the end; keep the visible order consistent.
+    const lastPopulated = rows.reduce((last, row, index) => row['__entryPlaceholder'] || this.isLineRowMeaningfullyEmpty(row) ? last : index, -1);
+    entry.lineRows = [...rows.slice(0, lastPopulated + 1), ...copies.map(copy => copy.draft), ...rows.slice(lastPopulated + 1)];
+    this.dirty = true;
+    for (const {draft,fields} of copies) {
+      this.trackUnsaved(draft,fields);
+      if (this.isWorksheetPage) this.worksheetChangedRows.add(draft);
+    }
+    this.activeLineRow = copies[0].draft; this.selectedLineIndexes = [];
+    this.ensureTrailingEmptyRows(); this.recalculateActiveLineTotals();
+    this.changeDetector.detectChanges();
+    // Reuse the normal line create path; failed drafts remain visible and dirty.
+    if (!this.usesManualSaveMode()) {
+      const canContinue = this.dataSource.captureWriteScope();
+      this.lineBatchPending = true;
+      const finish = () => {
+        this.lineBatchPending = false;
+        this.runModal.notifyBackground(this.initialRecord);
+        this.changeDetector.markForCheck();
+      };
+      const saveNext = (index: number): void => {
+        if (index >= copies.length || this.activeDocumentWindowConfig !== entry || !canContinue()) { finish(); return; }
+        const { draft, fields } = copies[index];
+        this.saveLineFields(draft, fields, { onSettled: success => {
+          if (success) saveNext(index + 1); else finish();
+        } });
+      };
+      saveNext(0);
+    }
   }
 
   private appendNewLine(mode: 'append' | 'prepend'): void {

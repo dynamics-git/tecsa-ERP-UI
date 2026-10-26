@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { DocumentLines } from '../document/document-lines/document-lines';
 import { provideRouter } from '@angular/router';
 import { describe,it,expect,vi } from 'vitest';
 import { of } from 'rxjs';
@@ -87,6 +89,15 @@ describe('Shared filters, exports, details and document layout',()=>{
   expect(details()).toContain('Second row');expect(details()).not.toContain('First row');
   f.componentRef.setInput('lineRows',[]);f.detectChanges();expect(details()).toContain('Select a row');
   f.componentRef.setInput('factBoxConfig',{enabled:false});f.detectChanges();expect(f.nativeElement.querySelector('.entry-info')).toBeNull();f.destroy();
+ });
+ it('opens paste preview from the existing toolbar even when a line is already active',()=>{
+  TestBed.configureTestingModule({imports:[DocumentWindow],providers:[provideRouter([]),{provide:DATA_REST_SERVICE,useValue:{get:()=>of([])}}]});
+  const f=TestBed.createComponent(DocumentWindow);
+  f.componentRef.setInput('lineColumns',[{id:'quantity',label:'Quantity',valueType:'number'}]);f.componentRef.setInput('lineRows',[{quantity:2}]);f.detectChanges();
+  const editor=f.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;const preview=vi.spyOn(editor,'requestPaste').mockResolvedValue(undefined);
+  const emit=vi.spyOn(f.componentInstance.action,'emit');
+  f.componentInstance.handleLineToolbarAction('cmd:line-paste');
+  expect(preview).toHaveBeenCalledOnce();expect(emit).not.toHaveBeenCalled();f.destroy();
  });
  it('exports CSV with formula protection, quoting and leading zeros without fetching more data',async()=>{
   const service=new ListExportService();let captured:Blob|undefined;

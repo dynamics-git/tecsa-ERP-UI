@@ -1,3 +1,4 @@
+import { writeTabularText } from '../../data/tabular-text';
 import { RunModalService } from '../../run-modal/run-modal.service';
 import { FactBoxHostService } from '../../../shared/ui/fact-box-toggle/fact-box-host.service';
 import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
@@ -104,6 +105,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   showColumns = false;
   showSaveView = false;
   groupingField = '';
+  frozenThrough = '';
   collapsedGroups = new Set<string>();
   get rowGroups(): Array<{key: string; label: string; rows: unknown[]}> {
     if (!this.groupingField) return [{key: 'all', label: '', rows: this.rows}];
@@ -203,7 +205,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   }
   get personalizationKey(): string { return this.config?.personalization?.storageKey ?? this.config?.pageId ?? this.config?.dataSurface?.id ?? 'list'; }
   get currentPersonalization(): ListPersonalizationState {
-    return {columnOrder: this.columnOrder, hiddenColumns: [...this.hiddenColumns], columnWidths: Object.fromEntries(this.resizedColumnWidths), density: this.density, factBoxOpen: this.factboxOpen, groupingField: this.groupingField};
+    return {columnOrder: this.columnOrder, hiddenColumns: [...this.hiddenColumns], columnWidths: Object.fromEntries(this.resizedColumnWidths), density: this.density, factBoxOpen: this.factboxOpen, groupingField: this.groupingField, ...(this.frozenThrough ? {frozenThrough:this.frozenThrough} : {})};
   }
 
   initializePersonalization(): void {
@@ -234,6 +236,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
       for (const [field, width] of Object.entries(state.columnWidths)) if (fields.has(field) && Number.isFinite(width)) this.resizedColumnWidths.set(field, Math.min(800, Math.max(72, width)));
     }
     if (state.density === 'compact' || state.density === 'comfortable' || state.density === 'spacious') this.density = state.density;
+    this.frozenThrough = typeof state.frozenThrough==='string' && fields.has(state.frozenThrough) ? state.frozenThrough : '';
     this.groupingField = state.groupingField && fields.has(state.groupingField) ? state.groupingField : '';
     if (typeof state.factBoxOpen === 'boolean') this.factboxOpen = state.factBoxOpen;
   }
@@ -266,7 +269,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
     this.persistPersonalization();
   }
 
-  resetColumns(): void { this.columnOrder = []; this.hiddenColumns.clear(); this.resizedColumnWidths.clear(); this.persistPersonalization(); }
+  resetColumns(): void { this.frozenThrough=''; this.columnOrder = []; this.hiddenColumns.clear(); this.resizedColumnWidths.clear(); this.persistPersonalization(); }
 
   handleAdvancedFilter(event: {actionKey: string; payload?: unknown}): void {
     if (event.actionKey === 'advancedFilterChanged') {
@@ -303,6 +306,39 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
     this.savedViews = this.savedViews.filter(view => view.id !== this.currentViewId);
     this.personalization.write(this.personalizationKey, 'views', this.savedViews);
     this.setActiveView('__all');
+  }
+
+  async copyRows(): Promise<void> {
+    if(this.config?.tools?.export===false)return;
+    const rows=this.selectedNos.size?this.rows.filter(row=>this.selectedNos.has(this.getRowKey(row))):this.selectedRow?[this.selectedRow]:[];
+    if(!rows.length){this.personalizationMessage='Select the rows to copy.';return;}
+    try { await navigator.clipboard.writeText(writeTabularText(rows.map(row=>this.columns.map(column=>this.getCellValue(row,column)))));this.personalizationMessage=rows.length+' selected rows copied.'; }
+    catch {this.personalizationMessage='Clipboard access is unavailable in this browser.';}
+    this.changeDetector.markForCheck();
+  }
+
+  freezeThrough(column: DisplayColumn): void {
+    const key=this.getColumnKey(column);this.frozenThrough=this.frozenThrough===key?'':key;this.persistPersonalization();
+  }
+  isFrozen(column: DisplayColumn): boolean {
+    const end=this.columns.findIndex(c=>this.getColumnKey(c)===this.frozenThrough),index=this.columns.indexOf(column);
+    return end>=0 && index>=0 && index<=end;
+  }
+  frozenLeft(column: DisplayColumn): number|null {
+    return this.isFrozen(column)?60+this.columns.slice(0,this.columns.indexOf(column)).reduce((total,c)=>total+this.columnWidthNumber(c),0):null;
+  }
+
+  autoFitColumn(column: DisplayColumn): void {
+    if(this.config?.dataSurface?.resizable===false)return;
+    // Measure only the loaded page; never fetch records to calculate a width.
+    const canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+    if(!context)return;
+    const sample=this.gridScroll?.nativeElement.querySelector('td');
+    context.font=sample?getComputedStyle(sample).font:'13px sans-serif';
+    let width=context.measureText(column.label).width+44;
+    for(const row of this.rows.slice(0,500)) width=Math.max(width,context.measureText(String(this.getCellValue(row,column))).width+24);
+    this.resizedColumnWidths.set(this.getColumnKey(column),Math.min(480,Math.max(72,Math.ceil(width))));
+    this.persistPersonalization();
   }
 
   async exportLoadedRows(format: ListExportFormat = 'csv'): Promise<void> {

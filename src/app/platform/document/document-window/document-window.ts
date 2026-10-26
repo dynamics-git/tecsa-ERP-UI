@@ -12,6 +12,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, inject, viewChildren } from '@angular/core';
 import { DynamicForm } from '../../../shared/ui/dynamic-form/dynamic-form';
 import { FactBox } from '../../../shared/ui/fact-box/fact-box';
+import { ViewChild } from '@angular/core';
 import { DocumentLines } from '../document-lines/document-lines';
 import { FieldConfig, FieldFactBoxConfig } from '../../models/field-config.model';
 import { LineColumnConfig } from '../../models/line-config.model';
@@ -266,8 +267,9 @@ export class DocumentWindow {
     return (this.detailToolbarButtons ?? []).filter((button) => button.hidden !== true);
   }
 
+  private readonly emptyHeaderData: Record<string, unknown> = {};
   get resolvedHeaderData(): Record<string, unknown> {
-    return this.headerData ?? {};
+    return this.headerData ?? this.emptyHeaderData;
   }
 
   get resolvedLineColumns(): LineColumnConfig[] {
@@ -673,6 +675,7 @@ export class DocumentWindow {
     this.routeAction(actionKey);
   }
 
+  @ViewChild(DocumentLines) private lineEditor?: DocumentLines;
   handleLineToolbarAction(actionKey: string): void {
     this.routeAction(actionKey, this.buildLineCommandPayload(actionKey));
   }
@@ -772,6 +775,9 @@ export class DocumentWindow {
 
   private routeAction(rawActionKey: string, payload?: unknown): void {
     const actionKey = this.normalizeActionKey(rawActionKey);
+    const command = actionKey.replace(/^cmd:/i,'').toLowerCase();
+    if (command === 'line-copy-rows') { void this.lineEditor?.copySelectedRows(); return; }
+    if (command === 'line-paste' && !(payload && typeof payload === 'object' && 'rows' in payload && Array.isArray(payload.rows))) { if (!this.interactionLocked) void this.lineEditor?.requestPaste(); return; }
 
     if (actionKey.startsWith('dialog:')) {
       this.handleDialogAction(actionKey.slice('dialog:'.length));
@@ -922,7 +928,7 @@ export class DocumentWindow {
   }
 
   private buildLineCommandPayload(actionKey: string): unknown {
-    if (!this.isLineDeleteCommand(actionKey)) {
+    if (!this.isLineDeleteCommand(actionKey) && !['line-copy', 'cmd:line-copy'].includes(actionKey.trim().toLowerCase())) {
       return this.activeLineRow ? { activeRow: this.activeLineRow } : undefined;
     }
 

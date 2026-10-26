@@ -4,6 +4,7 @@ import {
   HeaderConfig,
   LineConfig,
   ListPageConfig,
+  listColumns,
 } from '../../../platform/public-api';
 
 const actionDefinitions: CommandConfig[] = [
@@ -56,85 +57,9 @@ const actions = actionDefinitions.map((action, index) => ({
   order: 50 + index * 10,
 }));
 
-export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
-  factBox: { enabled: true },
-  pageId: 'purchase-requisition',
-  pageType: 'document',
-  title: 'Purchase Requisition',
-  identity: { primaryField: 'number', secondaryField: 'purpose' },
-  module: 'Purchase',
-  menu: {
-    module: 'Purchase',
-    group: 'Documents',
-    icon: 'ts-icon ts-icon-file',
-    route: '/purchase-requisition',
-  },
-  views: [
-    { id: 'all', label: 'All' },
-    { id: 'open', label: 'Open', filter: "status eq 'open'" },
-    { id: 'pending', label: 'Pending Approval', filter: "status eq 'pending_approval'" },
-    { id: 'approved', label: 'Approved', filter: "status eq 'approved'" },
-  ],
-  activeViewId: 'all',
-  dataSource: {
-    endpoint: '/purchaseRequisitions',
-    keyField: 'systemId',
-    documentNoField: 'number',
-    defaultSort: 'number desc',
-    pageSize: 25,
-    supportsCreate: true,
-    supportsUpdate: true,
-    supportsDelete: false,
-    writableStates: { field: 'status', values: ['open'] },
-    newRecordDefaults: { status: 'open' },
-    createFields: [
-      'number',
-      'selectedNoSeriesId',
-      'requestDate',
-      'requiredDate',
-      'purpose',
-      'locationId',
-    ],
-    updateFields: ['requestDate', 'requiredDate', 'purpose', 'locationId'],
-  },
-  dataSurface: {
-    idField: 'systemId',
-    columns: [
-      { field: 'number', label: 'No.', isPrimary: true, type: 'text' },
-      { field: 'requestDate', label: 'Request Date', type: 'date' },
-      { field: 'requiredDate', label: 'Required Date', type: 'date' },
-      { field: 'purpose', label: 'Purpose', width: '300px', type: 'text' },
-      {
-        field: 'status',
-        label: 'Status',
-        type: 'badge',
-        filter: {
-          type: 'select',
-          operator: 'eq',
-          options: [
-            { value: 'open', label: 'Open' },
-            { value: 'pending_approval', label: 'Pending Approval' },
-            { value: 'approved', label: 'Approved' },
-            { value: 'rejected', label: 'Rejected' },
-            { value: 'cancelled', label: 'Cancelled' },
-          ],
-        },
-      },
-      { field: 'lineCount', label: 'Lines', type: 'number', sortable: false, filterable: false },
-      {
-        field: 'estimatedTotal',
-        label: 'Estimated Total',
-        type: 'currency',
-        sortable: false,
-        filterable: false,
-      },
-    ],
-  },
-};
 export const purchaseRequisitionHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Requisition',
   toolbarButtons: [
-    { label: 'Save', actionKey: 'cmd:save', isPrimary: true, icon: 'ts-icon ts-icon-check' },
     ...actions,
   ],
   sections: [
@@ -145,7 +70,7 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
         {
           key: 'number',
           valueType: 'code',
-          label: 'No. (leave blank for automatic numbering)',
+          label: 'No.',
           readonlyAfterCreate: true,
           defaultValue: null,
           validation: { maxLength: 20 },
@@ -206,16 +131,80 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'name'],
           },
         },
-        {
-          key: 'estimatedTotal',
-          valueType: 'decimal',
-          label: 'Estimated Total',
-          readonly: true,
-          factBox: true,
-        },
+
       ],
     },
   ],
+};
+export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+  factBox: { enabled: true },
+  pageId: 'purchase-requisition',
+  pageType: 'document',
+  autoSave: true,
+  title: 'Purchase Requisition',
+  identity: { primaryField: 'number' },
+  module: 'Purchase',
+  menu: {
+    module: 'Purchase',
+    group: 'Documents',
+    icon: 'ts-icon ts-icon-file',
+    route: '/purchase-requisition',
+  },
+  views: [
+    { id: 'all', label: 'All' },
+    { id: 'open', label: 'Open', filter: "status eq 'open'" },
+    { id: 'pending', label: 'Pending Approval', filter: "status eq 'pending_approval'" },
+    { id: 'approved', label: 'Approved', filter: "status eq 'approved'" },
+  ],
+  activeViewId: 'all',
+  dataSource: {
+    endpoint: '/purchaseRequisitions',
+    keyField: 'systemId',
+    documentNoField: 'number',
+    autoGenerateNumber: true,
+    lazyCreateOnFirstInput: true,
+    omitEmptyFields: ['number'],
+    defaultSort: 'number desc',
+    pageSize: 25,
+    supportsCreate: true,
+    supportsUpdate: true,
+    supportsDelete: true,
+    writableStates: { field: 'status', values: ['open'] },
+    newRecordDefaults: { status: 'open' },
+  },
+  dataSurface: {
+    idField: 'systemId',
+    columns: listColumns(purchaseRequisitionHeaderConfig, [
+      { field: 'number', width: '128px' },
+      { field: 'requestDate', width: '118px' },
+      { field: 'requiredDate', width: '118px' },
+      { field: 'purpose', width: '300px' },
+      {
+        field: 'status',
+        label: 'Status',
+        type: 'badge',
+        filter: {
+          type: 'select',
+          operator: 'eq',
+          options: [
+            { value: 'open', label: 'Open' },
+            { value: 'pending_approval', label: 'Pending Approval' },
+            { value: 'approved', label: 'Approved' },
+            { value: 'rejected', label: 'Rejected' },
+            { value: 'cancelled', label: 'Cancelled' },
+          ],
+        },
+      },
+      { field: 'lineCount', label: 'Lines', type: 'number', sortable: false, filterable: false },
+      {
+        field: 'estimatedTotal',
+        label: 'Estimated Total',
+        type: 'currency',
+        sortable: false,
+        filterable: false,
+      },
+    ]),
+  },
 };
 export const purchaseRequisitionLineConfig: LineConfig = {
   placement: { mode: 'end' },
@@ -237,25 +226,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     supportsDelete: true,
     permissions: { create: 'modify', update: 'modify', delete: 'modify' },
     omitEmptyFields: ['description'],
-    createFields: [
-      'lineType',
-      'itemId',
-      'glAccountId',
-      'description',
-      'quantity',
-      'estimatedUnitCost',
-      'requiredDate',
-    ],
-    updateFields: [
-      'lineType',
-      'itemId',
-      'glAccountId',
-      'description',
-      'quantity',
-      'estimatedUnitCost',
-      'requiredDate',
-    ],
-    requiredCreateFields: ['lineType', 'quantity'],
     meaningfulFields: ['itemId', 'glAccountId', 'description'],
   },
   columns: [
@@ -263,6 +233,8 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'lineType',
       label: 'Type',
+      valueType: 'text',
+      required: true,
       cellType: 'dropdown',
       defaultValue: 'item',
       clearFieldsOnChange: ['itemId', 'glAccountId'],
@@ -322,4 +294,19 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     },
     { id: 'requiredDate', label: 'Required Date', valueType: 'date' },
   ],
-};
+  calculation: [
+    { target: 'estimatedAmount', formula: 'quantity * estimatedUnitCost', precision: 6 },
+  ],
+  totalsCalculation: {
+    defaults: { subtotal: '0.00', sst: '0.00', total: '0.00', difference: '0.00' },
+    totals: { total: { formula: 'sum(estimatedAmount)' } },
+    format: { type: 'number' },
+  },
+  footerSections: [
+    {
+      id: 'document-totals',
+      rows: [
+        { id: 'estimated-total', label: 'Estimated Total', source: 'total', totalKey: 'total', emphasis: true },
+      ],
+    },
+  ],};

@@ -97,6 +97,7 @@
               <summary class="export-trigger" aria-label="Export" title="Export"><i class="ts-icon ts-icon-download" aria-hidden="true"></i></summary>
               <div class="list-export-options" aria-label="Export loaded records">
                 <span>{{ rows.length }} loaded records · Visible columns</span>
+                <button type="button" (click)="copyRows()">Copy selected rows</button>
                 <button type="button" [disabled]="exportBusy" (click)="exportLoadedRows('xlsx')">Excel (.xlsx)</button>
                 <button type="button" [disabled]="exportBusy" (click)="exportLoadedRows('docx')">Word (.docx)</button>
                 <button type="button" [disabled]="exportBusy" (click)="exportLoadedRows('csv')">CSV (.csv)</button>
@@ -133,6 +134,8 @@
                 <label><input type="checkbox" [checked]="!hiddenColumns.has(column.field ?? column.id ?? column.label)"
                   [disabled]="columns.length === 1 && !hiddenColumns.has(column.field ?? column.id ?? column.label)"
                   (change)="setColumnVisible(column, $any($event.target).checked)" />{{ column.label }}</label>
+                <button type="button" [attr.aria-pressed]="frozenThrough === (column.field ?? column.id)" [attr.aria-label]="'Freeze columns through ' + column.label" [attr.title]="'Freeze columns through ' + column.label" (click)="freezeThrough(column)">{{ frozenThrough === (column.field ?? column.id) ? 'Unfreeze' : 'Freeze' }}</button>
+                <button type="button" [attr.aria-label]="'Auto-fit ' + column.label" (click)="autoFitColumn(column)">Auto-fit</button>
                 <button type="button" [attr.aria-label]="'Move ' + column.label + ' left'" [disabled]="index === 0" (click)="moveColumn(column, -1)"><i class="ts-icon ts-icon-arrow-left" aria-hidden="true"></i></button>
                 <button type="button" [attr.aria-label]="'Move ' + column.label + ' right'" [disabled]="index === configurableColumns.length - 1" (click)="moveColumn(column, 1)"><i class="ts-icon ts-icon-arrow" aria-hidden="true"></i></button>
               </div>
@@ -173,6 +176,7 @@
             </th>
             @for (column of columns; track column.field ?? column.id ?? column.label) {
               <th
+                [class.frozen-column]="isFrozen(column)" [style.left.px]="frozenLeft(column)"
                 [class.amount]="column.align === 'end' || column.type === 'currency'"
                 [class.sorted]="getColumnSortDirection(column)"
                 [attr.aria-sort]="getColumnSortDirection(column) === 'asc' ? 'ascending' : getColumnSortDirection(column) === 'desc' ? 'descending' : 'none'">
@@ -198,6 +202,7 @@
                     [attr.aria-valuenow]="columnWidthNumber(column)" aria-valuemin="72" aria-valuemax="800"
                     (keydown.arrowleft)="$event.preventDefault(); resizeColumn(column, -16)"
                     (keydown.arrowright)="$event.preventDefault(); resizeColumn(column, 16)"
+                    (dblclick)="$event.preventDefault(); autoFitColumn(column)"
                     (pointerdown)="startColumnResize($event, column)"></span>
                 }
               </th>
@@ -244,6 +249,7 @@
 
               @for (column of columns; track column.field ?? column.id ?? column.label) {
                 <td
+                  [class.frozen-column]="isFrozen(column)" [style.left.px]="frozenLeft(column)"
                   [class.amount]="column.align === 'end' || column.type === 'currency'"
                   [class.positive]="getTone(row) === 'positive' && column.type === 'currency'"
                   [class.negative]="getTone(row) === 'negative' && column.type === 'currency'">

@@ -13,6 +13,7 @@ export interface ListPersonalizationState {
   density: 'compact' | 'comfortable' | 'spacious';
   factBoxOpen: boolean;
   groupingField?: string;
+  frozenThrough?: string;
 }
 
 export interface ListSavedView {

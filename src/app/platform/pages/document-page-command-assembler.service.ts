@@ -93,13 +93,19 @@ export class DocumentPageCommandAssemblerService {
       },
     ];
 
+    if (supportsCreate && params.lineConfig.editable !== false && params.lineConfig.dataSource.createFields?.length && params.lineConfig.columns?.length) {
+      defaults.push({label:'Paste Lines',actionKey:'cmd:line-paste',order:50,tooltip:'Preview Excel cells as new lines before applying.'});
+      defaults.push({label: 'Copy Line', actionKey: 'cmd:line-copy', order: 40,
+        tooltip: 'Copy selected lines as new lines. Identity and line numbering are assigned by the server.'});
+    }
+    if (params.lineConfig.columns?.length) defaults.push({label:'Copy Rows',actionKey:'cmd:line-copy-rows',order:60,tooltip:'Copy selected line values to Excel. Ctrl+C also works when the grid is focused.'});
     const configured = (params.lineConfig.toolbarButtons ?? []).map((button) => ({ ...button }));
     return this
       .mergePopupDefaultCommands(defaults, configured)
       .map((button) => {
         const action = this.normalizePopupCommandKey(button.actionKey);
-        button = ((action === 'line-new' || action === 'line-insert') && !supportsCreate) || (action === 'line-delete' && !supportsDelete) ? {...button, disabled: true} : button;
-        const override = action === 'line-new' || action === 'line-insert' ? params.lineConfig?.dataSource.permissions?.create
+        button = ((action === 'line-new' || action === 'line-insert' || action === 'line-copy' || action === 'line-paste') && !supportsCreate) || (action === 'line-delete' && !supportsDelete) ? {...button, disabled: true} : button;
+        const override = action === 'line-new' || action === 'line-insert' || action === 'line-copy' || action === 'line-paste' ? params.lineConfig?.dataSource.permissions?.create
           : action === 'line-delete' ? params.lineConfig?.dataSource.permissions?.delete : undefined;
         return override ? this.popupCommandPermission.applyOperation(button, params.pageId, override) : this.applyPopupCommandPermission(button, params.pageId);
       });

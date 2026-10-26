@@ -272,3 +272,7 @@
 :host { display: block; min-height: 0; }
 
 .cell-error { display: block; color: var(--ts-danger); font-size: var(--ts-font-label); white-space: normal; }
+
+.line-clipboard-message, .line-paste-preview { padding: var(--ts-space-3); border-top: 1px solid var(--ts-border); font-size: var(--ts-font-body); color: var(--ts-text); background: var(--ts-surface); }
+.line-paste-preview { header { display:flex; gap:var(--ts-space-2); align-items:center; flex-wrap:wrap; strong {margin-inline-end:auto;} } button {font:inherit; padding:var(--ts-space-2); color:var(--ts-text);background:var(--ts-surface);border:1px solid var(--ts-border);border-radius:var(--ts-radius-sm);} p {color:var(--ts-text-soft);font-size:var(--ts-font-caption);} ul {color:var(--ts-danger);} table {border-collapse:collapse; width:100%;} th,td {padding:var(--ts-space-2);border-bottom:1px solid var(--ts-border-soft);text-align:start;white-space:pre-wrap;} }
+.line-paste-scroll { max-height:240px;overflow:auto; }

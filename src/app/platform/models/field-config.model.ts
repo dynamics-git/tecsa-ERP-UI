@@ -96,6 +96,8 @@ export interface FieldFactBoxConfig {
 export interface FieldCondition { field: string; values: unknown[]; negate?: boolean; }
 
 export interface FieldConfig {
+  /** Exclude from Enter quick entry without removing normal Tab access. */
+  quickEntry?: boolean;
   requiredWhen?: FieldCondition;
   readonlyWhen?: FieldCondition;
   hiddenWhen?: FieldCondition;

@@ -1,3 +1,5 @@
+import type { LineConfig } from '../models/line-config.model';
+import { fieldIsReadonly } from '../models/field-state';
 import { RecordDeleteService } from '../data/record-delete.service';
 import { Injectable, inject } from '@angular/core';
 import { Observable, defer, from } from 'rxjs';
@@ -21,6 +23,26 @@ export interface LineDeleteResult extends LineDeletePlan {
 })
 export class LineCommandService {
   private readonly deletes = inject(RecordDeleteService);
+  /** Copy only declared, editable create inputs. Identity/ownership/calculations never transfer. */
+  copyEditableValues(source: Record<string, unknown>, draft: Record<string, unknown>, config: LineConfig): Record<string, unknown> {
+    const calculated = Array.isArray(config.calculation) ? config.calculation : config.calculation?.rules ?? [];
+    const protectedFields = new Set([
+      'systemId', 'id', 'systemRowVersion', 'systemCreatedAt', 'systemCreatedBy', 'systemModifiedAt', 'systemModifiedBy',
+      'companyId', 'status', config.dataSource.keyField, config.lineKeyField, config.parentKeyField,
+      config.dataSource.parentKeyField, ...Object.keys(config.dataSource.parentFixedFields ?? {}),
+      ...calculated.filter(rule => rule.targetSource !== 'header').map(rule => rule.target),
+    ]);
+    const values: Record<string, unknown> = {};
+    for (const field of config.dataSource.createFields ?? []) {
+      const column = config.columns.find(column => (column.field ?? column.id) === field);
+      if (!column || column.hidden || column.cellType === 'icon' || protectedFields.has(field) || /^(system(id|rowversion|createdat|createdby|modifiedat|modifiedby)|companyid|lineno|status)$/i.test(field.replace(/_/g,'')) || field.startsWith('__') ||
+          fieldIsReadonly(column, source) || fieldIsReadonly(column, draft) || source['__lookupRestricted_' + field] === true ||
+          column.editableWhen && !column.editableWhen.values.includes(source[column.editableWhen.field])) continue;
+      if (Object.hasOwn(source, field)) values[field] = structuredClone(source[field]);
+    }
+    return values;
+  }
+
   planDeleteRequest(options: {
     lineRows: Record<string, unknown>[];
     payload: unknown;

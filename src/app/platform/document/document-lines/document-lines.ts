@@ -1,3 +1,6 @@
+import { moveQuickEntry } from '../../../shared/ui/quick-entry';
+import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token';
+import { readTabularText, writeTabularText } from '../../data/tabular-text';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { ListPersonalizationService } from '../../pages/list-personalization.service';
 import { FieldValidationService } from '../field-validation.service';
@@ -20,7 +23,7 @@ import {
 } from '@angular/core';
 import { LineColumnConfig } from '../../models/line-config.model';
 import { DataSourceService } from '../../data/data-source.service';
-import { Subscription, timer, switchMap, from } from 'rxjs';
+import { Subscription, timer, switchMap, from, firstValueFrom, timeout } from 'rxjs';
 
 type LineOption = { label: string; value: unknown; record?: Record<string, unknown> };
 
@@ -34,6 +37,7 @@ type LineOption = { label: string; value: unknown; record?: Record<string, unkno
 export class DocumentLines {
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
   private readonly hydration = inject(DocumentHydrationOrchestratorService);
+  private readonly timeoutPolicy = inject(RUNTIME_TIMEOUT_POLICY);
   private captionRequest?: Subscription;
   private captionGeneration = 0;
   private lookupSearch?: Subscription;
@@ -94,7 +98,7 @@ export class DocumentLines {
       this.changes.markForCheck();
     }, error: () => { if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); } });
   }
-  ngOnDestroy(): void { this.captionGeneration++; this.lookupSearch?.unsubscribe(); this.captionRequest?.unsubscribe(); }
+  ngOnDestroy(): void { this.pasteGeneration++; this.captionGeneration++; this.lookupSearch?.unsubscribe(); this.captionRequest?.unsubscribe(); }
   private static nextEditorId = 0;
   readonly editorId = 'line-editor-' + DocumentLines.nextEditorId++;
   private readonly preferences = inject(ListPersonalizationService);
@@ -107,7 +111,9 @@ export class DocumentLines {
   }
   @Input() headerData: Record<string,unknown> = {};
   @Input() worksheet = false;
+  @Input() disabled = false;
   @Input() columns: LineColumnConfig[] = [];
+  get visibleColumns(): LineColumnConfig[] { return this.columns.filter(column=>!column.hidden); }
   @Input() rows: Record<string, unknown>[] = [];
   @Input() showSelection = false;
   @Input() enableColumnResize = true;
@@ -215,6 +221,146 @@ export class DocumentLines {
 
     this.resizing = undefined;
     this.persistColumnWidths();
+  }
+
+  clipboardMessage = '';
+  pasteLoading = false;
+  private pasteGeneration = 0;
+  pastePreview?: { rows: Record<string,unknown>[]; labels: string[]; cells: string[][]; errors: string[]; context: string; inScope: () => boolean };
+  private focusedColumnIndex = 0;
+  focusCell(column: LineColumnConfig, rowIndex: number): void {
+    this.focusedColumnIndex = this.columns.indexOf(column);
+    if (this.activeRowIndex !== rowIndex) this.activateRow(rowIndex);
+  }
+  private clipboardContext(): string { return JSON.stringify(this.headerData) + ':' + this.columns.map(c=>c.id+':'+c.readonly).join('|'); }
+  async copySelectedRows(): Promise<void> {
+    const rows = this.selectedRowIndexes.size ? [...this.selectedRowIndexes].sort((a,b)=>a-b).map(i=>this.rows[i]) : [this.rows[this.activeRowIndex]];
+    const columns = this.columns.filter(c=>!c.hidden && c.cellType!=='icon');
+    const text = writeTabularText(rows.filter(row=>row && !row['__entryPlaceholder']).map(row=>columns.map(c=>c.lookup?this.lookupDisplay(c,row):this.getCellValue(row,c))));
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); this.clipboardMessage='Selected rows copied.'; }
+    catch { this.clipboardMessage='Clipboard unavailable. Select the grid and use Ctrl+C.'; }
+    this.changes.markForCheck();
+  }
+  handleCopy(event: ClipboardEvent): void {
+    if (this.isInteractiveTarget(event.target) || !event.clipboardData) return;
+    const indexes=this.selectedRowIndexes.size?[...this.selectedRowIndexes].sort((a,b)=>a-b):[this.activeRowIndex];
+    const columns=this.columns.filter(c=>!c.hidden && c.cellType!=='icon');
+    const rows=indexes.map(i=>this.rows[i]).filter(row=>row && !row['__entryPlaceholder']);
+    if (!rows.length) return;
+    event.clipboardData.setData('text/plain',writeTabularText(rows.map(row=>columns.map(c=>c.lookup?this.lookupDisplay(c,row):this.getCellValue(row,c)))));
+    event.preventDefault();
+  }
+  async requestPaste(): Promise<void> {
+    if (this.disabled) return;
+    this.focusedColumnIndex = 0; // Toolbar paste starts at the first editable column; cell paste keeps its anchor.
+    try { await this.preparePaste(await navigator.clipboard.readText()); }
+    catch { this.clipboardMessage='Focus a line cell and paste with Ctrl+V.'; this.changes.markForCheck(); }
+  }
+  handlePaste(event: ClipboardEvent, column: LineColumnConfig): void {
+    const text=event.clipboardData?.getData('text/plain');
+    if (!text || this.disabled || !/[\t\r\n]/.test(text)) return; // Single-cell text paste remains native.
+    event.preventDefault(); event.stopPropagation();
+    this.focusedColumnIndex=this.columns.indexOf(column);
+    this.preparePaste(text);
+  }
+  async preparePaste(text: string): Promise<void> {
+    if (this.disabled || this.pasteLoading) return;
+    const generation=++this.pasteGeneration, context=this.clipboardContext();
+    const inScope=this.source.captureWriteScope?.() ?? (()=>true);
+    const cache=new Map<string,Promise<Record<string,unknown>>>();
+    this.pastePreview=undefined;this.pasteLoading=true;this.clipboardMessage='Checking pasted values…';
+    try {
+      const cells=readTabularText(text,20);
+      if (!cells.length) return;
+      const columns=this.columns.slice(Math.max(0,this.focusedColumnIndex)).filter(c=>!c.hidden && !c.readonly && c.cellType!=='icon');
+      if (cells[0].length>columns.length) throw new Error('The pasted range has more columns than the editable fields. Start at the correct field.');
+      const used=columns.slice(0,cells[0].length),errors:string[]=[],rows:Record<string,unknown>[]=[];
+      // Work on isolated candidates; no business record changes during validation.
+      for (const [index,values] of cells.entries()) {
+        if(generation!==this.pasteGeneration || context!==this.clipboardContext() || !inScope()) throw new Error('The document context changed. Paste again.');
+        const row:Record<string,unknown>={};
+        for(const c of this.columns)if(c.defaultValue!==undefined)row[c.field??c.id]=structuredClone(c.defaultValue);
+        for(const [columnIndex,c] of used.entries()) {
+          const field=c.field??c.id,raw=values[columnIndex];
+          if(this.isReadonly(c,row)){if(raw.trim())errors.push('Row '+(index+1)+': '+c.label+' is not editable.');continue;}
+          let value:unknown=raw;
+          if(c.lookup && raw) {
+            try {
+              const query=lookupQuery(c.lookup,row,'',this.headerData);
+              const key=JSON.stringify([query,c.lookup.valueField,c.lookup.displayField,raw]);
+              if(!cache.has(key))cache.set(key,this.resolvePastedLookup(c,row,raw));
+              const selected=await cache.get(key)!;
+              value=selected[c.lookup.valueField];
+              if(value==null || value==='')throw new Error('No identifier returned.');
+              row[c.optionsDataKey??'__options_'+field]=[{value,label:this.resolveLookupLabel(c,selected),record:selected}];
+              this.applyFill(c,row,selected);
+            } catch {errors.push('Row '+(index+1)+': '+c.label+' could not be uniquely verified. Use its exact code or identifier.');continue;}
+          } else if(c.options?.length) {
+            const option=c.options.find(option=>String(option.value)===raw || option.label.toLowerCase()===raw.toLowerCase());
+            if(!option && raw)errors.push('Row '+(index+1)+': invalid '+c.label+'.');
+            value=option?.value??raw;
+          }
+          row[field]=normalizeFieldValue(value,c.valueType);
+        }
+        for(const c of this.columns) {
+          const field=c.field??c.id;if(c.readonly || c.hidden)continue;
+          errors.push(...this.validation.validateField({key:field,label:c.label,valueType:c.valueType,required:c.required,requiredWhen:c.requiredWhen,validation:c.validation},row[field],row).errors.map(error=>'Row '+(index+1)+': '+error));
+        }
+        rows.push(row);
+      }
+      if(generation!==this.pasteGeneration || context!==this.clipboardContext() || !inScope())throw new Error('The document context changed. Paste again.');
+      this.pastePreview={rows,labels:used.map(c=>c.label),cells,errors,context,inScope};this.clipboardMessage='';
+    } catch(error){if(generation===this.pasteGeneration)this.clipboardMessage=error instanceof Error?error.message:'Paste could not be read.';}
+    finally{if(generation===this.pasteGeneration){this.pasteLoading=false;this.changes.markForCheck();}}
+  }
+
+  private async resolvePastedLookup(column:LineColumnConfig,row:Record<string,unknown>,raw:string):Promise<Record<string,unknown>> {
+    const lookup=column.lookup!,query=lookupQuery(lookup,row,'',this.headerData);
+    if(!query.ready)throw new Error('Complete lookup dependencies first.');
+    const cached=this.source.getCachedLookup?.(lookup,raw,row,this.headerData);
+    if(cached)return cached;
+    const field=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)?lookup.valueField:lookup.displayField;
+    if(!/^[A-Za-z_]\w*$/.test(field))throw new Error('Unsupported lookup field.');
+    const exact=field+" eq '"+raw.replace(/'/g,"''")+"'";
+    const response=await firstValueFrom(this.source.loadList({endpoint:query.endpoint!,defaultFilter:[query.filter,exact].filter(Boolean).map(filter=>'('+filter+')').join(' and ')},{top:2,count:false,useCache:true,maxAgeMs:30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as {value:Record<string,unknown>[]};
+    if(response.value.length!==1 || String(response.value[0][field]).toLowerCase()!==raw.toLowerCase())throw new Error('Lookup is missing or ambiguous.');
+    return response.value[0];
+  }
+
+  applyPaste(): void {
+    const preview=this.pastePreview;
+    if (!preview || preview.errors.length || this.disabled || this.pasteLoading) return;
+    if (preview.context!==this.clipboardContext() || !preview.inScope()) { this.pastePreview=undefined;this.clipboardMessage='The document changed. Paste again to revalidate.';return; }
+    this.pastePreview=undefined;
+    this.action.emit({actionKey:'cmd:line-paste',payload:{rows:preview.rows}});
+  }
+
+  handleCellKeydown(event: KeyboardEvent, column: LineColumnConfig, row: Record<string,unknown>, rowIndex: number): void {
+    moveQuickEntry(event);
+    if (event.key === 'F8' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault(); event.stopPropagation();
+      const previous = this.rows[rowIndex - 1];
+      if (previous && !previous['__entryPlaceholder']) this.copyCell(column, previous, row);
+    } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd' && this.selectedRowIndexes.size > 1) {
+      event.preventDefault(); event.stopPropagation();
+      const indexes = [...this.selectedRowIndexes].sort((a,b)=>a-b);
+      const source = this.rows[indexes[0]];
+      if (!source || source['__entryPlaceholder']) return;
+      for (const index of indexes.slice(1)) this.copyCell(column,source,this.rows[index]);
+    }
+  }
+
+  private copyCell(column: LineColumnConfig, source: Record<string,unknown>, target: Record<string,unknown>): void {
+    const field = column.field ?? column.id;
+    if (column.hidden || column.cellType === 'icon' || this.isReadonly(column,target) || source['__lookupRestricted_'+field]) return;
+    if (column.lookup) {
+      // Lookup IDs may only be reused within the same declared dependency context.
+      if (JSON.stringify(lookupQuery(column.lookup,source,'',this.headerData)) !== JSON.stringify(lookupQuery(column.lookup,target,'',this.headerData))) return;
+      const option = this.getOptions(column,source).find(option=>String(option.value)===String(source[field]));
+      if (option) target[column.optionsDataKey ?? '__options_'+field] = [option];
+    }
+    this.updateCellValue(column,target,structuredClone(source[field]),false);
   }
 
   handleGridKeydown(event: KeyboardEvent): void {
@@ -438,10 +584,10 @@ export class DocumentLines {
   isRequired(column: LineColumnConfig, row: Record<string,unknown>): boolean { return fieldIsRequired(column,row); }
 
   isReadonly(column: LineColumnConfig, row: Record<string, unknown>): boolean {
-    return row[`__lookupRestricted_${column.field ?? column.id}`] === true || fieldIsReadonly(column, row) || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) || (!!column.lookup && !lookupQuery(column.lookup, row, '', this.headerData).ready);
+    return this.disabled || row[`__lookupRestricted_${column.field ?? column.id}`] === true || fieldIsReadonly(column, row) || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) || (!!column.lookup && !lookupQuery(column.lookup, row, '', this.headerData).ready);
   }
 
-  updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown): void {
+  updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, allowBulk = true): void {
     if (this.isReadonly(column, row)) {
       return;
     }
@@ -466,7 +612,7 @@ export class DocumentLines {
       (index) => index >= 0 && index < this.rows.length,
     );
     const applyBulk =
-      this.enableBulkEditFromSelection &&
+      allowBulk && this.enableBulkEditFromSelection &&
       this.showSelection &&
       selectedIndexes.length > 1 &&
       selectedIndexes.includes(rowIndex);
@@ -483,7 +629,7 @@ export class DocumentLines {
           continue;
         }
 
-        if (fieldValuesEqual(target[field], value, column.valueType)) continue;
+        if (this.isReadonly(column,target) || fieldValuesEqual(target[field], value, column.valueType)) continue;
         bulkChanges.push({ rowIndex: index, previousValue: target[field], value });
         const targetBefore = { ...target };
         target[field] = value;

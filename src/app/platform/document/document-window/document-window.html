@@ -228,7 +228,7 @@
 
       <app-document-lines
         [preferenceKey]="preferenceKey || pageLabel || 'document'" [worksheet]="worksheet" [headerData]="resolvedHeaderData" [columns]="resolvedLineColumns"
-        [rows]="resolvedLineRows"
+        [rows]="resolvedLineRows" [disabled]="interactionLocked"
         [showSelection]="true"
         (action)="handleLineAction($event)"
         (dropdownOpened)="handleLineDropdownOpened($event)"

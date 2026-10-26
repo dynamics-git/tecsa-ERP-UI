@@ -25,8 +25,10 @@ export class DocumentPageCommandPermissionService {
     if (button.runModalPageId) {
       const matched = this.sessionService.Permissions.filter(permission => this.matchesPage(permission, button.permissionKey ?? button.runModalPageId!));
       allowed = matched.length ? matched.some(permission => this.readPermissionFlag(permission, ['canRead', 'CanRead', 'ReadPermission'])) : this.sessionService.SuperAdmin;
-    } else if (action === 'new' || action === 'line-new' || action === 'line-insert') {
+    } else if (action === 'new' || action === 'line-new' || action === 'line-insert' || action === 'line-copy' || action === 'line-paste') {
       allowed = permissions.canCreate;
+    } else if (action === 'line-copy-rows') {
+      allowed = permissions.canRead;
     } else if (action === 'save' || action === 'apply' || action === 'edit') {
       allowed = permissions.canUpdate;
     } else if (action === 'delete' || action === 'line-delete') {
@@ -75,6 +77,9 @@ export class DocumentPageCommandPermissionService {
       'close',
       'line-new',
       'line-insert',
+      'line-copy',
+      'line-paste',
+      'line-copy-rows',
       'line-delete',
       'line-refresh',
     ]);
@@ -105,6 +110,7 @@ export class DocumentPageCommandPermissionService {
   }
 
   private resolvePagePermissionFlags(pageId: string): {
+    canRead: boolean;
     canCreate: boolean;
     canUpdate: boolean;
     canDelete: boolean;
@@ -115,10 +121,11 @@ export class DocumentPageCommandPermissionService {
       this.matchesPage(permission, targetPage),
     );
     if (!matched.length) {
-      return { canCreate: false, canUpdate: false, canDelete: false, canExecute: false };
+      return { canRead: false, canCreate: false, canUpdate: false, canDelete: false, canExecute: false };
     }
 
     return {
+      canRead: matched.some(permission => this.readPermissionFlag(permission, ['canRead','CanRead','ReadPermission'])),
       canCreate: matched.some((permission) =>
         this.readPermissionFlag(permission, ['canCreate', 'CanCreate', 'InsertPermission']),
       ),
