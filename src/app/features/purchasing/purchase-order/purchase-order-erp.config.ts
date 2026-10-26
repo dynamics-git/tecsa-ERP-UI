@@ -52,9 +52,8 @@ const workflowActions: CommandConfig[] = [
 export const purchaseOrderHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Order',
   toolbarButtons: [
-    // There is no standalone POST /purchaseOrders or DELETE /purchaseOrders.
-    { label: 'New', actionKey: 'cmd:new', hidden: true },
-    { label: 'Delete', actionKey: 'cmd:delete', hidden: true },
+    // Standard New/Delete/Refresh come from the shared document action assembler.
+    // Unsupported operations remain visible but disabled by dataSource capabilities.
     ...workflowActions,
   ],
   sections: [
@@ -108,11 +107,9 @@ export const purchaseOrderLineConfig: LineConfig = {
     permissions: { update: 'modify' },
     updateFields: ['quantity', 'directUnitCost', 'description', 'requiredDate'],
   },
-  toolbarButtons: [
-    { label: 'Line', actionKey: 'cmd:line-new', hidden: true },
-    { label: 'Insert', actionKey: 'cmd:line-insert', hidden: true },
-    { label: 'Delete Line', actionKey: 'cmd:line-delete', hidden: true },
-  ],
+  // Shared line assembler provides Line / Delete Line / Refresh Lines.
+  // Unsupported create/delete remain disabled according to dataSource capabilities.
+  toolbarButtons: [],
   columns: [
     { id: 'lineNo', label: 'Line No.', readonly: true, valueType: 'integer' },
     { id: 'lineType', label: 'Type', readonly: true },
@@ -156,7 +153,7 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
     density: true, grouping: true, export: true, columns: true, refresh: true,
   },
   factBox: { enabled: true },
-  standardActions: { new: false, delete: false },
+  // Do not suppress shared New/Delete; backend capabilities disable unsupported actions.
   views: [
     { id: 'all', label: 'All' },
     { id: 'open', label: 'Open', filter: "status eq 'open'" },
