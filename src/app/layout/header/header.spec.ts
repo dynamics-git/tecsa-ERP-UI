@@ -52,7 +52,7 @@ describe('Header', () => {
 
   it('shows a useful response when no alternative authorized company exists', async () => {
     const confirmation = TestBed.inject(ConfirmationService);
-    const message = vi.spyOn(confirmation, 'message').mockResolvedValue();
+    const message = vi.spyOn(confirmation, 'message').mockResolvedValue(undefined);
     await component.changeCompany();
     expect(message).toHaveBeenCalledWith(
       'No other authorized company is available for your account.', 'Change company',
