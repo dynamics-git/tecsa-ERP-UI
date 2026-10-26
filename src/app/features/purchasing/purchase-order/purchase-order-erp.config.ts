@@ -16,6 +16,7 @@ const workflowActions: CommandConfig[] = [
   {
     label: 'Release',
     actionKey: 'cmd:release',
+    isPrimary: true,
     group: 'Process',
     order: 40,
     icon: 'ts-icon ts-icon-check-square',
@@ -149,6 +150,11 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
   },
   identity: { primaryField: 'number', secondaryField: 'vendorName' },
   searchFields: ['number', 'vendorNo', 'vendorName', 'externalDocumentNo'],
+  filterConfig: { enabled: true, storageKey: 'purchase-order-list' },
+  tools: {
+    search: true, filter: true, advancedFilter: true, savedViews: true,
+    density: true, grouping: true, export: true, columns: true, refresh: true,
+  },
   factBox: { enabled: true },
   standardActions: { new: false, delete: false },
   views: [
@@ -172,6 +178,7 @@ export const purchaseOrderListConfig: ListPageConfig & { dataSource: DataSourceC
   },
   dataSurface: {
     idField: 'systemId',
+    selectable: true, multiSelect: true, sortable: true, resizable: true, infiniteScroll: true,
     columns: [
       { field: 'number', label: 'No.', type: 'text', isPrimary: true },
       { field: 'vendorNo', label: 'Vendor No.', type: 'text' },
