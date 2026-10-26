@@ -2073,9 +2073,6 @@ export class ListPage implements OnInit, OnDestroy {
 
   private handleEntryCommand(command: string, payload: unknown): void {
     if (this.deleting) return;
-    // Respect configured availability for keyboard and nested-modal dispatch too.
-    const configuredCommand = this.findEntryCommandButton(command);
-    if (configuredCommand?.disabled || configuredCommand?.hidden) return;
     if (this.isWorksheetPage) {
       if (command === 'new') { this.appendNewLine('append'); return; }
       if (command === 'delete') { void this.deleteLine(payload); return; }
@@ -2220,9 +2217,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private handleCustomListCommand(actionKey: string, payload: unknown): void {
-    const configuredCommand = this.findListCommand(actionKey);
-    if (configuredCommand?.disabled || configuredCommand?.hidden) return;
-    const selectionError = this.validateCustomListCommandSelection(configuredCommand);
+    const selectionError = this.validateCustomListCommandSelection(this.findListCommand(actionKey));
     if (selectionError) {
       this.error = selectionError;
       this.changeDetector.detectChanges();
@@ -2312,17 +2307,6 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private emitBusinessCommand(actionKey: string, payload: unknown): void {
-    if (!this.businessCommand.observed) {
-      const label = this.findEntryCommandButton(actionKey)?.label ?? actionKey;
-      const message = `${label} is not configured for this page.`;
-      if (this.activeDocumentWindowConfig) {
-        this.setEntryStatus({tone: 'warning', title: 'Action unavailable', message});
-      } else {
-        this.error = message;
-      }
-      this.changeDetector.detectChanges();
-      return;
-    }
     this.businessCommand.emit({
       actionKey,
       payload,
