@@ -50,14 +50,17 @@ describe('Live Purchase Order List + Header + Lines contract', () => {
     expect(fields.find(field => field.id === 'sourceRequisitionLineNo')?.readonly).toBe(true);
   });
 
-  it('never claims a standalone PO or PO-line create/delete API exists', () => {
+  it('retains shared standard actions; unsupported PO operations are disabled by capabilities, not hidden', () => {
     expect(purchaseOrderListConfig.dataSource.supportsCreate).toBe(false);
     expect(purchaseOrderListConfig.dataSource.supportsDelete).toBe(false);
-    expect(purchaseOrderListConfig.standardActions?.new).toBe(false);
-    expect(purchaseOrderListConfig.standardActions?.delete).toBe(false);
-    const hidden = purchaseOrderHeaderConfig.toolbarButtons.filter(button => button.hidden);
-    expect(hidden.map(button => button.actionKey)).toEqual(['cmd:new', 'cmd:delete']);
-    expect(purchaseOrderLineConfig.toolbarButtons.every(button => button.hidden)).toBe(true);
+    expect(purchaseOrderListConfig.standardActions?.new).toBeUndefined();
+    expect(purchaseOrderListConfig.standardActions?.delete).toBeUndefined();
+    // Shared header assembler must provide New / Delete / Refresh; PO config does not replace them.
+    expect(purchaseOrderHeaderConfig.toolbarButtons.some(button =>
+      ['cmd:new', 'cmd:delete', 'cmd:refresh'].includes(button.actionKey))).toBe(false);
+    expect(purchaseOrderLineConfig.dataSource.supportsCreate).toBe(false);
+    expect(purchaseOrderLineConfig.dataSource.supportsDelete).toBe(false);
+    expect(purchaseOrderLineConfig.toolbarButtons).toEqual([]);
   });
 
   it('routes backend-authorized release, reopen and cancel with valid states', () => {
