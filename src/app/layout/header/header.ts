@@ -1,10 +1,14 @@
 import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
 import { NavigationStart, Router } from '@angular/router';
-import { filter } from 'rxjs';
+import { filter, firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MenuItem } from '../../core/models/menu-item.model';
 import { MenuSearchItem } from '../../core/models/menu-item.model';
 import { GlobalSearchPopupService } from '../../core/services/global-search-popup.service';
+import { AuthService } from '../../core/services/auth.service';
+import { WorkspaceContext } from '../../core/services/workspace-context';
+import { ConfirmationService } from '../../shared/ui/confirmation.service';
+import { UnsavedChangesService } from '../../platform/pages/unsaved-changes.service';
 import { MenuService } from '../../core/services/menu.service';
 import { shouldOpenFromMenuAsRunModal } from '../../core/services/run-modal-config-registry';
 import { SessionService } from '../../core/services/session.service';
@@ -25,6 +29,7 @@ export class Header {
   activeModule = '';
   isGlobalSearchOpen = false;
   isUserMenuOpen = false;
+  isCompanyChanging = false;
   searchQuery = '';
   searchResults: MenuSearchItem[] = [];
   readonly userMenuItems: Array<{ id: string; label: string; icon: string; route?: string; disabled?: boolean }> = [
@@ -38,7 +43,11 @@ export class Header {
     private readonly menuService: MenuService,
     private readonly globalSearchPopup: GlobalSearchPopupService,
     private readonly sessionService: SessionService,
-    private readonly drawerService: DrawerService
+    private readonly drawerService: DrawerService,
+    private readonly authService: AuthService,
+    private readonly confirmation: ConfirmationService,
+    private readonly unsaved: UnsavedChangesService,
+    private readonly workspace: WorkspaceContext
   ) {
     this.router.events
       .pipe(filter((event): event is NavigationStart => event instanceof NavigationStart))
@@ -203,7 +212,43 @@ export class Header {
     }
   }
 
-  changeCompany(): void {
+  async changeCompany(): Promise<void> {
+    if (this.isCompanyChanging) return;
+    this.isCompanyChanging = true;
+    try {
+      const companies = await firstValueFrom(this.authService.listAuthorizedCompanies());
+      const available = companies.filter(company => company.systemId !== this.sessionService.Company);
+      if (!available.length) {
+        await this.confirmation.message('No other authorized company is available for your account.', 'Change company');
+        return;
+      }
+      const choice = await this.confirmation.prompt('Change company', [{
+        key: 'companyId',
+        label: 'Company',
+        type: 'select',
+        required: true,
+        defaultValue: this.sessionService.Company,
+        options: companies.map(company => ({
+          value: company.systemId,
+          label: [company.code, company.name].filter(Boolean).join(' - '),
+        })),
+      }]);
+      const id = choice?.['companyId'];
+      if (typeof id !== 'string' || !id || id === this.sessionService.Company) return;
+      if (!companies.some(company => company.systemId === id)) {
+        throw new Error('The selected company is not available to your account.');
+      }
+      // Never abandon unsaved edits or in-flight writes when switching company.
+      if (!await this.unsaved.canLeave()) return;
+      await firstValueFrom(this.authService.switchActiveCompany(id));
+      this.unsaved.discard();
+      // A clean reload destroys stale company-bound components, caches and popup stacks.
+      window.location.assign(this.workspace.baseHref);
+    } catch {
+      await this.confirmation.message('Unable to change company. Your current company is still active. Try again.', 'Change company');
+    } finally {
+      this.isCompanyChanging = false;
+    }
   }
 
   openGlobalSearch(): void {
