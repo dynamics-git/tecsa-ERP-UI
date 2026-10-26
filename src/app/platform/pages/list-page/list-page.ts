@@ -1519,7 +1519,11 @@ export class ListPage implements OnInit, OnDestroy {
     const { row, field, value } = change;
     delete row['__entryPlaceholder'];
     this.ensureTrailingEmptyRows();
-    this.trackUnsaved(row, [field, ...(change.calculatedFields ?? [])]);
+    // Calculated/readonly columns are server-owned. Keep them visible but do not
+    // retain them as unsent dirty edits on explicitly typed document lines.
+    const changedFields = [field, ...(change.calculatedFields ?? [])];
+    const writable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
+    this.trackUnsaved(row, changedFields.filter(name => !writable || writable.has(name)));
     this.activeLineRow = row;
     if (this.isWorksheetPage) this.worksheetChangedRows.add(row);
     const typeField = this.getLineTypeField();
