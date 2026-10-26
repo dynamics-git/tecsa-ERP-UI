@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow, DocumentPageCommandEvent } from '../../../platform/public-api';
-import { purchaseOrderListConfig, purchaseOrderHeaderConfig, purchaseOrderLineConfig } from './purchase-order.config';
-export * from './purchase-order.config';
+import { purchaseOrderListConfig, purchaseOrderHeaderConfig, purchaseOrderLineConfig } from './purchase-order-erp.config';
+export * from './purchase-order-erp.config';
 
 @Component({
   selector: 'app-purchase-order',
