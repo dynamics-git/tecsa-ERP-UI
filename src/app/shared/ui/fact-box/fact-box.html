@@ -2,8 +2,8 @@
   @if (label || title || subtitle) {
     <header class="factbox-header">
       <span>{{ label }}</span>
-      <h3>{{ title }}</h3>
-      <p>{{ subtitle }}</p>
+      @if (title) { <h3>{{ title }}</h3> }
+      @if (subtitle) { <p>{{ subtitle }}</p> }
     </header>
   }
   @if (config) {
