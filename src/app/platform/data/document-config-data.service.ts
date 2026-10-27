@@ -1,3 +1,4 @@
+import { lineConfigDefaults } from './document-config-defaults';
 import type { DataSourceConfig } from '../models/data-source-config.model';
 import { normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
@@ -143,6 +144,7 @@ export class DocumentConfigDataService {
     lineConfig: LineConfig,
     editedFields?: Iterable<string>,
   ): Record<string, unknown> | null {
+    lineConfig = lineConfigDefaults(lineConfig);
     if (!this.hasActiveLineMaster(row, lineConfig)) return null;
     const edited = editedFields === undefined ? undefined : new Set(editedFields);
     const fields = lineConfig.dataSource.createFields ?? [];
@@ -189,11 +191,13 @@ export class DocumentConfigDataService {
     fields: string[],
     lineConfig: LineConfig,
   ): Record<string, unknown> {
+    lineConfig = lineConfigDefaults(lineConfig);
+    const allowed = new Set(lineConfig.dataSource.updateFields);
     const blocked = new Set(lineConfig.dataSource.updateBlockedFields ?? []);
     const payload: Record<string, unknown> = {};
 
     for (const field of new Set(fields)) {
-      if (!field.trim() || blocked.has(field) || field === lineConfig.lineKeyField) {
+      if (!field.trim() || !allowed.has(field) || blocked.has(field) || field === lineConfig.lineKeyField) {
         continue;
       }
 

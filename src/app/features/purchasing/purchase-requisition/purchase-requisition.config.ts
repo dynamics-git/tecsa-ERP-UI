@@ -162,7 +162,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   factBox: purchaseRequisitionFactBoxConfig,
   pageId: 'purchase-requisition',
   pageType: 'document',
-  autoSave: true,
   title: 'Purchase Requisition',
   identity: { primaryField: 'number' },
   module: 'Purchase',
@@ -181,7 +180,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   activeViewId: 'all',
   dataSource: {
     endpoint: '/purchaseRequisitions',
-    keyField: 'systemId',
     documentNoField: 'number',
     autoGenerateNumber: true,
     lazyCreateOnFirstInput: true,
@@ -190,7 +188,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     pageSize: 25,
     supportsDelete: false, // Header API supports cancellation, not deletion.
     writableStates: { field: 'status', values: ['open'] },
-    newRecordDefaults: { status: 'open' },
   },
   dataSurface: {
     idField: 'systemId',
@@ -238,7 +235,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
   lineKeyField: 'lineNo',
   dataSource: {
     endpoint: '/purchaseRequisitions',
-    keyField: 'systemId',
     lineNo: true,
     defaultSort: 'lineNo asc',
     pageSize: 100,
@@ -251,9 +247,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     omitEmptyFields: ['description'],
     // POST prerequisites are separate from required markers during field entry.
     requiredCreateFields: ['lineType', 'quantity'],
-    // Keep calculated amounts and PO progress out of update payloads.
-    updateBlockedFields: ['qtyPerUnitOfMeasure', 'estimatedAmount', 'convertedQuantity', 'remainingQuantity'],
-    meaningfulFields: ['itemId', 'glAccountId', 'description'],
   },
   columns: [
     { id: 'lineNo', label: 'Line No.', readonly: true, valueType: 'integer' },

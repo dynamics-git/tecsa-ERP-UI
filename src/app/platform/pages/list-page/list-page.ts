@@ -1522,7 +1522,7 @@ export class ListPage implements OnInit, OnDestroy {
     // Calculated/readonly columns are server-owned. Keep them visible but do not
     // retain them as unsent dirty edits on explicitly typed document lines.
     const changedFields = [field, ...(change.calculatedFields ?? [])];
-    const writable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
+    const writable = new Set(this.lineConfig.dataSource.updateFields ?? []);
     const isNewLine = !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig.dataSource));
     // Empty dependency resets on a draft are not explicit user clears.
     this.trackUnsaved(row, changedFields.filter(name => (!writable || writable.has(name)) &&

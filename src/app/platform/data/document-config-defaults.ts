@@ -5,12 +5,14 @@ import { LineConfig } from '../models/line-config.model';
 
 /** Resolve optional write overrides without mutating the feature's declarations. */
 export function headerDataSourceDefaults(source: DataSourceConfig, header: HeaderConfig): DataSourceConfig {
-  const fields = header.sections.flatMap((section) => section.fields).filter((field) => !field.readonly);
+  const declared = header.sections.flatMap(section => section.fields);
+  const fields = declared.filter(field => !field.readonly);
   const writable = fields.map((field) => field.key);
   return {
     ...source,
-    createFields: source.createFields ?? writable,
-    updateFields: source.updateFields ?? fields.filter((field) => !field.readonlyAfterCreate).map((field) => field.key),
+    createFields: (source.createFields ?? writable).filter(key => !declared.some(field => field.key === key && field.readonly)),
+    updateFields: (source.updateFields ?? fields.filter(field => !field.readonlyAfterCreate).map(field => field.key))
+      .filter(key => !source.updateBlockedFields?.includes(key) && !declared.some(field => field.key === key && (field.readonly || field.readonlyAfterCreate))),
     requiredCreateFields: source.requiredCreateFields ?? fields.filter((field) => field.required).map((field) => field.key),
   };
 }
@@ -58,8 +60,10 @@ export function lineConfigDefaults(config: LineConfig): LineConfig {
     ...config,
     dataSource: {
       ...source,
-      createFields: source.createFields ?? [...new Set([...writable, ...relationFields])],
-      updateFields: source.updateFields ?? columns.filter(column => !column.readonlyAfterCreate).map(column => column.field ?? column.id),
+      createFields: (source.createFields ?? [...new Set([...writable, ...relationFields])])
+        .filter(key => !config.columns.some(column => (column.field ?? column.id) === key && column.readonly)),
+      updateFields: (source.updateFields ?? columns.filter(column => !column.readonlyAfterCreate).map(column => column.field ?? column.id))
+        .filter(key => !source.updateBlockedFields?.includes(key) && !config.columns.some(column => (column.field ?? column.id) === key && (column.readonly || column.readonlyAfterCreate))),
       requiredCreateFields:
         source.requiredCreateFields ?? (config.fields ?? []).filter((field) => field.required && !field.readonly).map((field) => field.key),
       meaningfulFields:

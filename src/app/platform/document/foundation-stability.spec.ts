@@ -141,7 +141,8 @@ describe('PR uses supported header and line capabilities', () => {
     expect(lines.find(command => command.actionKey === 'cmd:line-delete')?.disabled).not.toBe(true);
     const standard = TestBed.inject(StandardListActionsService).resolve({ pageId: 'purchase-requisition', dataSource: purchaseRequisitionListConfig.dataSource });
     expect(standard.delete).toMatchObject({ disabled: true });
-    expect(purchaseRequisitionListConfig.autoSave).toBe(true);
+    // PR uses the existing autosave default; pr-authoring.spec exercises writes and reopening.
+    expect(purchaseRequisitionListConfig.autoSave).toBeUndefined();
     expect(purchaseRequisitionListConfig.dataSource.autoGenerateNumber).toBe(true);
   });
 });
