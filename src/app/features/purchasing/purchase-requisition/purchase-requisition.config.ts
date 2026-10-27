@@ -227,8 +227,8 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   },
 };
 /** PR line presentation: defaults and lookups assist entry without requiring values.
- * Users can edit Quantity, UOM conversion, UOM, Location, Description and Cost.
- * Only record identity, calculated amount and conversion progress remain read-only.
+ * Users can edit Quantity, Item UOM/Location, Description and Cost.
+ * Record identity, UOM conversion, calculated amount and conversion progress are read-only.
  * API validation is separate from these UI settings.
  */
 export const purchaseRequisitionLineConfig: LineConfig = {
@@ -249,8 +249,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     },
     permissions: { create: 'modify', update: 'modify', delete: 'modify' },
     omitEmptyFields: ['description'],
+    // POST prerequisites are separate from required markers during field entry.
+    requiredCreateFields: ['lineType', 'quantity'],
     // Keep calculated amounts and PO progress out of update payloads.
-    updateBlockedFields: ['estimatedAmount', 'convertedQuantity', 'remainingQuantity'],
+    updateBlockedFields: ['qtyPerUnitOfMeasure', 'estimatedAmount', 'convertedQuantity', 'remainingQuantity'],
     meaningfulFields: ['itemId', 'glAccountId', 'description'],
   },
   columns: [
@@ -272,6 +274,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       // Selects the Items binding in the shared No. column; does not require a value.
       id: 'itemId',
+      fill: { description: 'description' },
       editableWhen: { field: 'lineType', values: ['item'] },
       label: 'No.',
       displayColumn: 'number',
@@ -290,6 +293,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       // Selects the G/L binding in that same column.
       id: 'glAccountId',
+      fill: { description: 'name' },
       editableWhen: { field: 'lineType', values: ['gl_account'] },
       label: 'No.',
       displayColumn: 'number',
@@ -309,16 +313,18 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
       id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown', defaultValue: null,
+      editableWhen: { field: 'lineType', values: ['item'] },
 
       lookup: { endpoint: '/unitsOfMeasure', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'description'] },
     },
     // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.
-    // Editable line value; the selected UOM can still supply its default.
-    { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', align: 'end' },
+    // The existing API calculates this factor and prohibits direct writes.
+    { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', readonly: true, align: 'end' },
     {
-      // Optional location lookup, available on either line type.
+      // Location applies to Item lines; untouched values can default from the header.
       // Select a location master record; free text is not a valid location ID.
       id: 'locationId', label: 'Location', cellType: 'dropdown', defaultValue: null,
+      editableWhen: { field: 'lineType', values: ['item'] },
 
       lookup: { endpoint: '/locations', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'name'] },
     },

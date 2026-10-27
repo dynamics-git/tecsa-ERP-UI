@@ -141,7 +141,10 @@ export class DocumentConfigDataService {
   buildLineCreatePayload(
     row: Record<string, unknown>,
     lineConfig: LineConfig,
+    editedFields?: Iterable<string>,
   ): Record<string, unknown> | null {
+    if (!this.hasActiveLineMaster(row, lineConfig)) return null;
+    const edited = editedFields === undefined ? undefined : new Set(editedFields);
     const fields = lineConfig.dataSource.createFields ?? [];
     if (!fields.length) {
       return null;
@@ -151,7 +154,11 @@ export class DocumentConfigDataService {
     const payload: Record<string, unknown> = {};
     for (const field of fields) {
       if (field === lineConfig.lineKeyField) continue; // Assigned by the backend.
-      payload[field] = normalizeFieldValue(row[field], lineConfig.columns.find(c => (c.field ?? c.id) === field)?.valueType);
+      const column = lineConfig.columns.find(c => (c.field ?? c.id) === field);
+      // An untouched empty lookup is omitted so existing API defaults can apply.
+      // Explicit clears remain null; PATCH behavior is unchanged.
+      if (edited && column?.lookup && !edited.has(field) && !this.hasValue(row[field])) continue;
+      payload[field] = normalizeFieldValue(row[field], column?.valueType);
     }
 
     const parentKeyField = lineConfig.dataSource.parentKeyField?.trim();
@@ -165,6 +172,16 @@ export class DocumentConfigDataService {
     }
 
     return payload;
+  }
+
+  /** A typed, shared master column must resolve a selected identity before writing. */
+  hasActiveLineMaster(row: Record<string, unknown>, lineConfig: LineConfig): boolean {
+    if (!lineConfig.typeField) return true;
+    const bindings = lineConfig.columns.filter(column => column.lookup && column.displayColumn && column.editableWhen?.field === lineConfig.typeField);
+    return [...new Set(bindings.map(column => column.displayColumn))].every(group => {
+      const active = bindings.find(column => column.displayColumn === group && column.editableWhen!.values.includes(row[lineConfig.typeField!]));
+      return !!active && this.hasValue(row[active.field ?? active.id]);
+    });
   }
 
   buildLineUpdatePayload(

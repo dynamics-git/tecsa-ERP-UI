@@ -729,9 +729,9 @@ export class ListPage implements OnInit, OnDestroy {
     this.closeRequested.emit();
   }
 
-  private validateLineRow(row: Record<string, unknown>): string[] {
+  private validateLineRow(row: Record<string, unknown>, fields?: string[]): string[] {
     return (this.lineConfig?.fields ?? [])
-      .filter(field => !field.readonly && !field.disabled)
+      .filter(field => !field.readonly && !field.disabled && (!fields || fields.includes(field.key)))
       .flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
   }
 
@@ -791,7 +791,7 @@ export class ListPage implements OnInit, OnDestroy {
           if (!lineId && required.some(field => !this.hasValue(row[field]))) throw new Error('Complete the required line fields before saving.');
           const linePayload = lineId
             ? this.documentConfigData.buildLineUpdatePayload(row, [...(this.unsavedFields.get(row)?.keys() ?? [])].filter(field => !lineSource.updateFields || lineSource.updateFields.includes(field)), this.lineConfig)
-            : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
+            : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig, this.unsavedFields.get(row)?.keys());
           if (!linePayload) throw new Error('Complete the required line fields before saving.');
           const line = await firstValueFrom(lineId ? this.dataSource.updateRecord(lineSource, lineId, linePayload, row) : this.dataSource.create(lineSource, linePayload));
           if (this.isRecord(line)) Object.assign(row, line);
@@ -1523,7 +1523,10 @@ export class ListPage implements OnInit, OnDestroy {
     // retain them as unsent dirty edits on explicitly typed document lines.
     const changedFields = [field, ...(change.calculatedFields ?? [])];
     const writable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
-    this.trackUnsaved(row, changedFields.filter(name => !writable || writable.has(name)));
+    const isNewLine = !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig.dataSource));
+    // Empty dependency resets on a draft are not explicit user clears.
+    this.trackUnsaved(row, changedFields.filter(name => (!writable || writable.has(name)) &&
+      (!isNewLine || name === field || this.hasValue(row[name]))));
     this.activeLineRow = row;
     if (this.isWorksheetPage) this.worksheetChangedRows.add(row);
     const typeField = this.getLineTypeField();
@@ -1738,17 +1741,22 @@ export class ListPage implements OnInit, OnDestroy {
       const errors = (this.lineConfig.fields ?? []).flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
       if (errors.length) { this.setEntryStatus({tone: 'error', title: 'Complete row', message: errors.join('. ')}); options.onSettled?.(false); return; }
     }
-    const lineErrors = this.validateLineRow(row);
+    const pendingTypeEdits = this.lineConfig.typeField && this.unsavedFields.get(row)?.has(this.lineConfig.typeField) && !this.isWorksheetPage
+      ? [...(this.unsavedFields.get(row)?.keys() ?? [])]
+      : [];
+    const writeable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
+    const uniqueFields = [...new Set([...fields, ...pendingTypeEdits].map((field) => field.trim()).filter(field => field && (!writeable || writeable.has(field))))];
+    // Validate only this edit and its configured dependent changes during autosave.
+    const lineErrors = this.validateLineRow(row, uniqueFields);
     if (lineErrors.length) {
       this.setEntryStatus({ tone: 'error', title: 'Check line fields', message: lineErrors.join('. ') });
       this.changeDetector.detectChanges();
       options.onSettled?.(false); return;
     }
-    const pendingTypeEdits = this.lineConfig.typeField && !this.isWorksheetPage
-      ? [...(this.unsavedFields.get(row)?.keys() ?? [])]
-      : [];
-    const writeable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
-    const uniqueFields = [...new Set([...fields, ...pendingTypeEdits].map((field) => field.trim()).filter(field => field && (!writeable || writeable.has(field))))];
+    if (this.lineConfig.typeField && pendingTypeEdits.includes(this.lineConfig.typeField) &&
+        !this.documentConfigData.hasActiveLineMaster(row, this.lineConfig)) {
+      options.onSettled?.(false); return;
+    }
     if (!uniqueFields.length) {
       options.onSettled?.(false); return;
     }
@@ -1851,14 +1859,9 @@ export class ListPage implements OnInit, OnDestroy {
       options.onSettled?.(false); return;
     }
 
-    const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
+    const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig, this.unsavedFields.get(row)?.keys());
     if (!payload) {
-      this.setEntryStatus({
-        tone: 'error',
-        title: 'Line save failed',
-        message: 'Required line fields are missing. Complete required values before saving line.',
-      });
-      this.changeDetector.detectChanges();
+      // Keep incomplete drafts dirty; the existing close guard protects them.
       options.onSettled?.(false); return;
     }
 
@@ -1896,7 +1899,8 @@ export class ListPage implements OnInit, OnDestroy {
           const createdRecord = this.toCreatedRecord(created);
           if (createdRecord) {
             const deferred = this.isWorksheetPage ? Object.fromEntries([...(this.deferredLineSaveFields.get(row) ?? [])].map(field => [field, row[field]])) : {};
-            Object.assign(row, createdRecord, deferred);
+            this.mergeAutosaveResponse(row, createdRecord);
+            Object.assign(row, deferred);
           }
 
           const deferredFields = this.takeDeferredLineSaveFields(row);

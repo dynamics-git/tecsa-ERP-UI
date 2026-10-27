@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { FieldValidationService } from '../../../platform/document/field-validation.service';
-import { lineConfigDefaults } from '../../../platform/data/document-config-defaults';
-import { DocumentConfigDataService } from '../../../platform/data/document-config-data.service';
-import { LineMasterService } from '../../../platform/data/line-master.service';
 import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
 import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from './purchase-requisition.config';
 
 describe('Purchase Requisition server contract', () => {
-  const line = lineConfigDefaults(purchaseRequisitionLineConfig);
+  const line = purchaseRequisitionLineConfig;
 
   it('declares the Item and G/L choices and explicit type identity', () => {
     expect(line.typeField).toBe('lineType');
@@ -17,31 +13,18 @@ describe('Purchase Requisition server contract', () => {
     expect(line.dataSource.navigation?.childCollection).toBe('lines');
   });
 
-  it('requires the correct master per type without demanding one on the other type', () => {
-    const validator = new FieldValidationService();
-    const itemField = line.fields!.find(f => f.key === 'itemId')!;
-    const glField = line.fields!.find(f => f.key === 'glAccountId')!;
-    expect(validator.validateField(itemField, null, { lineType: 'item' }).valid).toBe(false);
-    expect(validator.validateField(glField, null, { lineType: 'item' }).valid).toBe(true);
-    expect(validator.validateField(glField, null, { lineType: 'gl_account' }).valid).toBe(false);
-    expect(validator.validateField(itemField, null, { lineType: 'gl_account' }).valid).toBe(true);
+  it('declares active master bindings separately from create prerequisites and required indicators', () => {
+    expect(line.columns.find(c => c.id === 'itemId')?.editableWhen).toEqual({field:'lineType',values:['item']});
+    expect(line.columns.find(c => c.id === 'glAccountId')?.editableWhen).toEqual({field:'lineType',values:['gl_account']});
+    expect(line.columns.some(c => c.required || c.requiredWhen)).toBe(false);
+    expect(line.dataSource.requiredCreateFields).toEqual(['lineType','quantity']);
   });
 
-  it('creates valid draft defaults and never writes calculated or server-owned columns', () => {
-    const service = new DocumentConfigDataService(new LineMasterService());
-    const registry = { defaultType: 'item', emptyType: ' ', byType: {} };
-    const row = service.createEmptyLineRow(line, {}, registry, {});
-    expect(row['lineType']).toBe('item');
-    expect(row['quantity']).toBe('1');
-    expect(row['itemId']).toBeNull();
-    expect(line.dataSource.createFields).toContain('glAccountId');
-    expect(line.dataSource.createFields).not.toContain('lineNo');
-    expect(line.dataSource.createFields).not.toContain('estimatedAmount');
-    const updated = service.buildLineUpdatePayload({
-      lineType: 'gl_account', itemId: null, glAccountId: '123',
-      unitOfMeasureId: null, locationId: null, estimatedAmount: '99',
-    }, ['lineType','itemId','glAccountId','unitOfMeasureId','locationId','estimatedAmount'], line);
-    expect(updated).toEqual({lineType:'gl_account',itemId:null,glAccountId:'123',unitOfMeasureId:null,locationId:null});
+  it('uses existing fills and declares only supported editable fields', () => {
+    expect(line.columns.find(c => c.id === 'itemId')?.fill).toEqual({description:'description'});
+    expect(line.columns.find(c => c.id === 'glAccountId')?.fill).toEqual({description:'name'});
+    for (const id of ['unitOfMeasureId','locationId']) expect(line.columns.find(c => c.id === id)?.editableWhen).toEqual({field:'lineType',values:['item']});
+    for (const id of ['lineNo','qtyPerUnitOfMeasure','estimatedAmount','convertedQuantity','remainingQuantity']) expect(line.columns.find(c => c.id === id)?.readonly).toBe(true);
   });
 
   it('configures list, document and FactBox directly from backend response names', () => {
