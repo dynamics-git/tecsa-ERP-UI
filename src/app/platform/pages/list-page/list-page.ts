@@ -1745,7 +1745,7 @@ export class ListPage implements OnInit, OnDestroy {
       options.onSettled?.(false); return;
     }
     const pendingTypeEdits = this.lineConfig.typeField && !this.isWorksheetPage
-      ? [...(this.unsavedFields.get(row) ?? [])]
+      ? [...(this.unsavedFields.get(row)?.keys() ?? [])]
       : [];
     const writeable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
     const uniqueFields = [...new Set([...fields, ...pendingTypeEdits].map((field) => field.trim()).filter(field => field && (!writeable || writeable.has(field))))];
