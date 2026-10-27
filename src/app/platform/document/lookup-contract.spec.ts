@@ -1,3 +1,6 @@
+import { By } from '@angular/platform-browser';
+import { LineColumnConfig } from '../models/line-config.model';
+import { DocumentConfigDataService } from '../data/document-config-data.service';
 import { DocumentHydrationOrchestratorService } from '../data/document-hydration-orchestrator.service';
 import { DocumentLines } from './document-lines/document-lines';
 import { TestBed } from '@angular/core/testing';
@@ -139,4 +142,37 @@ describe('Shared lookup paging and keyboard contract',()=>{
   expect(hydrate).toHaveBeenCalledTimes(1);f.destroy();
  });
 
+});
+
+describe('Conditional line lookup identity',()=>{
+ function create(){
+  TestBed.configureTestingModule({imports:[DocumentLines],providers:[{provide:DataSourceService,useValue:{loadList:()=>of({value:[]}),loadById:()=>of({})}}]});
+  const f=TestBed.createComponent(DocumentLines);
+  const columns:LineColumnConfig[]=[
+   {id:'kind',label:'Type',options:[{label:'First',value:'first'},{label:'Second',value:'second'}]},
+   {id:'firstId',label:'No.',displayColumn:'choice',editableWhen:{field:'kind',values:['first']},lookup:{endpoint:'/first',valueField:'id',displayField:'code'}},
+   {id:'secondId',label:'No.',displayColumn:'choice',editableWhen:{field:'kind',values:['second']},lookup:{endpoint:'/second',valueField:'id',displayField:'code'}},
+   {id:'locationId',label:'Location',lookup:{endpoint:'/locations',valueField:'id',displayField:'code'}},
+  ];
+  f.componentRef.setInput('columns',columns);return {f,columns};
+ }
+ it('switches the rendered lookup and original API field, preserving numeric IDs across a save/reopen snapshot',()=>{
+  const {f,columns}=create();const row={kind:'first',firstId:123,secondId:456,locationId:789};
+  f.componentRef.setInput('rows',[row]);f.detectChanges();
+  let controls=f.debugElement.queryAll(By.directive(LookupSelect));
+  expect(controls[0].componentInstance.value).toBe(123);expect(controls[1].componentInstance.value).toBe(789);
+  row.kind='second';f.componentRef.setInput('rows',[{...row}]);f.detectChanges();
+  controls=f.debugElement.queryAll(By.directive(LookupSelect));expect(controls[0].componentInstance.value).toBe(456);
+  const resolved=f.componentInstance.resolveColumn(columns[1],row);expect(resolved.lookup?.endpoint).toBe('/second');
+  const payload=TestBed.inject(DocumentConfigDataService).buildLineUpdatePayload(row,[resolved.id],{columns,dataSource:{endpoint:'/lines'}} as any);
+  expect(payload).toEqual({secondId:456});
+  f.componentRef.setInput('rows',[JSON.parse(JSON.stringify({...row,...payload}))]);f.detectChanges();
+  expect(f.debugElement.queryAll(By.directive(LookupSelect))[0].componentInstance.value).toBe(456);
+  expect(f.componentInstance.resolveColumn(columns[3],row)).toBe(columns[3]);
+  expect(f.componentInstance.resolveColumn(columns[1],{kind:'unknown'}).readonly).toBe(true);f.destroy();
+ });
+ it('does not expose default lookup identities in placeholder rows',()=>{
+  const {f}=create();f.componentRef.setInput('rows',[{kind:'first',firstId:123,__entryPlaceholder:true}]);f.detectChanges();
+  expect(f.debugElement.queryAll(By.directive(LookupSelect))[0].componentInstance.value).toBeNull();f.destroy();
+ });
 });

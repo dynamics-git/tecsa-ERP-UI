@@ -1,4 +1,5 @@
 <span class="lookup-control" (focusout)="close()">
+  @if (!anchor) {
   <input #editor role="combobox" autocomplete="off" aria-autocomplete="list"
     [attr.aria-invalid]="error ? true : null" [attr.aria-label]="label" [attr.aria-required]="required || null"
     [attr.aria-expanded]="expanded" [attr.aria-controls]="expanded ? id : null"
@@ -8,6 +9,7 @@
   <button type="button" class="lookup-toggle" tabindex="-1" [disabled]="disabled"
     [attr.aria-label]="'Show choices for ' + label" (mousedown)="$event.preventDefault()"
     (click)="toggle(editor)"><i class="ts-icon ts-icon-down" aria-hidden="true"></i></button>
+  }
   @if (expanded) {
     <span #popup class="lookup-popup" popover="manual" (mousedown)="$event.preventDefault()">
       @if (error) { <span role="alert">{{ error }}</span><button type="button" (click)="retried.emit()">Retry</button> }
@@ -21,7 +23,6 @@
           <span aria-hidden="true" [style.height.px]="afterHeight" style="flex-shrink: 0"></span>
         </span>
         @if (loading) { <app-loading-indicator label="Loading choices…" [compact]="true"></app-loading-indicator> }
-        <span class="lookup-help">Search to narrow the choices.</span>
       @if (!required && value) { <button type="button" (click)="choose(null)">Clear selection</button> }
     </span>
   }

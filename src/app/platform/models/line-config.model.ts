@@ -19,6 +19,9 @@ export type LineCellType = 'text' | 'select' | 'dropdown' | 'icon';
 export type LineValueType = import('./field-value').FieldValueType;
 
 export interface LineColumnConfig extends DataSurfaceColumnConfig {
+  /** Alternative backend fields share one visible column. editableWhen selects
+   * the active field/lookup per row; writes retain the original API fields. */
+  displayColumn?: string;
   quickEntry?: boolean;
   requiredWhen?: FieldConfig['requiredWhen'];
   readonlyWhen?: FieldConfig['readonlyWhen'];

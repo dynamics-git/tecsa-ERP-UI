@@ -2452,20 +2452,37 @@ export class ListPage implements OnInit, OnDestroy {
     }
     const canContinue = this.dataSource.captureWriteScope();
     this.setDeleting(true);
+    let loaderStarted = false;
     try {
       const result = await this.lineCommands.deleteRows({
         lineRows, canContinue, payload: {selectedIndexes: plan.targetRows.map(row => lineRows.indexOf(row))},
         resolveId: row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource),
         deleteById: id => this.dataSource.delete(resolved.dataSource, id, lineRows.find(row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource) === id)?.['systemRowVersion']),
-        confirmDelete: count => this.confirmation.confirmIntent({intent: 'delete', count, entityLabel: 'line'}),
+        // One shared loader for the entire selection, after the confirmation closes.
+        confirmDelete: async count => {
+          const confirmed = await this.confirmation.confirmIntent({intent: 'delete', count, entityLabel: 'line'});
+          if (confirmed) {
+            loaderStarted = true;
+            this.startPopupLoading('Deleting lines…');
+          }
+          return confirmed;
+        },
       });
       if (result.deleted) {
         for (const row of result.targetRows) { this.unsavedFields.delete(row); this.worksheetChangedRows.delete(row); }
         this.dirty = this.unsavedFields.size > 0;
         this.applyLineDeletionResult((entry.lineRows ?? []).filter(row => !result.targetRows.includes(row)));
       }
+      // Clear the blocking loading status before publishing any failure message.
+      if (loaderStarted) {
+        this.stopPopupLoading();
+        loaderStarted = false;
+      }
       this.showDeleteFailures(result.failures, result.targetRows.length);
-    } finally { this.setDeleting(false); }
+    } finally {
+      if (loaderStarted) this.stopPopupLoading();
+      this.setDeleting(false);
+    }
   }
 
   private copySelectedLines(payload: unknown, paste = false): void {

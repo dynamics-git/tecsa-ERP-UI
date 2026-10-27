@@ -21,6 +21,18 @@ export class Notes extends RecordPanel implements OnDestroy {
   private readonly drafts = new Map<string, { body: string; editing?: CollaborationEntry; mentions?:Array<{systemId:string;name:string}> }>();
   @ViewChild(LookupSelect) mentionControl?:LookupSelect;
   private typingMention=false;
+  private mentionRange?: {start:number;end:number};
+  private mentionEditor?: HTMLTextAreaElement;
+  startMention(editor: HTMLTextAreaElement): void {
+    if(this.busy)return;
+    editor.focus();
+    const start=editor.selectionStart, end=editor.selectionEnd;
+    const prefix=this.draft.slice(0,start);
+    const token=(prefix && !/\s$/u.test(prefix)?' ':'')+'@';
+    editor.value=prefix+token+this.draft.slice(end);
+    editor.setSelectionRange(start+token.length,start+token.length);
+    this.changeDraft({target:editor} as unknown as Event);
+  }
   openMentionChoices():void{this.searchMentions(this.typingMention?this.mentionQuery:'');}
   mentionKey(event:KeyboardEvent):void{if(this.typingMention&&this.mentionControl?.expanded)this.mentionControl.key(event);}
   mentionOptions:Array<{value:string;label:string}>=[];
@@ -38,7 +50,11 @@ export class Notes extends RecordPanel implements OnDestroy {
   addMention(id:unknown):void{
     const option=this.mentionOptions.find(option=>option.value===id);if(!option || this.mentions.some(user=>user.systemId===id))return;
     if(this.mentions.length>=20){this.mentionError='Mention at most 20 users in one note.';return;}
-    const body=this.draft.replace(/@[^\s@]*$/u,'').trimEnd()+' @'+option.label+' ';
+    const range=this.mentionRange ?? {start:this.draft.length,end:this.draft.length};
+    const insertion=(!this.mentionRange && this.draft && !/\s$/u.test(this.draft)?' ':'')+'@'+option.label+' ';
+    const body=this.draft.slice(0,range.start)+insertion+this.draft.slice(range.end);
+    if(this.mentionEditor){this.mentionEditor.value=body;this.mentionEditor.setSelectionRange?.(range.start+insertion.length,range.start+insertion.length);}
+    this.mentionRange=undefined;
     this.drafts.set(this.currentKey,{body,editing:this.editing,mentions:[...this.mentions,{systemId:option.value,name:option.label}]});this.typingMention=false;this.mentionQuery='';
   }
   removeMention(id:string):void{this.drafts.set(this.currentKey,{body:this.draft,editing:this.editing,mentions:this.mentions.filter(user=>user.systemId!==id)});}
@@ -59,7 +75,7 @@ export class Notes extends RecordPanel implements OnDestroy {
   }
   override ngOnChanges(): void {
     const oldKey=this.currentKey;super.ngOnChanges();
-    if(oldKey!==this.currentKey){this.typingMention=false;this.mentionQuery='';this.mentionControl?.close();this.mentionRequest?.unsubscribe();this.mentionOptions=[];this.mentionLoading=false;this.mentionError='';}
+    if(oldKey!==this.currentKey){this.mentionRange=undefined;this.mentionEditor=undefined;this.typingMention=false;this.mentionQuery='';this.mentionControl?.close();this.mentionRequest?.unsubscribe();this.mentionOptions=[];this.mentionLoading=false;this.mentionError='';}
     this.registerEditor();
   }
   get hasDraft(): boolean {
@@ -86,7 +102,11 @@ export class Notes extends RecordPanel implements OnDestroy {
       editing: this.editing,
       mentions: this.mentions,
     });
-    const match=this.draft.match(/(?:^|\s)@([^\s@]*)$/u);
+    const editor=event.target as HTMLTextAreaElement;
+    const caret=editor.selectionStart ?? this.draft.length;
+    const match=this.draft.slice(0,caret).match(/(?:^|\s)@([^\s@]*)$/u);
+    this.mentionEditor=editor;
+    this.mentionRange=match ? {start:caret-match[1].length-1,end:caret} : undefined;
     if(match&&this.mentionControl){
       this.typingMention=true;this.mentionQuery=match[1];
       if(!this.mentionControl.expanded)this.mentionControl.open();else this.searchMentions(match[1]);

@@ -8,6 +8,8 @@ export class LookupSelect {
   private static nextId = 0;
   readonly id = 'choice-' + LookupSelect.nextId++;
   @Input() label = '';
+  /** Optional external editor for inline mention suggestions. */
+  @Input() anchor?: HTMLTextAreaElement;
   @Input() placeholder = '';
   @Input() display = '';
   @Input() value: unknown;
@@ -45,7 +47,7 @@ export class LookupSelect {
   }
   private positionPopup(): void {
     const popup = this.popup;
-    const editor = this.editor?.nativeElement;
+    const editor = this.anchor ?? this.editor?.nativeElement;
     if (!this.expanded || !popup || !editor) return;
     const rect = editor.getBoundingClientRect();
     const view = editor.ownerDocument.defaultView;

@@ -114,7 +114,28 @@ export class DocumentLines {
   @Input() worksheet = false;
   @Input() disabled = false;
   @Input() columns: LineColumnConfig[] = [];
-  get visibleColumns(): LineColumnConfig[] { return this.columns.filter(column=>!column.hidden); }
+  get visibleColumns(): LineColumnConfig[] {
+    const seen = new Set<string>();
+    return this.columns.filter(column => {
+      if (column.hidden) return false;
+      const key = this.displayColumnKey(column);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  resolveColumn(column: LineColumnConfig, row: Record<string, unknown>): LineColumnConfig {
+    if (!column.displayColumn) return column;
+    return this.columns.find(candidate => !candidate.hidden && candidate.displayColumn === column.displayColumn &&
+      (!candidate.editableWhen || candidate.editableWhen.values.includes(row[candidate.editableWhen.field])))
+      ?? { ...column, readonly: true };
+  }
+  private displayColumnKey(column: LineColumnConfig): string {
+    return column.displayColumn ? 'group:' + column.displayColumn : 'field:' + column.id;
+  }
+  private displayColumnIndex(column: LineColumnConfig): number {
+    return this.visibleColumns.findIndex(candidate => this.displayColumnKey(candidate) === this.displayColumnKey(column));
+  }
   @Input() rows: Record<string, unknown>[] = [];
   @Input() showSelection = false;
   @Input() rowCommands: CommandConfig[] = [];
@@ -277,14 +298,16 @@ export class DocumentLines {
   }
   private focusedColumnIndex = 0;
   focusCell(column: LineColumnConfig, rowIndex: number): void {
-    this.focusedColumnIndex = this.columns.indexOf(column);
+    this.focusedColumnIndex = this.displayColumnIndex(column);
     if (this.activeRowIndex !== rowIndex) this.activateRow(rowIndex);
   }
   private clipboardContext(): string { return JSON.stringify(this.headerData) + ':' + this.columns.map(c=>c.id+':'+c.readonly).join('|'); }
   private clipboardColumns(start = 0): LineColumnConfig[] {
-    return this.columns.slice(Math.max(0,start)).filter(column=>!column.hidden&&!column.readonly&&column.cellType!=='icon');
+    return this.visibleColumns.slice(Math.max(0,start)).filter(column => column.cellType !== 'icon' &&
+      (!column.readonly || !!column.displayColumn && this.columns.some(candidate => !candidate.hidden && !candidate.readonly && candidate.displayColumn === column.displayColumn)));
   }
   private clipboardCell(column: LineColumnConfig, row: Record<string,unknown>): unknown {
+    column = this.resolveColumn(column, row);
     const field=column.field??column.id;
     if(row['__lookupRestricted_'+field] || column.editableWhen&&!column.editableWhen.values.includes(row[column.editableWhen.field]))return '';
     if(column.lookup) {
@@ -337,7 +360,7 @@ export class DocumentLines {
     if (!text || this.disabled || this.isReadonly(column, this.rows[rowIndex] ?? {})) return;
     event.preventDefault(); event.stopPropagation();
     this.focusCell(column, rowIndex);
-    void this.pasteText(text, rowIndex, this.columns.indexOf(column));
+    void this.pasteText(text, rowIndex, this.focusedColumnIndex);
   }
   async pasteText(text: string, rowIndex = Math.max(0, this.activeRowIndex), columnIndex = this.focusedColumnIndex): Promise<void> {
     if (this.disabled || this.pasteLoading) return;
@@ -360,7 +383,8 @@ export class DocumentLines {
         const lineLabel=this.pasteLineLabel(target,index,rowIndex);
         const row:Record<string,unknown>=target ? structuredClone(target) : {};
         if(!target || target['__entryPlaceholder']) for(const c of this.columns) if(c.defaultValue!==undefined && row[c.field??c.id]===undefined) row[c.field??c.id]=structuredClone(c.defaultValue);
-        for(const [offset,c] of used.entries()) {
+        for(const [offset,declared] of used.entries()) {
+          const c = this.resolveColumn(declared, row);
           const field=c.field??c.id, raw=values[offset];
           if(this.isReadonly(c,row)){if(raw.trim() && !fieldValuesEqual(row[field],normalizeFieldValue(raw,c.valueType),c.valueType) && String(this.clipboardCell(c,row))!==raw)errors.push(lineLabel+' — '+c.label+' is not editable.');continue;}
           let value:unknown=raw, selected:Record<string,unknown>|undefined;
@@ -394,7 +418,10 @@ export class DocumentLines {
       if(errors.length)throw new Error(errors.slice(0,5).join(' ')+(errors.length>5?' More pasted cells need correction.':''));
       for(const [index,candidate] of candidates.entries()) {
         const target=targets[index];
-        if(target && !target['__entryPlaceholder'] && used.some((c,offset)=>cells[index][offset].trim() && !fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType) && (c.hidden || this.isReadonly(c,candidate)))) throw new Error('A target field is no longer editable.');
+        if(target && !target['__entryPlaceholder'] && used.some((declared,offset) => {
+          const c = this.resolveColumn(declared, candidate);
+          return cells[index][offset].trim() && !fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType) && (c.hidden || this.isReadonly(c,candidate));
+        })) throw new Error('A target field is no longer editable.');
       }
       const creates=candidates.filter((_row,index)=>!targets[index] || targets[index]['__entryPlaceholder']);
       const pasteCommand=this.rowCommands.find(command=>command.actionKey.replace(/^cmd:/i,'').toLowerCase()==='line-paste');
@@ -407,7 +434,7 @@ export class DocumentLines {
         const changed=this.columns.filter(c=>c.cellType!=='icon'&&!fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType));
         if(!changed.length)continue;
         // One row event carries the complete validated change, preserving the normal calculation and autosave path.
-        const anchors=used.filter(c=>changed.includes(c));
+        const anchors=used.map(c=>this.resolveColumn(c,candidate)).filter(c=>changed.includes(c));
         const column=anchors[anchors.length-1];
         if(!column)continue;
         const field=column.field??column.id,previousValue=target[field];
@@ -453,6 +480,9 @@ export class DocumentLines {
   }
 
   private copyCell(column: LineColumnConfig, source: Record<string,unknown>, target: Record<string,unknown>): void {
+    const sourceColumn = this.resolveColumn(column, source);
+    column = this.resolveColumn(column, target);
+    if ((sourceColumn.field ?? sourceColumn.id) !== (column.field ?? column.id)) return;
     const field = column.field ?? column.id;
     if (column.hidden || column.cellType === 'icon' || this.isReadonly(column,target) || source['__lookupRestricted_'+field]) return;
     if (column.lookup) {
@@ -523,7 +553,8 @@ export class DocumentLines {
   }
 
   getColumnWidthStyle(column: LineColumnConfig): string | null {
-    const resized = this.columnWidths.get(column.id);
+    const display = this.visibleColumns[this.displayColumnIndex(column)];
+    const resized = this.columnWidths.get(display?.id ?? column.id);
     if (typeof resized === 'number') {
       return `${resized}px`;
     }
@@ -591,6 +622,7 @@ export class DocumentLines {
   inputType(column: LineColumnConfig): string { return fieldInputType(column.valueType); }
 
   getCellValue(row: Record<string, unknown>, column: LineColumnConfig): string {
+    if (column.displayColumn && column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) return '';
     // Filler rows are empty entry space, not records with default values.
     // Keep defaults in the draft so they become visible when entry actually starts.
     if (row['__entryPlaceholder'] === true) return '';

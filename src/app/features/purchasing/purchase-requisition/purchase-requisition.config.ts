@@ -8,6 +8,7 @@ import {
 } from '../../../platform/public-api';
 import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
 
+// Process commands call server workflow actions. Permissions and document status decide availability.
 const actionDefinitions: CommandConfig[] = [
   {
     label: 'Submit',
@@ -58,6 +59,7 @@ const actions = actionDefinitions.map((action, index) => ({
   order: 50 + index * 10,
 }));
 
+// Header: users enter request details. Identity is locked after creation; workflow fields are server-owned.
 export const purchaseRequisitionHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Requisition',
   toolbarButtons: [
@@ -155,6 +157,7 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
     },
   ],
 };
+// List/document shell: shared autosave and FactBox renderers consume this configuration.
 export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   factBox: purchaseRequisitionFactBoxConfig,
   pageId: 'purchase-requisition',
@@ -223,6 +226,11 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     ]),
   },
 };
+/** PR line presentation: defaults and lookups assist entry without requiring values.
+ * Users can edit Quantity, UOM conversion, UOM, Location, Description and Cost.
+ * Only record identity, calculated amount and conversion progress remain read-only.
+ * API validation is separate from these UI settings.
+ */
 export const purchaseRequisitionLineConfig: LineConfig = {
   typeField: 'lineType',
   placement: { mode: 'after-section', afterSectionId: 'general' },
@@ -241,7 +249,8 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     },
     permissions: { create: 'modify', update: 'modify', delete: 'modify' },
     omitEmptyFields: ['description'],
-    updateBlockedFields: ['estimatedAmount', 'qtyPerUnitOfMeasure', 'convertedQuantity', 'remainingQuantity'],
+    // Keep calculated amounts and PO progress out of update payloads.
+    updateBlockedFields: ['estimatedAmount', 'convertedQuantity', 'remainingQuantity'],
     meaningfulFields: ['itemId', 'glAccountId', 'description'],
   },
   columns: [
@@ -250,9 +259,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       id: 'lineType',
       label: 'Type',
       valueType: 'text',
-      required: true,
+
       cellType: 'dropdown',
       defaultValue: 'item',
+      // Switching Item/G/L clears references that no longer apply.
       clearFieldsOnChange: ['itemId', 'glAccountId', 'unitOfMeasureId', 'locationId'],
       options: [
         { label: 'Item', value: 'item' },
@@ -260,13 +270,15 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       ],
     },
     {
+      // Selects the Items binding in the shared No. column; does not require a value.
       id: 'itemId',
-      label: 'Item',
-      valueType: 'guid',
-      defaultValue: null,
-      requiredWhen: { field: 'lineType', values: ['item'] },
-      cellType: 'dropdown',
       editableWhen: { field: 'lineType', values: ['item'] },
+      label: 'No.',
+      displayColumn: 'number',
+      defaultValue: null,
+
+      cellType: 'dropdown',
+
       lookup: {
         endpoint: '/items',
         filter: 'blocked eq false',
@@ -276,13 +288,15 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       },
     },
     {
+      // Selects the G/L binding in that same column.
       id: 'glAccountId',
-      label: 'G/L Account',
-      valueType: 'guid',
-      defaultValue: null,
-      requiredWhen: { field: 'lineType', values: ['gl_account'] },
-      cellType: 'dropdown',
       editableWhen: { field: 'lineType', values: ['gl_account'] },
+      label: 'No.',
+      displayColumn: 'number',
+      defaultValue: null,
+
+      cellType: 'dropdown',
+
       lookup: {
         endpoint: '/glAccounts',
         filter: "accountType eq 'posting' and blocked eq false",
@@ -291,37 +305,45 @@ export const purchaseRequisitionLineConfig: LineConfig = {
         searchFields: ['number', 'name'],
       },
     },
+    // Editable text (100 characters). The server supplies a description when omitted.
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
-      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
-      editableWhen: { field: 'lineType', values: ['item'] },
+      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown', defaultValue: null,
+
       lookup: { endpoint: '/unitsOfMeasure', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'description'] },
     },
-    { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', readonly: true, align: 'end' },
+    // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.
+    // Editable line value; the selected UOM can still supply its default.
+    { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', align: 'end' },
     {
-      id: 'locationId', label: 'Location', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
-      editableWhen: { field: 'lineType', values: ['item'] },
+      // Optional location lookup, available on either line type.
+      // Select a location master record; free text is not a valid location ID.
+      id: 'locationId', label: 'Location', cellType: 'dropdown', defaultValue: null,
+
       lookup: { endpoint: '/locations', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'name'] },
     },
     {
+      // Editable requested quantity. Starts at 1; no PR-specific required or pattern rule.
+      // Decimal editing uses the shared numeric control.
       id: 'quantity',
       label: 'Quantity',
       factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 20 },
       valueType: 'decimal',
-      required: true,
-      validation: { pattern: '^[0-9]{1,14}(?:[.][0-9]{1,6})?$' },
+
       defaultValue: '1',
       align: 'end',
     },
     {
+      // Editable estimate, initially 0; no PR-specific pattern restriction.
       id: 'estimatedUnitCost',
       label: 'Estimated Unit Cost',
       valueType: 'decimal',
-      validation: { pattern: '^[0-9]{1,14}(?:[.][0-9]{1,6})?$' },
+
       defaultValue: '0',
       align: 'end',
     },
     {
+      // Preview = quantity × estimated unit cost; the server calculates the saved amount.
       id: 'estimatedAmount',
       label: 'Estimated Amount',
       factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 30 },
@@ -330,6 +352,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       align: 'end',
     },
     { id: 'requiredDate', label: 'Required Date', valueType: 'date' },
+    // Purchase-order progress is calculated by the server, never entered manually.
     { id: 'convertedQuantity', label: 'Converted Quantity', valueType: 'decimal', readonly: true, align: 'end' },
     { id: 'remainingQuantity', label: 'Remaining Quantity', valueType: 'decimal', readonly: true, align: 'end' },
   ],
