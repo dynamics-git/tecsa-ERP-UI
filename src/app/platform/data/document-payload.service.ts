@@ -61,16 +61,11 @@ export class DocumentPayloadService {
           continue;
         }
 
-        payload[field.key] = headerData[field.key] === '' && field.defaultValue === null
-          ? null : this.coerceFieldValue(headerData[field.key], field.valueType ?? field.type);
+        payload[field.key] = normalizeFieldValue(headerData[field.key], field.valueType ?? field.type, field.defaultValue) ?? null;
       }
     }
 
     return payload;
-  }
-
-  private coerceFieldValue(value: unknown, valueType: string | undefined): unknown {
-    return normalizeFieldValue(value, valueType) ?? null;
   }
 
   private resolveAccessCenter(): string {

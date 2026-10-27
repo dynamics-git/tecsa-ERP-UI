@@ -1,3 +1,4 @@
+import { normalizeFieldValue } from '../../models/field-value';
 import { ListGrid } from '../list-grid/list-grid';
 import { RunModalHost } from '../../run-modal/run-modal-host/run-modal-host';
 import { RecordDeleteService } from '../../data/record-delete.service';
@@ -329,7 +330,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.lineConfig = {...this.lineConfig, dataSource: this.dataSource.resolveSourceContract(lineSource),
         columns: this.lineConfig.columns.map(column => {
           const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
-          return {...column, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
+          return {...column, lookup: field.lookup, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
             readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required, validation: field.validation};
         })};
     }
@@ -1708,6 +1709,10 @@ export class ListPage implements OnInit, OnDestroy {
       Object.assign(updatePayload, payload['updates']);
     }
 
+    for (const key of Object.keys(updatePayload)) {
+      const field = this.headerFieldConfigMap[key];
+      updatePayload[key] = normalizeFieldValue(updatePayload[key], field?.valueType ?? field?.type, field?.defaultValue);
+    }
     this.stripIdentityFields(updatePayload);
     if (!Object.keys(updatePayload).length) {
       return;

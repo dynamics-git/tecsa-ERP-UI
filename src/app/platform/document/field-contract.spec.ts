@@ -38,6 +38,21 @@ describe('Shared configurable field contract with synthetic records', () => {
     expect(data.buildLineCreatePayload({code:' pr ',lineNo:10000,__entryPlaceholder:true},config)).toEqual({code:'PR'});
     expect(data.buildLineCreatePayload({code:'PR'},{...config,dataSource:{endpoint:'/lines',createFields:[]}})).toBeNull();
   });
+  it('normalizes a resolved null default consistently while preserving ordinary blanks and raw identities', () => {
+    expect(normalizeFieldValue('', 'date', null)).toBeNull();
+    expect(normalizeFieldValue('', 'text')).toBe('');
+    expect(normalizeFieldValue('', 'text', '')).toBe('');
+    expect(normalizeFieldValue(null, 'text')).toBeNull();
+    expect(normalizeFieldValue(undefined, 'text', null)).toBeUndefined();
+    expect(normalizeFieldValue(123, undefined, null)).toBe(123);
+    const data=TestBed.inject(DocumentConfigDataService);
+    const config:LineConfig={placement:{mode:'end'},toolbarButtons:[],columns:[
+      {id:'description',label:'Description'},
+      {id:'date',label:'Date',valueType:'date',defaultValue:null},
+    ],dataSource:{endpoint:'/lines'}};
+    expect(data.buildLineCreatePayload({description:'Keep',date:''},config)).toEqual({description:'Keep',date:null});
+    expect(data.buildLineUpdatePayload({description:'Keep',date:''},['date'],config)).toEqual({date:null});
+  });
   it('normalizes codes but preserves text casing and leading zeros', () => {
     expect(normalizeFieldValue('  pr001  ','code')).toBe('PR001');
     expect(normalizeFieldValue('  Mixed Case  ','text')).toBe('  Mixed Case  ');

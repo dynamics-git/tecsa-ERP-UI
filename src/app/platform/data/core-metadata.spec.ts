@@ -256,6 +256,41 @@ describe('Authenticated shared Core metadata contract', () => {
       label: 'Code',
     });
   });
+  it('uses domain nullable hints without importing generic write restrictions or coercing lookup identities', async () => {
+    const contract = metadata();
+    contract.data.entities = {};
+    contract.data.endpoints = [{path:'/api/v1/companies/{companyId}/documents/{documentId}/lines', methods:['POST'], type:'write',
+      inputFields:{ locationId:{type:'string',format:'uuid',nullable:true}, quantity:{type:'string',required:true} }}];
+    get.mockReturnValue(of(contract));
+    await firstValueFrom(data.loadCoreMetadata());
+    const nested = {endpoint:'/documents', navigation:{parentEndpoint:'/documents',parentIdFields:['systemId'],childCollection:'lines'}};
+    const field = {key:'locationId',label:'Location',lookup:{endpoint:'/locations',displayField:'code'}};
+    expect(data.resolveFieldContract(nested,field)).toEqual({...field,defaultValue:null});
+    expect(data.resolveFieldContract(nested,{...field,defaultValue:'MAIN'}).defaultValue).toBe('MAIN');
+    expect(data.resolveFieldContract(nested,{key:'quantity',label:'Quantity'})).toEqual({key:'quantity',label:'Quantity'});
+    expect(data.resolveFieldContract({endpoint:'/other'},field)).toEqual(field);
+    contract.data.endpoints[0].path += '/{systemId}';
+    contract.data.endpoints[0].methods = ['PATCH'];
+    contracts.acceptMetadata(contract);
+    expect(data.resolveFieldContract(nested,field)).toEqual({...field,defaultValue:null});
+    contracts.clearMetadata();
+    expect(data.resolveFieldContract(nested,field)).toEqual(field);
+  });
+  it('resolves lookup search from its own authorized GET profile, retaining explicit overrides and legacy fallback', async () => {
+    const contract = metadata();
+    contract.data.endpoints = [{path:'/api/v1/companies/{companyId}/locations', methods:['GET'],type:'read',queryProfiles:['location']}];
+    contract.data.queryProfiles = {location:{search:['code','name','city']}};
+    get.mockReturnValue(of(contract));
+    await firstValueFrom(data.loadCoreMetadata());
+    const field = {key:'locationId',label:'Location',lookup:{endpoint:'/locations',displayField:'code'}};
+    expect(data.resolveFieldContract({endpoint:'/documents'},field).lookup?.searchFields).toEqual(['code','name','city']);
+    for (const searchFields of [[],['code']]) {
+      expect(data.resolveFieldContract(source,{...field,lookup:{...field.lookup,searchFields}}).lookup?.searchFields).toEqual(searchFields);
+    }
+    expect(data.resolveFieldContract(source,{...field,lookup:{endpoint:'/unknown',displayField:'code'}}).lookup?.searchFields).toBeUndefined();
+    contracts.clearMetadata();
+    expect(data.resolveFieldContract(source,field)).toEqual(field);
+  });
   it('keeps explicit nested parent identity separate from a document number', async () => {
     const contract = metadata();
     contract.data.entities['child'] = {

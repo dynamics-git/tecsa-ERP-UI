@@ -33,6 +33,7 @@ export interface CoreEntity {
   operations: Record<string, boolean>;
 }
 export interface CoreMetadata {
+  queryProfiles?: Record<string, { search?: string[] }>;
   contractVersion: string;
   entities: Record<string, CoreEntity>;
   endpoints: Array<{
@@ -40,6 +41,7 @@ export interface CoreMetadata {
     methods: string[];
     type: string;
     inputFields?: Record<string, unknown>;
+    queryProfiles?: string[];
   }>;
 }
 
@@ -197,10 +199,42 @@ export class EntityContractService {
   updateMethod(source: DataSourceConfig): 'PUT' | 'PATCH' {
     return source.singleton ? 'PUT' : (this.entity(source)?.updateMethod ?? 'PATCH');
   }
+  /** Catalogue paths may include workspace/company scopes; field paths remain API-relative. */
+  private endpointMatches(template: string, source: DataSourceConfig, record = false): boolean {
+    return this.matchesPath(template.replace(/^.*\/companies\/\{companyId\}/, ''), this.path(source) + (record ? '/{record}' : ''));
+  }
+
+  private resolveLookup(field: FieldConfig): FieldConfig {
+    const lookup = field.lookup;
+    if (!lookup || lookup.searchFields !== undefined) return field;
+    const endpoint = this.metadata?.endpoints.find(entry =>
+      entry.methods.includes('GET') && this.endpointMatches(entry.path, {endpoint: lookup.endpoint}));
+    const profiles = endpoint?.queryProfiles;
+    // Ambiguous/missing metadata retains the existing display-field search fallback.
+    if (!Array.isArray(profiles) || profiles.length !== 1) return field;
+    const search = this.metadata?.queryProfiles?.[profiles[0]]?.search;
+    if (!Array.isArray(search) || !search.length || !search.every(value => typeof value === 'string')) return field;
+    return {...field, lookup: {...lookup, searchFields: [...search]}};
+  }
+
+  private resolveDomainField(source: DataSourceConfig, field: FieldConfig): FieldConfig {
+    if (source.addressStyle === 'odata' || field.defaultValue !== undefined) return field;
+    const endpoint = this.metadata?.endpoints.find(entry =>
+      entry.methods.includes('POST') && this.endpointMatches(entry.path, source));
+    // Update-only users receive no POST metadata. Their permitted update hints remain usable.
+    const updateEndpoint = this.metadata?.endpoints.find(entry =>
+      entry.methods.includes(source.singleton ? 'PUT' : 'PATCH') && this.endpointMatches(entry.path, source, !source.singleton));
+    const hint = endpoint?.inputFields?.[field.key] ?? updateEndpoint?.inputFields?.[field.key];
+    // Domain hints are partial. Nullable is a safe empty-value default, never a write
+    // allowlist or a reason to import generic registry readonly/required rules.
+    return this.isRecord(hint) && hint['nullable'] === true ? {...field, defaultValue: null} : field;
+  }
+
   resolveField(source: DataSourceConfig, field: FieldConfig): FieldConfig {
+    field = this.resolveLookup(field);
     const entity = this.entity(source);
     const metadata = entity?.fields[field.key];
-    if (!metadata) return field;
+    if (!metadata) return this.resolveDomainField(source, field);
     const types: Record<string, FieldValueType> = {
       uuid: 'guid',
       enum: 'text',

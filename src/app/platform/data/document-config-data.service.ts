@@ -158,9 +158,9 @@ export class DocumentConfigDataService {
       if (field === lineConfig.lineKeyField) continue; // Assigned by the backend.
       const column = lineConfig.columns.find(c => (c.field ?? c.id) === field);
       // An untouched empty lookup is omitted so existing API defaults can apply.
-      // Explicit clears remain null; PATCH behavior is unchanged.
+      // Explicit clears use the same resolved empty-value semantics as updates.
       if (edited && column?.lookup && !edited.has(field) && !this.hasValue(row[field])) continue;
-      payload[field] = normalizeFieldValue(row[field], column?.valueType);
+      payload[field] = normalizeFieldValue(row[field], column?.valueType, column?.defaultValue);
     }
 
     const parentKeyField = lineConfig.dataSource.parentKeyField?.trim();
@@ -201,7 +201,8 @@ export class DocumentConfigDataService {
         continue;
       }
 
-      payload[field] = normalizeFieldValue(row[field], lineConfig.columns.find(c => (c.field ?? c.id) === field)?.valueType);
+      const column = lineConfig.columns.find(c => (c.field ?? c.id) === field);
+      payload[field] = normalizeFieldValue(row[field], column?.valueType, column?.defaultValue);
     }
 
     return payload;
