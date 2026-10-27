@@ -8,7 +8,7 @@ import {
 } from '../../../platform/public-api';
 import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
 
-// Process commands call server workflow actions. Permissions and document status decide availability.
+// PR workflow actions. Standard New, Refresh and line commands come from Core.
 const actionDefinitions: CommandConfig[] = [
   {
     label: 'Submit',
@@ -59,12 +59,10 @@ const actions = actionDefinitions.map((action, index) => ({
   order: 50 + index * 10,
 }));
 
-// Header: users enter request details. Identity is locked after creation; workflow fields are server-owned.
+// Header: field presentation and PR-specific entry rules.
 export const purchaseRequisitionHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Requisition',
-  toolbarButtons: [
-    ...actions,
-  ],
+  toolbarButtons: actions,
   sections: [
     {
       id: 'general',
@@ -84,12 +82,10 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           type: 'lookup',
           valueType: 'text',
           defaultValue: null,
-          valueField: 'systemId',
           labelField: 'code',
           displayFormat: '[code] — [description]',
           lookup: {
             endpoint: '/numberSeries',
-            valueField: 'systemId',
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
@@ -100,7 +96,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'requestDate',
           label: 'Request Date',
           type: 'date',
-          valueType: 'date',
           required: true,
           defaultValue: new Date().toLocaleDateString('en-CA'),
         },
@@ -108,7 +103,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'requiredDate',
           label: 'Required Date',
           type: 'date',
-          valueType: 'date',
           defaultValue: null,
         },
         {
@@ -131,11 +125,9 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           label: 'Location',
           type: 'lookup',
           defaultValue: null,
-          valueField: 'systemId',
           labelField: 'code',
           lookup: {
             endpoint: '/locations',
-            valueField: 'systemId',
             displayField: 'code',
             searchFields: ['code', 'name'],
           },
@@ -182,7 +174,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     endpoint: '/purchaseRequisitions',
     documentNoField: 'number',
     autoGenerateNumber: true,
-    lazyCreateOnFirstInput: true,
     omitEmptyFields: ['number'],
     defaultSort: 'number desc',
     pageSize: 25,
@@ -190,7 +181,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     writableStates: { field: 'status', values: ['open'] },
   },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(purchaseRequisitionHeaderConfig, [
       { field: 'number', width: '128px' },
       { field: 'requestDate', width: '118px' },
@@ -223,11 +213,8 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     ]),
   },
 };
-/** PR line presentation: defaults and lookups assist entry without requiring values.
- * Users can edit Quantity, Item UOM/Location, Description and Cost.
- * Record identity, UOM conversion, calculated amount and conversion progress are read-only.
- * API validation is separate from these UI settings.
- */
+// Lines: explicit parent binding, Type → No. choices, and PR calculations.
+// Core derives write fields from the editable columns and owns per-field autosave.
 export const purchaseRequisitionLineConfig: LineConfig = {
   typeField: 'lineType',
   placement: { mode: 'after-section', afterSectionId: 'general' },
@@ -235,7 +222,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
   lineKeyField: 'lineNo',
   dataSource: {
     endpoint: '/purchaseRequisitions',
-    lineNo: true,
     defaultSort: 'lineNo asc',
     pageSize: 100,
     navigation: {
@@ -273,12 +259,9 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       displayColumn: 'number',
       defaultValue: null,
 
-      cellType: 'dropdown',
-
       lookup: {
         endpoint: '/items',
         filter: 'blocked eq false',
-        valueField: 'systemId',
         displayField: 'number',
         searchFields: ['number', 'description'],
       },
@@ -292,12 +275,9 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       displayColumn: 'number',
       defaultValue: null,
 
-      cellType: 'dropdown',
-
       lookup: {
         endpoint: '/glAccounts',
         filter: "accountType eq 'posting' and blocked eq false",
-        valueField: 'systemId',
         displayField: 'number',
         searchFields: ['number', 'name'],
       },
@@ -305,10 +285,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     // Editable text (100 characters). The server supplies a description when omitted.
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
-      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown', defaultValue: null,
+      id: 'unitOfMeasureId', label: 'Unit of Measure', defaultValue: null,
       editableWhen: { field: 'lineType', values: ['item'] },
 
-      lookup: { endpoint: '/unitsOfMeasure', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'description'] },
+      lookup: { endpoint: '/unitsOfMeasure', displayField: 'code', searchFields: ['code', 'description'] },
     },
     // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.
     // The existing API calculates this factor and prohibits direct writes.
@@ -316,14 +296,12 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       // Location applies to Item lines; untouched values can default from the header.
       // Select a location master record; free text is not a valid location ID.
-      id: 'locationId', label: 'Location', cellType: 'dropdown', defaultValue: null,
+      id: 'locationId', label: 'Location', defaultValue: null,
       editableWhen: { field: 'lineType', values: ['item'] },
 
-      lookup: { endpoint: '/locations', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'name'] },
+      lookup: { endpoint: '/locations', displayField: 'code', searchFields: ['code', 'name'] },
     },
     {
-      // Editable requested quantity. Starts at 1; no PR-specific required or pattern rule.
-      // Decimal editing uses the shared numeric control.
       id: 'quantity',
       label: 'Quantity',
       factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 20 },
@@ -333,7 +311,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       align: 'end',
     },
     {
-      // Editable estimate, initially 0; no PR-specific pattern restriction.
       id: 'estimatedUnitCost',
       label: 'Estimated Unit Cost',
       valueType: 'decimal',
@@ -373,4 +350,5 @@ export const purchaseRequisitionLineConfig: LineConfig = {
         { id: 'total-incl-sst', label: 'Total Incl. SST', source: 'literal', value: '—', emphasis: true, order: 30 },
       ],
     },
-  ],};
+  ],
+};

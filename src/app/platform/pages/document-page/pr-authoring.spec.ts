@@ -55,6 +55,11 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   expect(rows[0]).toMatchObject({lineType:'gl_account',itemId:null,description:'Account description',quantity:'3',unitOfMeasureId:null,locationId:null});
   edit(row,'lineType','item');edit(row,'itemId',123);await vi.waitFor(()=>expect(rows[0]['lineType']).toBe('item'));
   expect(rows[0]).toMatchObject({glAccountId:null,itemId:123,description:'Item description',quantity:'3'});
+  edit(row,'unitOfMeasureId','box');await vi.waitFor(()=>expect(rows[0]['unitOfMeasureId']).toBe('box'));
+  expect(patch.mock.calls.at(-1)![1]).toEqual({unitOfMeasureId:'box'});
+  edit(row,'locationId','secondary');await vi.waitFor(()=>expect(rows[0]['locationId']).toBe('secondary'));
+  expect(patch.mock.calls.at(-1)![1]).toEqual({locationId:'secondary'});
+  expect(post.mock.calls[0][0]).toBe('/purchaseRequisitions/header/lines');
   f.detectChanges();const other=page.inlineDocumentWindowConfig!.lineRows!.find(r=>r['__entryPlaceholder'])!;
   edit(other,'lineType','gl_account');expect(post).toHaveBeenCalledTimes(1);
   other['__options_glAccountId']=[{value:456,label:'GL',record:{name:'Account description'}}];
@@ -63,6 +68,6 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   expect(page.hasPendingWrites).toBe(false);expect(page.hasUnsavedChanges).toBe(false);
   const closed=vi.fn();page.closeRequested.subscribe(closed);await page.requestClose();expect(closed).toHaveBeenCalledOnce();f.destroy();
   const reopened=await open();expect(reopened.componentInstance.inlineDocumentWindowConfig!.headerData!['purpose']).toBe('Autosave review');
-  expect(reopened.componentInstance.inlineDocumentWindowConfig!.lineRows).toEqual(expect.arrayContaining([expect.objectContaining({itemId:123,quantity:'3'}),expect.objectContaining({glAccountId:456})]));reopened.destroy();
+  expect(reopened.componentInstance.inlineDocumentWindowConfig!.lineRows).toEqual(expect.arrayContaining([expect.objectContaining({itemId:123,quantity:'3',unitOfMeasureId:'box',locationId:'secondary'}),expect.objectContaining({glAccountId:456})]));reopened.destroy();
  });
 });
