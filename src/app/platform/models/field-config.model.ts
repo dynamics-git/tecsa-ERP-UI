@@ -50,7 +50,7 @@ export interface FieldLookupConfig {
   filter?: string;
   identity?: RecordIdentityConfig;
   endpoint: string;
-  valueField: string;
+  valueField?: string;
   displayField: string;
   searchFields?: string[];
   /** Use cursor only when the backend resource declares cursor support. */

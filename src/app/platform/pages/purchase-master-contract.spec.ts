@@ -196,7 +196,7 @@ describe('Purchase master configuration integration', () => {
   it('opens a complete list item immediately without another header or selected-UOM request or a document loader',async()=>{
     const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
     const item={...Object.fromEntries(itemsHeaderConfig.sections.flatMap(section=>section.fields).map(field=>[field.key,null])),systemId:'item-reused',number:'REUSE',description:'Reuse',baseUnitOfMeasureId:'unit-reused',systemRowVersion:1};
-    const get=vi.fn((url:string)=>url.startsWith('/items?') ? of({data:[item],meta:{total:1,recordShape:'complete'}}) : url.startsWith('/unitsOfMeasure?') ? of({data:[{systemId:'unit-reused',code:'EA',description:'Each',systemRowVersion:1}],meta:{total:1,recordShape:'complete'}}) : of({data:[],meta:{total:0}}));
+    const get=vi.fn((url:string)=>url.endsWith('/apiCapabilities') ? of({data:{contractVersion:'1.0',entities:{},endpoints:[]}}) : url.startsWith('/items?') ? of({data:[item],meta:{total:1,recordShape:'complete'}}) : url.startsWith('/unitsOfMeasure?') ? of({data:[{systemId:'unit-reused',code:'EA',description:'Each',systemRowVersion:1}],meta:{total:1,recordShape:'complete'}}) : of({data:[],meta:{total:0}}));
     TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
     TestBed.inject(SessionService).SuperAdmin=true;
     const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
@@ -210,7 +210,7 @@ describe('Purchase master configuration integration', () => {
       card=fixture.debugElement.queryAll(By.directive(ListPage)).map(element=>element.componentInstance as ListPage).find(runtime=>runtime.documentOnly)!;
       expect(card?.inlineDocumentWindowConfig?.headerData?.['description']).toBe('Reuse');
     });
-    expect(card.popupLoading).toBe(false);expect(get).not.toHaveBeenCalled();
+    expect(card.popupLoading).toBe(false);expect(get.mock.calls.filter(([url])=>!url.endsWith('/apiCapabilities'))).toHaveLength(0);
     expect(fixture.nativeElement.textContent).not.toContain('Loading document...');
     expect(fixture.debugElement.query(By.directive(ListPage))).toBeTruthy();fixture.destroy();
   });
@@ -219,7 +219,7 @@ describe('Purchase master configuration integration', () => {
     const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
     const empty=Object.fromEntries(itemsHeaderConfig.sections.flatMap(section=>section.fields).map(field=>[field.key,null]));
     const rows=['a','b'].map(id=>({...empty,systemId:id,number:id,description:id,baseUnitOfMeasureId:'unit',generalProductPostingGroupId:'group',systemRowVersion:1}));
-    const get=vi.fn((url:string)=>url.startsWith('/items?') ? of({data:rows,meta:{total:2,recordShape:'complete'}})
+    const get=vi.fn((url:string)=>url.endsWith('/apiCapabilities') ? of({data:{contractVersion:'1.0',entities:{},endpoints:[]}}) : url.startsWith('/items?') ? of({data:rows,meta:{total:2,recordShape:'complete'}})
       : url.startsWith('/unitsOfMeasure?') ? of({data:[{systemId:'unit',code:'EA',description:'Each',systemRowVersion:1}],meta:{recordShape:'complete'}})
       : url.startsWith('/generalProductPostingGroups?') ? of({data:[{systemId:'group',code:'TRADE',description:'Trade',systemRowVersion:1}],meta:{recordShape:'complete'}})
       : of({data:[],meta:{total:0}}));
@@ -235,10 +235,10 @@ describe('Purchase master configuration integration', () => {
         let card!:ListPage;
         await vi.waitFor(()=>{fixture.detectChanges();card=fixture.debugElement.queryAll(By.directive(ListPage)).map(e=>e.componentInstance as ListPage).find(p=>p.documentOnly)!;expect(card?.inlineDocumentWindowConfig?.contentReady).toBe(true);});
         expect(card.inlineDocumentWindowConfig!.headerData!['__display_generalProductPostingGroupId']).toBe('TRADE — Trade');
-        expect(card.popupLoading).toBe(false);expect(get).not.toHaveBeenCalled();
+        expect(card.popupLoading).toBe(false);expect(get.mock.calls.filter(([url])=>!url.endsWith('/apiCapabilities'))).toHaveLength(0);
         await card.requestClose();await fixture.whenStable();fixture.detectChanges();
       }
-      expect(get).not.toHaveBeenCalled();
+      expect(get.mock.calls.filter(([url])=>!url.endsWith('/apiCapabilities'))).toHaveLength(0);
     }finally{now.mockRestore();fixture.destroy();}
   });
 

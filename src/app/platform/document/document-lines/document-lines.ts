@@ -92,7 +92,7 @@ export class DocumentLines {
       this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
       this.lookupHasMore = typeof page.meta?.['hasMore'] === 'boolean' ? page.meta['hasMore'] : column.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
       const options = page.value.map(record => ({
-        value: record[column.lookup!.valueField], label: this.resolveLookupLabel(column, record), record,
+        value: record[(column.lookup!.valueField ?? 'systemId')], label: this.resolveLookupLabel(column, record), record,
       }));
       row[bucket] = nextPage ? [...(Array.isArray(row[bucket]) ? row[bucket] as unknown[] : []), ...options] : options;
       this.lookupLoading = false;
@@ -390,10 +390,10 @@ export class DocumentLines {
           let value:unknown=raw, selected:Record<string,unknown>|undefined;
           if(c.lookup && raw) {
             try {
-              const key=JSON.stringify([lookupQuery(c.lookup,row,'',this.headerData),c.lookup.valueField,c.lookup.displayField,raw]);
+              const key=JSON.stringify([lookupQuery(c.lookup,row,'',this.headerData),(c.lookup.valueField ?? 'systemId'),c.lookup.displayField,raw]);
               if(!cache.has(key))cache.set(key,this.resolvePastedLookup(c,row,raw));
               selected=await cache.get(key)!;
-              value=selected[c.lookup.valueField];
+              value=selected[(c.lookup.valueField ?? 'systemId')];
               if(value==null || value==='')throw new Error('No identifier returned.');
               row[c.optionsDataKey??'__options_'+field]=[{value,label:this.resolveLookupLabel(c,selected),record:selected}];
             } catch {errors.push(lineLabel+' — '+c.label+' could not be uniquely verified. Use its exact code or identifier.');continue;}
@@ -456,7 +456,7 @@ export class DocumentLines {
     if(!query.ready)throw new Error('Complete lookup dependencies first.');
     const cached=this.source.getCachedLookup?.(lookup,raw,row,this.headerData);
     if(cached)return cached;
-    const field=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)?lookup.valueField:lookup.displayField;
+    const field=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)?(lookup.valueField ?? 'systemId'):lookup.displayField;
     if(!/^[A-Za-z_]\w*$/.test(field))throw new Error('Unsupported lookup field.');
     const exact=field+" eq '"+raw.replace(/'/g,"''")+"'";
     const response=await firstValueFrom(this.source.loadList({endpoint:query.endpoint!,defaultFilter:[query.filter,exact].filter(Boolean).map(filter=>'('+filter+')').join(' and ')},{top:2,count:false,useCache:true,maxAgeMs:30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as {value:Record<string,unknown>[]};

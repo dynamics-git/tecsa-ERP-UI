@@ -295,6 +295,44 @@ export class ListPage implements OnInit, OnDestroy {
       throw new Error('ListPage requires listConfig or setupConfig with dataSource.');
     }
 
+    const isCurrent = this.dataSource.captureWriteScope();
+    let initialized = false;
+    let metadataShell = false;
+    this.subscriptions.add(this.dataSource.loadCoreMetadata().subscribe(() => {
+      initialized = true;
+      if (metadataShell) { this.stopPopupLoading(); this.activeDocumentWindowConfig = undefined; }
+      if (!isCurrent()) {
+        this.error = 'Your company or session changed. Reopen the page.';
+        this.changeDetector.detectChanges();
+        return;
+      }
+      this.initializePage();
+    }));
+    if (!initialized && (this.documentOnly || this.isInlineEntryPage)) {
+      // Keep the existing document shell visible; no editable data or writes before resolution.
+      metadataShell = true;
+      this.activeDocumentWindowConfig = this.buildDocumentWindowConfig(this.initialRecord ?? {}, []);
+      this.activeDocumentWindowConfig.contentReady = false;
+      this.activeDocumentWindowConfig.interactionLocked = true;
+      this.startPopupLoading('Loading page...');
+    }
+  }
+
+  private initializePage(): void {
+    const source = this.listConfig.dataSource;
+    this.headerConfig = {...this.headerConfig, sections: this.headerConfig.sections.map(section => ({...section,
+      fields: section.fields.map(field => this.dataSource.resolveFieldContract(source, field))}))};
+    this.listConfig = {...this.listConfig, dataSource: this.dataSource.resolveSourceContract(source)};
+    if (this.lineConfig) {
+      this.lineConfig = lineConfigDefaults(this.lineConfig);
+      const lineSource = this.lineConfig.dataSource;
+      this.lineConfig = {...this.lineConfig, dataSource: this.dataSource.resolveSourceContract(lineSource),
+        columns: this.lineConfig.columns.map(column => {
+          const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
+          return {...column, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
+            readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required, validation: field.validation};
+        })};
+    }
     this.pageId = this.listConfig.pageId ?? this.pageId;
     this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
     const permission = this.sessionService.Permissions.find(value => this.isRecord(value) && (value['pageId'] === this.permissionPageId || value['PageId'] === this.permissionPageId));

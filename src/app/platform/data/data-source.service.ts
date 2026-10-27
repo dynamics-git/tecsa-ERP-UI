@@ -2,7 +2,7 @@ import { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
 import { lookupQuery } from './lookup-dependencies';
 import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
 import { Observable, defer, firstValueFrom, from, of } from 'rxjs';
-import { finalize, map, shareReplay, catchError } from 'rxjs/operators';
+import { finalize, map, shareReplay, catchError, timeout } from 'rxjs/operators';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
 import { DataSourceConfig } from '../models/data-source-config.model';
@@ -44,7 +44,7 @@ export class DataSourceService {
   }
   /** Identifies the current read/access generation for prepared view snapshots. */
   getReadGeneration(): number { this.key('/'); return this.readGeneration; }
-  invalidateReadCache(): void { this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
+  invalidateReadCache(): void { this.contracts.clearMetadata(); this.metadataLoadedAt = 0; this.metadataRequest = undefined; this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
   private cacheRecord(key: string, value: Record<string, unknown>, at = Date.now()): void {
     if (this.records.size >= 100) this.records.delete(this.records.keys().next().value!);
     this.records.set(key, { value: structuredClone(value), at });
@@ -79,6 +79,30 @@ export class DataSourceService {
     private readonly session: SessionService,
     private readonly workspace: WorkspaceContext,
   ) {}
+
+  private metadataRequest?: Observable<boolean>;
+  private metadataLoadedAt = 0;
+  /** Optional discovery; an outage preserves explicit legacy configuration. */
+  loadCoreMetadata(): Observable<boolean> {
+    this.key('/apiCapabilities');
+    if (!this.session.Company || !this.rest) return of(false);
+    if (this.metadataRequest) return this.metadataRequest;
+    if (Date.now() - this.metadataLoadedAt < 30000) return of(true);
+    this.contracts.clearMetadata();
+    this.metadataLoadedAt = 0;
+    const context = this.context();
+    const generation = this.readGeneration;
+    const request = defer(() => this.client.get(this.endpoint({endpoint:'/apiCapabilities'}))).pipe(timeout(5000), map(response => {
+      if (context !== this.context() || generation !== this.readGeneration) return false;
+      const accepted = this.contracts.acceptMetadata(response);
+      if (accepted) this.metadataLoadedAt = Date.now();
+      return accepted;
+    }), catchError(() => of(false)), finalize(() => { if (this.metadataRequest === request) this.metadataRequest = undefined; }), shareReplay({bufferSize:1,refCount:true}));
+    this.metadataRequest = request;
+    return request;
+  }
+  resolveSourceContract(source: DataSourceConfig): DataSourceConfig { this.key(source.endpoint); return this.contracts.resolveSource(source); }
+  resolveFieldContract(source: DataSourceConfig, field: FieldConfig): FieldConfig { this.key(source.endpoint); return this.contracts.resolveField(source, field); }
 
   loadList(config: DataSourceConfig, options: DataSourceLoadOptions = {}): Observable<unknown> {
     if (config.singleton) return this.loadSingleton(config, options);
@@ -175,7 +199,7 @@ export class DataSourceService {
     if (!this.present(id) || !query.ready || !query.endpoint) return undefined;
     // Collection-only lookups with filter dependencies must retain their constrained collection read.
     if (lookup.recordRead === 'collection' && query.filter) return undefined;
-    return this.getCachedRecord({endpoint: query.endpoint, keyField: lookup.valueField}, id);
+    return this.getCachedRecord({endpoint: query.endpoint, keyField: (lookup.valueField ?? 'systemId')}, id);
   }
   /** Selected lookup records follow the same company and parent scope as searches. */
   loadLookup(lookup: FieldLookupConfig, id: unknown, record: Record<string, unknown>, header: Record<string, unknown> = {}): Observable<unknown> {
@@ -184,7 +208,7 @@ export class DataSourceService {
     const cached = this.getCachedLookup(lookup, id, record, header);
     if (cached) return of(cached);
     if (lookup.recordRead !== 'collection') return this.loadById({endpoint: query.endpoint}, id, {useCache: true, maxAgeMs: 30000});
-    const identity = lookup.valueField + " eq '" + String(id).replace(/'/g, "''") + "'";
+    const identity = (lookup.valueField ?? 'systemId') + " eq '" + String(id).replace(/'/g, "''") + "'";
     return this.loadList({endpoint: query.endpoint, defaultFilter: [query.filter, identity].filter(Boolean).map(value => '(' + value + ')').join(' and ')}, {top: 1, useCache: true, maxAgeMs: 30000, count: false}).pipe(map(response => {
       const selected = (response as DataPage).value[0];
       if (!selected) throw new Error('The selected lookup record is unavailable in this company and parent scope.');
@@ -243,6 +267,8 @@ export class DataSourceService {
   }
   private mutate(config: DataSourceConfig, id: unknown, body: unknown, operation: 'create' | 'update' | 'delete', rowVersion?: unknown, editor?: Record<string, unknown>): Observable<unknown> {
     return defer(() => {
+      this.key(config.endpoint);
+      config = this.contracts.resolveSource(config);
       if ((operation === 'create' && config.supportsCreate === false) || (operation === 'update' && config.supportsUpdate === false) || (operation === 'delete' && config.supportsDelete === false)) throw new Error(`This resource does not support ${operation}.`);
       const endpoint = operation === 'create' || config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);
       const identity = this.key(endpoint);
@@ -254,7 +280,7 @@ export class DataSourceService {
         if (operation !== 'create' && !version && !(config.singleton && this.missingSingletons.has(identity))) throw new Error('Reload the record before saving: its row version is missing.');
         const payload = operation === 'delete' ? undefined : this.contracts.sanitizePayload(config, operation, body);
         const request = operation === 'delete' ? this.client.delete(endpoint, version)
-          : config.singleton ? this.client.put?.(endpoint, payload, version)
+          : (config.singleton || (operation === 'update' && this.contracts.updateMethod(config) === 'PUT')) ? this.client.put?.(endpoint, payload, version)
           : operation === 'create' ? this.client.post(endpoint, payload) : this.client.patch(endpoint, payload, version);
         if (!request) throw new Error('The configured data provider does not support PUT.');
         try {
@@ -338,7 +364,7 @@ export class DataSourceService {
     else if (options.skip) params.set('$skip', String(options.skip));
     return `${this.endpoint({ ...config, endpoint: path })}?${params}`;
   }
-  private context(): string { return `${this.workspace.slug}|${this.session.Company}|${this.session.UserId}|${this.session.AccessToken}`; }
+  private context(): string { return `${this.workspace.slug}|${this.session.Company}|${this.session.UserId}|${this.session.AccessToken}|${JSON.stringify(this.session.Permissions)}|${this.session.SuperAdmin}`; }
   private key(endpoint: string): string {
     const context = this.context();
     if (this.scope !== context) {

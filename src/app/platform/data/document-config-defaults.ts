@@ -100,7 +100,7 @@ export function listColumns(
             filter: {
               type: 'dropdown' as const,
               apiUrl: field.lookup.endpoint,
-              valueField: field.lookup.valueField,
+              valueField: (field.lookup.valueField ?? 'systemId'),
               labelField: field.lookup.displayField,
             },
           }
