@@ -196,6 +196,16 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(post).toHaveBeenCalledTimes(1);
     expect(post.mock.calls[0][1]).toEqual(input);
   });
+  it('does not lose tracked edits to explicit allowlists when discovery is unavailable', async () => {
+    get.mockReturnValue(throwError(() => new Error('Discovery unavailable')));
+    expect(await firstValueFrom(data.loadCoreMetadata())).toBe(false);
+    const input = { description: 'Retain this edit' };
+    expect(() => data.assertEditedFields({ ...source, createFields: ['code'] }, 'create', input, ['description'])).toThrow('description');
+    expect(() => data.assertEditedFields({ ...source, updateBlockedFields: ['description'] }, 'update', input, ['description'])).toThrow('description');
+    expect(input.description).toBe('Retain this edit');
+    expect(post).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
+  });
   it('checks generic server write rules before presentation overrides or omission rules', async () => {
     await firstValueFrom(data.loadCoreMetadata());
     data.resolveFieldContract(source, { key: 'derived', label: 'Derived', readonly: false });

@@ -247,8 +247,17 @@ export class EntityContractService {
 
   /** Check tracked user edits before page payload builders can filter them. */
   assertEditedFields(config: DataSourceConfig, operation: 'create' | 'update', record: Record<string, unknown>, fields: Iterable<string>): void {
-    if (!this.entity(config)) return; // Legacy/domain explicit contracts retain their existing behavior.
-    this.sanitizePayload(config, operation, Object.fromEntries([...fields].map(key => [key, record[key]])));
+    const edits = Object.fromEntries([...fields].map(key => [key, record[key]]));
+    const payload = this.sanitizePayload(config, operation, edits) as Record<string, unknown>;
+    const mapping = this.buildOutboundFieldMap(this.resolveProfile(config));
+    // Explicit configuration still applies when discovery is unavailable. Detect
+    // excluded user edits without changing legacy generated payload formatting.
+    for (const key of Object.keys(edits)) {
+      if (key.trim().startsWith('__')) continue;
+      const mappedKey = mapping.get(this.normalizeToken(key)) ?? key;
+      if (!Object.prototype.hasOwnProperty.call(payload, mappedKey))
+        throw new Error('Cannot save field "' + key + '" for this operation. Your edits are retained.');
+    }
   }
 
   sanitizePayload(
