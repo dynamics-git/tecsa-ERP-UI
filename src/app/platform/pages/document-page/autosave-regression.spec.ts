@@ -76,7 +76,7 @@ describe('Configured create payload readiness',()=>{
   row['glAccountId']=456;expect(service.buildLineCreatePayload(row,config)?.['glAccountId']).toBe(456);
  });
  it('omits untouched empty lookup defaults but preserves explicit null and update clears',()=>{
-  const row={...draft(),itemId:123};
+  const row={...draft(),itemId:123,locationId:null};
   const build=service.buildLineCreatePayload.bind(service) as (...args:any[])=>Record<string,unknown>;
   expect(build(row,config,['itemId'])).not.toHaveProperty('locationId');
   expect(build(row,config,['itemId'])).not.toHaveProperty('unitOfMeasureId');

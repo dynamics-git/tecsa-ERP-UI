@@ -59,7 +59,8 @@ const actions = actionDefinitions.map((action, index) => ({
   order: 50 + index * 10,
 }));
 
-// Header: field presentation and PR-specific entry rules.
+// Header: fields and presentation. Core reads nullable defaults and lookup search
+// from API metadata; declare defaults here only when the page needs a specific value.
 export const purchaseRequisitionHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Requisition',
   toolbarButtons: actions,
@@ -73,7 +74,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           valueType: 'code',
           label: 'No.',
           readonlyAfterCreate: true,
-          defaultValue: null,
           validation: { maxLength: 20 },
         },
         {
@@ -81,13 +81,11 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           label: 'Number Series (optional)',
           type: 'lookup',
           valueType: 'text',
-          defaultValue: null,
           labelField: 'code',
           displayFormat: '[code] — [description]',
           lookup: {
             endpoint: '/numberSeries',
             displayField: 'code',
-            searchFields: ['code', 'description'],
           },
           readonlyAfterCreate: true,
         },
@@ -103,7 +101,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'requiredDate',
           label: 'Required Date',
           type: 'date',
-          defaultValue: null,
         },
         {
           key: 'purpose',
@@ -111,7 +108,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           label: 'Purpose',
           type: 'textarea',
           width: 'wide',
-          defaultValue: null,
           validation: { maxLength: 250 },
         },
       ],
@@ -124,12 +120,10 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'locationId',
           label: 'Location',
           type: 'lookup',
-          defaultValue: null,
           labelField: 'code',
           lookup: {
             endpoint: '/locations',
             displayField: 'code',
-            searchFields: ['code', 'name'],
           },
         },
       ],
@@ -240,7 +234,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       id: 'lineType',
       label: 'Type',
       valueType: 'text',
-
       cellType: 'dropdown',
       defaultValue: 'item',
       // Switching Item/G/L clears references that no longer apply.
@@ -257,13 +250,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       editableWhen: { field: 'lineType', values: ['item'] },
       label: 'No.',
       displayColumn: 'number',
-      defaultValue: null,
-
       lookup: {
         endpoint: '/items',
         filter: 'blocked eq false',
         displayField: 'number',
-        searchFields: ['number', 'description'],
       },
     },
     {
@@ -273,22 +263,18 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       editableWhen: { field: 'lineType', values: ['gl_account'] },
       label: 'No.',
       displayColumn: 'number',
-      defaultValue: null,
-
       lookup: {
         endpoint: '/glAccounts',
         filter: "accountType eq 'posting' and blocked eq false",
         displayField: 'number',
-        searchFields: ['number', 'name'],
       },
     },
     // Editable text (100 characters). The server supplies a description when omitted.
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
-      id: 'unitOfMeasureId', label: 'Unit of Measure', defaultValue: null,
+      id: 'unitOfMeasureId', label: 'Unit of Measure',
       editableWhen: { field: 'lineType', values: ['item'] },
-
-      lookup: { endpoint: '/unitsOfMeasure', displayField: 'code', searchFields: ['code', 'description'] },
+      lookup: { endpoint: '/unitsOfMeasure', displayField: 'code' },
     },
     // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.
     // The existing API calculates this factor and prohibits direct writes.
@@ -296,17 +282,15 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       // Location applies to Item lines; untouched values can default from the header.
       // Select a location master record; free text is not a valid location ID.
-      id: 'locationId', label: 'Location', defaultValue: null,
+      id: 'locationId', label: 'Location',
       editableWhen: { field: 'lineType', values: ['item'] },
-
-      lookup: { endpoint: '/locations', displayField: 'code', searchFields: ['code', 'name'] },
+      lookup: { endpoint: '/locations', displayField: 'code' },
     },
     {
       id: 'quantity',
       label: 'Quantity',
       factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 20 },
       valueType: 'decimal',
-
       defaultValue: '1',
       align: 'end',
     },
@@ -314,7 +298,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       id: 'estimatedUnitCost',
       label: 'Estimated Unit Cost',
       valueType: 'decimal',
-
       defaultValue: '0',
       align: 'end',
     },
