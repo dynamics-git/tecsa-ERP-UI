@@ -73,44 +73,21 @@ describe('Enterprise persistence integration', () => {
     dataSource = TestBed.inject(DataSourceService);
   });
 
-  it('retries create when BC reports unknown property', async () => {
-    let attempt = 0;
-    postImpl = () => {
-      attempt += 1;
-      if (attempt === 1) {
-        return throwError(() => bcError("The property 'CurrencyCode' does not exist on type 'purchaseOrderHeader'."));
-      }
-
-      return of({ Id: 'PO-1' });
-    };
-
-    const actual = await firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, {
-        CreatedBy: 'tester',
-        CurrencyCode: 'MYR'
-      }));
-
-    expect(actual).toEqual({ Id: 'PO-1' });
-    expect(postCalls.length).toBe(2);
-
-    const firstPayload = postCalls[0][1] as Record<string, unknown>;
-    const secondPayload = postCalls[1][1] as Record<string, unknown>;
-
-    expect(firstPayload['CurrencyCode']).toBe('MYR');
-    expect('CurrencyCode' in secondPayload).toBeFalsy();
+  it('rejects unknown properties without dropping values or retrying', async () => {
+    const error = bcError("The property 'CurrencyCode' does not exist on type 'purchaseOrderHeader'.");
+    postImpl = () => postCalls.length === 1 ? throwError(() => error) : of({ Id: 'PO-1' });
+    const payload = { CreatedBy: 'tester', CurrencyCode: 'MYR' };
+    await expect(firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, payload))).rejects.toBe(error);
+    expect(postCalls).toHaveLength(1);
+    expect(postCalls[0][1]).toEqual(payload);
+    expect(payload.CurrencyCode).toBe('MYR');
   });
-
-  it('returns null without retrying when BC rejects a create body', async () => {
-    postImpl = () => throwError(() => bcError('Values must be provided in the body.'));
-
-    const actual = await firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, {
-        UnknownField: 'value'
-      }));
-
-    expect(actual).toBeNull();
-    expect(postCalls.length).toBe(1);
-
-    const sentPayload = postCalls[0][1] as Record<string, unknown>;
-    expect(sentPayload).toEqual({ UnknownField: 'value' });
+  it('propagates the actual create validation error without retrying', async () => {
+    const error = bcError('Values must be provided in the body.');
+    postImpl = () => throwError(() => error);
+    await expect(firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, { UnknownField: 'value' }))).rejects.toBe(error);
+    expect(postCalls).toHaveLength(1);
+    expect(postCalls[0][1]).toEqual({ UnknownField: 'value' });
   });
 
   it('returns save error when BC rejects readonly field update shape', async () => {

@@ -44,6 +44,27 @@ describe('Shared first-input automatic creation policy',()=>{
   expect(page.inlineDocumentWindowConfig!.headerData!['description']).toBe('Latest');
   expect(post).toHaveBeenCalledTimes(1);f.destroy();
  });
+ it('retains rejected input and pending edits, surfaces validation and retries corrected input once',async()=>{
+  const {f,page,edit,post,patch,pending}=await setup();
+  edit('code','NET30');edit('description','Rejected');
+  await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
+  edit('description','Latest unsaved');
+  pending.error({status:422,error:{message:'Validation failed.',errors:{code:['This code already exists.']}}});
+  await vi.waitFor(()=>expect(page.inlineDocumentWindowConfig?.statusMessage?.message).toContain('This code already exists.'));
+  expect(page.inlineDocumentWindowConfig?.statusMessage?.tone).toBe('error');
+  expect(page.inlineDocumentWindowConfig?.headerData?.['description']).toBe('Latest unsaved');
+  expect(page.inlineDocumentWindowConfig?.headerData?.['code']).toBe('NET30');
+  expect(page.hasUnsavedChanges).toBe(true);expect(page.hasPendingWrites).toBe(false);
+  expect(post).toHaveBeenCalledTimes(1);expect(patch).not.toHaveBeenCalled();
+  const retry=new Subject<unknown>();post.mockImplementation(()=>retry);
+  edit('code','NET31');await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(2));
+  edit('description','Latest corrected');expect(post).toHaveBeenCalledTimes(2);
+  retry.next({data:{systemId:'created',systemRowVersion:1,code:'NET31',description:'Latest unsaved'}});retry.complete();
+  await vi.waitFor(()=>expect(patch).toHaveBeenCalled());
+  expect(patch.mock.calls.at(-1)![1]['description']).toBe('Latest corrected');
+  expect(page.inlineDocumentWindowConfig?.headerData?.['systemId']).toBe('created');
+  expect(post).toHaveBeenCalledTimes(2);f.destroy();
+ });
  it('PR retains lazy numbered creation: no POST on open, one POST after input, server number retained',async()=>{
   const {f,page,edit,post,pending}=await setup({pr:true});
   expect(post).not.toHaveBeenCalled();edit('purpose','Test request');

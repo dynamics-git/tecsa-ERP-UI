@@ -1993,14 +1993,14 @@ export class ListPage implements OnInit, OnDestroy {
 
           this.changeDetector.detectChanges();
         },
-        error: () => {
+        error: (error: unknown) => {
           this.finishAutosave(headerData, savedEdits, false);
           this.draftCreateInProgress = false;
           this.stopPopupLoading();
           this.setEntryStatus({
             tone: 'error',
             title: GENERIC_MESSAGES.createFailedTitle,
-            message: GENERIC_MESSAGES.createFailedMessage,
+            message: this.apiError.toMessage(error, GENERIC_MESSAGES.createFailedMessage),
           });
           this.changeDetector.detectChanges();
         },
@@ -2612,7 +2612,6 @@ export class ListPage implements OnInit, OnDestroy {
       )
       .pipe(
         map((response) => this.toCreatedRecord(response)),
-        catchError(() => of(null)),
       );
   }
 
