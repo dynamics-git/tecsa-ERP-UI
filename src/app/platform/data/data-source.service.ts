@@ -101,6 +101,11 @@ export class DataSourceService {
     this.metadataRequest = request;
     return request;
   }
+  usesGenericContract(source: DataSourceConfig): boolean { this.key(source.endpoint); return this.contracts.usesGenericContract(source); }
+  assertEditedFields(source: DataSourceConfig, operation: 'create' | 'update', record: Record<string, unknown>, fields: Iterable<string>): void {
+    this.key(source.endpoint);
+    this.contracts.assertEditedFields(source, operation, record, fields);
+  }
   resolveSourceContract(source: DataSourceConfig): DataSourceConfig { this.key(source.endpoint); return this.contracts.resolveSource(source); }
   resolveFieldContract(source: DataSourceConfig, field: FieldConfig): FieldConfig { this.key(source.endpoint); return this.contracts.resolveField(source, field); }
 

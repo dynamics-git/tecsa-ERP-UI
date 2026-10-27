@@ -39,10 +39,12 @@ export class DocumentPayloadService {
 
   buildHeaderCreatePayload(
     headerData: Record<string, unknown>,
-    sections: FormSectionConfig[]
+    sections: FormSectionConfig[],
+    includeLegacySessionFields = true,
   ): Record<string, unknown> {
     return {
-      ...this.buildSessionCreatePayload(),
+      // Generic APIs own company/audit fields; legacy APIs retain their established payload.
+      ...(includeLegacySessionFields ? this.buildSessionCreatePayload() : {}),
       ...this.buildHeaderUpdatePayload(headerData, sections),
     };
   }

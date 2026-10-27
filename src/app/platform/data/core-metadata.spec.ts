@@ -184,6 +184,32 @@ describe('Authenticated shared Core metadata contract', () => {
     ).rejects.toThrow('does not support delete');
     expect(remove).not.toHaveBeenCalled();
   });
+  it('rejects generic configured allowlist exclusions without losing the submitted edits', async () => {
+    await firstValueFrom(data.loadCoreMetadata());
+    const input = { code: 'A', description: 'Keep this edit' };
+    await expect(firstValueFrom(data.create({ ...source, createFields: ['code'] }, input))).rejects.toThrow('description');
+    await expect(firstValueFrom(data.update({ ...source, updateFields: [] }, 'created', { description: input.description }, 1))).rejects.toThrow('description');
+    expect(post).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
+    expect(input).toEqual({ code: 'A', description: 'Keep this edit' });
+    await firstValueFrom(data.create({ ...source, createFields: ['code', 'description'] }, input));
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][1]).toEqual(input);
+  });
+  it('checks generic server write rules before presentation overrides or omission rules', async () => {
+    await firstValueFrom(data.loadCoreMetadata());
+    data.resolveFieldContract(source, { key: 'derived', label: 'Derived', readonly: false });
+    for (const config of [
+      { ...source, createFields: ['description'] },
+      { ...source, omitEmptyFields: ['derived'] },
+    ]) {
+      await expect(firstValueFrom(data.create(config, { description: 'Kept', derived: '' }))).rejects.toThrow('derived');
+    }
+    data.resolveFieldContract(source, { key: 'code', label: 'Code', readonlyAfterCreate: false });
+    await expect(firstValueFrom(data.update({ ...source, updateBlockedFields: ['code'] }, 'created', { code: 'B' }, 1))).rejects.toThrow('code');
+    expect(post).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
+  });
   it('uses domain methods instead of collaboration registry flags and never treats hints as an allowlist', async () => {
     const contract = metadata();
     contract.data.entities['fixtures'].kind = 'domain';
@@ -332,6 +358,55 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(post.mock.calls[0][1]).toMatchObject({ code: 'NEW', description: null, amount: '0' });
     fixture.destroy();
   });
+  for (const manual of [false, true])
+    it('retains a header edit excluded by configuration in ' + (manual ? 'manual' : 'automatic') + ' save', async () => {
+      session.SuperAdmin = true;
+      const fixture = TestBed.createComponent(ListPage);
+      fixture.componentRef.setInput('listConfig', { ...paymentTermsListConfig, autoSave: !manual, dataSource: { ...source, createFields: ['code'] } });
+      fixture.componentRef.setInput('headerConfig', { sections: [{ id: 'general', fields: [
+        { key: 'code', label: 'Code', defaultValue: 'A' }, { key: 'description', label: 'Description' },
+      ] }] });
+      fixture.componentRef.setInput('documentOnly', true);
+      fixture.componentRef.setInput('initialRecord', {});
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const page = fixture.componentInstance;
+      page.handleInlineAction({ actionKey: 'header:changed', payload: { fieldKey: 'description', value: 'Keep my edit', previousValue: null } });
+      if (manual) expect(await page['saveEntry']()).toBe(false);
+      await vi.waitFor(() => expect(page.inlineDocumentWindowConfig?.statusMessage?.tone).toBe('error'));
+      expect(page.inlineDocumentWindowConfig?.statusMessage?.message).toContain('description');
+      expect(page.inlineDocumentWindowConfig?.headerData?.['description']).toBe('Keep my edit');
+      expect(page.hasUnsavedChanges).toBe(true);
+      expect(post).not.toHaveBeenCalled();
+      page.listConfig.dataSource.createFields = ['code', 'description'];
+      if (manual) await page['saveEntry'](); else page['triggerDraftCreateIfReady']();
+      await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+      expect(post.mock.calls[0][1]).toEqual({ code: 'A', description: 'Keep my edit' });
+      fixture.destroy();
+    });
+  for (const persisted of [false, true])
+    it('retains a direct line edit before ' + (persisted ? 'update' : 'create') + ' payload filtering', async () => {
+      session.SuperAdmin = true;
+      await firstValueFrom(data.loadCoreMetadata());
+      const fixture = TestBed.createComponent(ListPage);
+      const page = fixture.componentInstance;
+      page.listConfig = { ...paymentTermsListConfig, dataSource: { endpoint: '/headers' } };
+      page.headerConfig = { dialogTitle: 'Fixture', toolbarButtons: [], sections: [] };
+      page.lineConfig = { placement: { mode: 'end' }, toolbarButtons: [],
+        dataSource: { ...source, createFields: ['code'], updateFields: ['code'] },
+        columns: [{ id: 'code', label: 'Code' }, { id: 'description', label: 'Description' }],
+      };
+      const row = { code: 'A', description: 'Keep line edit', ...(persisted ? { systemId: 'line', systemRowVersion: 1 } : {}) };
+      page['activeDocumentWindowConfig'] = { headerData: { systemId: 'header' }, lineRows: [row] };
+      page['handleLineChanged']({ row, column: page.lineConfig.columns[1], value: row.description });
+      expect(page['activeDocumentWindowConfig']?.statusMessage?.message).toContain('description');
+      expect(page.hasUnsavedChanges).toBe(true);
+      expect(row.description).toBe('Keep line edit');
+      expect(page['unsavedFields'].get(row)?.has('description')).toBe(true);
+      expect(post).not.toHaveBeenCalled();
+      expect(patch).not.toHaveBeenCalled();
+      fixture.destroy();
+    });
   it('keeps the setup shell visible and editors locked during delayed metadata discovery', async () => {
     const pending = new Subject<unknown>();
     get.mockImplementation((url: string) => url.endsWith('/apiCapabilities') ? pending : of({data:{systemId:'saved',code:'A',systemRowVersion:1}}));

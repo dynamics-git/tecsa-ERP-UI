@@ -243,6 +243,14 @@ export class EntityContractService {
     };
   }
 
+  usesGenericContract(config: DataSourceConfig): boolean { return !!this.entity(config); }
+
+  /** Check tracked user edits before page payload builders can filter them. */
+  assertEditedFields(config: DataSourceConfig, operation: 'create' | 'update', record: Record<string, unknown>, fields: Iterable<string>): void {
+    if (!this.entity(config)) return; // Legacy/domain explicit contracts retain their existing behavior.
+    this.sanitizePayload(config, operation, Object.fromEntries([...fields].map(key => [key, record[key]])));
+  }
+
   sanitizePayload(
     config: DataSourceConfig,
     operation: Exclude<ContractOperation, 'delete'>,
@@ -259,6 +267,9 @@ export class EntityContractService {
     const outboundFieldMap = this.buildOutboundFieldMap(profile);
     const omitted = this.buildOmittedFieldSet(profile);
     const sanitized: Record<string, unknown> = {};
+    const entity = this.entity(config);
+    if (entity && !entity.operations[operation])
+      throw new Error("This resource does not support " + operation + ". Your edits are retained.");
 
     for (const [key, value] of Object.entries(payload)) {
       if (key.trim().startsWith('__')) {
@@ -266,6 +277,14 @@ export class EntityContractService {
       }
 
       const mappedKey = outboundFieldMap.get(this.normalizeToken(key)) ?? key;
+      // Authoritative flags apply before optional client filtering. Never turn a rejected edit into success.
+      if (entity && (!entity.fields[mappedKey]?.[operation] ||
+          (allowed && !allowed.includes(mappedKey)) ||
+          (operation === 'update' && config.updateBlockedFields?.includes(mappedKey)) ||
+          omitted.has(this.normalizeToken(key)) || omitted.has(this.normalizeToken(mappedKey)) ||
+          (config.omitEmptyFields?.includes(mappedKey) && (value === '' || value === null || value === undefined)))) {
+        throw new Error('Cannot save field "' + mappedKey + '" for this operation. Your edits are retained.');
+      }
       if (
         config.omitEmptyFields?.includes(mappedKey) &&
         (value === '' || value === null || value === undefined)
@@ -280,19 +299,6 @@ export class EntityContractService {
       sanitized[mappedKey] = value;
     }
 
-    const entity = this.entity(config);
-    if (entity) {
-      if (!entity.operations[operation])
-        throw new Error(
-          'This resource does not support ' + operation + '. Your edits are retained.',
-        );
-      for (const key of Object.keys(sanitized)) {
-        if (!entity.fields[key]?.[operation])
-          throw new Error(
-            'Cannot save field "' + key + '" for this operation. Your edits are retained.',
-          );
-      }
-    }
     return sanitized;
   }
 

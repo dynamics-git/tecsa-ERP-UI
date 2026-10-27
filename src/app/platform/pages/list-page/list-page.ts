@@ -7,7 +7,7 @@ import { fieldIsRequired } from '../../models/field-state';
 import { resolvePageIdentity, recordIdentityText } from '../../data/record-identity';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
-import { Observable, Subscription, from, of, firstValueFrom } from 'rxjs';
+import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
 import { catchError, map, timeout } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
@@ -807,9 +807,10 @@ export class ListPage implements OnInit, OnDestroy {
     this.startPopupLoading('Saving changes...');
     try {
       const id = this.resolvePersistedRecordId(header, source);
+      this.dataSource.assertEditedFields(source, id || source.singleton ? 'update' : 'create', header, this.unsavedFields.get(header)?.keys() ?? []);
       const payload = id || source.singleton
         ? this.documentPayload.buildHeaderUpdatePayload(header, this.headerConfig.sections)
-        : this.documentPayload.buildHeaderCreatePayload(header, this.headerConfig.sections);
+        : this.documentPayload.buildHeaderCreatePayload(header, this.headerConfig.sections, !this.dataSource.usesGenericContract(source));
       const headerEdits = this.unsavedFields.get(header);
       if ((!id && !source.singleton) || headerEdits?.size) {
         const headerPayload = id || source.singleton ? Object.fromEntries(Object.entries(payload).filter(([key]) => headerEdits?.has(key))) : payload;
@@ -827,6 +828,7 @@ export class ListPage implements OnInit, OnDestroy {
           if (!this.hasValue(lineId) && this.isLineRowMeaningfullyEmpty(row)) continue;
           const required = lineSource.requiredCreateFields ?? [];
           if (!lineId && required.some(field => !this.hasValue(row[field]))) throw new Error('Complete the required line fields before saving.');
+          this.dataSource.assertEditedFields(lineSource, lineId ? 'update' : 'create', row, this.unsavedFields.get(row)?.keys() ?? []);
           const linePayload = lineId
             ? this.documentConfigData.buildLineUpdatePayload(row, [...(this.unsavedFields.get(row)?.keys() ?? [])].filter(field => !lineSource.updateFields || lineSource.updateFields.includes(field)), this.lineConfig)
             : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig, this.unsavedFields.get(row)?.keys());
@@ -1563,7 +1565,7 @@ export class ListPage implements OnInit, OnDestroy {
     const writable = new Set(this.lineConfig.dataSource.updateFields ?? []);
     const isNewLine = !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig.dataSource));
     // Empty dependency resets on a draft are not explicit user clears.
-    this.trackUnsaved(row, changedFields.filter(name => (!writable || writable.has(name)) &&
+    this.trackUnsaved(row, changedFields.filter(name => (name === field || writable.has(name)) &&
       (!isNewLine || name === field || this.hasValue(row[name]))));
     this.activeLineRow = row;
     if (this.isWorksheetPage) this.worksheetChangedRows.add(row);
@@ -1779,6 +1781,15 @@ export class ListPage implements OnInit, OnDestroy {
       const errors = (this.lineConfig.fields ?? []).flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
       if (errors.length) { this.setEntryStatus({tone: 'error', title: 'Complete row', message: errors.join('. ')}); options.onSettled?.(false); return; }
     }
+    try {
+      const source = this.resolveLineDataSourceForHeader(this.activeDocumentWindowConfig.headerData).dataSource;
+      const operation = this.hasValue(this.resolvePersistedRecordId(row, source)) ? 'update' : 'create';
+      this.dataSource.assertEditedFields(source, operation, row, this.unsavedFields.get(row)?.keys() ?? fields);
+    } catch (error) {
+      this.setEntryStatus({ tone: 'error', title: 'Save failed', message: this.getErrorMessage(error) });
+      this.changeDetector.detectChanges();
+      options.onSettled?.(false); return;
+    }
     const pendingTypeEdits = this.lineConfig.typeField && this.unsavedFields.get(row)?.has(this.lineConfig.typeField) && !this.isWorksheetPage
       ? [...(this.unsavedFields.get(row)?.keys() ?? [])]
       : [];
@@ -1897,6 +1908,13 @@ export class ListPage implements OnInit, OnDestroy {
       options.onSettled?.(false); return;
     }
 
+    try {
+      this.dataSource.assertEditedFields(lineDataSource, 'create', row, this.unsavedFields.get(row)?.keys() ?? []);
+    } catch (error) {
+      this.setEntryStatus({ tone: 'error', title: 'Save failed', message: this.getErrorMessage(error) });
+      this.changeDetector.detectChanges();
+      options.onSettled?.(false); return;
+    }
     const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig, this.unsavedFields.get(row)?.keys());
     if (!payload) {
       // Keep incomplete drafts dirty; the existing close guard protects them.
@@ -2643,14 +2661,13 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private createDraftRecord(newRecord: Record<string, unknown>): Observable<Record<string, unknown> | null> {
-    return this.draftCreate
-      .createWithUnknownPropertyFallback(
+    return defer(() => {
+      this.dataSource.assertEditedFields(this.listConfig.dataSource, 'create', newRecord, this.unsavedFields.get(newRecord)?.keys() ?? []);
+      return this.draftCreate.createWithUnknownPropertyFallback(
         this.listConfig.dataSource,
-        this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
-      )
-      .pipe(
-        map((response) => this.toCreatedRecord(response)),
+        this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections, !this.dataSource.usesGenericContract(this.listConfig.dataSource)),
       );
+    }).pipe(map((response) => this.toCreatedRecord(response)));
   }
 
   private loadConfiguredHeaderDropdownOptions(): Observable<Record<string, Record<string, unknown>[]>> {
