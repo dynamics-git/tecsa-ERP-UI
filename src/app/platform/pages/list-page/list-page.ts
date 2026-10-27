@@ -2009,8 +2009,9 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private shouldCreateDraftOnInput(): boolean {
-    if (this.listConfig.dataSource.singleton || this.listConfig.dataSource.supportsCreate === false || this.usesManualSaveMode()) return false;
-    return this.listConfig.autoSave === true || (!!this.listConfig.dataSource.autoGenerateNumber && !!this.listConfig.dataSource.lazyCreateOnFirstInput);
+    if (this.isWorksheetPage || this.listConfig.dataSource.singleton || this.listConfig.dataSource.supportsCreate === false || this.usesManualSaveMode()) return false;
+    // Creation follows the resolved save mode; first input and readiness gate the POST.
+    return true;
   }
 
   private canCreateDraft(headerData: Record<string, unknown>): boolean {
