@@ -48,6 +48,8 @@ export interface LineColumnConfig extends DataSurfaceColumnConfig {
 }
 
 export interface LineConfig {
+  /** Explicit data field containing the line kind; unlike lineType, it is a column key. */
+  typeField?: string;
   /** Explicit permission scope for a child master with separate backend rights. */
   permissionPageId?: string;
   commandBar?: CommandBarConfig;

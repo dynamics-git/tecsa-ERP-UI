@@ -6,6 +6,7 @@ import {
   ListPageConfig,
   listColumns,
 } from '../../../platform/public-api';
+import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
 
 const actionDefinitions: CommandConfig[] = [
   {
@@ -117,6 +118,12 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           defaultValue: null,
           validation: { maxLength: 250 },
         },
+      ],
+    },
+    {
+      id: 'request-details',
+      title: 'Request Details',
+      fields: [
         {
           key: 'locationId',
           label: 'Location',
@@ -131,13 +138,25 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'name'],
           },
         },
-
+      ],
+    },
+    {
+      id: 'processing',
+      title: 'Processing',
+      fields: [
+        { key: 'conversionStatus', label: 'Conversion Status', type: 'select', readonly: true, options: [
+          { value: 'not_converted', label: 'Not Converted' },
+          { value: 'partially_converted', label: 'Partially Converted' },
+          { value: 'fully_converted', label: 'Fully Converted' },
+        ] },
+        { key: 'purchaseOrderCount', label: 'Purchase Orders', valueType: 'integer', readonly: true },
+        { key: 'statusChangedAt', label: 'Status Changed At', type: 'datetime', readonly: true },
       ],
     },
   ],
 };
 export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
-  factBox: { enabled: true },
+  factBox: purchaseRequisitionFactBoxConfig,
   pageId: 'purchase-requisition',
   pageType: 'document',
   autoSave: true,
@@ -166,9 +185,7 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     omitEmptyFields: ['number'],
     defaultSort: 'number desc',
     pageSize: 25,
-    supportsCreate: true,
-    supportsUpdate: true,
-    supportsDelete: true,
+    supportsDelete: false, // Header API supports cancellation, not deletion.
     writableStates: { field: 'status', values: ['open'] },
     newRecordDefaults: { status: 'open' },
   },
@@ -207,7 +224,8 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   },
 };
 export const purchaseRequisitionLineConfig: LineConfig = {
-  placement: { mode: 'end' },
+  typeField: 'lineType',
+  placement: { mode: 'after-section', afterSectionId: 'general' },
   toolbarButtons: [],
   lineKeyField: 'lineNo',
   dataSource: {
@@ -221,11 +239,9 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       parentIdFields: ['systemId'],
       childCollection: 'lines',
     },
-    supportsCreate: true,
-    supportsUpdate: true,
-    supportsDelete: true,
     permissions: { create: 'modify', update: 'modify', delete: 'modify' },
     omitEmptyFields: ['description'],
+    updateBlockedFields: ['estimatedAmount', 'qtyPerUnitOfMeasure', 'convertedQuantity', 'remainingQuantity'],
     meaningfulFields: ['itemId', 'glAccountId', 'description'],
   },
   columns: [
@@ -237,7 +253,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       required: true,
       cellType: 'dropdown',
       defaultValue: 'item',
-      clearFieldsOnChange: ['itemId', 'glAccountId'],
+      clearFieldsOnChange: ['itemId', 'glAccountId', 'unitOfMeasureId', 'locationId'],
       options: [
         { label: 'Item', value: 'item' },
         { label: 'G/L Account', value: 'gl_account' },
@@ -246,10 +262,14 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'itemId',
       label: 'Item',
+      valueType: 'guid',
+      defaultValue: null,
+      requiredWhen: { field: 'lineType', values: ['item'] },
       cellType: 'dropdown',
       editableWhen: { field: 'lineType', values: ['item'] },
       lookup: {
         endpoint: '/items',
+        filter: 'blocked eq false',
         valueField: 'systemId',
         displayField: 'number',
         searchFields: ['number', 'description'],
@@ -258,19 +278,35 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'glAccountId',
       label: 'G/L Account',
+      valueType: 'guid',
+      defaultValue: null,
+      requiredWhen: { field: 'lineType', values: ['gl_account'] },
       cellType: 'dropdown',
       editableWhen: { field: 'lineType', values: ['gl_account'] },
       lookup: {
         endpoint: '/glAccounts',
+        filter: "accountType eq 'posting' and blocked eq false",
         valueField: 'systemId',
         displayField: 'number',
         searchFields: ['number', 'name'],
       },
     },
-    { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 } },
+    { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
+    {
+      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
+      editableWhen: { field: 'lineType', values: ['item'] },
+      lookup: { endpoint: '/unitsOfMeasure', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'description'] },
+    },
+    { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', readonly: true, align: 'end' },
+    {
+      id: 'locationId', label: 'Location', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
+      editableWhen: { field: 'lineType', values: ['item'] },
+      lookup: { endpoint: '/locations', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'name'] },
+    },
     {
       id: 'quantity',
       label: 'Quantity',
+      factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 20 },
       valueType: 'decimal',
       required: true,
       validation: { pattern: '^[0-9]{1,14}(?:[.][0-9]{1,6})?$' },
@@ -288,11 +324,14 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'estimatedAmount',
       label: 'Estimated Amount',
+      factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 30 },
       valueType: 'decimal',
       readonly: true,
       align: 'end',
     },
     { id: 'requiredDate', label: 'Required Date', valueType: 'date' },
+    { id: 'convertedQuantity', label: 'Converted Quantity', valueType: 'decimal', readonly: true, align: 'end' },
+    { id: 'remainingQuantity', label: 'Remaining Quantity', valueType: 'decimal', readonly: true, align: 'end' },
   ],
   calculation: [
     { target: 'estimatedAmount', formula: 'quantity * estimatedUnitCost', precision: 6 },
@@ -306,7 +345,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'document-totals',
       rows: [
-        { id: 'estimated-total', label: 'Estimated Total', source: 'total', totalKey: 'total', emphasis: true },
+        { id: 'subtotal', label: 'Subtotal', source: 'total', totalKey: 'total', order: 10 },
+        // PR has no confirmed SST amounts yet; placeholders must not imply zero tax.
+        { id: 'sst', label: 'SST', source: 'literal', value: '—', order: 20 },
+        { id: 'total-incl-sst', label: 'Total Incl. SST', source: 'literal', value: '—', emphasis: true, order: 30 },
       ],
     },
   ],};

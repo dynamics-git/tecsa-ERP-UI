@@ -13,7 +13,8 @@ export interface HeaderSectionConfig extends FormSectionConfig {
   actionDialog?: DocumentDetailType;
 }
 
-export interface LineTotalsConfig {
+/** Named display totals. Existing subtotal/sst/total/difference configs remain valid. */
+export interface LineTotalsConfig extends Record<string, string> {
   subtotal: string;
   sst: string;
   total: string;

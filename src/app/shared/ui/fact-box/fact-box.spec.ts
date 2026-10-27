@@ -597,3 +597,34 @@ describe('Collaboration uses common persistence', () => {
     expect(remove).toHaveBeenCalledWith('/items/A/notes/note-1', '"1"');
   });
 });
+
+describe('Shared FactBox compact presentation', () => {
+  it('keeps Notes author, date, Edit/Delete, mentions, and plain-text draft actions without an overflow menu', () => {
+    setup();
+    const f = TestBed.createComponent(Notes);
+    f.componentRef.setInput('context', context);
+    f.detectChanges();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('textarea')?.getAttribute('rows')).toBe('3');
+    expect(el.querySelector('app-lookup-select')).not.toBeNull();
+    expect(el.querySelector('.note-meta strong')?.textContent).toContain('Amit');
+    expect(el.querySelector('.note-meta time')).not.toBeNull();
+    expect([...el.querySelectorAll('.note-actions button')].map(b => b.textContent?.trim())).toEqual(['Edit','Delete']);
+    expect(el.querySelector('[aria-label="Refresh notes"]')).not.toBeNull();
+    expect(el.querySelector('.note-actions [aria-label="More"]')).toBeNull();
+    f.destroy();
+  });
+
+  it('preserves the existing compact Files upload, download and delete entry points', () => {
+    setup();
+    const f = TestBed.createComponent(Attachments);
+    f.componentRef.setInput('context', context);
+    f.detectChanges();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('input[type="file"]')).not.toBeNull();
+    expect(el.querySelector('.file-name')?.textContent).toContain('spec.txt');
+    expect(el.querySelector('button[aria-label="Delete spec.txt"]')).not.toBeNull();
+    expect(el.querySelector('nav')).toBeNull();
+    f.destroy();
+  });
+});

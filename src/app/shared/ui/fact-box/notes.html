@@ -1,18 +1,15 @@
 <section class="record-panel" aria-label="Record notes">
-  <header>
+  <header class="record-panel-header">
     <h4>Internal notes</h4>
     @if (result) {
-      <span>{{ result.meta.total }}</span>
+      <span class="record-count">{{ result.meta.total }}</span>
     }
-    <button
-      type="button"
-      [disabled]="loading || busy || !context.recordEndpoint"
-      (click)="load()"
-      aria-label="Refresh notes"
-    >
+    <button type="button" [disabled]="loading || busy || !context.recordEndpoint"
+      (click)="load()" aria-label="Refresh notes" title="Refresh notes">
       <i class="ts-icon ts-icon-refresh" aria-hidden="true"></i>
     </button>
   </header>
+
   @if (!context.recordEndpoint) {
     <p class="empty">Save or select a record to use notes.</p>
   }
@@ -23,50 +20,69 @@
   @if (loading) {
     <p class="empty" role="status">Loading notes…</p>
   }
+
   @if (editing ? result?.capabilities?.modify : result?.capabilities?.create) {
-    <label class="composer"
-      >{{ editing ? 'Edit note' : 'New note'
-      }}<textarea
-        rows="4"
-        [disabled]="busy"
-        [value]="draft"
-        (input)="changeDraft($event)" (keydown)="mentionKey($event)" [attr.aria-controls]="mentionControl?.expanded ? mentionControl?.id : null" [attr.aria-activedescendant]="mentionControl?.expanded && (mentionControl?.active ?? -1) >= 0 ? mentionControl?.id + '-' + mentionControl?.active : null"
-        placeholder="Write an internal note…"
-      ></textarea>
-    </label>
-    <app-lookup-select label="Mention a user" placeholder="Mention someone…" [display]="''" [options]="mentionOptions" [loading]="mentionLoading" [error]="mentionError" [hasMore]="mentionHasMore" [disabled]="busy" (opened)="openMentionChoices()" (searched)="searchMentions($event)" (selected)="addMention($event)" (nextPage)="searchMentions(mentionQuery,true)" (retried)="searchMentions(mentionQuery)"></app-lookup-select>
-    @for(user of mentions;track user.systemId){<button type="button" [disabled]="busy" (click)="removeMention(user.systemId)" [attr.aria-label]="'Remove mention for '+user.name">@{{user.name}} ×</button>}
-    <small>Notifications follow enabled Notification Setup rules.</small>
-    <div class="tools">
-      <span>Visible to authorized users</span
-      ><button type="button" [disabled]="busy || !draft.trim()" (click)="save()">
-        <i class="ts-icon ts-icon-send" aria-hidden="true"></i>{{ busy ? 'Saving…' : 'Save note' }}
-      </button>
-      @if (draft) {
-        <button type="button" [disabled]="busy" (click)="cancel()">Cancel</button>
+    <div class="note-composer">
+      <label class="composer">
+        {{ editing ? 'Edit note' : 'New note' }}
+        <textarea rows="3" [disabled]="busy" [value]="draft"
+          (input)="changeDraft($event)" (keydown)="mentionKey($event)"
+          [attr.aria-controls]="mentionControl?.expanded ? mentionControl?.id : null"
+          [attr.aria-activedescendant]="mentionControl?.expanded && (mentionControl?.active ?? -1) >= 0 ? mentionControl?.id + '-' + mentionControl?.active : null"
+          placeholder="Write an internal note…"></textarea>
+      </label>
+      <div class="note-mention-picker">
+        <app-lookup-select label="Mention a user" placeholder="Mention someone…"
+          [display]="''" [options]="mentionOptions" [loading]="mentionLoading"
+          [error]="mentionError" [hasMore]="mentionHasMore" [disabled]="busy"
+          (opened)="openMentionChoices()" (searched)="searchMentions($event)"
+          (selected)="addMention($event)" (nextPage)="searchMentions(mentionQuery,true)"
+          (retried)="searchMentions(mentionQuery)"></app-lookup-select>
+      </div>
+      @if (mentions.length) {
+        <div class="mention-chips">
+          @for (user of mentions; track user.systemId) {
+            <button class="mention-chip" type="button" [disabled]="busy"
+              (click)="removeMention(user.systemId)"
+              [attr.aria-label]="'Remove mention for ' + user.name">@{{ user.name }} ×</button>
+          }
+        </div>
       }
+      <p class="notification-hint">Notifications follow enabled Notification Setup rules.</p>
+      <div class="tools composer-actions">
+        @if (draft) {
+          <button type="button" [disabled]="busy" (click)="cancel()">Cancel</button>
+        }
+        <button type="button" class="save-note" [disabled]="busy || !draft.trim()"
+          (click)="save()">
+          <i class="ts-icon ts-icon-send" aria-hidden="true"></i>{{ busy ? 'Saving…' : 'Save note' }}
+        </button>
+      </div>
     </div>
   }
+
   @for (entry of result?.data ?? []; track entry.systemId) {
     <article class="note">
       <div class="avatar" aria-hidden="true">{{ entry.author.slice(0, 1) }}</div>
-      <div>
-        <strong>{{ entry.author }}</strong
-        ><time [attr.datetime]="entry.systemCreatedAt">{{
-          entry.systemCreatedAt | date: 'medium'
-        }}</time>
+      <div class="note-main">
+        <div class="note-head">
+          <div class="note-meta">
+            <strong>{{ entry.author }}</strong>
+            <time [attr.datetime]="entry.systemCreatedAt">{{ entry.systemCreatedAt | date: 'medium' }}</time>
+          </div>
+          <div class="note-actions">
+            @if (result?.capabilities?.modify) {
+              <button type="button" [disabled]="busy" (click)="edit(entry)">Edit</button>
+            }
+            @if (result?.capabilities?.delete) {
+              <button type="button" [disabled]="busy" (click)="remove(entry)">Delete</button>
+            }
+          </div>
+        </div>
         <p>{{ entry.body }}</p>
         @if (entry.systemModifiedAt !== entry.systemCreatedAt) {
           <small>Edited {{ entry.systemModifiedAt | date: 'medium' }}</small>
         }
-        <div class="tools">
-          @if (result?.capabilities?.modify) {
-            <button type="button" [disabled]="busy" (click)="edit(entry)">Edit</button>
-          }
-          @if (result?.capabilities?.delete) {
-            <button type="button" [disabled]="busy" (click)="remove(entry)">Delete</button>
-          }
-        </div>
       </div>
     </article>
   } @empty {
@@ -74,22 +90,14 @@
       <p class="empty">No notes yet.</p>
     }
   }
+
   @if (result && result.meta.lastPage > 1) {
     <nav aria-label="Note pages">
-      <button
-        type="button"
-        [disabled]="loading || result.meta.currentPage === 1"
-        (click)="load(result.meta.currentPage - 1)"
-      >
-        Previous</button
-      ><span>{{ result.meta.currentPage }} / {{ result.meta.lastPage }}</span
-      ><button
-        type="button"
-        [disabled]="loading || result.meta.currentPage === result.meta.lastPage"
-        (click)="load(result.meta.currentPage + 1)"
-      >
-        Next
-      </button>
+      <button type="button" [disabled]="loading || result.meta.currentPage === 1"
+        (click)="load(result.meta.currentPage - 1)">Previous</button>
+      <span>{{ result.meta.currentPage }} / {{ result.meta.lastPage }}</span>
+      <button type="button" [disabled]="loading || result.meta.currentPage === result.meta.lastPage"
+        (click)="load(result.meta.currentPage + 1)">Next</button>
     </nav>
   }
 </section>

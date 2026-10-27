@@ -142,6 +142,8 @@ export class DocumentPageDataSourceResolverService {
   }
 
   getLineTypeField(params: { lineConfig?: LineConfig }): string {
+    const explicit = params.lineConfig?.typeField?.trim();
+    if (explicit) return params.lineConfig?.columns.some(column => this.getColumnField({ column }) === explicit) ? explicit : '';
     const configured = params.lineConfig?.columns.find((column) =>
       (column.options ?? []).some((option) => this.resolveApiEndpoints({ source: option.api }).length > 0),
     );

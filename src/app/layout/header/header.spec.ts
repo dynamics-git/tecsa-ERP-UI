@@ -15,6 +15,7 @@ describe('Header', () => {
       providers: [provideRouter([]), ...providePlatformGovernance()],
     }).compileComponents();
 
+    TestBed.inject(SessionService).SuperAdmin = false;
     // Global search now reads explicit backend-derived page permissions.
     TestBed.inject(SessionService).Permissions = [{
       PageId: 'purchase-requisition', PageName: 'Purchase Order', ObjectName: 'purchase_orders', ReadPermission: 'Yes',

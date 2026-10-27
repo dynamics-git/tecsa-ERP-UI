@@ -117,7 +117,8 @@ describe('Items list and configured card use one shared controller', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-dynamic-form')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('app-document-lines')).toBeNull();
-    expect(fixture.nativeElement.querySelector('app-fact-box')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('app-document-window app-fact-box')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelectorAll('app-fact-box')).toHaveLength(2);
     expect(await firstValueFrom(TestBed.inject(RunModalStackService).stack$)).toHaveLength(1);
     expect(write).not.toHaveBeenCalled();
     fixture.destroy();

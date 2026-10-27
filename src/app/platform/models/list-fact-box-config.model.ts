@@ -5,6 +5,8 @@ export interface ListFactBoxFieldConfig {
   id: string;
   label: string;
   field?: string;
+  /** Optional display semantics when the field is not a List column. */
+  type?: string;
 }
 
 export interface ListFactBoxBadgeConfig {

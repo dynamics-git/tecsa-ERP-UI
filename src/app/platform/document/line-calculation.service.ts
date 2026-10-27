@@ -4,7 +4,6 @@ import {
   CalculationConfig,
   CalculationRuleConfig,
   LineTotalExpressionConfig,
-  LineTotalKey,
   LineTotalsCalculationConfig,
 } from '../models/line-calculation-config.model';
 
@@ -14,6 +13,7 @@ import {
 export class LineCalculationService {
   private formulaTokens: string[] = [];
   private formulaTokenIndex = 0;
+  private activeTotals?: Record<string, number>;
 
   readonly emptyTotals: LineTotalsConfig = {
     subtotal: '0.00',
@@ -54,29 +54,49 @@ export class LineCalculationService {
     headerData?: Record<string, unknown>
   ): LineTotalsConfig {
     const defaults = config.defaults;
-    const result: LineTotalsConfig = { ...defaults };
-
-    for (const key of Object.keys(config.totals) as LineTotalKey[]) {
+    const result: LineTotalsConfig = { ...this.emptyTotals, ...defaults };
+    const values: Record<string, number> = Object.create(null);
+    const visiting = new Set<string>();
+    const resolved = new Set<string>();
+    const previousTotals = this.activeTotals;
+    this.activeTotals = values;
+    const resolve = (key: string): void => {
+      if (!/^[A-Za-z_]\w*$/.test(key) || ['__proto__', 'prototype', 'constructor'].includes(key)) throw new Error('Invalid total name: ' + key);
+      if (resolved.has(key)) return;
+      if (visiting.has(key)) throw new Error('Circular total dependency: ' + key);
+      if (!Object.hasOwn(config.totals, key) && !Object.hasOwn(defaults, key))
+        throw new Error('Unknown total: ' + key);
+      visiting.add(key);
       const expression = config.totals[key];
-      if (!expression) {
-        continue;
+      // Resolve named totals before parsing so recursive evaluation cannot overwrite parser state.
+      const formulas = this.totalFormulas(expression);
+      for (const formula of formulas) {
+        for (const match of formula.matchAll(/\btotals\.([A-Za-z_][A-Za-z0-9_]*)/g)) resolve(match[1]);
       }
-
-      if ('formula' in expression) {
-        result[key] = this.format(
-          this.round(this.evaluateFormula(expression.formula, {}, headerData, rows), expression.precision),
-          config,
-          headerData
-        );
-        continue;
-      }
-
-      result[key] = expression.kind === 'default'
-        ? defaults[key]
-        : this.format(this.evaluate(rows, expression), config, headerData);
+      const value = !expression || 'kind' in expression && expression.kind === 'default'
+        ? this.toNumber(defaults[key]) ?? 0
+        : 'formula' in expression
+          ? this.round(this.evaluateFormula(expression.formula, {}, headerData, rows), expression.precision)
+          : this.evaluate(rows, expression, headerData);
+      values[key] = value;
+      if (expression && !('kind' in expression && expression.kind === 'default'))
+        result[key] = this.format(value, config, headerData);
+      visiting.delete(key);
+      resolved.add(key);
+    };
+    try {
+      for (const key of Object.keys(config.totals)) resolve(key);
+      return result;
+    } finally {
+      this.activeTotals = previousTotals;
     }
+  }
 
-    return result;
+  private totalFormulas(expression?: LineTotalExpressionConfig): string[] {
+    if (!expression) return [];
+    if ('formula' in expression) return [expression.formula];
+    return expression.kind === 'difference'
+      ? [...this.totalFormulas(expression.left), ...this.totalFormulas(expression.right)] : [];
   }
 
   private assignIfChanged(
@@ -93,16 +113,16 @@ export class LineCalculationService {
     changedFields.push(field);
   }
 
-  private evaluate(rows: Record<string, unknown>[], expression: LineTotalExpressionConfig): number {
+  private evaluate(rows: Record<string, unknown>[], expression: LineTotalExpressionConfig, headerData?: Record<string, unknown>): number {
     if ('formula' in expression) {
-      return this.evaluateFormula(expression.formula, {}, undefined, rows);
+      return this.evaluateFormula(expression.formula, {}, headerData, rows);
     }
 
     switch (expression.kind) {
       case 'sum':
         return rows.reduce((sum, row) => sum + (this.toNumber(row[expression.field]) ?? 0), 0);
       case 'difference':
-        return this.evaluate(rows, expression.left) - this.evaluate(rows, expression.right);
+        return this.evaluate(rows, expression.left, headerData) - this.evaluate(rows, expression.right, headerData);
       case 'value':
         return expression.value;
       case 'default':
@@ -227,6 +247,8 @@ export class LineCalculationService {
     row: Record<string, unknown>,
     headerData?: Record<string, unknown>
   ): number {
+    if (token.startsWith('totals.')) return this.activeTotals?.[token.slice('totals.'.length)] ?? 0;
+
     if (token.startsWith('header.')) {
       return this.toNumber(headerData?.[token.slice('header.'.length)]) ?? 0;
     }
@@ -256,7 +278,7 @@ export class LineCalculationService {
     config: LineTotalsCalculationConfig,
     headerData?: Record<string, unknown>
   ): string {
-    const formatted = this.formatNumber(value);
+    const formatted = this.formatNumber(value, config.format?.precision);
     if (config.format?.type !== 'currency') {
       return formatted;
     }
@@ -270,10 +292,11 @@ export class LineCalculationService {
     return currencyCode ? `${currencyCode} ${formatted}` : formatted;
   }
 
-  private formatNumber(value: number): string {
+  private formatNumber(value: number, precision = 2): string {
+    const digits = Number.isFinite(precision) ? Math.max(0, Math.min(12, Math.trunc(precision))) : 2;
     return Number.isFinite(value) ? value.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits
     }) : '0.00';
   }
 

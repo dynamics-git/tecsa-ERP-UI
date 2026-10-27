@@ -100,7 +100,7 @@ describe('RunModal navigation', () => {
     expect(requests.some((endpoint) => endpoint.startsWith('/purchaseOrderLines') && endpoint.includes('PO-1'))).toBe(
       true,
     );
-    fixture.componentInstance.closePopup(child);
+    await fixture.componentInstance.closePopup(child);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
     expect(data(popups[0]).runModalList!.rows).toBe(rows);
@@ -142,8 +142,8 @@ describe('RunModal navigation', () => {
     }
     fixture.detectChanges();
     expect(fixture.debugElement.queryAll(By.directive(DocumentWindow))).toHaveLength(3);
-    fixture.componentInstance.closePopup(popups[2]);
-    fixture.componentInstance.closePopup(popups[1]);
+    await fixture.componentInstance.closePopup(popups[2]);
+    await fixture.componentInstance.closePopup(popups[1]);
     fixture.detectChanges();
     expect(popups.map((popup) => popup.id)).toEqual(['parent']);
     expect(configFor(popups[0])).toBe(config);
@@ -196,7 +196,7 @@ describe('RunModal navigation', () => {
     expect(popups[0]).toBe(parent);
     expect(fixture.debugElement.queryAll(By.directive(DocumentWindow))).toHaveLength(1);
 
-    host.closePopup(relatedList);
+    await host.closePopup(relatedList);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
     expect(configFor(parent)).toBe(config);
@@ -243,7 +243,7 @@ describe('RunModal navigation', () => {
     expect(data(popups[1]).runModalList).toBeDefined();
     expect(popups[0]).toBe(parent);
 
-    fixture.componentInstance.closePopup(popups[1]);
+    await fixture.componentInstance.closePopup(popups[1]);
     fixture.detectChanges();
     expect(popups).toEqual([parent]);
     expect(configFor(parent)).toBe(config);
@@ -270,7 +270,7 @@ describe('RunModal navigation', () => {
     expect(popups).toHaveLength(2);
     expect(data(popups[1]).runModalList).toBeDefined();
     const host = fixture.componentInstance;
-    host.closePopup(popups[1]);
+    await host.closePopup(popups[1]);
     expect(configFor(popups[0])).toBe(config);
     expect(config.headerData!['vendorOrderNumber']).toBe('UNSAVED');
   });
@@ -288,7 +288,7 @@ describe('RunModal navigation', () => {
     TestBed.inject(DrawerService).open({ id: 'drawer', viewId: 'profile', allowNested: true });
     const decision = TestBed.inject(ConfirmationService).confirm({ message: 'Continue?' });
     expect(host.getRenderablePopups(popups).map((popup) => popup.id)).toEqual(['parent', popups[2].id]);
-    host.closePopup(popups[2]);
+    await host.closePopup(popups[2]);
     expect(await decision).toBe(false);
     expect(popups.map((popup) => popup.id)).toEqual(['parent', 'drawer']);
     TestBed.inject(DrawerService).close('drawer');

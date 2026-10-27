@@ -174,8 +174,8 @@ export class ListFactBox implements OnChanges {
       return factBox.sections.map((section) => ({
         title: section.title, subtitle: section.subtitle, collapsed: section.collapsed, layout: section.layout, buttons: section.buttons,
         fields: (section.fields ?? []).map((field) => ({
-          ...field,
           ...this.pickColumnFormat(field.field),
+          ...field,
           order: 0,
         })),
       }));

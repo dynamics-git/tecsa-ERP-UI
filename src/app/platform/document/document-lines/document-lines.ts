@@ -1,3 +1,4 @@
+import { CommandConfig } from '../../models/command-config.model';
 import { moveQuickEntry } from '../../../shared/ui/quick-entry';
 import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token';
 import { readTabularText, writeTabularText } from '../../data/tabular-text';
@@ -116,6 +117,7 @@ export class DocumentLines {
   get visibleColumns(): LineColumnConfig[] { return this.columns.filter(column=>!column.hidden); }
   @Input() rows: Record<string, unknown>[] = [];
   @Input() showSelection = false;
+  @Input() rowCommands: CommandConfig[] = [];
   @Input() enableColumnResize = true;
   @Input() enableBulkEditFromSelection = false;
   @Output() action = new EventEmitter<{
@@ -226,17 +228,86 @@ export class DocumentLines {
   clipboardMessage = '';
   pasteLoading = false;
   private pasteGeneration = 0;
-  pastePreview?: { rows: Record<string,unknown>[]; labels: string[]; cells: string[][]; errors: string[]; context: string; inScope: () => boolean };
+  rowMenuIndex = -1;
+  rowMenuLeft = 0;
+  rowMenuTop = 0;
+  get visibleRowCommands(): CommandConfig[] { return this.rowCommands.filter(command => !command.hidden); }
+  showRowMenu(event: MouseEvent, rowIndex: number): void {
+    event.preventDefault(); event.stopPropagation();
+    if (this.activeRowIndex !== rowIndex) this.focusedColumnIndex = 0;
+    this.activateRow(rowIndex);
+    this.rowMenuIndex = rowIndex;
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.changes.detectChanges();
+    const menu = document.getElementById(this.editorId + '-row-menu');
+    menu?.showPopover?.();
+    const bounds = menu?.getBoundingClientRect();
+    this.rowMenuLeft = Math.max(0, Math.min(box.right, window.innerWidth - (bounds?.width ?? 0)));
+    this.rowMenuTop = Math.max(0, Math.min(box.bottom, window.innerHeight - (bounds?.height ?? 0)));
+    this.changes.detectChanges();
+    menu?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  }
+  closeRowMenu(): void {
+    document.getElementById(this.editorId + '-row-menu')?.hidePopover?.();
+    this.rowMenuIndex = -1;
+  }
+  rowCommandDisabled(command: CommandConfig): boolean {
+    const copyRows = command.actionKey.replace(/^cmd:/i, '').toLowerCase() === 'line-copy-rows';
+    const paste = command.actionKey.replace(/^cmd:/i, '').toLowerCase() === 'line-paste';
+    return !!command.disabled || (!copyRows && this.disabled) || this.pasteLoading ||
+      !this.rows[this.rowMenuIndex] || (!paste && this.rows[this.rowMenuIndex]['__entryPlaceholder'] === true);
+  }
+  runRowCommand(command: CommandConfig): void {
+    if (this.rowCommandDisabled(command)) return;
+    const rowIndex = this.rowMenuIndex;
+    const indexes = this.selectedRowIndexes.has(rowIndex) ? [...this.selectedRowIndexes].sort((a,b) => a-b) : [rowIndex];
+    this.closeRowMenu();
+    this.clipboardMessage = '';
+    const key = command.actionKey.replace(/^cmd:/i, '').toLowerCase();
+    if (key === 'line-copy-rows') { void this.copySelectedRows(indexes); return; }
+    if (key === 'line-paste') { void this.requestPaste(); return; }
+    this.action.emit({actionKey: command.actionKey, row: this.rows[rowIndex], payload: {activeRow: this.rows[rowIndex], selectedIndexes: indexes}});
+  }
+  rowMenuKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    event.preventDefault();
+    const buttons = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+  }
   private focusedColumnIndex = 0;
   focusCell(column: LineColumnConfig, rowIndex: number): void {
     this.focusedColumnIndex = this.columns.indexOf(column);
     if (this.activeRowIndex !== rowIndex) this.activateRow(rowIndex);
   }
   private clipboardContext(): string { return JSON.stringify(this.headerData) + ':' + this.columns.map(c=>c.id+':'+c.readonly).join('|'); }
-  async copySelectedRows(): Promise<void> {
-    const rows = this.selectedRowIndexes.size ? [...this.selectedRowIndexes].sort((a,b)=>a-b).map(i=>this.rows[i]) : [this.rows[this.activeRowIndex]];
-    const columns = this.columns.filter(c=>!c.hidden && c.cellType!=='icon');
-    const text = writeTabularText(rows.filter(row=>row && !row['__entryPlaceholder']).map(row=>columns.map(c=>c.lookup?this.lookupDisplay(c,row):this.getCellValue(row,c))));
+  private clipboardColumns(start = 0): LineColumnConfig[] {
+    return this.columns.slice(Math.max(0,start)).filter(column=>!column.hidden&&!column.readonly&&column.cellType!=='icon');
+  }
+  private clipboardCell(column: LineColumnConfig, row: Record<string,unknown>): unknown {
+    const field=column.field??column.id;
+    if(row['__lookupRestricted_'+field] || column.editableWhen&&!column.editableWhen.values.includes(row[column.editableWhen.field]))return '';
+    if(column.lookup) {
+      const lookup=column.lookup;
+      const option=this.getOptions(column,row).find(option=>String(option.value)===String(row[field]));
+      const record=option?.record??this.source.getCachedLookup?.(lookup,row[field],row,this.headerData);
+      return record?.[lookup.displayField]??row[field]??'';
+    }
+    return this.getCellValue(row,column);
+  }
+  private pasteLineLabel(target: Record<string,unknown> | undefined, pastedIndex: number, start: number): string {
+    if(target&&!target['__entryPlaceholder']) {
+      const column=this.columns.find(column=>(column.field??column.id)==='lineNo');
+      const number=target[column?.field??column?.id??'lineNo'];
+      if(number!==undefined&&number!==null&&number!=='')return (column?.label??'Line No.')+' '+String(number);
+      return 'Line '+(start+pastedIndex+1);
+    }
+    return 'New line '+(pastedIndex+1);
+  }
+  async copySelectedRows(indexes?: number[]): Promise<void> {
+    const rows = indexes ? indexes.map(index => this.rows[index]) : this.selectedRowIndexes.size ? [...this.selectedRowIndexes].sort((a,b)=>a-b).map(i=>this.rows[i]) : [this.rows[this.activeRowIndex]];
+    const columns = this.clipboardColumns();
+    const text = writeTabularText(rows.filter(row=>row && !row['__entryPlaceholder']).map(row=>columns.map(c=>this.clipboardCell(c,row))));
     if (!text) return;
     try { await navigator.clipboard.writeText(text); this.clipboardMessage='Selected rows copied.'; }
     catch { this.clipboardMessage='Clipboard unavailable. Select the grid and use Ctrl+C.'; }
@@ -245,72 +316,110 @@ export class DocumentLines {
   handleCopy(event: ClipboardEvent): void {
     if (this.isInteractiveTarget(event.target) || !event.clipboardData) return;
     const indexes=this.selectedRowIndexes.size?[...this.selectedRowIndexes].sort((a,b)=>a-b):[this.activeRowIndex];
-    const columns=this.columns.filter(c=>!c.hidden && c.cellType!=='icon');
+    const columns=this.clipboardColumns();
     const rows=indexes.map(i=>this.rows[i]).filter(row=>row && !row['__entryPlaceholder']);
     if (!rows.length) return;
-    event.clipboardData.setData('text/plain',writeTabularText(rows.map(row=>columns.map(c=>c.lookup?this.lookupDisplay(c,row):this.getCellValue(row,c)))));
+    event.clipboardData.setData('text/plain',writeTabularText(rows.map(row=>columns.map(c=>this.clipboardCell(c,row)))));
     event.preventDefault();
   }
   async requestPaste(): Promise<void> {
-    if (this.disabled) return;
-    this.focusedColumnIndex = 0; // Toolbar paste starts at the first editable column; cell paste keeps its anchor.
-    try { await this.preparePaste(await navigator.clipboard.readText()); }
-    catch { this.clipboardMessage='Focus a line cell and paste with Ctrl+V.'; this.changes.markForCheck(); }
+    if (this.disabled || this.pasteLoading) return;
+    const rowIndex = Math.max(0, this.activeRowIndex), columnIndex = this.focusedColumnIndex;
+    const context = this.clipboardContext();
+    try {
+      const text = await navigator.clipboard.readText();
+      if (context !== this.clipboardContext()) throw new Error('The document changed. Paste again.');
+      await this.pasteText(text, rowIndex, columnIndex);
+    } catch { this.clipboardMessage='Select a line cell and paste with Ctrl+V.'; this.changes.markForCheck(); }
   }
-  handlePaste(event: ClipboardEvent, column: LineColumnConfig): void {
-    const text=event.clipboardData?.getData('text/plain');
-    if (!text || this.disabled || !/[\t\r\n]/.test(text)) return; // Single-cell text paste remains native.
+  handlePaste(event: ClipboardEvent, column: LineColumnConfig, rowIndex = this.activeRowIndex): void {
+    const text = event.clipboardData?.getData('text/plain');
+    if (!text || this.disabled || this.isReadonly(column, this.rows[rowIndex] ?? {})) return;
     event.preventDefault(); event.stopPropagation();
-    this.focusedColumnIndex=this.columns.indexOf(column);
-    this.preparePaste(text);
+    this.focusCell(column, rowIndex);
+    void this.pasteText(text, rowIndex, this.columns.indexOf(column));
   }
-  async preparePaste(text: string): Promise<void> {
+  async pasteText(text: string, rowIndex = Math.max(0, this.activeRowIndex), columnIndex = this.focusedColumnIndex): Promise<void> {
     if (this.disabled || this.pasteLoading) return;
     const generation=++this.pasteGeneration, context=this.clipboardContext();
     const inScope=this.source.captureWriteScope?.() ?? (()=>true);
     const cache=new Map<string,Promise<Record<string,unknown>>>();
-    this.pastePreview=undefined;this.pasteLoading=true;this.clipboardMessage='Checking pasted values…';
+    const targets=this.rows.slice(rowIndex,rowIndex+100);
+    const snapshots=targets.map(row=>JSON.stringify(row));
+    this.pasteLoading=true; this.clipboardMessage='Checking pasted values…';
     try {
-      const cells=readTabularText(text,20);
-      if (!cells.length) return;
-      const columns=this.columns.slice(Math.max(0,this.focusedColumnIndex)).filter(c=>!c.hidden && !c.readonly && c.cellType!=='icon');
-      if (cells[0].length>columns.length) throw new Error('The pasted range has more columns than the editable fields. Start at the correct field.');
-      const used=columns.slice(0,cells[0].length),errors:string[]=[],rows:Record<string,unknown>[]=[];
-      // Work on isolated candidates; no business record changes during validation.
+      const cells=readTabularText(text,100);
+      if (!cells.length) { this.clipboardMessage=''; return; }
+      const columns=this.clipboardColumns(columnIndex);
+      if (cells[0].length>columns.length) throw new Error('Copied '+cells[0].length+' columns, but only '+columns.length+' fields remain from '+(columns[0]?.label??'this cell')+'. Select '+(this.clipboardColumns()[0]?.label??'the first editable field')+' to paste a whole row.');
+      const used=columns.slice(0,cells[0].length);
+      const errors:string[]=[], candidates:Record<string,unknown>[]=[];
       for (const [index,values] of cells.entries()) {
         if(generation!==this.pasteGeneration || context!==this.clipboardContext() || !inScope()) throw new Error('The document context changed. Paste again.');
-        const row:Record<string,unknown>={};
-        for(const c of this.columns)if(c.defaultValue!==undefined)row[c.field??c.id]=structuredClone(c.defaultValue);
-        for(const [columnIndex,c] of used.entries()) {
-          const field=c.field??c.id,raw=values[columnIndex];
-          if(this.isReadonly(c,row)){if(raw.trim())errors.push('Row '+(index+1)+': '+c.label+' is not editable.');continue;}
-          let value:unknown=raw;
+        const target=targets[index];
+        const lineLabel=this.pasteLineLabel(target,index,rowIndex);
+        const row:Record<string,unknown>=target ? structuredClone(target) : {};
+        if(!target || target['__entryPlaceholder']) for(const c of this.columns) if(c.defaultValue!==undefined && row[c.field??c.id]===undefined) row[c.field??c.id]=structuredClone(c.defaultValue);
+        for(const [offset,c] of used.entries()) {
+          const field=c.field??c.id, raw=values[offset];
+          if(this.isReadonly(c,row)){if(raw.trim() && !fieldValuesEqual(row[field],normalizeFieldValue(raw,c.valueType),c.valueType) && String(this.clipboardCell(c,row))!==raw)errors.push(lineLabel+' — '+c.label+' is not editable.');continue;}
+          let value:unknown=raw, selected:Record<string,unknown>|undefined;
           if(c.lookup && raw) {
             try {
-              const query=lookupQuery(c.lookup,row,'',this.headerData);
-              const key=JSON.stringify([query,c.lookup.valueField,c.lookup.displayField,raw]);
+              const key=JSON.stringify([lookupQuery(c.lookup,row,'',this.headerData),c.lookup.valueField,c.lookup.displayField,raw]);
               if(!cache.has(key))cache.set(key,this.resolvePastedLookup(c,row,raw));
-              const selected=await cache.get(key)!;
+              selected=await cache.get(key)!;
               value=selected[c.lookup.valueField];
               if(value==null || value==='')throw new Error('No identifier returned.');
               row[c.optionsDataKey??'__options_'+field]=[{value,label:this.resolveLookupLabel(c,selected),record:selected}];
-              this.applyFill(c,row,selected);
-            } catch {errors.push('Row '+(index+1)+': '+c.label+' could not be uniquely verified. Use its exact code or identifier.');continue;}
+            } catch {errors.push(lineLabel+' — '+c.label+' could not be uniquely verified. Use its exact code or identifier.');continue;}
           } else if(c.options?.length) {
             const option=c.options.find(option=>String(option.value)===raw || option.label.toLowerCase()===raw.toLowerCase());
-            if(!option && raw)errors.push('Row '+(index+1)+': invalid '+c.label+'.');
+            if(!option && raw)errors.push(lineLabel+' — '+c.label+': “'+raw.slice(0,60)+'” is not valid. Choose '+c.options.slice(0,4).map(option=>option.label).join(' or ')+'.');
             value=option?.value??raw;
           }
-          row[field]=normalizeFieldValue(value,c.valueType);
+          value=normalizeFieldValue(value,c.valueType);
+          if(!fieldValuesEqual(row[field],value,c.valueType)) {
+            this.applyCellChange(c,row,value,selected);
+          }
         }
         for(const c of this.columns) {
-          const field=c.field??c.id;if(c.readonly || c.hidden)continue;
-          errors.push(...this.validation.validateField({key:field,label:c.label,valueType:c.valueType,required:c.required,requiredWhen:c.requiredWhen,validation:c.validation},row[field],row).errors.map(error=>'Row '+(index+1)+': '+error));
+          const field=c.field??c.id;if(c.readonly||c.hidden)continue;
+          errors.push(...this.validation.validateField({key:field,label:c.label,valueType:c.valueType,required:c.required,requiredWhen:c.requiredWhen,validation:c.validation},row[field],row).errors.map(error=>lineLabel+' — '+error));
         }
-        rows.push(row);
+        candidates.push(row);
       }
       if(generation!==this.pasteGeneration || context!==this.clipboardContext() || !inScope())throw new Error('The document context changed. Paste again.');
-      this.pastePreview={rows,labels:used.map(c=>c.label),cells,errors,context,inScope};this.clipboardMessage='';
+      if(this.disabled || targets.some((target,index)=>this.rows[rowIndex+index]!==target || JSON.stringify(target)!==snapshots[index])) throw new Error('The target lines changed. Paste again.');
+      if(errors.length)throw new Error(errors.slice(0,5).join(' ')+(errors.length>5?' More pasted cells need correction.':''));
+      for(const [index,candidate] of candidates.entries()) {
+        const target=targets[index];
+        if(target && !target['__entryPlaceholder'] && used.some((c,offset)=>cells[index][offset].trim() && !fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType) && (c.hidden || this.isReadonly(c,candidate)))) throw new Error('A target field is no longer editable.');
+      }
+      const creates=candidates.filter((_row,index)=>!targets[index] || targets[index]['__entryPlaceholder']);
+      const pasteCommand=this.rowCommands.find(command=>command.actionKey.replace(/^cmd:/i,'').toLowerCase()==='line-paste');
+      if(creates.length && (pasteCommand?.disabled || pasteCommand?.hidden))throw new Error('You cannot add lines to this document.');
+      // Validate the entire range before any record changes. New rows use the existing bounded create queue.
+      if(creates.length)this.action.emit({actionKey:'cmd:line-paste',payload:{rows:creates}});
+      for(const [index,candidate] of candidates.entries()) {
+        const target=targets[index];
+        if(!target || target['__entryPlaceholder'])continue;
+        const changed=this.columns.filter(c=>c.cellType!=='icon'&&!fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType));
+        if(!changed.length)continue;
+        // One row event carries the complete validated change, preserving the normal calculation and autosave path.
+        const anchors=used.filter(c=>changed.includes(c));
+        const column=anchors[anchors.length-1];
+        if(!column)continue;
+        const field=column.field??column.id,previousValue=target[field];
+        for(const c of this.columns) {
+          const key=c.field??c.id;
+          if(changed.includes(c))target[key]=candidate[key];
+          const bucket=c.optionsDataKey??'__options_'+key;
+          if(c.lookup&&candidate[bucket])target[bucket]=candidate[bucket];
+        }
+        this.rowChanged.emit({row:target,column,value:target[field],previousValue,rowIndex:rowIndex+index,updatedFields:changed.filter(c=>c!==column).map(c=>c.field??c.id)});
+      }
+      this.clipboardMessage='';
     } catch(error){if(generation===this.pasteGeneration)this.clipboardMessage=error instanceof Error?error.message:'Paste could not be read.';}
     finally{if(generation===this.pasteGeneration){this.pasteLoading=false;this.changes.markForCheck();}}
   }
@@ -326,14 +435,6 @@ export class DocumentLines {
     const response=await firstValueFrom(this.source.loadList({endpoint:query.endpoint!,defaultFilter:[query.filter,exact].filter(Boolean).map(filter=>'('+filter+')').join(' and ')},{top:2,count:false,useCache:true,maxAgeMs:30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as {value:Record<string,unknown>[]};
     if(response.value.length!==1 || String(response.value[0][field]).toLowerCase()!==raw.toLowerCase())throw new Error('Lookup is missing or ambiguous.');
     return response.value[0];
-  }
-
-  applyPaste(): void {
-    const preview=this.pastePreview;
-    if (!preview || preview.errors.length || this.disabled || this.pasteLoading) return;
-    if (preview.context!==this.clipboardContext() || !preview.inScope()) { this.pastePreview=undefined;this.clipboardMessage='The document changed. Paste again to revalidate.';return; }
-    this.pastePreview=undefined;
-    this.action.emit({actionKey:'cmd:line-paste',payload:{rows:preview.rows}});
   }
 
   handleCellKeydown(event: KeyboardEvent, column: LineColumnConfig, row: Record<string,unknown>, rowIndex: number): void {
@@ -409,7 +510,8 @@ export class DocumentLines {
   }
 
   get allRowsSelected(): boolean {
-    return this.rows.length > 0 && this.selectedRowIndexes.size === this.rows.length;
+    const count = this.rows.filter(row => !row['__entryPlaceholder']).length;
+    return count > 0 && this.selectedRowIndexes.size === count;
   }
 
   isRowSelected(rowIndex: number): boolean {
@@ -444,7 +546,7 @@ export class DocumentLines {
       return;
     }
 
-    if (checked) {
+    if (checked && !this.rows[rowIndex]['__entryPlaceholder']) {
       this.selectedRowIndexes.add(rowIndex);
       if (this.activeRowIndex < 0) {
         this.activeRowIndex = rowIndex;
@@ -460,7 +562,7 @@ export class DocumentLines {
   toggleAllRowsSelection(checked: boolean): void {
     this.selectedRowIndexes.clear();
     if (checked) {
-      this.rows.forEach((_row, index) => this.selectedRowIndexes.add(index));
+      this.rows.forEach((row, index) => { if (!row['__entryPlaceholder']) this.selectedRowIndexes.add(index); });
       if (this.activeRowIndex < 0 && this.rows.length) {
         this.activeRowIndex = 0;
       }
@@ -587,6 +689,16 @@ export class DocumentLines {
     return this.disabled || row[`__lookupRestricted_${column.field ?? column.id}`] === true || fieldIsReadonly(column, row) || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) || (!!column.lookup && !lookupQuery(column.lookup, row, '', this.headerData).ready);
   }
 
+  private applyCellChange(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, selectedRecord?: Record<string, unknown>): { updatedFields: string[]; invalidated: string[] } {
+    const field = column.field ?? column.id, before = { ...row };
+    row[field] = normalizeFieldValue(value, column.valueType);
+    for (const key of column.clearFieldsOnChange ?? []) row[key] = null;
+    this.applyFill(column, row, selectedRecord);
+    const dependent = clearDependentLookups(this.columns, Object.keys(row).filter(key => !key.startsWith('__') && !Object.is(before[key], row[key])), row);
+    for (const key of dependent.invalidated) delete row['__display_' + key];
+    return { updatedFields: this.columns.map(column => column.field ?? column.id).filter(key => key !== field && !Object.is(before[key], row[key])), invalidated: dependent.invalidated };
+  }
+
   updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, allowBulk = true): void {
     if (this.isReadonly(column, row)) {
       return;
@@ -600,14 +712,8 @@ export class DocumentLines {
     const rowIndex = this.rows.indexOf(row);
     const selectedRecord = this.resolveSelectedRecord(column, row, value);
 
-    const before = { ...row };
-    row[field] = value;
-    for (const key of column.clearFieldsOnChange ?? []) row[key] = null;
-    this.applyFill(column, row, selectedRecord);
-
-    const dependent = clearDependentLookups(this.columns, Object.keys(row).filter(key => !key.startsWith('__') && !Object.is(before[key], row[key])), row);
-    this.invalidateLookupRows(row, dependent.invalidated);
-    const updatedFields = this.columns.map(column => column.field ?? column.id).filter(key => key !== field && !Object.is(before[key], row[key]));
+    const { updatedFields, invalidated } = this.applyCellChange(column, row, value, selectedRecord);
+    this.invalidateLookupRows(row, invalidated);
     const selectedIndexes = [...this.selectedRowIndexes].filter(
       (index) => index >= 0 && index < this.rows.length,
     );
@@ -631,14 +737,9 @@ export class DocumentLines {
 
         if (this.isReadonly(column,target) || fieldValuesEqual(target[field], value, column.valueType)) continue;
         bulkChanges.push({ rowIndex: index, previousValue: target[field], value });
-        const targetBefore = { ...target };
-        target[field] = value;
-        for (const key of column.clearFieldsOnChange ?? []) target[key] = null;
-        this.applyFill(column, target, this.resolveSelectedRecord(column, target, value));
-        const dependent = clearDependentLookups(this.columns, Object.keys(target).filter(key => !key.startsWith('__') && !Object.is(targetBefore[key], target[key])), target);
-        this.invalidateLookupRows(target, dependent.invalidated);
-        const change = bulkChanges[bulkChanges.length - 1];
-        change.updatedFields = this.columns.map(column => column.field ?? column.id).filter(key => key !== field && !Object.is(targetBefore[key], target[key]));
+        const change = this.applyCellChange(column, target, value, this.resolveSelectedRecord(column, target, value));
+        this.invalidateLookupRows(target, change.invalidated);
+        bulkChanges[bulkChanges.length - 1].updatedFields = change.updatedFields;
       }
 
       // Each changed row must pass through the same calculations and persistence path.

@@ -1,10 +1,10 @@
 @use '../form-control' as form-control;
 
 .header-form {
-  padding: var(--ts-space-5) var(--ts-6);
+  padding: var(--ts-space-3) var(--ts-space-4);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--ts-space-5) var(--ts-6);
+  gap: var(--ts-space-3) var(--ts-space-4);
 
   label {
     color: var(--ts-text-soft);
