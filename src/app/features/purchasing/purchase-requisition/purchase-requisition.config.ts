@@ -13,19 +13,16 @@ const actionDefinitions: CommandConfig[] = [
   {
     label: 'Submit',
     actionKey: 'cmd:submit',
-    permissionKey: 'purchase-requisition.submit',
     apiAction: { name: 'submit', states: { field: 'status', values: ['open'] } },
   },
   {
     label: 'Approve',
     actionKey: 'cmd:approve',
-    permissionKey: 'purchase-requisition.approve',
     apiAction: { name: 'approve', states: { field: 'status', values: ['pending_approval'] } },
   },
   {
     label: 'Reject',
     actionKey: 'cmd:reject',
-    permissionKey: 'purchase-requisition.reject',
     apiAction: {
       name: 'reject',
       states: { field: 'status', values: ['pending_approval'] },
@@ -43,13 +40,11 @@ const actionDefinitions: CommandConfig[] = [
   {
     label: 'Reopen',
     actionKey: 'cmd:reopen',
-    permissionKey: 'purchase-requisition.reopen',
     apiAction: { name: 'reopen', states: { field: 'status', values: ['rejected'] } },
   },
   {
     label: 'Cancel',
     actionKey: 'cmd:cancel',
-    permissionKey: 'purchase-requisition.cancel',
     apiAction: { name: 'cancel', states: { field: 'status', values: ['open', 'rejected'] } },
   },
 ];

@@ -1,9 +1,9 @@
-import type { CommandConfig } from '../models/command-config.model';
+import { CommandConfig, resolveCommandPermissionKey } from '../models/command-config.model';
 import { Injectable } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
-// Extracted without changing the authorization rules or permission aliases.
+// API action identities default centrally; explicit permission aliases remain supported.
 // This governs the visual availability of document commands, not API authorization.
 @Injectable({ providedIn: 'root' })
 export class DocumentPageCommandPermissionService {
@@ -34,7 +34,7 @@ export class DocumentPageCommandPermissionService {
     } else if (action === 'delete' || action === 'line-delete') {
       allowed = permissions.canDelete;
     } else if (this.isCustomExecutableCommand(action)) {
-      allowed = this.canExecutePopupCommand(button, permissions.canExecute);
+      allowed = this.canExecutePopupCommand(button, pageId, permissions.canExecute);
     }
 
     if (allowed) {
@@ -86,8 +86,8 @@ export class DocumentPageCommandPermissionService {
     return !standard.has(action);
   }
 
-  private canExecutePopupCommand(button: CommandConfig, fallbackCanExecute: boolean): boolean {
-    const permissionKey = this.valueMapper.toText(button.permissionKey).trim();
+  private canExecutePopupCommand(button: CommandConfig, pageId: string, fallbackCanExecute: boolean): boolean {
+    const permissionKey = this.valueMapper.toText(resolveCommandPermissionKey(button, pageId)).trim();
     if (!permissionKey.length) {
       return fallbackCanExecute;
     }

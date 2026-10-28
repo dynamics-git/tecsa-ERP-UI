@@ -25,7 +25,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { SessionService } from '../../../core/services/session.service';
-import { CommandConfig, StandardCommandConfig } from '../../models/command-config.model';
+import { CommandConfig, StandardCommandConfig, resolveCommandPermissionKey } from '../../models/command-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
 import { CommandBar } from '../../../shared/ui/command-bar/command-bar';
 import { ListFactBox } from '../list-fact-box/list-fact-box';
@@ -475,7 +475,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
           return command;
         }
 
-        const canExecute = this.canExecuteCommand(command.permissionKey, pagePermissions.canExecute);
+        const canExecute = this.canExecuteCommand(resolveCommandPermissionKey(command, this.config?.pageId ?? ''), pagePermissions.canExecute);
         if (canExecute) {
           return command;
         }
