@@ -58,7 +58,8 @@ export interface LineConfig {
   commandBar?: CommandBarConfig;
   placement: LinePlacementConfig;
   dataSource: DataSourceConfig;
-  toolbarButtons: CommandConfig[];
+  /** Standard commands are supplied by Core; declare only custom actions/overrides. */
+  toolbarButtons?: CommandConfig[];
   columns: LineColumnConfig[];
   fields?: FieldConfig[];
   lineKeyField?: string;

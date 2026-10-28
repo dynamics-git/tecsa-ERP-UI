@@ -212,7 +212,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
 export const purchaseRequisitionLineConfig: LineConfig = {
   typeField: 'lineType',
   placement: { mode: 'after-section', afterSectionId: 'general' },
-  toolbarButtons: [],
   lineKeyField: 'lineNo',
   dataSource: {
     endpoint: '/purchaseRequisitions',
@@ -319,18 +318,19 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     { target: 'estimatedAmount', formula: 'quantity * estimatedUnitCost', precision: 6 },
   ],
   totalsCalculation: {
-    defaults: { subtotal: '0.00', sst: '0.00', total: '0.00', difference: '0.00' },
-    totals: { total: { formula: 'sum(estimatedAmount)' } },
-    format: { type: 'number' },
+    // PR has no SST calculation; Core supplies zero SST and two-decimal display.
+    totals: {
+      subtotal: { formula: 'sum(estimatedAmount)' },
+      total: { formula: 'totals.subtotal + totals.sst' },
+    },
   },
   footerSections: [
     {
       id: 'document-totals',
       rows: [
-        { id: 'subtotal', label: 'Subtotal', source: 'total', totalKey: 'total', order: 10 },
-        // PR has no confirmed SST amounts yet; placeholders must not imply zero tax.
-        { id: 'sst', label: 'SST', source: 'literal', value: '—', order: 20 },
-        { id: 'total-incl-sst', label: 'Total Incl. SST', source: 'literal', value: '—', emphasis: true, order: 30 },
+        { id: 'subtotal', label: 'Subtotal', source: 'total', totalKey: 'subtotal', order: 10 },
+        { id: 'sst', label: 'SST', source: 'total', totalKey: 'sst', order: 20 },
+        { id: 'total-incl-sst', label: 'Total Incl. SST', source: 'total', totalKey: 'total', emphasis: true, order: 30 },
       ],
     },
   ],

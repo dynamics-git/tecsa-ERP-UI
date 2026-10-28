@@ -14,6 +14,13 @@ import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchas
 afterEach(() => TestBed.resetTestingModule());
 
 describe('Configurable totals use the existing calculation engine', () => {
+  it('provides standard zero totals without requiring page boilerplate and preserves overrides', () => {
+    const engine = new LineCalculationService();
+    const totals = {subtotal:{formula:'sum(amount)'},total:{formula:'totals.subtotal + totals.sst'}};
+    expect(engine.calculateLineTotals([{amount:'12.50'}],{totals})).toMatchObject({subtotal:'12.50',sst:'0.00',total:'12.50'});
+    expect(engine.calculateLineTotals([{amount:'12.50'}],{totals,defaults:{sst:'2.50'}})).toMatchObject({subtotal:'12.50',sst:'2.50',total:'15.00'});
+    expect(engine.calculateLineTotals([],{totals})).toMatchObject({subtotal:'0.00',sst:'0.00',total:'0.00'});
+  });
   it('resolves arbitrary subtotal, discount, tax, charges, rounding and grand total keys regardless of declaration order', () => {
     const engine = new LineCalculationService();
     const rows = [{ amount: '12.50' }, { amount: '7.50' }];
@@ -168,9 +175,9 @@ describe('PR document field layout follows its existing API', () => {
     const totals = new LineCalculationService().calculateLineTotals([{ estimatedAmount: '12.50' }, { estimatedAmount: '7.50' }], purchaseRequisitionLineConfig.totalsCalculation!);
     expect(totals.total).toBe('20.00');
     expect(purchaseRequisitionLineConfig.footerSections?.[0].rows).toMatchObject([
-      { label: 'Subtotal', source: 'total', totalKey: 'total' },
-      { label: 'SST', source: 'literal', value: '—' },
-      { label: 'Total Incl. SST', source: 'literal', value: '—' },
+      { label: 'Subtotal', source: 'total', totalKey: 'subtotal' },
+      { label: 'SST', source: 'total', totalKey: 'sst' },
+      { label: 'Total Incl. SST', source: 'total', totalKey: 'total' },
     ]);
     const lines = lineConfigDefaults(purchaseRequisitionLineConfig);
     expect(lines.dataSource.updateFields).toEqual(expect.arrayContaining(['unitOfMeasureId', 'locationId']));

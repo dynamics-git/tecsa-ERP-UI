@@ -10,7 +10,8 @@ export type LineTotalExpressionConfig =
   | { formula: string; precision?: number };
 
 export interface LineTotalsCalculationConfig {
-  defaults: Record<string, string>;
+  /** Override standard zero totals only when this document needs different defaults. */
+  defaults?: Record<string, string>;
   totals: Partial<Record<LineTotalKey, LineTotalExpressionConfig>>;
   format?: {
     type?: 'number' | 'currency';

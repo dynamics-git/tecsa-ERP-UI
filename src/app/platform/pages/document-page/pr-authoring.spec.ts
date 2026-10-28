@@ -19,10 +19,11 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   const patch=vi.fn((path:string,payload:Record<string,unknown>)=>{
    const target=path.includes('/lines/')?rows.find(r=>path.endsWith('/'+r['systemId']))!:header;
    Object.assign(target,payload,{systemRowVersion:Number(target['systemRowVersion'])+1});
+   if(path.includes('/lines/')) target['estimatedAmount']=(Number(target['quantity'])*Number(target['estimatedUnitCost'])).toFixed(6);
    return of({data:structuredClone(target)});
   });
   const post=vi.fn((_path:string,payload:Record<string,unknown>)=>{
-   const row={...(payload['lineType']==='item'?{unitOfMeasureId:'ea',locationId:'main'}:{}),...payload,systemId:'line-'+(rows.length+1),lineNo:(rows.length+1)*10000,systemRowVersion:1};
+   const row={estimatedAmount:(Number(payload['quantity'])*Number(payload['estimatedUnitCost'])).toFixed(6),...(payload['lineType']==='item'?{unitOfMeasureId:'ea',locationId:'main'}:{}),...payload,systemId:'line-'+(rows.length+1),lineNo:(rows.length+1)*10000,systemRowVersion:1};
    rows.push(row);return of({data:structuredClone(row)});
   });
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{
@@ -57,6 +58,9 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   expect(post.mock.calls[0][1]).not.toHaveProperty('estimatedAmount');expect(post.mock.calls[0][1]).not.toHaveProperty('locationId');
   edit(row,'quantity','3');await vi.waitFor(()=>expect(rows[0]['quantity']).toBe('3'));
   expect(patch.mock.calls.at(-1)![1]).toEqual({quantity:'3'});
+  edit(row,'estimatedUnitCost','12.50');await vi.waitFor(()=>expect(rows[0]['estimatedAmount']).toBe('37.500000'));
+  expect(patch.mock.calls.at(-1)![1]).toEqual({estimatedUnitCost:'12.50'});
+  expect(page.inlineDocumentWindowConfig!.lineTotals).toMatchObject({subtotal:'37.50',sst:'0.00',total:'37.50'});
   const count=patch.mock.calls.length;edit(row,'lineType','gl_account');expect(patch).toHaveBeenCalledTimes(count);
   row['__options_glAccountId']=[{value:456,label:'GL',record:{name:'Account description'}}];
   edit(row,'glAccountId',456);await vi.waitFor(()=>expect(rows[0]['glAccountId']).toBe(456));
@@ -82,6 +86,7 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   expect(rows[0]['requiredDate']).toBeNull();
   const reopened=await open();expect(reopened.componentInstance.inlineDocumentWindowConfig!.headerData!['purpose']).toBe('Autosave review');
   expect(reopened.componentInstance.inlineDocumentWindowConfig!.headerData!['requiredDate']).toBeNull();
+  expect(reopened.componentInstance.inlineDocumentWindowConfig!.lineTotals).toMatchObject({subtotal:'37.50',sst:'0.00',total:'37.50'});
   expect(reopened.componentInstance.inlineDocumentWindowConfig!.lineRows).toEqual(expect.arrayContaining([expect.objectContaining({itemId:123,quantity:'3',unitOfMeasureId:'box',locationId:'secondary',requiredDate:''}),expect.objectContaining({glAccountId:456})]));reopened.destroy();
  });
 });

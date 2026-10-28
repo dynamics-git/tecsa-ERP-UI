@@ -53,7 +53,7 @@ export class LineCalculationService {
     config: LineTotalsCalculationConfig,
     headerData?: Record<string, unknown>
   ): LineTotalsConfig {
-    const defaults = config.defaults;
+    const defaults = { ...this.emptyTotals, ...config.defaults };
     const result: LineTotalsConfig = { ...this.emptyTotals, ...defaults };
     const values: Record<string, number> = Object.create(null);
     const visiting = new Set<string>();
