@@ -7,7 +7,9 @@ import { MenuService } from '../../../core/services/menu.service';
 import { resolveRunModalConfigModule, resolvePageType } from '../../../core/services/run-modal-config-registry';
 import { DocumentPageCommandAssemblerService } from '../document-page-command-assembler.service';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
-import { DATA_REST_SERVICE } from '../../data/data-source.service';
+import { EntityContractService } from '../../data/entity-contract.service';
+import { prCoreContract } from './pr-core-contract.fixture';
+import { DataSourceService, DATA_REST_SERVICE } from '../../data/data-source.service';
 import { LineCalculationService } from '../../document/line-calculation.service';
 import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
 
@@ -27,7 +29,7 @@ describe('PR reference page acceptance', () => {
     expect(menu.getModules()).toEqual([]);
   });
 
-  it('provides standard line commands without an empty toolbar declaration and retains PR permission aliases', () => {
+  it('provides standard line commands without an empty toolbar declaration and uses the authorized API contract without PR permission aliases', () => {
     const permission={pageId:'purchase-requisition',ReadPermission:true,InsertPermission:false,ModifyPermission:false,DeletePermission:false,PostPermission:false};
     TestBed.configureTestingModule({providers:[provideRouter([]),{provide:SessionService,useValue:{SuperAdmin:false,Permissions:[permission]}}]});
     const assembler=TestBed.inject(DocumentPageCommandAssemblerService);
@@ -36,6 +38,11 @@ describe('PR reference page acceptance', () => {
     for(const action of ['cmd:line-new','cmd:line-delete']) expect(commands().find(command=>command.actionKey===action)?.disabled).toBe(true);
     expect(commands().find(command=>command.actionKey==='cmd:line-refresh')?.disabled).not.toBe(true);
     permission.ModifyPermission=true;
+    TestBed.inject(DataSourceService).getReadGeneration();
+    const contract=structuredClone(prCoreContract);
+    contract.endpoints=contract.endpoints.filter(endpoint=>!(endpoint.path.endsWith('/purchaseRequisitions') && endpoint.methods.includes('POST')));
+    TestBed.inject(EntityContractService).acceptMetadata({data:contract});
+    expect(purchaseRequisitionLineConfig.dataSource.permissions).toBeUndefined();
     for(const action of ['cmd:line-new','cmd:line-delete']) expect(commands().find(command=>command.actionKey===action)?.disabled).not.toBe(true);
     const header=assembler.resolveHeaderToolbarButtons({pageId:'purchase-requisition',dataSource:purchaseRequisitionListConfig.dataSource,toolbarButtons:purchaseRequisitionHeaderConfig.toolbarButtons});
     expect(header.find(command=>command.actionKey==='cmd:new')?.disabled).toBe(true);

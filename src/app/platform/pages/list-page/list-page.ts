@@ -137,9 +137,8 @@ export class ListPage implements OnInit, OnDestroy {
   }
   private worksheetAllowed(row: Record<string, unknown>): boolean {
     const source = this.worksheetSource ?? this.listConfig.dataSource;
-    const operation = this.hasValue(this.resolvePersistedRecordId(row, source)) ? 'modify' : 'create';
-    const mapped = source.permissions?.[operation === 'modify' ? 'update' : 'create'] ?? operation;
-    return !this.commandPermission.applyOperation({label: 'Save', actionKey: 'save'}, this.permissionPageId, mapped).disabled && this.dataSource.canWrite(source, row);
+    const operation = this.hasValue(this.resolvePersistedRecordId(row, source)) ? 'update' : 'create';
+    return !this.commandPermission.applySourceOperation({label: 'Save', actionKey: 'save'}, this.permissionPageId, source, operation).disabled && this.dataSource.canWrite(source, row);
   }
   private async loadWorksheet(reset = true, forceRefresh = false): Promise<void> {
     if (!this.lineConfig || this.popupLoading || this.dirtyWorksheet) return;
@@ -1263,11 +1262,14 @@ export class ListPage implements OnInit, OnDestroy {
 
   private canModifyPage(): boolean {
     const creating = !this.listConfig.dataSource.singleton && !this.hasPersistedIdentity(this.activeDocumentWindowConfig?.headerData);
-    return !this.commandPermission.applyOperation({label: 'Edit', actionKey: 'edit'}, this.permissionPageId, creating ? 'create' : 'modify').disabled;
+    return !this.commandPermission.applySourceOperation({label: 'Edit', actionKey: 'edit'}, this.permissionPageId, this.listConfig.dataSource, creating ? 'create' : 'update').disabled;
   }
 
   private canModifyLines(operation: 'create' | 'update' | 'read' = 'update'): boolean {
     const pageId = this.lineConfig?.permissionPageId;
+    const source = this.lineConfig?.dataSource;
+    if (source && operation !== 'read' && (source.permissions?.[operation] || this.dataSource.operationAllowed(source, operation) !== undefined))
+      return !this.commandPermission.applySourceOperation({label: 'Edit', actionKey: 'edit'}, pageId ?? this.permissionPageId, source, operation).disabled;
     if (!pageId) return operation === 'read' || this.canModifyPage();
     if (operation !== 'read') return !this.commandPermission.applyOperation({label: 'Edit', actionKey: 'edit'}, pageId, operation === 'create' ? 'create' : 'modify').disabled;
     const grants = this.sessionService.Permissions.filter(value => this.isRecord(value) && (value['pageId'] === pageId || value['PageId'] === pageId));
@@ -1312,7 +1314,7 @@ export class ListPage implements OnInit, OnDestroy {
     const action = button.apiAction;
     const header = listRecord ?? this.activeDocumentWindowConfig?.headerData;
     const source = this.listConfig.dataSource;
-    if (!action || !header || button.hidden || button.disabled || this.popupLoading || this.hasPendingWrites || this.commandPermission.apply(button, this.permissionPageId).disabled) return;
+    if (!action || !header || button.hidden || button.disabled || this.popupLoading || this.hasPendingWrites || this.commandPermission.apply(button, this.permissionPageId, this.listConfig.dataSource).disabled) return;
     if (!this.hasValue(this.resolvePersistedRecordId(header, source))) {
       if (listRecord) this.error = 'Select one saved record before running this action.';
       return;
@@ -2320,7 +2322,7 @@ export class ListPage implements OnInit, OnDestroy {
     const button = this.findEntryCommandButton(actionKey);
     if (button?.runModalPageId || button?.apiAction) {
       const record = this.checkedRowKeys.size ? this.rows.find(row => this.checkedRowKeys.has(this.getRowKey(row))) : this.selectedRow;
-      const permitted = this.commandPermission.apply(button, this.permissionPageId);
+      const permitted = this.commandPermission.apply(button, this.permissionPageId, this.listConfig.dataSource);
       if (button.hidden || button.disabled || permitted.disabled) return;
       if (this.checkedRowKeys.size > 1 || !this.isRecord(record) || !this.hasPersistedIdentity(record)) {
         this.error = 'Select one saved record before running this command.';
@@ -2445,7 +2447,7 @@ export class ListPage implements OnInit, OnDestroy {
 
   private deleteAllowed(source: DataSourceConfig, records: Record<string, unknown>[], permissionPageId = this.permissionPageId): boolean {
     if (source.supportsDelete === false || this.hasPendingWrites || this.popupLoading) return false;
-    if (this.commandPermission.applyOperation({label: 'Delete', actionKey: 'delete'}, permissionPageId, source.permissions?.delete ?? 'delete').disabled) return false;
+    if (this.commandPermission.applySourceOperation({label: 'Delete', actionKey: 'delete'}, permissionPageId, source, 'delete').disabled) return false;
     return records.every(row => this.dataSource.canWrite(source, row));
   }
 

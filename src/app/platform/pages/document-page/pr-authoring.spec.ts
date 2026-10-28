@@ -13,7 +13,7 @@ import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchas
 
 afterEach(()=>{vi.restoreAllMocks();TestBed.resetTestingModule();});
 describe('Simplified PR configuration through shared autosave (mock API)',()=>{
- it('creates Item and G/L lines, switches Type, fills Description and reopens persisted header/line edits without Save',async()=>{
+ it.each([false,true])('creates and reopens PR through API permissions without config aliases (SuperAdmin=%s)',async(superAdmin)=>{
   let header:Record<string,unknown>={systemId:'header',number:'PR-TEST',status:'open',requestDate:'2026-10-27',locationId:'main',systemRowVersion:1};
   const rows:Record<string,unknown>[]=[];
   const patch=vi.fn((path:string,payload:Record<string,unknown>)=>{
@@ -29,7 +29,7 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{
    get:(path:string)=>of({data:path.includes('/apiCapabilities')?prCoreContract:path.includes('/lines')?structuredClone(rows):path.includes('/purchaseRequisitions')?structuredClone(header):[]}),post,patch,delete:()=>of({})
   }}]});
-  TestBed.inject(SessionService).SuperAdmin=true;
+  TestBed.inject(SessionService).SuperAdmin=superAdmin;
   vi.spyOn(TestBed.inject(SessionService),'Company','get').mockReturnValue('test-company');
   const open=async()=>{
    const f=TestBed.createComponent(DocumentPage);

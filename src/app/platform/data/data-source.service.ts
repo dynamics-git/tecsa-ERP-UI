@@ -106,6 +106,14 @@ export class DataSourceService {
     this.key(source.endpoint);
     this.contracts.assertEditedFields(source, operation, record, fields);
   }
+  operationAllowed(source: DataSourceConfig, operation: 'create' | 'update' | 'delete'): boolean | undefined {
+    this.key(source.endpoint);
+    return this.contracts.operationAllowed(source, operation);
+  }
+  actionAllowed(source: DataSourceConfig, action: string): boolean | undefined {
+    this.key(source.endpoint);
+    return this.contracts.actionAllowed(source, action);
+  }
   resolveSourceContract(source: DataSourceConfig): DataSourceConfig { this.key(source.endpoint); return this.contracts.resolveSource(source); }
   resolveFieldContract(source: DataSourceConfig, field: FieldConfig): FieldConfig { this.key(source.endpoint); return this.contracts.resolveField(source, field); }
 

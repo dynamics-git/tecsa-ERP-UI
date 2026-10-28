@@ -1,5 +1,7 @@
 import { CommandConfig, resolveCommandPermissionKey } from '../models/command-config.model';
-import { Injectable } from '@angular/core';
+import { DataSourceService } from '../data/data-source.service';
+import { DataSourceConfig } from '../models/data-source-config.model';
+import { Injectable, Optional } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
@@ -10,13 +12,19 @@ export class DocumentPageCommandPermissionService {
   constructor(
     private readonly sessionService: SessionService,
     private readonly valueMapper: RuntimeValueMapperService,
+    @Optional() private readonly dataSource?: DataSourceService,
   ) {}
 
-  apply(button: CommandConfig, pageId: string): CommandConfig {
+  apply(button: CommandConfig, pageId: string, source?: DataSourceConfig): CommandConfig {
     if (button.hidden === true) {
       return button;
     }
 
+    if (source && button.apiAction && !button.runModalPageId) {
+      const allowed = this.dataSource?.actionAllowed(source, button.apiAction.name);
+      if (allowed === false) return {...button, disabled: true, tooltip: 'This action is not available for your access.'};
+      if (allowed === true && !button.permissionKey) return button;
+    }
     if (this.sessionService.SuperAdmin && !button.runModalPageId && !this.hasDeclaredPage(pageId)) return button;
     const permissions = this.resolvePagePermissionFlags(pageId);
     const action = this.normalizePopupCommandKey(button.actionKey);
@@ -46,6 +54,15 @@ export class DocumentPageCommandPermissionService {
       disabled: true,
       tooltip: button.tooltip ?? 'You do not have permission for this command.',
     };
+  }
+
+  applySourceOperation(button: CommandConfig, pageId: string, source: DataSourceConfig,
+    operation: 'create' | 'update' | 'delete'): CommandConfig {
+    const allowed = this.dataSource?.operationAllowed(source, operation);
+    if (allowed === false) return {...button, disabled: true, tooltip: 'This operation is not available for your access.'};
+    const override = source.permissions?.[operation];
+    if (allowed === true && !override) return button;
+    return this.applyOperation(button, pageId, override ?? (operation === 'update' ? 'modify' : operation));
   }
 
   applyOperation(

@@ -51,8 +51,8 @@ export class DocumentPageCommandAssemblerService {
         const action = this.normalizePopupCommandKey(button.actionKey);
         const unsupported = (action === 'new' && !supportsCreate) || (action === 'delete' && !supportsDelete);
         const guarded = unsupported ? {...button, disabled: true} : button;
-        const operation = action === 'new' ? params.dataSource.permissions?.create : action === 'delete' ? params.dataSource.permissions?.delete : undefined;
-        return operation ? this.popupCommandPermission.applyOperation(guarded, params.pageId, operation) : this.applyPopupCommandPermission(guarded, params.pageId);
+        if (action === 'new' || action === 'delete') return this.popupCommandPermission.applySourceOperation(guarded, params.pageId, params.dataSource, action === 'new' ? 'create' : 'delete');
+        return this.popupCommandPermission.apply(guarded, params.pageId, params.dataSource);
       });
   }
 
@@ -105,9 +105,10 @@ export class DocumentPageCommandAssemblerService {
       .map((button) => {
         const action = this.normalizePopupCommandKey(button.actionKey);
         button = ((action === 'line-new' || action === 'line-insert' || action === 'line-copy' || action === 'line-paste') && !supportsCreate) || (action === 'line-delete' && !supportsDelete) ? {...button, disabled: true} : button;
-        const override = action === 'line-new' || action === 'line-insert' || action === 'line-copy' || action === 'line-paste' ? params.lineConfig?.dataSource.permissions?.create
-          : action === 'line-delete' ? params.lineConfig?.dataSource.permissions?.delete : undefined;
-        return override ? this.popupCommandPermission.applyOperation(button, params.pageId, override) : this.applyPopupCommandPermission(button, params.pageId);
+        const source = params.lineConfig!.dataSource;
+        if (['line-new', 'line-insert', 'line-copy', 'line-paste', 'line-delete'].includes(action))
+          return this.popupCommandPermission.applySourceOperation(button, params.pageId, source, action === 'line-delete' ? 'delete' : 'create');
+        return this.popupCommandPermission.apply(button, params.pageId, source);
       });
   }
 

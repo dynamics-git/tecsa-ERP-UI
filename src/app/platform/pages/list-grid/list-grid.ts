@@ -25,6 +25,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { SessionService } from '../../../core/services/session.service';
+import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
 import { CommandConfig, StandardCommandConfig, resolveCommandPermissionKey } from '../../models/command-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
 import { CommandBar } from '../../../shared/ui/command-bar/command-bar';
@@ -64,6 +65,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   readonly saves = inject(RunModalService);
   private readonly factBoxHost = inject(FactBoxHostService);
   private readonly sessionService = inject(SessionService);
+  private readonly commandPermissions = inject(DocumentPageCommandPermissionService);
   private readonly standardActions = inject(StandardListActionsService);
   private readonly listExport = inject(ListExportService);
   exportBusy = false;
@@ -475,6 +477,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
           return command;
         }
 
+        if (command.apiAction && this.config?.dataSource) return this.commandPermissions.apply(command, this.config.pageId ?? '', this.config.dataSource);
         const canExecute = this.canExecuteCommand(resolveCommandPermissionKey(command, this.config?.pageId ?? ''), pagePermissions.canExecute);
         if (canExecute) {
           return command;

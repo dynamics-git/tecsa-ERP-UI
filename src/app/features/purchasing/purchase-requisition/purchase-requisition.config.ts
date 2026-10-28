@@ -217,7 +217,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       parentIdFields: ['systemId'],
       childCollection: 'lines',
     },
-    permissions: { create: 'modify', update: 'modify', delete: 'modify' },
     omitEmptyFields: ['description'],
     // POST prerequisites are separate from required markers during field entry.
     requiredCreateFields: ['lineType', 'quantity'],

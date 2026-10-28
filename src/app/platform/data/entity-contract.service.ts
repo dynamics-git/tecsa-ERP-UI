@@ -153,6 +153,35 @@ export class EntityContractService {
       parts.every((part, index) => part === actual[index] || /^\{[^}]+\}$/.test(part))
     );
   }
+  /** Decisions from authenticated, company-scoped discovery, not the static catalogue.
+   * Unknown resources keep legacy behavior. Explicit restrictions can only narrow access. */
+  operationAllowed(source: DataSourceConfig, operation: 'create' | 'update' | 'delete'): boolean | undefined {
+    const flag = {create: 'supportsCreate', update: 'supportsUpdate', delete: 'supportsDelete'} as const;
+    if (source[flag[operation]] === false) return false;
+    if (!this.metadata || source.addressStyle === 'odata') return undefined;
+    const entity = this.entity(source);
+    if (entity) return entity.operations[operation] === true;
+    if (!this.hasResource(source)) return undefined;
+    const method = operation === 'create' ? 'POST' : operation === 'delete' ? 'DELETE' : this.updateMethod(source);
+    return this.metadata.endpoints.some(endpoint => endpoint.methods.includes(method) &&
+      this.endpointMatches(endpoint.path, source, operation !== 'create' && !source.singleton));
+  }
+
+  actionAllowed(source: DataSourceConfig, action: string): boolean | undefined {
+    if (!this.metadata || source.addressStyle === 'odata') return undefined;
+    const path = this.path(source) + '/{record}/' + action;
+    if (this.metadata.endpoints.some(endpoint => endpoint.methods.includes('POST') &&
+      this.matchesPath(endpoint.path.replace(/^.*\/companies\/\{companyId\}/, ''), path))) return true;
+    return this.hasResource(source) ? false : undefined;
+  }
+
+  private hasResource(source: DataSourceConfig): boolean {
+    return Object.values(this.metadata?.entities ?? {}).some(entity =>
+      this.matchesPath('/' + entity.path.replace(/^\//, ''), this.path(source))) ||
+      (this.metadata?.endpoints ?? []).some(endpoint =>
+        this.endpointMatches(endpoint.path, source) || this.endpointMatches(endpoint.path, source, true));
+  }
+
   resolveSource(source: DataSourceConfig): DataSourceConfig {
     if (source.addressStyle === 'odata') return source;
     const entity = this.entity(source);
