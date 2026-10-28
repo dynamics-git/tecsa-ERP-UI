@@ -301,6 +301,10 @@ export class DocumentHydrationOrchestratorService {
       return [];
     }
 
+    for (const [field, headerField] of Object.entries(lineDataSource.parentFieldMap ?? {})) {
+      if (!this.hasValue(headerData[headerField])) return [];
+      clauses.push(`${field} eq ${this.toODataFilterLiteral(headerData[headerField])}`);
+    }
     for (const [field, value] of Object.entries(lineDataSource.parentFixedFields ?? {})) {
       const key = this.toText(field).trim();
       if (!key.length) {

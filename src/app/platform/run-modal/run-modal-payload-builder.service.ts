@@ -134,6 +134,10 @@ export class RunModalPayloadBuilderService {
       }
     }
 
+    for (const field of Object.keys(params.dataSource.parentFieldMap ?? {})) {
+      if (!this.hasMeaningfulPayloadValue(source[field])) return {};
+      payload[field] = source[field];
+    }
     this.applyFixedParentFields({
       payload,
       fixedFields: params.dataSource.parentFixedFields,
@@ -199,6 +203,9 @@ export class RunModalPayloadBuilderService {
       }
     }
 
+    for (const [field, headerField] of Object.entries(params.dataSource.parentFieldMap ?? {})) {
+      if (!this.hasMeaningfulPayloadValue(params.row[field])) params.row[field] = headerData[headerField];
+    }
     this.applyFixedParentFields({
       payload: params.row,
       fixedFields: params.dataSource.parentFixedFields,

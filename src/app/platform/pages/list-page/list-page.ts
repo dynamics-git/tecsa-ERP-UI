@@ -2832,6 +2832,10 @@ export class ListPage implements OnInit, OnDestroy {
         this.activeDocumentWindowConfig.headerData[parentKeyField];
     }
 
+    for (const [field, headerField] of Object.entries(this.lineConfig.dataSource.parentFieldMap ?? {})) {
+      if (!this.hasValue(row[field])) row[field] = this.activeDocumentWindowConfig.headerData[headerField];
+    }
+
     for (const [field, value] of Object.entries(this.lineConfig.dataSource.parentFixedFields ?? {})) {
       if (!this.hasValue(row[field])) {
         row[field] = value;
@@ -3091,6 +3095,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.toText(this.lineConfig.dataSource.keyField).trim(),
       this.toText(this.lineConfig.dataSource.parentKeyField).trim(),
       this.toText(this.lineConfig.dataSource.documentNoField).trim(),
+      ...Object.keys(this.lineConfig.dataSource.parentFieldMap ?? {}),
       lineNoField,
     ].filter((field) => field.length > 0));
 

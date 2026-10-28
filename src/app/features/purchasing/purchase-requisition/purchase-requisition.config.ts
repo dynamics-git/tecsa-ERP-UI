@@ -64,6 +64,8 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
       id: 'general',
       title: 'General',
       fields: [
+        // Display the backend enum caption. Raw documentType remains in header data for line binding.
+        { key: 'documentTypeLabel', label: 'Document Type', readonly: true },
         {
           key: 'number',
           valueType: 'code',
@@ -166,7 +168,7 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     omitEmptyFields: ['number'],
     defaultSort: 'number desc',
     pageSize: 25,
-    supportsDelete: false, // Header API supports cancellation, not deletion.
+    // supportsDelete: false, // Header API supports cancellation, not deletion.
     writableStates: { field: 'status', values: ['open'] },
   },
   dataSurface: {
@@ -209,14 +211,14 @@ export const purchaseRequisitionLineConfig: LineConfig = {
   placement: { mode: 'after-section', afterSectionId: 'general' },
   lineKeyField: 'lineNo',
   dataSource: {
-    endpoint: '/purchaseRequisitions',
+    endpoint: '/purchaseRequisitionLines',
+    // Document matching is independent of each record's systemId.
+    documentNoField: 'number',
+    parentKeyField: 'documentNumber',
+    // Child API field → header response field. No document-type value is defined in the UI.
+    parentFieldMap: { documentType: 'documentType' },
+    invalidates: ['/purchaseRequisitions'],
     defaultSort: 'lineNo asc',
-    pageSize: 100,
-    navigation: {
-      parentEndpoint: '/purchaseRequisitions',
-      parentIdFields: ['systemId'],
-      childCollection: 'lines',
-    },
   },
   columns: [
     { id: 'lineNo', label: 'Line No.', readonly: true, valueType: 'integer' },

@@ -249,7 +249,14 @@ export class RunModalService {
     const record = (context['headerData'] ?? context['activeLine'] ?? {}) as Record<string, unknown>;
     const value = record[source.contextDocumentNoField ?? source.documentNoField ?? source.parentKeyField];
     if (value === undefined || value === null || value === '') throw new Error('The related record context is missing.');
-    const predicate = `${source.parentKeyField} eq '${String(value).replace(/'/g, "''")}'`;
+    const clauses = [`${source.parentKeyField} eq '${String(value).replace(/'/g, "''")}'`];
+    for (const [field, headerField] of Object.entries(source.parentFieldMap ?? {})) {
+      const mapped = record[headerField];
+      if (mapped === undefined || mapped === null || mapped === '') throw new Error('The related record context is missing.');
+      const literal = typeof mapped === 'number' || typeof mapped === 'boolean' ? String(mapped) : `'${String(mapped).replace(/'/g, "''")}'`;
+      clauses.push(`${field} eq ${literal}`);
+    }
+    const predicate = clauses.join(' and ');
     return { ...source, defaultFilter: source.defaultFilter ? `(${source.defaultFilter}) and (${predicate})` : predicate };
   }
 }

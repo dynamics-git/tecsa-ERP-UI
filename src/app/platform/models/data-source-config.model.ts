@@ -40,6 +40,8 @@ export interface DataSourceConfig {
   keyField?: string;
   parentKeyField?: string;
   parentFixedFields?: Record<string, unknown>;
+  /** Additional child API field → header field bindings, independent of record identity. */
+  parentFieldMap?: Record<string, string>;
   createFields?: string[];
   updateBlockedFields?: string[];
   documentNoField?: string;

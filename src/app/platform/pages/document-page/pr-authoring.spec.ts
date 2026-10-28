@@ -15,15 +15,15 @@ import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchas
 afterEach(()=>{vi.restoreAllMocks();TestBed.resetTestingModule();});
 describe('Simplified PR configuration through shared autosave (mock API)',()=>{
  it.each([false,true])('creates and reopens PR through login permissions without capability discovery (SuperAdmin=%s)',async(superAdmin)=>{
-  let header:Record<string,unknown>={systemId:'header',number:'PR-TEST',status:'open',requestDate:'2026-10-27',locationId:'main',systemRowVersion:1};
+  let header:Record<string,unknown>={systemId:'header',documentType:'purchase_requisition',number:'PR-TEST',status:'open',requestDate:'2026-10-27',locationId:'main',systemRowVersion:1};
   const rows:Record<string,unknown>[]=[];
   const beforeCreate=vi.fn(()=>undefined),afterCreate=vi.fn(()=>undefined),beforeUpdate=vi.fn(()=>undefined),afterUpdate=vi.fn(()=>undefined);
   const patch=vi.fn((path:string,payload:Record<string,unknown>)=>{
-   const target=path.includes('/lines/')?rows.find(r=>path.endsWith('/'+r['systemId']))!:header;
+   const target=path.includes('/purchaseRequisitionLines/')?rows.find(r=>path.endsWith('/'+r['systemId']))!:header;
    // Match Laravel's existing ConvertEmptyStringsToNull middleware.
    const stored=Object.fromEntries(Object.entries(payload).map(([key,value])=>[key,value === '' ? null : value]));
    Object.assign(target,stored,{systemRowVersion:Number(target['systemRowVersion'])+1});
-   if(path.includes('/lines/')) target['estimatedAmount']=(Number(target['quantity'])*Number(target['estimatedUnitCost'])).toFixed(6);
+   if(path.includes('/purchaseRequisitionLines/')) target['estimatedAmount']=(Number(target['quantity'])*Number(target['estimatedUnitCost'])).toFixed(6);
    return of({data:structuredClone(target)});
   });
   const post=vi.fn((_path:string,payload:Record<string,unknown>)=>{
@@ -31,7 +31,7 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
    rows.push(row);return of({data:structuredClone(row)});
   });
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{
-   get:(path:string)=>{expect(path).not.toContain('/apiCapabilities');return of({data:path.includes('/lines')?structuredClone(rows):path.includes('/purchaseRequisitions')?structuredClone(header):[]});},post,patch,delete:()=>of({})
+   get:(path:string)=>{expect(path).not.toContain('/apiCapabilities');return of({data:path.includes('/purchaseRequisitionLines')?structuredClone(rows):path.includes('/purchaseRequisitions')?structuredClone(header):[]});},post,patch,delete:()=>of({})
   }}]});
   TestBed.inject(SessionService).SuperAdmin=superAdmin;
   TestBed.inject(SessionService).Permissions=[{pageId:'purchase-requisition',canRead:true,canCreate:true,canUpdate:true,canDelete:true,canExecute:true}];
@@ -91,14 +91,16 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   edit(row,'requiredDate','2026-10-29');await vi.waitFor(()=>expect(rows[0]['requiredDate']).toBe('2026-10-29'));
   edit(row,'requiredDate','');await vi.waitFor(()=>expect(rows[0]['requiredDate']).toBeNull());
   expect(patch.mock.calls.at(-1)![1]).toEqual({requiredDate:''});
-  expect(post.mock.calls[0][0]).toBe('/purchaseRequisitions/header/lines');
+  expect(post.mock.calls[0][0]).toBe('/purchaseRequisitionLines');
+  expect(post.mock.calls[0][1]).toMatchObject({documentNumber:'PR-TEST',documentType:'purchase_requisition'});
+  expect(post.mock.calls[0][1]).not.toHaveProperty('purchaseRequisitionId');
   f.detectChanges();const other=page.inlineDocumentWindowConfig!.lineRows!.find(r=>r['__entryPlaceholder'])!;
   edit(other,'lineType','gl_account');await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(2));
   other['__options_glAccountId']=[{value:456,label:'GL',record:{name:'Account description'}}];
   edit(other,'glAccountId',456);await vi.waitFor(()=>expect(rows[1]['glAccountId']).toBe(456));
   expect(rows[1]).toMatchObject({lineType:'gl_account',glAccountId:456,description:'Account description'});
   expect(beforeCreate).toHaveBeenCalledTimes(post.mock.calls.length);expect(afterCreate).toHaveBeenCalledTimes(post.mock.calls.length);
-  expect(beforeUpdate).toHaveBeenCalledTimes(patch.mock.calls.filter(([path])=>path.includes('/lines/')).length);expect(afterUpdate).toHaveBeenCalledTimes(beforeUpdate.mock.calls.length);
+  expect(beforeUpdate).toHaveBeenCalledTimes(patch.mock.calls.filter(([path])=>path.includes('/purchaseRequisitionLines/')).length);expect(afterUpdate).toHaveBeenCalledTimes(beforeUpdate.mock.calls.length);
   expect(page.hasPendingWrites).toBe(false);expect(page.hasUnsavedChanges).toBe(false);
   const closed=vi.fn();page.closeRequested.subscribe(closed);await page.requestClose();expect(closed).toHaveBeenCalledOnce();f.destroy();
   // The API stores null; the line editor displays it as an empty string.
@@ -109,7 +111,7 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   expect(reopened.componentInstance.inlineDocumentWindowConfig!.lineRows).toEqual(expect.arrayContaining([expect.objectContaining({itemId:123,quantity:'3',unitOfMeasureId:'box',locationId:'secondary',requiredDate:''}),expect.objectContaining({glAccountId:456})]));reopened.destroy();
  });
  it('runs PR header update hooks only when Manual Save is requested',async()=>{
-  const header={systemId:'manual-header',number:'PR-MANUAL',status:'open',requestDate:'2026-10-28',purpose:'Before',systemRowVersion:1};
+  const header={systemId:'manual-header',documentType:'purchase_requisition',number:'PR-MANUAL',status:'open',requestDate:'2026-10-28',purpose:'Before',systemRowVersion:1};
   const beforeUpdate=vi.fn(()=>undefined),afterUpdate=vi.fn(()=>undefined),post=vi.fn();
   const patch=vi.fn((_path:string,payload:Record<string,unknown>)=>of({data:{...header,...payload,systemRowVersion:2}}));
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get:()=>of({data:header}),post,patch,delete:()=>of(null)}}]});
@@ -126,7 +128,7 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
 
 describe('PR pending-write and draft action guards',()=>{
  it.each([false,true])('retains pending edits across blocked refresh/new/close; failed=%s',async(failed)=>{
-  const header={systemId:'guard-header',number:'PR-GUARD',status:'open',requestDate:'2026-10-28',purpose:'Before',systemRowVersion:1};
+  const header={systemId:'guard-header',documentType:'purchase_requisition',number:'PR-GUARD',status:'open',requestDate:'2026-10-28',purpose:'Before',systemRowVersion:1};
   const response=new Subject<unknown>(),get=vi.fn(()=>of({data:header})),post=vi.fn(()=>of({})),patch=vi.fn(()=>response);
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get,post,patch,delete:()=>of(null)}}]});
   TestBed.inject(SessionService).SuperAdmin=true;
@@ -146,7 +148,7 @@ describe('PR pending-write and draft action guards',()=>{
   f.destroy();
  });
  it('blocks Submit with an invalid draft even when the persisted record is clean',async()=>{
-  const header={systemId:'guard-header',number:'PR-GUARD',status:'open',requestDate:'2026-10-28',systemRowVersion:1};
+  const header={systemId:'guard-header',documentType:'purchase_requisition',number:'PR-GUARD',status:'open',requestDate:'2026-10-28',systemRowVersion:1};
   const post=vi.fn(()=>of({data:header}));
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get:()=>of({data:header}),post,patch:()=>of({data:header}),delete:()=>of(null)}}]});TestBed.inject(SessionService).SuperAdmin=true;
   const f=TestBed.createComponent(DocumentPage);f.componentRef.setInput('pageId','purchase-requisition');f.componentRef.setInput('documentOnly',true);f.componentRef.setInput('initialRecord',header);f.componentRef.setInput('listConfig',purchaseRequisitionListConfig);f.componentRef.setInput('headerConfig',purchaseRequisitionHeaderConfig);f.detectChanges();await f.whenStable();await vi.waitFor(()=>expect(f.componentInstance.popupLoading).toBe(false));f.detectChanges();const page=f.componentInstance;
