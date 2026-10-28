@@ -118,7 +118,7 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly sessionService = inject(SessionService);
   private readonly subscriptions = new Subscription();
   private readonly unsavedNavigation = inject(UnsavedChangesService);
-  get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0; }
+  get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0 || this.hasInvalidLineDrafts; }
   get hasPendingWrites(): boolean { return this.deleting || this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0 || this.lineBatchPending; }
   private readonly commandPermission = inject(DocumentPageCommandPermissionService);
   private readonly worksheetChangedRows = new Set<Record<string, unknown>>();
@@ -203,6 +203,10 @@ export class ListPage implements OnInit, OnDestroy {
   private savingEntry = false;
   private unknownSaveOutcome = false;
   private dirty = false;
+  private readonly invalidLineDrafts = new Map<Record<string, unknown>, Set<string>>();
+  private get hasInvalidLineDrafts(): boolean {
+    return (this.activeDocumentWindowConfig?.lineRows ?? []).some(row => !!this.invalidLineDrafts.get(row)?.size);
+  }
   private readonly invalidHeaderDrafts = new Set<string>();
   private autosavePending = 0;
   private lineBatchPending = false;
@@ -377,6 +381,18 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   handlePopupAction(event: { popupId: string; actionKey: string; payload?: unknown }): void {
+    if (event.popupId === this.entryPopupId && event.actionKey === 'header-draft') {
+      const payload=event.payload as {fieldKey:string;invalid:boolean};
+      if(payload.invalid)this.invalidHeaderDrafts.add(payload.fieldKey);else this.invalidHeaderDrafts.delete(payload.fieldKey);
+      return;
+    }
+    if (event.popupId === this.entryPopupId && event.actionKey === 'line-draft') {
+      const payload = event.payload as {row:Record<string,unknown>;fieldKey:string;invalid:boolean};
+      const fields = this.invalidLineDrafts.get(payload.row) ?? new Set<string>();
+      if (payload.invalid) fields.add(payload.fieldKey); else fields.delete(payload.fieldKey);
+      if (fields.size) this.invalidLineDrafts.set(payload.row,fields); else this.invalidLineDrafts.delete(payload.row);
+      return;
+    }
     this.documentState.handleEntryPopupAction(
       event,
       this.entryPopupId,
@@ -741,7 +757,7 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
     if (this.hasPendingWrites || this.popupLoading) return;
-    if (this.invalidHeaderDrafts.size || (this.isWorksheetPage ? this.dirtyWorksheet : this.dirty)) {
+    if (this.hasInvalidLineDrafts || this.invalidHeaderDrafts.size || (this.isWorksheetPage ? this.dirtyWorksheet : this.dirty)) {
       const confirmed = await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and close this page?' });
       if (!confirmed) return;
     }
@@ -755,6 +771,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private async saveEntry(): Promise<boolean> {
+    if(this.invalidHeaderDrafts.size || this.hasInvalidLineDrafts) return false;
     if (this.deleting) return false;
     if (this.isWorksheetPage) { this.saveWorksheet(); return !this.dirtyWorksheet; }
     const config = this.activeDocumentWindowConfig;
@@ -1305,14 +1322,14 @@ export class ListPage implements OnInit, OnDestroy {
       else this.setEntryStatus({tone: 'warning', title: 'Action unavailable', message: 'This action is not available for the current record state.'});
       this.changeDetector.detectChanges(); return;
     }
-    if (!listRecord && this.dirty) {
+    if (!listRecord && this.hasUnsavedChanges) {
       this.setEntryStatus({ tone: 'warning', title: 'Save changes', message: 'Save your changes before running this action.' });
       this.changeDetector.detectChanges();
       return;
     }
     const canContinue = this.dataSource.captureWriteScope();
     const input = action.inputFields?.length ? await this.confirmation.prompt(button.label, action.inputFields) : {};
-    if (!input || !canContinue() || this.popupLoading || this.hasPendingWrites) return;
+    if (!input || !canContinue() || this.popupLoading || this.hasPendingWrites || (!listRecord && this.hasUnsavedChanges)) return;
     this.startPopupLoading('Processing...');
     try {
       const record = await firstValueFrom(this.dataSource.execute(this.listConfig.dataSource, this.resolvePersistedRecordId(header, this.listConfig.dataSource), action.name, { ...action.payload, ...input }));
@@ -2209,19 +2226,22 @@ export class ListPage implements OnInit, OnDestroy {
     void this.loadWorksheet(true, true);
   }
   private async openNewEntrySafely(): Promise<void> {
-    if ((this.dirty || this.invalidHeaderDrafts.size) && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and start a new record?' })) return;
+    if (this.hasPendingWrites || this.popupLoading) return;
+    if (this.hasUnsavedChanges && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and start a new record?' })) return;
     this.dirty = false;
     this.openNewPreview();
   }
 
   private async refreshEntrySafely(): Promise<void> {
-    if (this.dirty && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and reload this record?' })) return;
+    if (this.hasPendingWrites || this.popupLoading) return;
+    if (this.hasUnsavedChanges && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and reload this record?' })) return;
     this.dirty = false;
     this.refreshActiveEntry();
   }
 
   private async refreshLinesSafely(): Promise<void> {
-    if (this.dirty && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved line edits and reload lines?' })) return;
+    if (this.hasPendingWrites || this.popupLoading) return;
+    if (this.hasUnsavedChanges && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved line edits and reload lines?' })) return;
     this.refreshActiveLines();
   }
 
@@ -3051,6 +3071,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private isLineRowMeaningfullyEmpty(row: Record<string, unknown>): boolean {
+    if (this.invalidLineDrafts.get(row)?.size) return false;
     const fields = this.lineConfig?.dataSource.meaningfulFields;
     if (fields?.length) {
       const hasMeaningfulValue = fields.some(field => this.hasValue(row[field]) && row[field] !== 0 && row[field] !== false);

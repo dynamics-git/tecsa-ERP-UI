@@ -4,7 +4,7 @@ import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token'
 import { readTabularText, writeTabularText } from '../../data/tabular-text';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { ListPersonalizationService } from '../../pages/list-personalization.service';
-import { FieldValidationService } from '../field-validation.service';
+import { FieldValidationService, FieldValidationResult } from '../field-validation.service';
 import { fieldIsRequired, fieldIsReadonly } from '../../models/field-state';
 import { lookupQuery, clearDependentLookups } from '../../data/lookup-dependencies';
 import { resolveLookupIdentity } from '../../data/record-identity';
@@ -99,14 +99,30 @@ export class DocumentLines {
       this.changes.markForCheck();
     }, error: () => { if (lookupQuery(column.lookup!, row, text, this.headerData).filter !== lookupFilter.filter || this.activeLookupRow !== row || this.activeLookupColumn !== column.id) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); } });
   }
-  ngOnDestroy(): void { this.pasteGeneration++; this.captionGeneration++; this.lookupSearch?.unsubscribe(); this.captionRequest?.unsubscribe(); }
+  ngOnDestroy(): void { this.destroyed=true; this.pasteGeneration++; this.captionGeneration++; this.lookupSearch?.unsubscribe(); this.captionRequest?.unsubscribe(); }
   private static nextEditorId = 0;
   readonly editorId = 'line-editor-' + DocumentLines.nextEditorId++;
   private readonly preferences = inject(ListPersonalizationService);
   @Input() preferenceKey = '';
+  private destroyed = false;
+  private readonly validationRuns = new WeakMap<Record<string,unknown>,Map<string,object>>();
+  private readonly invalidDrafts = new WeakMap<Record<string, unknown>, Map<string, {value: unknown; error: string}>>();
+  private validateEdit(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, accepted?: FieldValidationResult): FieldValidationResult | undefined {
+    const key = column.field ?? column.id;
+    const result = accepted ?? this.validation.validateField({...column, type: undefined, key}, value, row, true, this.columns.map(c=>({...c,type:undefined,key:c.field??c.id,disabled:this.isReadonly(c,row)})));
+    const drafts = this.invalidDrafts.get(row) ?? new Map();
+    const hadDraft = drafts.has(key);
+    if (!result.valid) drafts.set(key, {value, error: result.errors[0]}); else drafts.delete(key);
+    this.invalidDrafts.set(row, drafts);
+    if (!result.valid || hadDraft) this.action.emit({actionKey:'line-draft', row, payload:{fieldKey:key, invalid:!result.valid}});
+    this.changes.markForCheck();
+    return result.valid ? result : undefined;
+  }
   private readonly touchedFields = new WeakMap<Record<string,unknown>,Set<string>>();
   cellError(row: Record<string,unknown>,column:LineColumnConfig):string {
     const key=column.field ?? column.id;
+    const draft = this.invalidDrafts.get(row)?.get(key);
+    if (draft) return draft.error;
     if (!this.touchedFields.get(row)?.has(key) || this.isReadonly(column,row)) return '';
     return this.validation.validateField({key,label:column.label,valueType:column.valueType,required:column.required,requiredWhen:column.requiredWhen,validation:column.validation},row[key],row).errors[0] ?? '';
   }
@@ -403,8 +419,13 @@ export class DocumentLines {
             value=option?.value??raw;
           }
           value=normalizeFieldValue(value,c.valueType);
+          const validationFields=this.columns.map(c=>({...c,type:undefined,key:c.field??c.id,disabled:this.isReadonly(c,row)}));
+          const validation = c.validation?.customAsync
+            ? await this.validation.validateEditorAsync({...c,type:undefined,key:field},value,row,validationFields)
+            : this.validation.validateField({...c,type:undefined,key:field},value,row,true,validationFields);
+          if (!validation.valid) { errors.push(...validation.errors.map(error=>lineLabel+' — '+error)); continue; }
           if(!fieldValuesEqual(row[field],value,c.valueType)) {
-            this.applyCellChange(c,row,value,selected);
+            this.applyCellChange(c,row,value,selected,validation.updates);
           }
         }
         for(const c of this.columns) {
@@ -431,6 +452,11 @@ export class DocumentLines {
       for(const [index,candidate] of candidates.entries()) {
         const target=targets[index];
         if(!target || target['__entryPlaceholder'])continue;
+        // A successful paste replaces an invalid editor draft, even if the accepted value is unchanged.
+        for (const declared of used) {
+          const c=this.resolveColumn(declared,candidate),key=c.field??c.id;
+          if(this.invalidDrafts.get(target)?.delete(key)) this.action.emit({actionKey:'line-draft',row:target,payload:{fieldKey:key,invalid:false}});
+        }
         const changed=this.columns.filter(c=>c.cellType!=='icon'&&!fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType));
         if(!changed.length)continue;
         // One row event carries the complete validated change, preserving the normal calculation and autosave path.
@@ -623,6 +649,8 @@ export class DocumentLines {
 
   getCellValue(row: Record<string, unknown>, column: LineColumnConfig): string {
     if (column.displayColumn && column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) return '';
+    const draft = this.invalidDrafts.get(row)?.get(column.field ?? column.id);
+    if (draft) return fieldEditorValue(draft.value, column.valueType);
     // Filler rows are empty entry space, not records with default values.
     // Keep defaults in the draft so they become visible when entry actually starts.
     if (row['__entryPlaceholder'] === true) return '';
@@ -721,17 +749,18 @@ export class DocumentLines {
     return this.disabled || row[`__lookupRestricted_${column.field ?? column.id}`] === true || fieldIsReadonly(column, row) || (!!column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) || (!!column.lookup && !lookupQuery(column.lookup, row, '', this.headerData).ready);
   }
 
-  private applyCellChange(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, selectedRecord?: Record<string, unknown>): { updatedFields: string[]; invalidated: string[] } {
+  private applyCellChange(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, selectedRecord?: Record<string, unknown>, updates: Record<string,unknown> = {}): { updatedFields: string[]; invalidated: string[] } {
     const field = column.field ?? column.id, before = { ...row };
     row[field] = normalizeFieldValue(value, column.valueType);
     for (const key of column.clearFieldsOnChange ?? []) row[key] = null;
     this.applyFill(column, row, selectedRecord);
+    Object.assign(row,updates);
     const dependent = clearDependentLookups(this.columns, Object.keys(row).filter(key => !key.startsWith('__') && !Object.is(before[key], row[key])), row);
     for (const key of dependent.invalidated) delete row['__display_' + key];
     return { updatedFields: this.columns.map(column => column.field ?? column.id).filter(key => key !== field && !Object.is(before[key], row[key])), invalidated: dependent.invalidated };
   }
 
-  updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, allowBulk = true): void {
+  updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, allowBulk = true, accepted?: FieldValidationResult): void {
     if (this.isReadonly(column, row)) {
       return;
     }
@@ -739,12 +768,30 @@ export class DocumentLines {
     const field = column.field ?? column.id;
     const previousValue = row[field];
     value = normalizeFieldValue(value, column.valueType);
+    if(column.validation?.customAsync && !accepted) {
+      const runs=this.validationRuns.get(row)??new Map<string,object>(), run={}, snapshot=JSON.stringify(row), rows=this.rows;
+      const inScope=this.source.captureWriteScope?.() ?? (()=>true);
+      const headerSnapshot=JSON.stringify(this.headerData);
+      runs.set(field,run);this.validationRuns.set(row,runs);
+      this.validateEdit(column,row,value,{valid:false,errors:['Validating…']});
+      void this.validation.validateEditorAsync({...column,type:undefined,key:field},value,row,this.columns.map(c=>({...c,type:undefined,key:c.field??c.id,disabled:this.isReadonly(c,row)}))).then(result=>{
+        if(this.destroyed || runs.get(field)!==run || this.rows!==rows || !this.rows.includes(row))return;
+        runs.delete(field);
+        if(!inScope() || JSON.stringify(this.headerData)!==headerSnapshot || JSON.stringify(row)!==snapshot || this.isReadonly(column,row)) {
+          this.validateEdit(column,row,value,{valid:false,errors:['Record changed during validation. Re-enter this value to validate again.']});return;
+        }
+        this.updateCellValue(column,row,value,allowBulk,result);
+      });
+      return;
+    }
+    const validation = this.validateEdit(column, row, value, accepted);
+    if (!validation) return;
     if (fieldValuesEqual(previousValue, value, column.valueType)) return;
     const touched = this.touchedFields.get(row) ?? new Set<string>(); touched.add(field); this.touchedFields.set(row,touched);
     const rowIndex = this.rows.indexOf(row);
     const selectedRecord = this.resolveSelectedRecord(column, row, value);
 
-    const { updatedFields, invalidated } = this.applyCellChange(column, row, value, selectedRecord);
+    const { updatedFields, invalidated } = this.applyCellChange(column, row, value, selectedRecord, validation.updates);
     this.invalidateLookupRows(row, invalidated);
     const selectedIndexes = [...this.selectedRowIndexes].filter(
       (index) => index >= 0 && index < this.rows.length,
@@ -768,8 +815,11 @@ export class DocumentLines {
         }
 
         if (this.isReadonly(column,target) || fieldValuesEqual(target[field], value, column.valueType)) continue;
+        if(column.validation?.customAsync) { this.updateCellValue(column,target,value,false); continue; }
+        const targetValidation = this.validateEdit(column, target, value);
+        if (!targetValidation) continue;
         bulkChanges.push({ rowIndex: index, previousValue: target[field], value });
-        const change = this.applyCellChange(column, target, value, this.resolveSelectedRecord(column, target, value));
+        const change = this.applyCellChange(column, target, value, this.resolveSelectedRecord(column, target, value), targetValidation.updates);
         this.invalidateLookupRows(target, change.invalidated);
         bulkChanges[bulkChanges.length - 1].updatedFields = change.updatedFields;
       }

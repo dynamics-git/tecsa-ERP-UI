@@ -1,11 +1,11 @@
 import { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
 import { lookupQuery } from './lookup-dependencies';
-import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
+import { Inject, Injectable, InjectionToken, Optional, ErrorHandler } from '@angular/core';
 import { Observable, defer, firstValueFrom, from, of } from 'rxjs';
 import { finalize, map, shareReplay, catchError, timeout } from 'rxjs/operators';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
-import { DataSourceConfig } from '../models/data-source-config.model';
+import { DataSourceConfig, DataWriteContext } from '../models/data-source-config.model';
 import { EntityContractService } from './entity-contract.service';
 
 export interface DataRestService {
@@ -78,6 +78,7 @@ export class DataSourceService {
     private readonly contracts: EntityContractService,
     private readonly session: SessionService,
     private readonly workspace: WorkspaceContext,
+    @Optional() private readonly hookErrors?: ErrorHandler,
   ) {}
 
   private metadataRequest?: Observable<boolean>;
@@ -278,6 +279,17 @@ export class DataSourceService {
     const rule = config.writableStates;
     return !rule || !this.present(record[config.keyField ?? 'systemId']) || rule.values.includes(record[rule.field]);
   }
+  private notifyWriteHook(callback: (() => unknown) | undefined): void {
+    if (!callback) return;
+    const report = (error: unknown) => { try { if (this.hookErrors) this.hookErrors.handleError(error); else console.error(error); } catch { /* Observer failures must not turn a committed write into a failed save. */ } };
+    try {
+      const result = callback();
+      if (result && typeof result === 'object' && 'then' in result) {
+        void Promise.resolve(result).catch(report);
+        report(new Error('Write hooks must be synchronous.'));
+      }
+    } catch (error) { report(error); }
+  }
   private mutate(config: DataSourceConfig, id: unknown, body: unknown, operation: 'create' | 'update' | 'delete', rowVersion?: unknown, editor?: Record<string, unknown>): Observable<unknown> {
     return defer(() => {
       this.key(config.endpoint);
@@ -292,22 +304,31 @@ export class DataSourceService {
         const version = currentVersion !== undefined ? `"${Number(currentVersion)}"` : this.versions.get(identity);
         if (operation !== 'create' && !version && !(config.singleton && this.missingSingletons.has(identity))) throw new Error('Reload the record before saving: its row version is missing.');
         const payload = operation === 'delete' ? undefined : this.contracts.sanitizePayload(config, operation, body);
+        const hookContext: DataWriteContext = Object.freeze({operation, endpoint:config.endpoint, id,
+          payload: payload && typeof payload === 'object' ? Object.freeze(structuredClone(payload as Record<string,unknown>)) : undefined});
+        const hooks = config.hooks;
+        const before = operation==='create' ? hooks?.beforeCreate : operation==='update' ? hooks?.beforeUpdate : hooks?.beforeDelete;
+        const after = operation==='create' ? hooks?.afterCreate : operation==='update' ? hooks?.afterUpdate : hooks?.afterDelete;
+        try {
+          const message = before?.(hookContext);
+          if (message !== undefined) throw new Error(typeof message==='string' && message.trim() ? message : 'Before-write hook returned an invalid result.');
+          if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
         const request = operation === 'delete' ? this.client.delete(endpoint, version)
           : (config.singleton || (operation === 'update' && this.contracts.updateMethod(config) === 'PUT')) ? this.client.put?.(endpoint, payload, version)
           : operation === 'create' ? this.client.post(endpoint, payload) : this.client.patch(endpoint, payload, version);
         if (!request) throw new Error('The configured data provider does not support PUT.');
-        try {
           const response = await firstValueFrom(request);
           if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
           this.recordMutation(endpoint, config.invalidates);
           // Number allocation can change a separate series resource through server business policies.
           if (operation === 'create' && config.autoGenerateNumber) this.invalidateReadCache();
-          if (operation === 'delete' || response == null) { this.versions.delete(identity); return response; }
+          if (operation === 'delete' || response == null) { this.versions.delete(identity); this.notifyWriteHook(after ? ()=>after({...hookContext,record:undefined}) : undefined); return response; }
           const record = this.record(response, endpoint);
           if (Number.isSafeInteger(Number(record['systemRowVersion'])) && Number(record['systemRowVersion'])>0) this.cacheRecord(this.key(operation==='create' && !config.singleton ? this.recordEndpoint(config,record[config.keyField ?? 'systemId']) : endpoint),record);
           if (editor) editor['systemRowVersion'] = record['systemRowVersion'];
           this.missingSingletons.delete(identity);
           if (operation === 'create' && !config.singleton) this.remember(this.recordEndpoint(config, record[config.keyField ?? 'systemId']), record);
+          this.notifyWriteHook(after ? ()=>after({...hookContext,record:Object.freeze(structuredClone(record))}) : undefined);
           return record;
         } catch (error) {
           if (error && typeof error === 'object' && 'status' in error && error.status === 412) {
@@ -315,6 +336,7 @@ export class DataSourceService {
             this.invalidateReadCache();
             if (editor) this.conflictedRecords.add(editor);
           }
+          this.notifyWriteHook(hooks?.onError ? ()=>hooks.onError!({...hookContext,error}) : undefined);
           throw error;
         }
       });

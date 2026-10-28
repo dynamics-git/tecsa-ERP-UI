@@ -58,7 +58,18 @@ export interface FieldLookupConfig {
   allowOpenCard?: boolean;
 }
 
+/** Pure, synchronous editor validation. Return an error message or undefined. */
+export interface FieldValidationContext {
+  readonly value: unknown;
+  readonly record: Readonly<Record<string, unknown>>;
+}
+
 export interface FieldValidationConfig {
+  /** Optional remote check; editors retain input and reject stale responses. */
+  customAsync?: (context: FieldValidationContext) => Promise<string | undefined>;
+  custom?: (context: FieldValidationContext) => string | undefined;
+  /** Optional updates to other declared editable fields after validation passes. */
+  afterValidate?: (context: FieldValidationContext) => Readonly<Record<string, unknown>> | undefined;
   min?: number | string;
   max?: number | string;
   maxLength?: number;

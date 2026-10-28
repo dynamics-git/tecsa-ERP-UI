@@ -278,6 +278,13 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     {
       id: 'quantity',
       label: 'Quantity',
+      // Optional PR field rule. Other fields and ordinary draft creation remain independent.
+      validation: { custom: ({record}) => {
+        if (!record['lineType']) return 'Choose Type before entering Quantity.';
+        const master = record['lineType'] === 'item' ? record['itemId'] : record['glAccountId'];
+        if (master === undefined || master === null || master === '') return 'Choose No. before entering Quantity.';
+        return undefined;
+      } },
       factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 20 },
       valueType: 'decimal',
       defaultValue: '1',
