@@ -54,8 +54,8 @@ const actions = actionDefinitions.map((action, index) => ({
   order: 50 + index * 10,
 }));
 
-// Header: fields and presentation. Core reads nullable defaults and lookup search
-// from API metadata; declare defaults here only when the page needs a specific value.
+// Header: API field names and presentation. Defaults below are PR starting values.
+// Core owns loading and autosave; no capability discovery is required.
 export const purchaseRequisitionHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Requisition',
   toolbarButtons: actions,
@@ -226,7 +226,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       valueType: 'text',
       cellType: 'dropdown',
       defaultValue: 'item',
-      // Switching Item/G/L clears references that no longer apply.
+      // On a Type change, reset master, UOM and location selections for the new line context.
       clearFieldsOnChange: ['itemId', 'glAccountId', 'unitOfMeasureId', 'locationId'],
       options: [
         { label: 'Item', value: 'item' },
@@ -263,7 +263,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
       id: 'unitOfMeasureId', label: 'Unit of Measure',
-      // editableWhen: { field: 'lineType', values: ['item'] },
+      // Available on both Item and G/L draft lines.
       lookup: { endpoint: '/unitsOfMeasure', displayField: 'code' },
     },
     // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.

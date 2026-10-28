@@ -1,4 +1,4 @@
-import { prCoreContract } from './pr-core-contract.fixture';
+
 import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -13,12 +13,14 @@ import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchas
 
 afterEach(()=>{vi.restoreAllMocks();TestBed.resetTestingModule();});
 describe('Simplified PR configuration through shared autosave (mock API)',()=>{
- it.each([false,true])('creates and reopens PR through API permissions without config aliases (SuperAdmin=%s)',async(superAdmin)=>{
+ it.each([false,true])('creates and reopens PR through login permissions without capability discovery (SuperAdmin=%s)',async(superAdmin)=>{
   let header:Record<string,unknown>={systemId:'header',number:'PR-TEST',status:'open',requestDate:'2026-10-27',locationId:'main',systemRowVersion:1};
   const rows:Record<string,unknown>[]=[];
   const patch=vi.fn((path:string,payload:Record<string,unknown>)=>{
    const target=path.includes('/lines/')?rows.find(r=>path.endsWith('/'+r['systemId']))!:header;
-   Object.assign(target,payload,{systemRowVersion:Number(target['systemRowVersion'])+1});
+   // Match Laravel's existing ConvertEmptyStringsToNull middleware.
+   const stored=Object.fromEntries(Object.entries(payload).map(([key,value])=>[key,value === '' ? null : value]));
+   Object.assign(target,stored,{systemRowVersion:Number(target['systemRowVersion'])+1});
    if(path.includes('/lines/')) target['estimatedAmount']=(Number(target['quantity'])*Number(target['estimatedUnitCost'])).toFixed(6);
    return of({data:structuredClone(target)});
   });
@@ -27,9 +29,10 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
    rows.push(row);return of({data:structuredClone(row)});
   });
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{
-   get:(path:string)=>of({data:path.includes('/apiCapabilities')?prCoreContract:path.includes('/lines')?structuredClone(rows):path.includes('/purchaseRequisitions')?structuredClone(header):[]}),post,patch,delete:()=>of({})
+   get:(path:string)=>{expect(path).not.toContain('/apiCapabilities');return of({data:path.includes('/lines')?structuredClone(rows):path.includes('/purchaseRequisitions')?structuredClone(header):[]});},post,patch,delete:()=>of({})
   }}]});
   TestBed.inject(SessionService).SuperAdmin=superAdmin;
+  TestBed.inject(SessionService).Permissions=[{pageId:'purchase-requisition',canRead:true,canCreate:true,canUpdate:true,canDelete:true,canExecute:true}];
   vi.spyOn(TestBed.inject(SessionService),'Company','get').mockReturnValue('test-company');
   const open=async()=>{
    const f=TestBed.createComponent(DocumentPage);
@@ -41,11 +44,11 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   };
   const f=await open(),page=f.componentInstance;
   expect(post).not.toHaveBeenCalled();
-  expect(page.headerConfig.sections.flatMap(section=>section.fields).find(field=>field.key==='requiredDate')?.defaultValue).toBeNull();
-  expect(page.lineConfig?.columns.find(column=>column.id==='locationId')?.lookup?.searchFields).toEqual(prCoreContract.queryProfiles!['location'].search);
+  expect(page.headerConfig.sections.flatMap(section=>section.fields).find(field=>field.key==='requiredDate')?.defaultValue).toBeUndefined();
+  expect(page.lineConfig?.columns.find(column=>column.id==='locationId')?.lookup?.searchFields).toBeUndefined();
   page.handleInlineAction({actionKey:'header:changed',payload:{fieldKey:'requiredDate',value:'',previousValue:'2026-10-28'}});
   await vi.waitFor(()=>expect(header['requiredDate']).toBeNull());
-  expect(patch.mock.calls.at(-1)![1]).toEqual({requiredDate:null});
+  expect(patch.mock.calls.at(-1)![1]).toEqual({requiredDate:''});
   page.handleInlineAction({actionKey:'header:changed',payload:{fieldKey:'purpose',value:'Autosave review',previousValue:''}});
   await vi.waitFor(()=>expect(header['purpose']).toBe('Autosave review'));
   const grid=f.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
@@ -75,7 +78,7 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
   expect(patch.mock.calls.at(-1)![1]).toEqual({locationId:'secondary'});
   edit(row,'requiredDate','2026-10-29');await vi.waitFor(()=>expect(rows[0]['requiredDate']).toBe('2026-10-29'));
   edit(row,'requiredDate','');await vi.waitFor(()=>expect(rows[0]['requiredDate']).toBeNull());
-  expect(patch.mock.calls.at(-1)![1]).toEqual({requiredDate:null});
+  expect(patch.mock.calls.at(-1)![1]).toEqual({requiredDate:''});
   expect(post.mock.calls[0][0]).toBe('/purchaseRequisitions/header/lines');
   f.detectChanges();const other=page.inlineDocumentWindowConfig!.lineRows!.find(r=>r['__entryPlaceholder'])!;
   edit(other,'lineType','gl_account');await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(2));

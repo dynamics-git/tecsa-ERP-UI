@@ -42,7 +42,13 @@ describe('Write metadata without duplicate page block lists',()=>{
     expect(pr.dataSource.meaningfulFields!.some(key=>!!draft[key])).toBe(false);
     expect(pr.dataSource.meaningfulFields).toContain('description');
     expect(pr.dataSource.meaningfulFields).not.toContain('estimatedAmount');
-    expect(service.buildLineCreatePayload(draft,pr)).toBeNull();
+    // A payload builder does not trigger POST. First-input gating belongs to ListPage.
+    // Description-first drafts must not wait for an Item/G/L selection.
+    draft['description']='Draft before selecting a master';
+    const payload=service.buildLineCreatePayload(draft,pr,['description']);
+    expect(payload).toMatchObject({description:'Draft before selecting a master',lineType:'item',quantity:'1'});
+    expect(payload).not.toHaveProperty('itemId');
+    expect(payload).not.toHaveProperty('estimatedAmount');
     draft['itemId']=123;
     expect(service.buildLineCreatePayload(draft,pr, ['itemId'])).not.toHaveProperty('locationId');
   });

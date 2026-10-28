@@ -369,7 +369,7 @@ describe('Authenticated shared Core metadata contract', () => {
       expect(get).toHaveBeenCalledTimes(2);
       expect(data.resolveSourceContract(source)).toEqual(source);
     });
-  it('opens an ordinary configured page and autosaves first input using metadata without repeated rules', async () => {
+  it('opens an ordinary configured page and autosaves first input without capability discovery', async () => {
     session.SuperAdmin = true;
     const fixture = TestBed.createComponent(ListPage);
     fixture.componentRef.setInput('listConfig', { ...paymentTermsListConfig, dataSource: source });
@@ -393,14 +393,15 @@ describe('Authenticated shared Core metadata contract', () => {
     fixture.detectChanges();
     const page = fixture.componentInstance;
     expect(post).not.toHaveBeenCalled();
-    expect(page.headerConfig.sections[0].fields[0].readonlyAfterCreate).toBe(true);
-    expect(page.inlineDocumentWindowConfig?.headerData?.['amount']).toBe('0');
+    expect(page.headerConfig.sections[0].fields[0].readonlyAfterCreate).toBeUndefined();
+    expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
     page.handleInlineAction({
       actionKey: 'header:changed',
       payload: { fieldKey: 'code', value: 'NEW', previousValue: '' },
     });
     await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-    expect(post.mock.calls[0][1]).toMatchObject({ code: 'NEW', description: null, amount: '0' });
+    expect(post.mock.calls[0][1]).toMatchObject({ code: 'NEW' });
+    expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
     fixture.destroy();
   });
   for (const manual of [false, true])
@@ -452,7 +453,7 @@ describe('Authenticated shared Core metadata contract', () => {
       expect(patch).not.toHaveBeenCalled();
       fixture.destroy();
     });
-  it('keeps the setup shell visible and editors locked during delayed metadata discovery', async () => {
+  it('opens the setup page without waiting for capability discovery', async () => {
     const pending = new Subject<unknown>();
     get.mockImplementation((url: string) => url.endsWith('/apiCapabilities') ? pending : of({data:{systemId:'saved',code:'A',systemRowVersion:1}}));
     session.SuperAdmin = true;
@@ -461,10 +462,10 @@ describe('Authenticated shared Core metadata contract', () => {
     fixture.componentRef.setInput('headerConfig',{sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code'}]}]});
     fixture.componentRef.setInput('documentOnly',true);fixture.componentRef.setInput('initialRecord',{});fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.entry-header')).not.toBeNull();
-    expect(fixture.componentInstance.inlineDocumentWindowConfig?.contentReady).toBe(false);
-    expect(fixture.componentInstance.inlineDocumentWindowConfig?.interactionLocked).toBe(true);
+    expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
+    // Existing record loading can still lock the editor; metadata must not gate it.
     expect(post).not.toHaveBeenCalled();
-    pending.next(metadata());pending.complete();
+    // Leave discovery unresolved to prove page loading does not depend on it.
     await vi.waitFor(()=>expect(fixture.componentInstance.inlineDocumentWindowConfig?.contentReady).toBe(true));
     expect(post).not.toHaveBeenCalled();fixture.destroy();
   });

@@ -17,13 +17,18 @@ describe('Purchase Requisition server contract', () => {
     expect(line.columns.find(c => c.id === 'itemId')?.editableWhen).toEqual({field:'lineType',values:['item']});
     expect(line.columns.find(c => c.id === 'glAccountId')?.editableWhen).toEqual({field:'lineType',values:['gl_account']});
     expect(line.columns.some(c => c.required || c.requiredWhen)).toBe(false);
-    expect(line.dataSource.requiredCreateFields).toEqual(['lineType','quantity']);
+    expect(line.dataSource.requiredCreateFields).toBeUndefined();
   });
 
   it('uses existing fills and declares only supported editable fields', () => {
     expect(line.columns.find(c => c.id === 'itemId')?.fill).toEqual({description:'description'});
     expect(line.columns.find(c => c.id === 'glAccountId')?.fill).toEqual({description:'name'});
-    for (const id of ['unitOfMeasureId','locationId']) expect(line.columns.find(c => c.id === id)?.editableWhen).toEqual({field:'lineType',values:['item']});
+    for (const id of ['unitOfMeasureId','locationId']) {
+      const column = line.columns.find(c => c.id === id)!;
+      expect(column.lookup?.endpoint).toBeTruthy();
+      expect(column.editableWhen).toBeUndefined();
+      expect(column.readonly).not.toBe(true);
+    }
     for (const id of ['lineNo','qtyPerUnitOfMeasure','estimatedAmount','convertedQuantity','remainingQuantity']) expect(line.columns.find(c => c.id === id)?.readonly).toBe(true);
   });
 
