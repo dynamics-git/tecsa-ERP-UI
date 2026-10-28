@@ -176,13 +176,16 @@ export class DocumentConfigDataService {
     return payload;
   }
 
-  /** A typed, shared master column must resolve a selected identity before writing. */
+  /** Conditional lookup presentation does not imply a required master identity. */
   hasActiveLineMaster(row: Record<string, unknown>, lineConfig: LineConfig): boolean {
     if (!lineConfig.typeField) return true;
     const bindings = lineConfig.columns.filter(column => column.lookup && column.displayColumn && column.editableWhen?.field === lineConfig.typeField);
     return [...new Set(bindings.map(column => column.displayColumn))].every(group => {
       const active = bindings.find(column => column.displayColumn === group && column.editableWhen!.values.includes(row[lineConfig.typeField!]));
-      return !!active && this.hasValue(row[active.field ?? active.id]);
+      if (!active) return true;
+      const field = active.field ?? active.id;
+      const required = active.required === true || (lineConfig.dataSource.requiredCreateFields ?? []).includes(field);
+      return !required || this.hasValue(row[field]);
     });
   }
 

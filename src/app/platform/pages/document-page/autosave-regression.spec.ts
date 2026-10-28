@@ -69,11 +69,14 @@ describe('Configured create payload readiness',()=>{
  const service=new DocumentConfigDataService(new LineMasterService());
  const config=lineConfigDefaults(purchaseRequisitionLineConfig);
  const draft=()=>service.createEmptyLineRow(config,{}, {defaultType:'item',emptyType:' ',byType:{}},{});
- it('waits for the active master without adding mandatory UI indicators',()=>{
-  const row=draft();expect(service.buildLineCreatePayload(row,config)).toBeNull();
-  row['itemId']=123;expect(service.buildLineCreatePayload(row,config)?.['itemId']).toBe(123);
-  row['lineType']='gl_account';expect(service.buildLineCreatePayload(row,config)).toBeNull();
-  row['glAccountId']=456;expect(service.buildLineCreatePayload(row,config)?.['glAccountId']).toBe(456);
+ it('does not infer required master selection from conditional lookup presentation',()=>{
+  const row=draft();expect(service.buildLineCreatePayload(row,config)).not.toBeNull();
+  row['lineType']='gl_account';expect(service.buildLineCreatePayload(row,config)).not.toBeNull();
+ });
+ it('retains explicitly required master prerequisites',()=>{
+  const required={...config,columns:config.columns.map(column=>column.id==='itemId'?{...column,required:true}:column)};
+  const row=draft();expect(service.buildLineCreatePayload(row,required)).toBeNull();
+  row['itemId']=123;expect(service.buildLineCreatePayload(row,required)?.['itemId']).toBe(123);
  });
  it('omits untouched empty lookup defaults but preserves explicit null and update clears',()=>{
   const row={...draft(),itemId:123,locationId:null};

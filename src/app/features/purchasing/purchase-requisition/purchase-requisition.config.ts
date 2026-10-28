@@ -217,9 +217,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       parentIdFields: ['systemId'],
       childCollection: 'lines',
     },
-    omitEmptyFields: ['description'],
-    // POST prerequisites are separate from required markers during field entry.
-    requiredCreateFields: ['lineType', 'quantity'],
   },
   columns: [
     { id: 'lineNo', label: 'Line No.', readonly: true, valueType: 'integer' },
@@ -266,17 +263,16 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
       id: 'unitOfMeasureId', label: 'Unit of Measure',
-      editableWhen: { field: 'lineType', values: ['item'] },
+      // editableWhen: { field: 'lineType', values: ['item'] },
       lookup: { endpoint: '/unitsOfMeasure', displayField: 'code' },
     },
     // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.
     // The existing API calculates this factor and prohibits direct writes.
     { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', readonly: true, align: 'end' },
     {
-      // Location applies to Item lines; untouched values can default from the header.
+      // Untouched locations can default from the header.
       // Select a location master record; free text is not a valid location ID.
       id: 'locationId', label: 'Location',
-      editableWhen: { field: 'lineType', values: ['item'] },
       lookup: { endpoint: '/locations', displayField: 'code' },
     },
     {

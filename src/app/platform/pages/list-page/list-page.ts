@@ -1576,11 +1576,11 @@ export class ListPage implements OnInit, OnDestroy {
     const numberField = this.getLineNumberField();
 
     if (typeField && field === typeField && this.lineConfig.typeField) {
-      // The grid already applied the configured dependent-field clears. Wait for
-      // the required master selection, then persist type + ID + cleared values
-      // in a single PATCH. Never reset server-owned line numbering or quantities.
+      // Save Type and its declared dependent changes immediately. Only an explicit
+      // required master can defer this write; presentation alone cannot require it.
       this.clearEntryStatus();
       this.recalculateActiveLineTotals();
+      if (!this.usesManualSaveMode()) this.saveLineFields(row, changedFields);
       this.changeDetector.detectChanges();
       return;
     }
