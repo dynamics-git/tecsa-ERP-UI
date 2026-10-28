@@ -82,4 +82,20 @@ describe('Config-driven deletion across page surfaces',()=>{
   f.componentInstance.handleInlineAction({actionKey:'cmd:delete'});await f.whenStable();expect(remove).toHaveBeenCalledOnce();
   pending.next(undefined);pending.complete();await vi.waitFor(()=>expect(f.componentInstance.hasPendingWrites).toBe(false));f.destroy();
  });
+
+ it('shows one shared line loader only after confirmation and clears it on failure',async()=>{
+  const {f,remove,confirm}=await create();confirm.mockResolvedValueOnce(false);
+  f.componentInstance.handleInlineAction({actionKey:'cmd:line-delete',payload:{selectedIndexes:[0,1]}});
+  await vi.waitFor(()=>expect(f.componentInstance.hasPendingWrites).toBe(false));
+  expect(f.componentInstance.popupLoading).toBe(false);expect(remove).not.toHaveBeenCalled();
+  const pending=new Subject<undefined>();remove.mockImplementation(()=>pending);
+  f.componentInstance.handleInlineAction({actionKey:'cmd:line-delete',payload:{selectedIndexes:[0,1]}});
+  await vi.waitFor(()=>expect(remove).toHaveBeenCalled());f.detectChanges();
+  expect(f.componentInstance.popupLoadingMessage).toBe('Deleting lines…');
+  expect(f.nativeElement.querySelectorAll('app-loading-indicator').length).toBe(1);
+  pending.error({status:409,error:{message:'Line is used'}});
+  await vi.waitFor(()=>expect(f.componentInstance.hasPendingWrites).toBe(false));
+  expect(f.componentInstance.popupLoading).toBe(false);
+  expect(f.componentInstance.inlineDocumentWindowConfig?.statusMessage?.tone).toBe('error');f.destroy();
+ });
 });

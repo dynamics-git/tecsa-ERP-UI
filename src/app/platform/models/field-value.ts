@@ -1,6 +1,8 @@
 /** Shared value semantics. Invalid input is preserved for validation, never silently zeroed. */
 export type FieldValueType = 'text' | 'code' | 'number' | 'integer' | 'decimal' | 'boolean' | 'date' | 'datetime' | 'time' | 'guid' | 'email' | 'url' | 'phone';
-export function normalizeFieldValue(value: unknown, type?: string): unknown {
+export function normalizeFieldValue(value: unknown, type?: string, defaultValue?: unknown): unknown {
+  // A resolved null default represents an empty nullable editor; preserve all other inputs.
+  if (value === '' && defaultValue === null) return null;
   if (value === null || value === undefined) return value;
   if (type === 'datetime' && typeof value === 'string' && isValidDateTime(value)) return new Date(value).toISOString();
   if (type === 'guid') return String(value).trim().toLowerCase();

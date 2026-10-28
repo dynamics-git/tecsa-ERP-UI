@@ -286,7 +286,7 @@ export class DynamicForm {
   }
 
   private resolveOptionValue(field: FieldConfig, item: Record<string, unknown>): unknown {
-    const valueFields = this.resolveFieldCandidates(field.valueField ?? field.bindValue ?? field.lookup?.valueField);
+    const valueFields = this.resolveFieldCandidates(field.valueField ?? field.bindValue ?? (field.lookup ? field.lookup.valueField ?? 'systemId' : undefined));
     for (const valueField of valueFields) {
       if (valueField in item) {
         return item[valueField];

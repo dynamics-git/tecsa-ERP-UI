@@ -12,7 +12,8 @@ import { DocumentPageCommandAssemblerService } from './document-page-command-ass
 describe('DocumentPage command assembly', () => {
   let assembler: DocumentPageCommandAssemblerService;
   let permission: {
-    apply: ReturnType<typeof vi.fn>;
+    apply: ReturnType<typeof vi.fn<(value: CommandConfig, page?: string) => CommandConfig>>;
+    applySourceOperation: ReturnType<typeof vi.fn>;
     normalizePopupCommandKey: (action: unknown) => string;
   };
   const pageId = 'purchase-order';
@@ -23,6 +24,7 @@ describe('DocumentPage command assembly', () => {
   beforeEach(() => {
     permission = {
       apply: vi.fn((value: CommandConfig) => value),
+      applySourceOperation: vi.fn((value: CommandConfig, page: string) => permission.apply(value, page)),
       normalizePopupCommandKey: (action: unknown) => {
         const text = action == null ? '' : String(action).trim().toLowerCase();
         return text.startsWith('cmd:') ? text.slice(4) : text;

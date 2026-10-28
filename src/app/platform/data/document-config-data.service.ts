@@ -1,3 +1,4 @@
+import { lineConfigDefaults } from './document-config-defaults';
 import type { DataSourceConfig } from '../models/data-source-config.model';
 import { normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
@@ -141,7 +142,11 @@ export class DocumentConfigDataService {
   buildLineCreatePayload(
     row: Record<string, unknown>,
     lineConfig: LineConfig,
+    editedFields?: Iterable<string>,
   ): Record<string, unknown> | null {
+    lineConfig = lineConfigDefaults(lineConfig);
+    if (!this.hasActiveLineMaster(row, lineConfig)) return null;
+    const edited = editedFields === undefined ? undefined : new Set(editedFields);
     const fields = lineConfig.dataSource.createFields ?? [];
     if (!fields.length) {
       return null;
@@ -151,7 +156,11 @@ export class DocumentConfigDataService {
     const payload: Record<string, unknown> = {};
     for (const field of fields) {
       if (field === lineConfig.lineKeyField) continue; // Assigned by the backend.
-      payload[field] = normalizeFieldValue(row[field], lineConfig.columns.find(c => (c.field ?? c.id) === field)?.valueType);
+      const column = lineConfig.columns.find(c => (c.field ?? c.id) === field);
+      // An untouched empty lookup is omitted so existing API defaults can apply.
+      // Explicit clears use the same resolved empty-value semantics as updates.
+      if (edited && column?.lookup && !edited.has(field) && !this.hasValue(row[field])) continue;
+      payload[field] = normalizeFieldValue(row[field], column?.valueType, column?.defaultValue);
     }
 
     const parentKeyField = lineConfig.dataSource.parentKeyField?.trim();
@@ -167,20 +176,36 @@ export class DocumentConfigDataService {
     return payload;
   }
 
+  /** Conditional lookup presentation does not imply a required master identity. */
+  hasActiveLineMaster(row: Record<string, unknown>, lineConfig: LineConfig): boolean {
+    if (!lineConfig.typeField) return true;
+    const bindings = lineConfig.columns.filter(column => column.lookup && column.displayColumn && column.editableWhen?.field === lineConfig.typeField);
+    return [...new Set(bindings.map(column => column.displayColumn))].every(group => {
+      const active = bindings.find(column => column.displayColumn === group && column.editableWhen!.values.includes(row[lineConfig.typeField!]));
+      if (!active) return true;
+      const field = active.field ?? active.id;
+      const required = active.required === true || (lineConfig.dataSource.requiredCreateFields ?? []).includes(field);
+      return !required || this.hasValue(row[field]);
+    });
+  }
+
   buildLineUpdatePayload(
     row: Record<string, unknown>,
     fields: string[],
     lineConfig: LineConfig,
   ): Record<string, unknown> {
+    lineConfig = lineConfigDefaults(lineConfig);
+    const allowed = new Set(lineConfig.dataSource.updateFields);
     const blocked = new Set(lineConfig.dataSource.updateBlockedFields ?? []);
     const payload: Record<string, unknown> = {};
 
     for (const field of new Set(fields)) {
-      if (!field.trim() || blocked.has(field) || field === lineConfig.lineKeyField) {
+      if (!field.trim() || !allowed.has(field) || blocked.has(field) || field === lineConfig.lineKeyField) {
         continue;
       }
 
-      payload[field] = normalizeFieldValue(row[field], lineConfig.columns.find(c => (c.field ?? c.id) === field)?.valueType);
+      const column = lineConfig.columns.find(c => (c.field ?? c.id) === field);
+      payload[field] = normalizeFieldValue(row[field], column?.valueType, column?.defaultValue);
     }
 
     return payload;

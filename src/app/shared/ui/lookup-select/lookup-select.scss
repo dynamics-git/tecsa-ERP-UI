@@ -59,3 +59,13 @@ input {
 
 // A consistent single-line option height lets the shared viewport bound DOM growth.
 [role="option"] { flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+:host(.mention-suggestions) .lookup-popup {
+  border-radius: var(--ts-radius-sm);
+  box-shadow: var(--ts-shadow-popover);
+  padding: var(--ts-space-2);
+  font-weight: 500;
+  [role="option"] { border-radius: var(--ts-radius-sm); }
+  .lookup-help { font-size: var(--ts-font-caption); padding: var(--ts-space-2); }
+}
+

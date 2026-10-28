@@ -1,22 +1,30 @@
-import type { CommandConfig } from '../models/command-config.model';
-import { Injectable } from '@angular/core';
+import { CommandConfig, resolveCommandPermissionKey } from '../models/command-config.model';
+import { DataSourceService } from '../data/data-source.service';
+import { DataSourceConfig } from '../models/data-source-config.model';
+import { Injectable, Optional } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
-// Extracted without changing the authorization rules or permission aliases.
+// API action identities default centrally; explicit permission aliases remain supported.
 // This governs the visual availability of document commands, not API authorization.
 @Injectable({ providedIn: 'root' })
 export class DocumentPageCommandPermissionService {
   constructor(
     private readonly sessionService: SessionService,
     private readonly valueMapper: RuntimeValueMapperService,
+    @Optional() private readonly dataSource?: DataSourceService,
   ) {}
 
-  apply(button: CommandConfig, pageId: string): CommandConfig {
+  apply(button: CommandConfig, pageId: string, source?: DataSourceConfig): CommandConfig {
     if (button.hidden === true) {
       return button;
     }
 
+    if (source && button.apiAction && !button.runModalPageId) {
+      const allowed = this.dataSource?.actionAllowed(source, button.apiAction.name);
+      if (allowed === false) return {...button, disabled: true, tooltip: 'This action is not available for your access.'};
+      if (allowed === true && !button.permissionKey) return button;
+    }
     if (this.sessionService.SuperAdmin && !button.runModalPageId && !this.hasDeclaredPage(pageId)) return button;
     const permissions = this.resolvePagePermissionFlags(pageId);
     const action = this.normalizePopupCommandKey(button.actionKey);
@@ -34,7 +42,7 @@ export class DocumentPageCommandPermissionService {
     } else if (action === 'delete' || action === 'line-delete') {
       allowed = permissions.canDelete;
     } else if (this.isCustomExecutableCommand(action)) {
-      allowed = this.canExecutePopupCommand(button, permissions.canExecute);
+      allowed = this.canExecutePopupCommand(button, pageId, permissions.canExecute);
     }
 
     if (allowed) {
@@ -46,6 +54,15 @@ export class DocumentPageCommandPermissionService {
       disabled: true,
       tooltip: button.tooltip ?? 'You do not have permission for this command.',
     };
+  }
+
+  applySourceOperation(button: CommandConfig, pageId: string, source: DataSourceConfig,
+    operation: 'create' | 'update' | 'delete'): CommandConfig {
+    const allowed = this.dataSource?.operationAllowed(source, operation);
+    if (allowed === false) return {...button, disabled: true, tooltip: 'This operation is not available for your access.'};
+    const override = source.permissions?.[operation];
+    if (allowed === true && !override) return button;
+    return this.applyOperation(button, pageId, override ?? (operation === 'update' ? 'modify' : operation));
   }
 
   applyOperation(
@@ -86,8 +103,8 @@ export class DocumentPageCommandPermissionService {
     return !standard.has(action);
   }
 
-  private canExecutePopupCommand(button: CommandConfig, fallbackCanExecute: boolean): boolean {
-    const permissionKey = this.valueMapper.toText(button.permissionKey).trim();
+  private canExecutePopupCommand(button: CommandConfig, pageId: string, fallbackCanExecute: boolean): boolean {
+    const permissionKey = this.valueMapper.toText(resolveCommandPermissionKey(button, pageId)).trim();
     if (!permissionKey.length) {
       return fallbackCanExecute;
     }

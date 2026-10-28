@@ -57,7 +57,7 @@ export class DocumentHydrationOrchestratorService {
         const options = row[bucket];
         if (Array.isArray(options))
           row[bucket] = options.map((record) => ({
-            value: record[field.lookup!.valueField],
+            value: record[(field.lookup!.valueField ?? 'systemId')],
             label: row[`__lookupRestricted_${field.key}`]
               ? 'Restricted'
               : this.lookupLabel(field, record),
@@ -96,7 +96,7 @@ export class DocumentHydrationOrchestratorService {
         if (!query.ready || !query.endpoint) continue;
         const stamp = JSON.stringify([this.dataSource.getReadGeneration?.() ?? 0, query.endpoint, query.filter, this.dataSource.getResourceRevision?.({endpoint: query.endpoint}) ?? 0]);
         const existing = row[field.optionsDataKey ?? '__options_' + field.key];
-        const selected = Array.isArray(existing) ? existing.map(value => value?.record ?? value).find(value => value && String(value[field.lookup!.valueField]) === String(row[field.key])) : undefined;
+        const selected = Array.isArray(existing) ? existing.map(value => value?.record ?? value).find(value => value && String(value[(field.lookup!.valueField ?? 'systemId')]) === String(row[field.key])) : undefined;
         const reusable = selected && (row['__lookupStamp_' + field.key] === undefined || row['__lookupStamp_' + field.key] === stamp)
           ? selected : this.dataSource.getCachedLookup?.(field.lookup, row[field.key], row, header);
         if (reusable) {
@@ -107,11 +107,11 @@ export class DocumentHydrationOrchestratorService {
           row['__lookupRestricted_' + field.key] = false;
           continue;
         }
-        const key = JSON.stringify([query.endpoint, query.filter, field.lookup.valueField]);
+        const key = JSON.stringify([query.endpoint, query.filter, (field.lookup.valueField ?? 'systemId')]);
         const group = groups.get(key) ?? {
           endpoint: query.endpoint,
           filter: query.filter,
-          valueField: field.lookup.valueField,
+          valueField: (field.lookup.valueField ?? 'systemId'),
           targets: [],
         };
         group.targets.push({ row, field, id: String(row[field.key]), stamp });

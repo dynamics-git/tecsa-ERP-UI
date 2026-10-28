@@ -58,7 +58,8 @@
                 (change)="toggleRowSelection(rowIndex, $any($event.target).checked)" />
             </td>
           }
-          @for (column of visibleColumns; track column.id) {
+          @for (declared of visibleColumns; track declared.id) {
+            @let column = resolveColumn(declared, row);
             <td
               [attr.data-quick-entry]="column.quickEntry !== false && !isReadonly(column, row) && column.cellType !== 'icon'"
               (keydown)="handleCellKeydown($event, column, row, rowIndex)"
@@ -67,7 +68,7 @@
               [class.line-icon-col]="column.cellType === 'icon'"
               [style.width]="getColumnWidthStyle(column)">
               @if (column.lookup) {
-                <app-lookup-select class="grid-editor" [label]="column.label" [display]="lookupDisplay(column, row)" [value]="row[column.field ?? column.id]"
+                <app-lookup-select class="grid-editor" [label]="column.label" [display]="lookupDisplay(column, row)" [value]="row['__entryPlaceholder'] ? null : row[column.field ?? column.id]"
                   [disabled]="isReadonly(column, row)" [required]="isRequired(column, row)" [options]="getOptions(column, row)"
                   [loading]="activeLookupRow === row && activeLookupColumn === column.id && lookupLoading"
                   [error]="activeLookupRow === row && activeLookupColumn === column.id ? lookupError : ''"

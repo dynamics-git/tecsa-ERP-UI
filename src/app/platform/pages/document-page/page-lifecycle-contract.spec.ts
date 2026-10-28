@@ -16,7 +16,7 @@ describe('Page lifecycle with synthetic data, no operational records',()=>{
  const record={id:'fixture-1',code:'PR',description:'Purchase Requisition',systemRowVersion:1};
  function create(type:'card'|'document'|'setup'|'worksheet',response?:Subject<unknown>,autoSave=false,headerConfig?:typeof purchasesPayablesSetupHeaderConfig){
   let current = structuredClone(record);
-  const get=vi.fn((endpoint:string)=>response ?? of(endpoint.includes('lines')?{data:[{id:'line-1',lineNo:10000,quantity:2,systemRowVersion:1}]}:{data:current}));
+  const get=vi.fn((endpoint:string)=>endpoint.endsWith('/apiCapabilities') ? of({data:{contractVersion:'1.0',entities:{},endpoints:[]}}) : response ?? of(endpoint.includes('lines')?{data:[{id:'line-1',lineNo:10000,quantity:2,systemRowVersion:1}]}:{data:current}));
   const patch=vi.fn((endpoint:string,body:Record<string,unknown>)=>{if(!endpoint.includes('lines')) current={...current,...body,systemRowVersion:current.systemRowVersion+1};return of({data:endpoint.includes('lines')?{id:'line-1',...body,systemRowVersion:2}:current});});
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get,patch,put:patch,post:patch,delete:()=>of({})}}]});
   TestBed.inject(SessionService).SuperAdmin=true;

@@ -1,3 +1,4 @@
+import { normalizeFieldValue } from '../../models/field-value';
 import { ListGrid } from '../list-grid/list-grid';
 import { RunModalHost } from '../../run-modal/run-modal-host/run-modal-host';
 import { RecordDeleteService } from '../../data/record-delete.service';
@@ -7,7 +8,7 @@ import { fieldIsRequired } from '../../models/field-state';
 import { resolvePageIdentity, recordIdentityText } from '../../data/record-identity';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
-import { Observable, Subscription, from, of, firstValueFrom } from 'rxjs';
+import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
 import { catchError, map, timeout } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
@@ -136,9 +137,8 @@ export class ListPage implements OnInit, OnDestroy {
   }
   private worksheetAllowed(row: Record<string, unknown>): boolean {
     const source = this.worksheetSource ?? this.listConfig.dataSource;
-    const operation = this.hasValue(this.resolvePersistedRecordId(row, source)) ? 'modify' : 'create';
-    const mapped = source.permissions?.[operation === 'modify' ? 'update' : 'create'] ?? operation;
-    return !this.commandPermission.applyOperation({label: 'Save', actionKey: 'save'}, this.permissionPageId, mapped).disabled && this.dataSource.canWrite(source, row);
+    const operation = this.hasValue(this.resolvePersistedRecordId(row, source)) ? 'update' : 'create';
+    return !this.commandPermission.applySourceOperation({label: 'Save', actionKey: 'save'}, this.permissionPageId, source, operation).disabled && this.dataSource.canWrite(source, row);
   }
   private async loadWorksheet(reset = true, forceRefresh = false): Promise<void> {
     if (!this.lineConfig || this.popupLoading || this.dirtyWorksheet) return;
@@ -295,6 +295,25 @@ export class ListPage implements OnInit, OnDestroy {
       throw new Error('ListPage requires listConfig or setupConfig with dataSource.');
     }
 
+    // Pages initialize from their declared configuration and the existing login context.
+    this.initializePage();
+  }
+
+  private initializePage(): void {
+    const source = this.listConfig.dataSource;
+    this.headerConfig = {...this.headerConfig, sections: this.headerConfig.sections.map(section => ({...section,
+      fields: section.fields.map(field => this.dataSource.resolveFieldContract(source, field))}))};
+    this.listConfig = {...this.listConfig, dataSource: this.dataSource.resolveSourceContract(source)};
+    if (this.lineConfig) {
+      this.lineConfig = lineConfigDefaults(this.lineConfig);
+      const lineSource = this.lineConfig.dataSource;
+      this.lineConfig = {...this.lineConfig, dataSource: this.dataSource.resolveSourceContract(lineSource),
+        columns: this.lineConfig.columns.map(column => {
+          const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
+          return {...column, lookup: field.lookup, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
+            readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required, validation: field.validation};
+        })};
+    }
     this.pageId = this.listConfig.pageId ?? this.pageId;
     this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
     const permission = this.sessionService.Permissions.find(value => this.isRecord(value) && (value['pageId'] === this.permissionPageId || value['PageId'] === this.permissionPageId));
@@ -729,9 +748,9 @@ export class ListPage implements OnInit, OnDestroy {
     this.closeRequested.emit();
   }
 
-  private validateLineRow(row: Record<string, unknown>): string[] {
+  private validateLineRow(row: Record<string, unknown>, fields?: string[]): string[] {
     return (this.lineConfig?.fields ?? [])
-      .filter(field => !field.readonly && !field.disabled)
+      .filter(field => !field.readonly && !field.disabled && (!fields || fields.includes(field.key)))
       .flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
   }
 
@@ -769,9 +788,10 @@ export class ListPage implements OnInit, OnDestroy {
     this.startPopupLoading('Saving changes...');
     try {
       const id = this.resolvePersistedRecordId(header, source);
+      this.dataSource.assertEditedFields(source, id || source.singleton ? 'update' : 'create', header, this.unsavedFields.get(header)?.keys() ?? []);
       const payload = id || source.singleton
         ? this.documentPayload.buildHeaderUpdatePayload(header, this.headerConfig.sections)
-        : this.documentPayload.buildHeaderCreatePayload(header, this.headerConfig.sections);
+        : this.documentPayload.buildHeaderCreatePayload(header, this.headerConfig.sections, !this.dataSource.usesGenericContract(source));
       const headerEdits = this.unsavedFields.get(header);
       if ((!id && !source.singleton) || headerEdits?.size) {
         const headerPayload = id || source.singleton ? Object.fromEntries(Object.entries(payload).filter(([key]) => headerEdits?.has(key))) : payload;
@@ -789,9 +809,10 @@ export class ListPage implements OnInit, OnDestroy {
           if (!this.hasValue(lineId) && this.isLineRowMeaningfullyEmpty(row)) continue;
           const required = lineSource.requiredCreateFields ?? [];
           if (!lineId && required.some(field => !this.hasValue(row[field]))) throw new Error('Complete the required line fields before saving.');
+          this.dataSource.assertEditedFields(lineSource, lineId ? 'update' : 'create', row, this.unsavedFields.get(row)?.keys() ?? []);
           const linePayload = lineId
             ? this.documentConfigData.buildLineUpdatePayload(row, [...(this.unsavedFields.get(row)?.keys() ?? [])].filter(field => !lineSource.updateFields || lineSource.updateFields.includes(field)), this.lineConfig)
-            : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
+            : this.documentConfigData.buildLineCreatePayload(row, this.lineConfig, this.unsavedFields.get(row)?.keys());
           if (!linePayload) throw new Error('Complete the required line fields before saving.');
           const line = await firstValueFrom(lineId ? this.dataSource.updateRecord(lineSource, lineId, linePayload, row) : this.dataSource.create(lineSource, linePayload));
           if (this.isRecord(line)) Object.assign(row, line);
@@ -1222,11 +1243,14 @@ export class ListPage implements OnInit, OnDestroy {
 
   private canModifyPage(): boolean {
     const creating = !this.listConfig.dataSource.singleton && !this.hasPersistedIdentity(this.activeDocumentWindowConfig?.headerData);
-    return !this.commandPermission.applyOperation({label: 'Edit', actionKey: 'edit'}, this.permissionPageId, creating ? 'create' : 'modify').disabled;
+    return !this.commandPermission.applySourceOperation({label: 'Edit', actionKey: 'edit'}, this.permissionPageId, this.listConfig.dataSource, creating ? 'create' : 'update').disabled;
   }
 
   private canModifyLines(operation: 'create' | 'update' | 'read' = 'update'): boolean {
     const pageId = this.lineConfig?.permissionPageId;
+    const source = this.lineConfig?.dataSource;
+    if (source && operation !== 'read' && (source.permissions?.[operation] || this.dataSource.operationAllowed(source, operation) !== undefined))
+      return !this.commandPermission.applySourceOperation({label: 'Edit', actionKey: 'edit'}, pageId ?? this.permissionPageId, source, operation).disabled;
     if (!pageId) return operation === 'read' || this.canModifyPage();
     if (operation !== 'read') return !this.commandPermission.applyOperation({label: 'Edit', actionKey: 'edit'}, pageId, operation === 'create' ? 'create' : 'modify').disabled;
     const grants = this.sessionService.Permissions.filter(value => this.isRecord(value) && (value['pageId'] === pageId || value['PageId'] === pageId));
@@ -1271,7 +1295,7 @@ export class ListPage implements OnInit, OnDestroy {
     const action = button.apiAction;
     const header = listRecord ?? this.activeDocumentWindowConfig?.headerData;
     const source = this.listConfig.dataSource;
-    if (!action || !header || button.hidden || button.disabled || this.popupLoading || this.hasPendingWrites || this.commandPermission.apply(button, this.permissionPageId).disabled) return;
+    if (!action || !header || button.hidden || button.disabled || this.popupLoading || this.hasPendingWrites || this.commandPermission.apply(button, this.permissionPageId, this.listConfig.dataSource).disabled) return;
     if (!this.hasValue(this.resolvePersistedRecordId(header, source))) {
       if (listRecord) this.error = 'Select one saved record before running this action.';
       return;
@@ -1522,19 +1546,22 @@ export class ListPage implements OnInit, OnDestroy {
     // Calculated/readonly columns are server-owned. Keep them visible but do not
     // retain them as unsent dirty edits on explicitly typed document lines.
     const changedFields = [field, ...(change.calculatedFields ?? [])];
-    const writable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
-    this.trackUnsaved(row, changedFields.filter(name => !writable || writable.has(name)));
+    const writable = new Set(this.lineConfig.dataSource.updateFields ?? []);
+    const isNewLine = !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig.dataSource));
+    // Empty dependency resets on a draft are not explicit user clears.
+    this.trackUnsaved(row, changedFields.filter(name => (name === field || writable.has(name)) &&
+      (!isNewLine || name === field || this.hasValue(row[name]))));
     this.activeLineRow = row;
     if (this.isWorksheetPage) this.worksheetChangedRows.add(row);
     const typeField = this.getLineTypeField();
     const numberField = this.getLineNumberField();
 
     if (typeField && field === typeField && this.lineConfig.typeField) {
-      // The grid already applied the configured dependent-field clears. Wait for
-      // the required master selection, then persist type + ID + cleared values
-      // in a single PATCH. Never reset server-owned line numbering or quantities.
+      // Save Type and its declared dependent changes immediately. Only an explicit
+      // required master can defer this write; presentation alone cannot require it.
       this.clearEntryStatus();
       this.recalculateActiveLineTotals();
+      if (!this.usesManualSaveMode()) this.saveLineFields(row, changedFields);
       this.changeDetector.detectChanges();
       return;
     }
@@ -1665,6 +1692,10 @@ export class ListPage implements OnInit, OnDestroy {
       Object.assign(updatePayload, payload['updates']);
     }
 
+    for (const key of Object.keys(updatePayload)) {
+      const field = this.headerFieldConfigMap[key];
+      updatePayload[key] = normalizeFieldValue(updatePayload[key], field?.valueType ?? field?.type, field?.defaultValue);
+    }
     this.stripIdentityFields(updatePayload);
     if (!Object.keys(updatePayload).length) {
       return;
@@ -1738,17 +1769,31 @@ export class ListPage implements OnInit, OnDestroy {
       const errors = (this.lineConfig.fields ?? []).flatMap(field => this.fieldValidation.validateField(field, row[field.key], row).errors);
       if (errors.length) { this.setEntryStatus({tone: 'error', title: 'Complete row', message: errors.join('. ')}); options.onSettled?.(false); return; }
     }
-    const lineErrors = this.validateLineRow(row);
+    try {
+      const source = this.resolveLineDataSourceForHeader(this.activeDocumentWindowConfig.headerData).dataSource;
+      const operation = this.hasValue(this.resolvePersistedRecordId(row, source)) ? 'update' : 'create';
+      this.dataSource.assertEditedFields(source, operation, row, this.unsavedFields.get(row)?.keys() ?? fields);
+    } catch (error) {
+      this.setEntryStatus({ tone: 'error', title: 'Save failed', message: this.getErrorMessage(error) });
+      this.changeDetector.detectChanges();
+      options.onSettled?.(false); return;
+    }
+    const pendingTypeEdits = this.lineConfig.typeField && this.unsavedFields.get(row)?.has(this.lineConfig.typeField) && !this.isWorksheetPage
+      ? [...(this.unsavedFields.get(row)?.keys() ?? [])]
+      : [];
+    const writeable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
+    const uniqueFields = [...new Set([...fields, ...pendingTypeEdits].map((field) => field.trim()).filter(field => field && (!writeable || writeable.has(field))))];
+    // Validate only this edit and its configured dependent changes during autosave.
+    const lineErrors = this.validateLineRow(row, uniqueFields);
     if (lineErrors.length) {
       this.setEntryStatus({ tone: 'error', title: 'Check line fields', message: lineErrors.join('. ') });
       this.changeDetector.detectChanges();
       options.onSettled?.(false); return;
     }
-    const pendingTypeEdits = this.lineConfig.typeField && !this.isWorksheetPage
-      ? [...(this.unsavedFields.get(row)?.keys() ?? [])]
-      : [];
-    const writeable = this.lineConfig.typeField ? new Set(this.lineConfig.dataSource.updateFields ?? []) : null;
-    const uniqueFields = [...new Set([...fields, ...pendingTypeEdits].map((field) => field.trim()).filter(field => field && (!writeable || writeable.has(field))))];
+    if (this.lineConfig.typeField && pendingTypeEdits.includes(this.lineConfig.typeField) &&
+        !this.documentConfigData.hasActiveLineMaster(row, this.lineConfig)) {
+      options.onSettled?.(false); return;
+    }
     if (!uniqueFields.length) {
       options.onSettled?.(false); return;
     }
@@ -1851,14 +1896,16 @@ export class ListPage implements OnInit, OnDestroy {
       options.onSettled?.(false); return;
     }
 
-    const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig);
-    if (!payload) {
-      this.setEntryStatus({
-        tone: 'error',
-        title: 'Line save failed',
-        message: 'Required line fields are missing. Complete required values before saving line.',
-      });
+    try {
+      this.dataSource.assertEditedFields(lineDataSource, 'create', row, this.unsavedFields.get(row)?.keys() ?? []);
+    } catch (error) {
+      this.setEntryStatus({ tone: 'error', title: 'Save failed', message: this.getErrorMessage(error) });
       this.changeDetector.detectChanges();
+      options.onSettled?.(false); return;
+    }
+    const payload = this.documentConfigData.buildLineCreatePayload(row, this.lineConfig, this.unsavedFields.get(row)?.keys());
+    if (!payload) {
+      // Keep incomplete drafts dirty; the existing close guard protects them.
       options.onSettled?.(false); return;
     }
 
@@ -1896,7 +1943,8 @@ export class ListPage implements OnInit, OnDestroy {
           const createdRecord = this.toCreatedRecord(created);
           if (createdRecord) {
             const deferred = this.isWorksheetPage ? Object.fromEntries([...(this.deferredLineSaveFields.get(row) ?? [])].map(field => [field, row[field]])) : {};
-            Object.assign(row, createdRecord, deferred);
+            this.mergeAutosaveResponse(row, createdRecord);
+            Object.assign(row, deferred);
           }
 
           const deferredFields = this.takeDeferredLineSaveFields(row);
@@ -1989,14 +2037,14 @@ export class ListPage implements OnInit, OnDestroy {
 
           this.changeDetector.detectChanges();
         },
-        error: () => {
+        error: (error: unknown) => {
           this.finishAutosave(headerData, savedEdits, false);
           this.draftCreateInProgress = false;
           this.stopPopupLoading();
           this.setEntryStatus({
             tone: 'error',
             title: GENERIC_MESSAGES.createFailedTitle,
-            message: GENERIC_MESSAGES.createFailedMessage,
+            message: this.apiError.toMessage(error, GENERIC_MESSAGES.createFailedMessage),
           });
           this.changeDetector.detectChanges();
         },
@@ -2005,8 +2053,9 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private shouldCreateDraftOnInput(): boolean {
-    if (this.listConfig.dataSource.singleton || this.listConfig.dataSource.supportsCreate === false || this.usesManualSaveMode()) return false;
-    return this.listConfig.autoSave === true || (!!this.listConfig.dataSource.autoGenerateNumber && !!this.listConfig.dataSource.lazyCreateOnFirstInput);
+    if (this.isWorksheetPage || this.listConfig.dataSource.singleton || this.listConfig.dataSource.supportsCreate === false || this.usesManualSaveMode()) return false;
+    // Creation follows the resolved save mode; first input and readiness gate the POST.
+    return true;
   }
 
   private canCreateDraft(headerData: Record<string, unknown>): boolean {
@@ -2254,7 +2303,7 @@ export class ListPage implements OnInit, OnDestroy {
     const button = this.findEntryCommandButton(actionKey);
     if (button?.runModalPageId || button?.apiAction) {
       const record = this.checkedRowKeys.size ? this.rows.find(row => this.checkedRowKeys.has(this.getRowKey(row))) : this.selectedRow;
-      const permitted = this.commandPermission.apply(button, this.permissionPageId);
+      const permitted = this.commandPermission.apply(button, this.permissionPageId, this.listConfig.dataSource);
       if (button.hidden || button.disabled || permitted.disabled) return;
       if (this.checkedRowKeys.size > 1 || !this.isRecord(record) || !this.hasPersistedIdentity(record)) {
         this.error = 'Select one saved record before running this command.';
@@ -2379,7 +2428,7 @@ export class ListPage implements OnInit, OnDestroy {
 
   private deleteAllowed(source: DataSourceConfig, records: Record<string, unknown>[], permissionPageId = this.permissionPageId): boolean {
     if (source.supportsDelete === false || this.hasPendingWrites || this.popupLoading) return false;
-    if (this.commandPermission.applyOperation({label: 'Delete', actionKey: 'delete'}, permissionPageId, source.permissions?.delete ?? 'delete').disabled) return false;
+    if (this.commandPermission.applySourceOperation({label: 'Delete', actionKey: 'delete'}, permissionPageId, source, 'delete').disabled) return false;
     return records.every(row => this.dataSource.canWrite(source, row));
   }
 
@@ -2452,20 +2501,37 @@ export class ListPage implements OnInit, OnDestroy {
     }
     const canContinue = this.dataSource.captureWriteScope();
     this.setDeleting(true);
+    let loaderStarted = false;
     try {
       const result = await this.lineCommands.deleteRows({
         lineRows, canContinue, payload: {selectedIndexes: plan.targetRows.map(row => lineRows.indexOf(row))},
         resolveId: row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource),
         deleteById: id => this.dataSource.delete(resolved.dataSource, id, lineRows.find(row => this.documentRecord.resolvePersistedRecordId(row, resolved.dataSource) === id)?.['systemRowVersion']),
-        confirmDelete: count => this.confirmation.confirmIntent({intent: 'delete', count, entityLabel: 'line'}),
+        // One shared loader for the entire selection, after the confirmation closes.
+        confirmDelete: async count => {
+          const confirmed = await this.confirmation.confirmIntent({intent: 'delete', count, entityLabel: 'line'});
+          if (confirmed) {
+            loaderStarted = true;
+            this.startPopupLoading('Deleting lines…');
+          }
+          return confirmed;
+        },
       });
       if (result.deleted) {
         for (const row of result.targetRows) { this.unsavedFields.delete(row); this.worksheetChangedRows.delete(row); }
         this.dirty = this.unsavedFields.size > 0;
         this.applyLineDeletionResult((entry.lineRows ?? []).filter(row => !result.targetRows.includes(row)));
       }
+      // Clear the blocking loading status before publishing any failure message.
+      if (loaderStarted) {
+        this.stopPopupLoading();
+        loaderStarted = false;
+      }
       this.showDeleteFailures(result.failures, result.targetRows.length);
-    } finally { this.setDeleting(false); }
+    } finally {
+      if (loaderStarted) this.stopPopupLoading();
+      this.setDeleting(false);
+    }
   }
 
   private copySelectedLines(payload: unknown, paste = false): void {
@@ -2583,15 +2649,13 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private createDraftRecord(newRecord: Record<string, unknown>): Observable<Record<string, unknown> | null> {
-    return this.draftCreate
-      .createWithUnknownPropertyFallback(
+    return defer(() => {
+      this.dataSource.assertEditedFields(this.listConfig.dataSource, 'create', newRecord, this.unsavedFields.get(newRecord)?.keys() ?? []);
+      return this.draftCreate.createWithUnknownPropertyFallback(
         this.listConfig.dataSource,
-        this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
-      )
-      .pipe(
-        map((response) => this.toCreatedRecord(response)),
-        catchError(() => of(null)),
+        this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections, !this.dataSource.usesGenericContract(this.listConfig.dataSource)),
       );
+    }).pipe(map((response) => this.toCreatedRecord(response)));
   }
 
   private loadConfiguredHeaderDropdownOptions(): Observable<Record<string, Record<string, unknown>[]>> {

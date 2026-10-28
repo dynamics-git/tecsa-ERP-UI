@@ -50,5 +50,16 @@ export interface CommandConfig {
   requireSelection?: boolean;
   selectionMode?: CommandSelectionMode;
   tooltip?: string;
+  /** Override the default Page ID + API Action ID permission identity. */
   permissionKey?: string;
+}
+
+/** API actions have their own permission identity; ordinary legacy callbacks retain
+ * page-execute fallback. This resolves an identity only, never grants access. */
+export function resolveCommandPermissionKey(command: CommandConfig, pageId: string): string | undefined {
+  const override = command.permissionKey?.trim();
+  if (override) return override;
+  if (!command.apiAction || command.runModalPageId) return undefined;
+  const action = command.actionKey.trim().toLowerCase().replace(/^cmd:/, '');
+  return pageId.trim().toLowerCase() + '.' + action;
 }

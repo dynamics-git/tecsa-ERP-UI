@@ -155,3 +155,24 @@ RunModal can suspend a page with pending writes while its existing runtime, subs
 The shared request deadline changes slow progress into an unknown-outcome message; it does not claim a rollback or automatically resend. Check status performs a bounded, read-only lookup. Matching server values are reported as an observation, not proof that an unacknowledged request finished. Browser/tab closure and route navigation retain the existing unsaved-navigation safeguards. Scope changes suppress old-company notices and responses.
 
 Confirmed update responses synchronize an existing loaded row when active filter/search/sort fields remain unchanged. Inserts, deletes, partial or unavailable snapshots and query-affecting edits retain a server list query. An ordinary field update needs neither a collection reload nor a misleading Loading records indicator. Success notices disappear after a short display period; failed/unknown notices retain their recovery action. No per-feature page configuration or CRUD controller is added.
+
+## One visible column with conditional backend bindings
+
+Use `displayColumn` on alternative line fields when one grid column must select a different backend field and lookup according to a row value. Keep each existing API field, lookup, permissions and validation. `editableWhen` chooses the active binding; one binding should match each supported discriminator value. The first declared member supplies the column position and heading.
+
+```ts
+{ id: 'lineType', label: 'Type', cellType: 'dropdown', options: [
+  { value: 'item', label: 'Item' },
+  { value: 'gl_account', label: 'G/L Account' },
+], clearFieldsOnChange: ['itemId', 'glAccountId'] },
+{ id: 'itemId', label: 'No.', displayColumn: 'number',
+  editableWhen: { field: 'lineType', values: ['item'] },
+  lookup: { endpoint: '/items', valueField: 'systemId', displayField: 'number' } },
+{ id: 'glAccountId', label: 'No.', displayColumn: 'number',
+  editableWhen: { field: 'lineType', values: ['gl_account'] },
+  lookup: { endpoint: '/glAccounts', valueField: 'systemId', displayField: 'number' } },
+```
+
+This renders Type followed by a single No. column. Use the existing LineConfig.typeField option when the API requires type and selected master changes to be saved together. The active lookup still searches/pages through the existing LookupSelect; the API still receives itemId or glAccountId, never a synthetic number field. Selected captions, clipboard codes, per-row validation, resize and quick-entry use that same binding. F8/Fill Down do not transfer identifiers between different bound fields. An unsupported discriminator has no editable binding. Omit displayColumn to retain existing behavior.
+
+Partners can add another supported type by adding its backend field declaration with the same displayColumn and its own editableWhen/lookup. The shared renderer contains no business type names. This UI mapping does not add backend support or grant permissions for an undeclared resource.

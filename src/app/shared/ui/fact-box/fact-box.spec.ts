@@ -628,3 +628,36 @@ describe('Shared FactBox compact presentation', () => {
     f.destroy();
   });
 });
+
+describe('Inline note mentions', () => {
+  it('opens suggestions from the compact button without a second input and keeps keyboard selection', () => {
+    setup();
+    const f=TestBed.createComponent(Notes);f.componentRef.setInput('context',context);f.detectChanges();
+    const el=f.nativeElement as HTMLElement;
+    expect(el.querySelector('app-lookup-select input')).toBeNull();
+    (el.querySelector('.mention-trigger') as HTMLButtonElement).click();f.detectChanges();
+    const editor=el.querySelector('textarea')!;
+    expect(editor.value).toBe('@');
+    expect(f.componentInstance.mentionControl?.expanded).toBe(true);
+    editor.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+    editor.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));f.detectChanges();
+    expect(f.componentInstance.draft).toContain('@Colleague');
+    expect(f.componentInstance.mentions.map(user=>user.systemId)).toEqual(['colleague']);
+    expect(f.componentInstance.mentionControl?.expanded).toBe(false);
+    f.destroy();
+  });
+});
+
+describe('Mention insertion at the caret',()=>{
+ it('inserts and resolves a mention in the middle without deleting following text',()=>{
+  setup();const f=TestBed.createComponent(Notes);f.componentRef.setInput('context',context);f.detectChanges();
+  const editor=f.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+  editor.value='Hello world';editor.setSelectionRange(6,6);editor.dispatchEvent(new Event('input'));f.detectChanges();
+  f.componentInstance.startMention(editor);f.detectChanges();
+  editor.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+  editor.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));f.detectChanges();
+  expect(f.componentInstance.draft).toBe('Hello @Colleague world');
+  expect(editor.selectionStart).toBe('Hello @Colleague '.length);
+  expect(f.componentInstance.mentions.map(user=>user.systemId)).toEqual(['colleague']);f.destroy();
+ });
+});

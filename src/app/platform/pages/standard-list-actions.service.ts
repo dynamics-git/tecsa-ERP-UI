@@ -9,7 +9,7 @@ import { DocumentPageCommandPermissionService } from './document-page-command-pe
 export class StandardListActionsService {
   private readonly permissions = inject(DocumentPageCommandPermissionService);
 
-  resolve(config: Pick<ListPageConfig, 'pageId' | 'standardActions' | 'tools'> & { dataSource?: Pick<DataSourceConfig, 'supportsCreate' | 'supportsDelete' | 'permissions' | 'singleton'> }): StandardCommandConfig {
+  resolve(config: Pick<ListPageConfig, 'pageId' | 'standardActions' | 'tools'> & { dataSource?: Pick<DataSourceConfig, 'supportsCreate' | 'supportsDelete' | 'permissions' | 'singleton'> & Partial<Pick<DataSourceConfig, 'endpoint' | 'navigation' | 'addressStyle'>> }): StandardCommandConfig {
     const result: StandardCommandConfig = {};
     for (const key of ['new', 'delete', 'refresh'] as const) {
       const configured = config.standardActions?.[key];
@@ -30,7 +30,9 @@ export class StandardListActionsService {
         disabled: unsupported || override.disabled === true,
         tooltip: unsupported ? `${labels[key]} is not supported for this page.` : override.tooltip,
       };
-      const permission = key === 'refresh' ? this.permissions.apply(command, config.pageId ?? '') : this.permissions.applyOperation(command, config.pageId ?? '',
+      const permission = key !== 'refresh' && config.dataSource?.endpoint
+        ? this.permissions.applySourceOperation(command, config.pageId ?? '', config.dataSource as DataSourceConfig, key === 'new' ? 'create' : 'delete')
+        : key === 'refresh' ? this.permissions.apply(command, config.pageId ?? '') : this.permissions.applyOperation(command, config.pageId ?? '',
         config.dataSource?.permissions?.[operation as 'create' | 'delete'] ?? (key === 'new' ? 'create' : 'delete'));
       result[key] = {
         ...override,

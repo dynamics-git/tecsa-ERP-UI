@@ -8,23 +8,21 @@ import {
 } from '../../../platform/public-api';
 import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
 
+// PR workflow actions. Standard New, Refresh and line commands come from Core.
 const actionDefinitions: CommandConfig[] = [
   {
     label: 'Submit',
     actionKey: 'cmd:submit',
-    permissionKey: 'purchase-requisition.submit',
     apiAction: { name: 'submit', states: { field: 'status', values: ['open'] } },
   },
   {
     label: 'Approve',
     actionKey: 'cmd:approve',
-    permissionKey: 'purchase-requisition.approve',
     apiAction: { name: 'approve', states: { field: 'status', values: ['pending_approval'] } },
   },
   {
     label: 'Reject',
     actionKey: 'cmd:reject',
-    permissionKey: 'purchase-requisition.reject',
     apiAction: {
       name: 'reject',
       states: { field: 'status', values: ['pending_approval'] },
@@ -42,13 +40,11 @@ const actionDefinitions: CommandConfig[] = [
   {
     label: 'Reopen',
     actionKey: 'cmd:reopen',
-    permissionKey: 'purchase-requisition.reopen',
     apiAction: { name: 'reopen', states: { field: 'status', values: ['rejected'] } },
   },
   {
     label: 'Cancel',
     actionKey: 'cmd:cancel',
-    permissionKey: 'purchase-requisition.cancel',
     apiAction: { name: 'cancel', states: { field: 'status', values: ['open', 'rejected'] } },
   },
 ];
@@ -58,11 +54,11 @@ const actions = actionDefinitions.map((action, index) => ({
   order: 50 + index * 10,
 }));
 
+// Header: API field names and presentation. Defaults below are PR starting values.
+// Core owns loading and autosave; no capability discovery is required.
 export const purchaseRequisitionHeaderConfig: HeaderConfig = {
   dialogTitle: 'Purchase Requisition',
-  toolbarButtons: [
-    ...actions,
-  ],
+  toolbarButtons: actions,
   sections: [
     {
       id: 'general',
@@ -73,7 +69,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           valueType: 'code',
           label: 'No.',
           readonlyAfterCreate: true,
-          defaultValue: null,
           validation: { maxLength: 20 },
         },
         {
@@ -81,15 +76,11 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           label: 'Number Series (optional)',
           type: 'lookup',
           valueType: 'text',
-          defaultValue: null,
-          valueField: 'systemId',
           labelField: 'code',
           displayFormat: '[code] — [description]',
           lookup: {
             endpoint: '/numberSeries',
-            valueField: 'systemId',
             displayField: 'code',
-            searchFields: ['code', 'description'],
           },
           readonlyAfterCreate: true,
         },
@@ -98,7 +89,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'requestDate',
           label: 'Request Date',
           type: 'date',
-          valueType: 'date',
           required: true,
           defaultValue: new Date().toLocaleDateString('en-CA'),
         },
@@ -106,8 +96,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'requiredDate',
           label: 'Required Date',
           type: 'date',
-          valueType: 'date',
-          defaultValue: null,
         },
         {
           key: 'purpose',
@@ -115,7 +103,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           label: 'Purpose',
           type: 'textarea',
           width: 'wide',
-          defaultValue: null,
           validation: { maxLength: 250 },
         },
       ],
@@ -128,14 +115,10 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'locationId',
           label: 'Location',
           type: 'lookup',
-          defaultValue: null,
-          valueField: 'systemId',
           labelField: 'code',
           lookup: {
             endpoint: '/locations',
-            valueField: 'systemId',
             displayField: 'code',
-            searchFields: ['code', 'name'],
           },
         },
       ],
@@ -155,11 +138,11 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
     },
   ],
 };
+// List/document shell: shared autosave and FactBox renderers consume this configuration.
 export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   factBox: purchaseRequisitionFactBoxConfig,
   pageId: 'purchase-requisition',
   pageType: 'document',
-  autoSave: true,
   title: 'Purchase Requisition',
   identity: { primaryField: 'number' },
   module: 'Purchase',
@@ -178,19 +161,15 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
   activeViewId: 'all',
   dataSource: {
     endpoint: '/purchaseRequisitions',
-    keyField: 'systemId',
     documentNoField: 'number',
     autoGenerateNumber: true,
-    lazyCreateOnFirstInput: true,
     omitEmptyFields: ['number'],
     defaultSort: 'number desc',
     pageSize: 25,
     supportsDelete: false, // Header API supports cancellation, not deletion.
     writableStates: { field: 'status', values: ['open'] },
-    newRecordDefaults: { status: 'open' },
   },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(purchaseRequisitionHeaderConfig, [
       { field: 'number', width: '128px' },
       { field: 'requestDate', width: '118px' },
@@ -223,15 +202,14 @@ export const purchaseRequisitionListConfig: ListPageConfig & { dataSource: DataS
     ]),
   },
 };
+// Lines: explicit parent binding, Type → No. choices, and PR calculations.
+// Core derives write fields from the editable columns and owns per-field autosave.
 export const purchaseRequisitionLineConfig: LineConfig = {
   typeField: 'lineType',
   placement: { mode: 'after-section', afterSectionId: 'general' },
-  toolbarButtons: [],
   lineKeyField: 'lineNo',
   dataSource: {
     endpoint: '/purchaseRequisitions',
-    keyField: 'systemId',
-    lineNo: true,
     defaultSort: 'lineNo asc',
     pageSize: 100,
     navigation: {
@@ -239,10 +217,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       parentIdFields: ['systemId'],
       childCollection: 'lines',
     },
-    permissions: { create: 'modify', update: 'modify', delete: 'modify' },
-    omitEmptyFields: ['description'],
-    updateBlockedFields: ['estimatedAmount', 'qtyPerUnitOfMeasure', 'convertedQuantity', 'remainingQuantity'],
-    meaningfulFields: ['itemId', 'glAccountId', 'description'],
   },
   columns: [
     { id: 'lineNo', label: 'Line No.', readonly: true, valueType: 'integer' },
@@ -250,9 +224,9 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       id: 'lineType',
       label: 'Type',
       valueType: 'text',
-      required: true,
       cellType: 'dropdown',
       defaultValue: 'item',
+      // On a Type change, reset master, UOM and location selections for the new line context.
       clearFieldsOnChange: ['itemId', 'glAccountId', 'unitOfMeasureId', 'locationId'],
       options: [
         { label: 'Item', value: 'item' },
@@ -260,56 +234,52 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       ],
     },
     {
+      // Selects the Items binding in the shared No. column; does not require a value.
       id: 'itemId',
-      label: 'Item',
-      valueType: 'guid',
-      defaultValue: null,
-      requiredWhen: { field: 'lineType', values: ['item'] },
-      cellType: 'dropdown',
+      fill: { description: 'description' },
       editableWhen: { field: 'lineType', values: ['item'] },
+      label: 'No.',
+      displayColumn: 'number',
       lookup: {
         endpoint: '/items',
         filter: 'blocked eq false',
-        valueField: 'systemId',
         displayField: 'number',
-        searchFields: ['number', 'description'],
       },
     },
     {
+      // Selects the G/L binding in that same column.
       id: 'glAccountId',
-      label: 'G/L Account',
-      valueType: 'guid',
-      defaultValue: null,
-      requiredWhen: { field: 'lineType', values: ['gl_account'] },
-      cellType: 'dropdown',
+      fill: { description: 'name' },
       editableWhen: { field: 'lineType', values: ['gl_account'] },
+      label: 'No.',
+      displayColumn: 'number',
       lookup: {
         endpoint: '/glAccounts',
         filter: "accountType eq 'posting' and blocked eq false",
-        valueField: 'systemId',
         displayField: 'number',
-        searchFields: ['number', 'name'],
       },
     },
+    // Editable text (100 characters). The server supplies a description when omitted.
     { id: 'description', label: 'Description', valueType: 'text', validation: { maxLength: 100 }, factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 10 } },
     {
-      id: 'unitOfMeasureId', label: 'Unit of Measure', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
-      editableWhen: { field: 'lineType', values: ['item'] },
-      lookup: { endpoint: '/unitsOfMeasure', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'description'] },
+      id: 'unitOfMeasureId', label: 'Unit of Measure',
+      // Available on both Item and G/L draft lines.
+      lookup: { endpoint: '/unitsOfMeasure', displayField: 'code' },
     },
+    // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.
+    // The existing API calculates this factor and prohibits direct writes.
     { id: 'qtyPerUnitOfMeasure', label: 'Qty. per Unit of Measure', valueType: 'decimal', readonly: true, align: 'end' },
     {
-      id: 'locationId', label: 'Location', cellType: 'dropdown', valueType: 'guid', defaultValue: null,
-      editableWhen: { field: 'lineType', values: ['item'] },
-      lookup: { endpoint: '/locations', valueField: 'systemId', displayField: 'code', searchFields: ['code', 'name'] },
+      // Untouched locations can default from the header.
+      // Select a location master record; free text is not a valid location ID.
+      id: 'locationId', label: 'Location',
+      lookup: { endpoint: '/locations', displayField: 'code' },
     },
     {
       id: 'quantity',
       label: 'Quantity',
       factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 20 },
       valueType: 'decimal',
-      required: true,
-      validation: { pattern: '^[0-9]{1,14}(?:[.][0-9]{1,6})?$' },
       defaultValue: '1',
       align: 'end',
     },
@@ -317,11 +287,11 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       id: 'estimatedUnitCost',
       label: 'Estimated Unit Cost',
       valueType: 'decimal',
-      validation: { pattern: '^[0-9]{1,14}(?:[.][0-9]{1,6})?$' },
       defaultValue: '0',
       align: 'end',
     },
     {
+      // Preview = quantity × estimated unit cost; the server calculates the saved amount.
       id: 'estimatedAmount',
       label: 'Estimated Amount',
       factBox: { sectionId: 'selected-line', sectionTitle: 'Selected line', order: 30 },
@@ -330,6 +300,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       align: 'end',
     },
     { id: 'requiredDate', label: 'Required Date', valueType: 'date' },
+    // Purchase-order progress is calculated by the server, never entered manually.
     { id: 'convertedQuantity', label: 'Converted Quantity', valueType: 'decimal', readonly: true, align: 'end' },
     { id: 'remainingQuantity', label: 'Remaining Quantity', valueType: 'decimal', readonly: true, align: 'end' },
   ],
@@ -337,18 +308,20 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     { target: 'estimatedAmount', formula: 'quantity * estimatedUnitCost', precision: 6 },
   ],
   totalsCalculation: {
-    defaults: { subtotal: '0.00', sst: '0.00', total: '0.00', difference: '0.00' },
-    totals: { total: { formula: 'sum(estimatedAmount)' } },
-    format: { type: 'number' },
+    // PR has no SST calculation; Core supplies zero SST and two-decimal display.
+    totals: {
+      subtotal: { formula: 'sum(estimatedAmount)' },
+      total: { formula: 'totals.subtotal + totals.sst' },
+    },
   },
   footerSections: [
     {
       id: 'document-totals',
       rows: [
-        { id: 'subtotal', label: 'Subtotal', source: 'total', totalKey: 'total', order: 10 },
-        // PR has no confirmed SST amounts yet; placeholders must not imply zero tax.
-        { id: 'sst', label: 'SST', source: 'literal', value: '—', order: 20 },
-        { id: 'total-incl-sst', label: 'Total Incl. SST', source: 'literal', value: '—', emphasis: true, order: 30 },
+        { id: 'subtotal', label: 'Subtotal', source: 'total', totalKey: 'subtotal', order: 10 },
+        { id: 'sst', label: 'SST', source: 'total', totalKey: 'sst', order: 20 },
+        { id: 'total-incl-sst', label: 'Total Incl. SST', source: 'total', totalKey: 'total', emphasis: true, order: 30 },
       ],
     },
-  ],};
+  ],
+};

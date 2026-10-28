@@ -23,16 +23,21 @@
 
   @if (editing ? result?.capabilities?.modify : result?.capabilities?.create) {
     <div class="note-composer">
+      <div class="note-editor">
       <label class="composer">
         {{ editing ? 'Edit note' : 'New note' }}
-        <textarea rows="3" [disabled]="busy" [value]="draft"
-          (input)="changeDraft($event)" (keydown)="mentionKey($event)"
+        <textarea #noteEditor rows="3" [disabled]="busy" [value]="draft"
+          (blur)="mentionControl?.close()" (input)="changeDraft($event)" (keydown)="mentionKey($event)"
           [attr.aria-controls]="mentionControl?.expanded ? mentionControl?.id : null"
           [attr.aria-activedescendant]="mentionControl?.expanded && (mentionControl?.active ?? -1) >= 0 ? mentionControl?.id + '-' + mentionControl?.active : null"
-          placeholder="Write an internal note…"></textarea>
+          placeholder="Write a note…"></textarea>
       </label>
+      <div class="note-editor-toolbar">
+        <button type="button" class="mention-trigger" [disabled]="busy" aria-label="Mention someone" title="Mention someone" (mousedown)="$event.preventDefault()" (click)="startMention(noteEditor)"><span aria-hidden="true">@</span><span>Mention</span></button>
+      </div>
+      </div>
       <div class="note-mention-picker">
-        <app-lookup-select label="Mention a user" placeholder="Mention someone…"
+        <app-lookup-select class="mention-suggestions" [anchor]="noteEditor" label="Mention a user" placeholder="Mention someone…"
           [display]="''" [options]="mentionOptions" [loading]="mentionLoading"
           [error]="mentionError" [hasMore]="mentionHasMore" [disabled]="busy"
           (opened)="openMentionChoices()" (searched)="searchMentions($event)"
@@ -48,7 +53,6 @@
           }
         </div>
       }
-      <p class="notification-hint">Notifications follow enabled Notification Setup rules.</p>
       <div class="tools composer-actions">
         @if (draft) {
           <button type="button" [disabled]="busy" (click)="cancel()">Cancel</button>
@@ -70,6 +74,9 @@
             <strong>{{ entry.author }}</strong>
             <time [attr.datetime]="entry.systemCreatedAt">{{ entry.systemCreatedAt | date: 'medium' }}</time>
           </div>
+
+        </div>
+        <p>{{ entry.body }}</p>
           <div class="note-actions">
             @if (result?.capabilities?.modify) {
               <button type="button" [disabled]="busy" (click)="edit(entry)">Edit</button>
@@ -78,8 +85,6 @@
               <button type="button" [disabled]="busy" (click)="remove(entry)">Delete</button>
             }
           </div>
-        </div>
-        <p>{{ entry.body }}</p>
         @if (entry.systemModifiedAt !== entry.systemCreatedAt) {
           <small>Edited {{ entry.systemModifiedAt | date: 'medium' }}</small>
         }

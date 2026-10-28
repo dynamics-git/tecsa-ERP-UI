@@ -35,6 +35,7 @@
         (change)="upload($event)"
     /></label>
   }
+  @if (result?.data?.length) { <h5 class="attachments-heading">Attached files</h5> }
   @for (entry of result?.data ?? []; track entry.systemId) {
     <article class="file">
       <i class="ts-icon ts-icon-clip" aria-hidden="true"></i>

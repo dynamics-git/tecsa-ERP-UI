@@ -68,6 +68,36 @@ describe('DocumentPage popup command permissions', () => {
     }
   });
 
+  it('derives API action permission identity without falling back to broad page execute rights', () => {
+    const approve=command('cmd:approve',{apiAction:{name:'approve'}});
+    session.Permissions=[{pageId:'purchase-requisition',canExecute:true}];
+    expect(apply(approve,'purchase-requisition').disabled).toBe(true);
+    session.Permissions.push({actionId:'purchase-requisition.approve',canExecute:true});
+    expect(apply(approve,'purchase-requisition')).toBe(approve);
+    expect(apply(approve,'purchase-order').disabled).toBe(true);
+    session.Permissions[1]={actionId:'purchase-requisition.approve',canExecute:false};
+    expect(apply(approve,'purchase-requisition').disabled).toBe(true);
+  });
+
+  it('keeps explicit API action permission overrides authoritative and independent of captions/API names', () => {
+    const approve=command('cmd:approve',{label:'Translated caption',apiAction:{name:'approveDocument'},permissionKey:'SPECIAL_APPROVAL'});
+    session.Permissions=[{pageId:'purchase-requisition',canExecute:true},{actionId:'purchase-requisition.approve',canExecute:true}];
+    expect(apply(approve,'purchase-requisition').disabled).toBe(true);
+    session.Permissions.push({ActionCode:'SPECIAL_APPROVAL',PostPermission:'Yes'});
+    expect(apply(approve,'purchase-requisition')).toBe(approve);
+  });
+
+  it('preserves the previous explicit PR mapping for all workflow actions', () => {
+    for(const action of ['submit','approve','reject','reopen','cancel']) {
+      const implicit=command('cmd:'+action,{apiAction:{name:action}});
+      const explicit={...implicit,permissionKey:'purchase-requisition.'+action};
+      for(const allowed of [false,true]) {
+        session.Permissions=[{pageId:'purchase-requisition',canExecute:true},{actionId:'purchase-requisition.'+action,canExecute:allowed}];
+        expect(apply(implicit,'purchase-requisition').disabled).toBe(apply(explicit,'purchase-requisition').disabled);
+      }
+    }
+  });
+
   it('uses custom action permission keys instead of falling back to page execute rights', () => {
     session.Permissions = [{ PageName: 'purchase order', CanExecute: true }];
     const custom = command('cmd:post', { permissionKey: 'POST_PURCHASE_ORDER' });
