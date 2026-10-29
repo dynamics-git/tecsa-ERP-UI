@@ -365,6 +365,7 @@ export class AuthService {
 
       permissions.push({
         query: pageRecord['query'],
+        targets: pageRecord['targets'],
         PageId: pageId,
         pageId,
         ObjectName: pageCode,
