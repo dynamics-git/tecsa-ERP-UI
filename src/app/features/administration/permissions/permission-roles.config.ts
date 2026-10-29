@@ -41,6 +41,7 @@ export const permissionRolesListConfig: ListPageConfig & { dataSource: DataSourc
   commands: [{
     label: 'Page / Resource Permissions',
     actionKey: 'manage-permissions',
+    permissionOperation: 'modify',
     group: 'Process',
     requireSelection: true,
     selectionMode: 'single',

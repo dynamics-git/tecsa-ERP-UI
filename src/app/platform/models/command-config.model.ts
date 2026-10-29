@@ -15,6 +15,8 @@ export interface StandardCommandStateConfig {
   disabled?: boolean;
   tooltip?: string;
   permissionKey?: string;
+  /** Choose the existing page CRUD grant for non-API UI commands. Defaults to Execute. */
+  permissionOperation?: 'read' | 'create' | 'modify' | 'delete' | 'execute';
 }
 
 export interface StandardCommandConfig {

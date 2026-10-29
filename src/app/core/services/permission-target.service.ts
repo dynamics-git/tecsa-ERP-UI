@@ -21,7 +21,10 @@ export class PermissionTargetService {
     }) as Record<string, unknown> | undefined;
     const targets = grant?.['targets'];
     if (!targets || typeof targets !== 'object' || Array.isArray(targets)) return true;
-    const entry = (targets as Record<string, unknown>)[[surface, type, key].join('|')];
+    const values = targets as Record<string, unknown>;
+    const prefix = surface + '|' + type + '|';
+    const entry = values[prefix + key] ??
+      (type === 'command' ? values[prefix + (key.startsWith('cmd:') ? key.slice(4) : 'cmd:' + key)] : undefined);
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return true;
     return (entry as Record<string, unknown>)[ability] !== false;
   }

@@ -33,9 +33,9 @@ export const permissionUsersListConfig: ListPageConfig & { dataSource: DataSourc
   },
   standardActions: { new: false, delete: false },
   commands: [
-    { label: 'Create User', actionKey: 'create-user', group: 'New', order: 10, icon: 'ts-icon ts-icon-plus' },
+    { label: 'Create User', actionKey: 'create-user', permissionOperation: 'create', group: 'New', order: 10, icon: 'ts-icon ts-icon-plus' },
     {
-      label: 'Company / Role Access', actionKey: 'manage-access', group: 'Process',
+      label: 'Company / Role Access', actionKey: 'manage-access', permissionOperation: 'modify', group: 'Process',
       order: 30, requireSelection: true, selectionMode: 'single', icon: 'ts-icon ts-icon-users',
     },
   ],
