@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { discoverPermissionCatalog } from './permission-catalog-builder';
 
 describe('Permission Page Config discovery', () => {
@@ -30,10 +31,10 @@ describe('Permission Page Config discovery', () => {
     expect(page.pageId).toBe('sample-order');
     expect(page.route).toBe('/sample-order');
     expect(page.resource).toBe('purchase_orders');
-    expect(page.targets).toContain(jasmine.objectContaining({surface:'header',targetType:'field',targetKey:'status'}));
-    expect(page.targets).toContain(jasmine.objectContaining({surface:'line',targetType:'field',targetKey:'quantity'}));
-    expect(page.targets).toContain(jasmine.objectContaining({surface:'list',targetType:'command',targetKey:'cmd:release'}));
-    expect(page.targets).toContain(jasmine.objectContaining({surface:'runModal',targetType:'page',targetKey:'order-details'}));
+    expect(page.targets).toContain(expect.objectContaining({surface:'header',targetType:'field',targetKey:'status'}));
+    expect(page.targets).toContain(expect.objectContaining({surface:'line',targetType:'field',targetKey:'quantity'}));
+    expect(page.targets).toContain(expect.objectContaining({surface:'list',targetType:'command',targetKey:'cmd:release'}));
+    expect(page.targets).toContain(expect.objectContaining({surface:'runModal',targetType:'page',targetKey:'order-details'}));
   });
 
   it('does not register pages without an approved backend permission resource', () => {
