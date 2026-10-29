@@ -38,14 +38,16 @@ export interface DataSourceConfig {
   newRecordDefaults?: Record<string, unknown>;
   contractProfileKey?: string;
   keyField?: string;
-  parentKeyField?: string;
+  /** Field on a line holding its header's key, e.g. documentNumber. */
+  lineFKProp?: string;
   parentFixedFields?: Record<string, unknown>;
   /** Additional child API field → header field bindings, independent of record identity. */
   parentFieldMap?: Record<string, string>;
   createFields?: string[];
   updateBlockedFields?: string[];
-  documentNoField?: string;
-  contextDocumentNoField?: string;
+  /** Header field used to bind its lines, e.g. number. Separate from keyField. */
+  headerPKProp?: string;
+  contextHeaderPKProp?: string;
   lineNo?: boolean;
   autoGenerateNumber?: boolean;
   lazyCreateOnFirstInput?: boolean;

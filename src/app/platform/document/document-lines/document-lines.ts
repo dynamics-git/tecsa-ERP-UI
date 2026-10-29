@@ -9,7 +9,7 @@ import { fieldIsRequired, fieldIsReadonly } from '../../models/field-state';
 import { lookupQuery, clearDependentLookups } from '../../data/lookup-dependencies';
 import { resolveLookupIdentity } from '../../data/record-identity';
 import { LookupSelect } from '../../../shared/ui/lookup-select/lookup-select';
-import { normalizeFieldValue, fieldValuesEqual , fieldInputType, fieldEditorValue } from '../../models/field-value';
+import { resolvedValueType, normalizeFieldValue, fieldValuesEqual , fieldInputType, fieldEditorValue } from '../../models/field-value';
 import { CommonModule } from '@angular/common';
 import {
   Component,
@@ -109,7 +109,7 @@ export class DocumentLines {
   private readonly invalidDrafts = new WeakMap<Record<string, unknown>, Map<string, {value: unknown; error: string}>>();
   private validateEdit(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, accepted?: FieldValidationResult): FieldValidationResult | undefined {
     const key = column.field ?? column.id;
-    const result = accepted ?? this.validation.validateField({...column, type: undefined, key}, value, row, true, this.columns.map(c=>({...c,type:undefined,key:c.field??c.id,disabled:this.isReadonly(c,row)})));
+    const result = accepted ?? this.validation.validateField({...column, key}, value, row, true, this.columns.map(c=>({...c,key:c.field??c.id,disabled:this.isReadonly(c,row)})));
     const drafts = this.invalidDrafts.get(row) ?? new Map();
     const hadDraft = drafts.has(key);
     if (!result.valid) drafts.set(key, {value, error: result.errors[0]}); else drafts.delete(key);
@@ -124,7 +124,7 @@ export class DocumentLines {
     const draft = this.invalidDrafts.get(row)?.get(key);
     if (draft) return draft.error;
     if (!this.touchedFields.get(row)?.has(key) || this.isReadonly(column,row)) return '';
-    return this.validation.validateField({key,label:column.label,valueType:column.valueType,required:column.required,requiredWhen:column.requiredWhen,validation:column.validation},row[key],row).errors[0] ?? '';
+    return this.validation.validateField({key,label:column.label,valueType:resolvedValueType(column),required:column.required,requiredWhen:column.requiredWhen,validation:column.validation},row[key],row).errors[0] ?? '';
   }
   @Input() headerData: Record<string,unknown> = {};
   @Input() worksheet = false;
@@ -402,7 +402,7 @@ export class DocumentLines {
         for(const [offset,declared] of used.entries()) {
           const c = this.resolveColumn(declared, row);
           const field=c.field??c.id, raw=values[offset];
-          if(this.isReadonly(c,row)){if(raw.trim() && !fieldValuesEqual(row[field],normalizeFieldValue(raw,c.valueType),c.valueType) && String(this.clipboardCell(c,row))!==raw)errors.push(lineLabel+' — '+c.label+' is not editable.');continue;}
+          if(this.isReadonly(c,row)){if(raw.trim() && !fieldValuesEqual(row[field],normalizeFieldValue(raw,resolvedValueType(c)),resolvedValueType(c)) && String(this.clipboardCell(c,row))!==raw)errors.push(lineLabel+' — '+c.label+' is not editable.');continue;}
           let value:unknown=raw, selected:Record<string,unknown>|undefined;
           if(c.lookup && raw) {
             try {
@@ -418,19 +418,19 @@ export class DocumentLines {
             if(!option && raw)errors.push(lineLabel+' — '+c.label+': “'+raw.slice(0,60)+'” is not valid. Choose '+c.options.slice(0,4).map(option=>option.label).join(' or ')+'.');
             value=option?.value??raw;
           }
-          value=normalizeFieldValue(value,c.valueType);
-          const validationFields=this.columns.map(c=>({...c,type:undefined,key:c.field??c.id,disabled:this.isReadonly(c,row)}));
+          value=normalizeFieldValue(value,resolvedValueType(c));
+          const validationFields=this.columns.map(c=>({...c,key:c.field??c.id,disabled:this.isReadonly(c,row)}));
           const validation = c.validation?.customAsync
-            ? await this.validation.validateEditorAsync({...c,type:undefined,key:field},value,row,validationFields)
-            : this.validation.validateField({...c,type:undefined,key:field},value,row,true,validationFields);
+            ? await this.validation.validateEditorAsync({...c,key:field},value,row,validationFields)
+            : this.validation.validateField({...c,key:field},value,row,true,validationFields);
           if (!validation.valid) { errors.push(...validation.errors.map(error=>lineLabel+' — '+error)); continue; }
-          if(!fieldValuesEqual(row[field],value,c.valueType)) {
+          if(!fieldValuesEqual(row[field],value,resolvedValueType(c))) {
             this.applyCellChange(c,row,value,selected,validation.updates);
           }
         }
         for(const c of this.columns) {
           const field=c.field??c.id;if(c.readonly||c.hidden)continue;
-          errors.push(...this.validation.validateField({key:field,label:c.label,valueType:c.valueType,required:c.required,requiredWhen:c.requiredWhen,validation:c.validation},row[field],row).errors.map(error=>lineLabel+' — '+error));
+          errors.push(...this.validation.validateField({key:field,label:c.label,valueType:resolvedValueType(c),required:c.required,requiredWhen:c.requiredWhen,validation:c.validation},row[field],row).errors.map(error=>lineLabel+' — '+error));
         }
         candidates.push(row);
       }
@@ -441,7 +441,7 @@ export class DocumentLines {
         const target=targets[index];
         if(target && !target['__entryPlaceholder'] && used.some((declared,offset) => {
           const c = this.resolveColumn(declared, candidate);
-          return cells[index][offset].trim() && !fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType) && (c.hidden || this.isReadonly(c,candidate));
+          return cells[index][offset].trim() && !fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],resolvedValueType(c)) && (c.hidden || this.isReadonly(c,candidate));
         })) throw new Error('A target field is no longer editable.');
       }
       const creates=candidates.filter((_row,index)=>!targets[index] || targets[index]['__entryPlaceholder']);
@@ -457,7 +457,7 @@ export class DocumentLines {
           const c=this.resolveColumn(declared,candidate),key=c.field??c.id;
           if(this.invalidDrafts.get(target)?.delete(key)) this.action.emit({actionKey:'line-draft',row:target,payload:{fieldKey:key,invalid:false}});
         }
-        const changed=this.columns.filter(c=>c.cellType!=='icon'&&!fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],c.valueType));
+        const changed=this.columns.filter(c=>c.cellType!=='icon'&&!fieldValuesEqual(target[c.field??c.id],candidate[c.field??c.id],resolvedValueType(c)));
         if(!changed.length)continue;
         // One row event carries the complete validated change, preserving the normal calculation and autosave path.
         const anchors=used.map(c=>this.resolveColumn(c,candidate)).filter(c=>changed.includes(c));
@@ -645,12 +645,12 @@ export class DocumentLines {
     };
   }
 
-  inputType(column: LineColumnConfig): string { return fieldInputType(column.valueType); }
+  inputType(column: LineColumnConfig): string { return fieldInputType(resolvedValueType(column)); }
 
   getCellValue(row: Record<string, unknown>, column: LineColumnConfig): string {
     if (column.displayColumn && column.editableWhen && !column.editableWhen.values.includes(row[column.editableWhen.field])) return '';
     const draft = this.invalidDrafts.get(row)?.get(column.field ?? column.id);
-    if (draft) return fieldEditorValue(draft.value, column.valueType);
+    if (draft) return fieldEditorValue(draft.value, resolvedValueType(column));
     // Filler rows are empty entry space, not records with default values.
     // Keep defaults in the draft so they become visible when entry actually starts.
     if (row['__entryPlaceholder'] === true) return '';
@@ -659,7 +659,7 @@ export class DocumentLines {
       return '';
     }
 
-    return fieldEditorValue(value, column.valueType);
+    return fieldEditorValue(value, resolvedValueType(column));
   }
 
   private isLineNoColumn(column: LineColumnConfig): boolean {
@@ -751,7 +751,7 @@ export class DocumentLines {
 
   private applyCellChange(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, selectedRecord?: Record<string, unknown>, updates: Record<string,unknown> = {}): { updatedFields: string[]; invalidated: string[] } {
     const field = column.field ?? column.id, before = { ...row };
-    row[field] = normalizeFieldValue(value, column.valueType);
+    row[field] = normalizeFieldValue(value, resolvedValueType(column));
     for (const key of column.clearFieldsOnChange ?? []) row[key] = null;
     this.applyFill(column, row, selectedRecord);
     Object.assign(row,updates);
@@ -767,14 +767,14 @@ export class DocumentLines {
 
     const field = column.field ?? column.id;
     const previousValue = row[field];
-    value = normalizeFieldValue(value, column.valueType);
+    value = normalizeFieldValue(value, resolvedValueType(column));
     if(column.validation?.customAsync && !accepted) {
       const runs=this.validationRuns.get(row)??new Map<string,object>(), run={}, snapshot=JSON.stringify(row), rows=this.rows;
       const inScope=this.source.captureWriteScope?.() ?? (()=>true);
       const headerSnapshot=JSON.stringify(this.headerData);
       runs.set(field,run);this.validationRuns.set(row,runs);
       this.validateEdit(column,row,value,{valid:false,errors:['Validating…']});
-      void this.validation.validateEditorAsync({...column,type:undefined,key:field},value,row,this.columns.map(c=>({...c,type:undefined,key:c.field??c.id,disabled:this.isReadonly(c,row)}))).then(result=>{
+      void this.validation.validateEditorAsync({...column,key:field},value,row,this.columns.map(c=>({...c,key:c.field??c.id,disabled:this.isReadonly(c,row)}))).then(result=>{
         if(this.destroyed || runs.get(field)!==run || this.rows!==rows || !this.rows.includes(row))return;
         runs.delete(field);
         if(!inScope() || JSON.stringify(this.headerData)!==headerSnapshot || JSON.stringify(row)!==snapshot || this.isReadonly(column,row)) {
@@ -786,7 +786,7 @@ export class DocumentLines {
     }
     const validation = this.validateEdit(column, row, value, accepted);
     if (!validation) return;
-    if (fieldValuesEqual(previousValue, value, column.valueType)) return;
+    if (fieldValuesEqual(previousValue, value, resolvedValueType(column))) return;
     const touched = this.touchedFields.get(row) ?? new Set<string>(); touched.add(field); this.touchedFields.set(row,touched);
     const rowIndex = this.rows.indexOf(row);
     const selectedRecord = this.resolveSelectedRecord(column, row, value);
@@ -814,7 +814,7 @@ export class DocumentLines {
           continue;
         }
 
-        if (this.isReadonly(column,target) || fieldValuesEqual(target[field], value, column.valueType)) continue;
+        if (this.isReadonly(column,target) || fieldValuesEqual(target[field], value, resolvedValueType(column))) continue;
         if(column.validation?.customAsync) { this.updateCellValue(column,target,value,false); continue; }
         const targetValidation = this.validateEdit(column, target, value);
         if (!targetValidation) continue;
@@ -901,7 +901,7 @@ export class DocumentLines {
   }
 
   coerceCellValue(column: LineColumnConfig, rawValue: string): unknown {
-    return normalizeFieldValue(rawValue, column.valueType);
+    return normalizeFieldValue(rawValue, resolvedValueType(column));
   }
 
   private reconcileRows(previousRows?: Record<string, unknown>[]): void {

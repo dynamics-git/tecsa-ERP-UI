@@ -43,7 +43,6 @@ export const dimensionValueCombinationsLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: dimensionValueCombinationsDataSource,
   toolbarButtons: [],
   columns: [

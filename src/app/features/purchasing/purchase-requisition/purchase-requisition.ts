@@ -1,6 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { purchaseRequisitionListConfig, purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig } from './purchase-requisition.config';
+import {
+  purchaseRequisitionListConfig,
+  purchaseRequisitionHeaderConfig,
+  purchaseRequisitionLineConfig,
+} from './purchase-requisition.config';
 export * from './purchase-requisition.config';
 
 @Component({

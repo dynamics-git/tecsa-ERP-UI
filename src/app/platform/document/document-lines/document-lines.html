@@ -78,7 +78,7 @@
                   (retried)="searchLookup(column, row, lookupQuery, lookupRetryNextPage)"
                   (searched)="searchLookup(column, row, $event)"
                   (selected)="updateCellValue(column, row, $event)" />
-              } @else if (column.cellType === 'select' || column.cellType === 'dropdown') {
+              } @else if (column.cellType === 'select' || column.cellType === 'dropdown' || column.type === 'select' || column.type === 'dropdown') {
                 <select [value]="getCellValue(row, column)" [disabled]="isReadonly(column, row)" (focus)="notifyDropdownOpened(column, row, rowIndex)" (change)="updateCellValue(column, row, resolveSelectValue(column, row, $any($event.target).value))">
                   @if (showEmptyOption(column, row)) {
                     <option value=""></option>
@@ -91,10 +91,10 @@
                 <button type="button" [title]="column.buttonTitle ?? ''" (click)="runAction(column, row, rowIndex)">
                   <i [class]="column.buttonIcon ?? ''"></i>
                 </button>
-              } @else if (column.valueType === 'boolean') {
+              } @else if ((column.valueType ?? column.type) === 'boolean') {
                 <input type="checkbox" [attr.aria-label]="column.label" [checked]="getCellValue(row, column) === 'true'" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, $any($event.target).checked)" />
               } @else {
-                <input [class.empty-date]="column.valueType === 'date' && !getCellValue(row, column)" [attr.aria-label]="column.label" [type]="inputType(column)" [attr.inputmode]="column.valueType === 'decimal' ? 'decimal' : null" [attr.aria-invalid]="cellError(row, column) ? true : null" [attr.aria-describedby]="cellError(row,column) ? editorId + '-error-' + rowIndex + '-' + column.id : null" step="any" [attr.aria-required]="isRequired(column, row)" [value]="getCellValue(row, column)" [readonly]="isReadonly(column, row)" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
+                <input [class.empty-date]="(column.valueType ?? column.type) === 'date' && !getCellValue(row, column)" [attr.aria-label]="column.label" [type]="inputType(column)" [attr.inputmode]="(column.valueType ?? column.type) === 'decimal' ? 'decimal' : null" [attr.aria-invalid]="cellError(row, column) ? true : null" [attr.aria-describedby]="cellError(row,column) ? editorId + '-error-' + rowIndex + '-' + column.id : null" step="any" [attr.aria-required]="isRequired(column, row)" [value]="getCellValue(row, column)" [readonly]="isReadonly(column, row)" [disabled]="isReadonly(column, row)" (change)="updateCellValue(column, row, coerceCellValue(column, $any($event.target).value))" />
               }
               @if (cellError(row,column); as error) { <span class="cell-error" role="alert" [id]="editorId + '-error-' + rowIndex + '-' + column.id">{{ error }}</span> }
             </td>

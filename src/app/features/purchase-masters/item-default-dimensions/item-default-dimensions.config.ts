@@ -61,7 +61,6 @@ export const itemDefaultDimensionsLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: itemDefaultDimensionsDataSource,
   toolbarButtons: [],
   columns: [

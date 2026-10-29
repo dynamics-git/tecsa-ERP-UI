@@ -109,7 +109,18 @@ export class DataSourceService {
   }
   operationAllowed(source: DataSourceConfig, operation: 'create' | 'update' | 'delete'): boolean | undefined {
     this.key(source.endpoint);
-    return this.contracts.operationAllowed(source, operation);
+    const supported = this.contracts.operationAllowed(source, operation);
+    if (supported === false) return false;
+    const normalizePath = (value: string) => value.split('?')[0].replace(/\{[^}]+\}/g, '{}').replace(/^\/+|\/+$/g, '');
+    const path = normalizePath(source.navigation
+      ? source.navigation.parentEndpoint + '/{parent}/' + source.navigation.childCollection
+      : source.endpoint);
+    const permissions = this.session.Permissions.filter(value => value && typeof value === 'object' &&
+      typeof (value as Record<string, unknown>)['apiPath'] === 'string' &&
+      normalizePath((value as Record<string, unknown>)['apiPath'] as string) === path) as Record<string, unknown>[];
+    if (!permissions.length) return supported;
+    const flag = {create: 'canCreate', update: 'canUpdate', delete: 'canDelete'}[operation];
+    return permissions.some(permission => permission[flag] === true);
   }
   actionAllowed(source: DataSourceConfig, action: string): boolean | undefined {
     this.key(source.endpoint);

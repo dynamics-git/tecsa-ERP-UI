@@ -1135,7 +1135,7 @@ export class ListPage implements OnInit, OnDestroy {
       header,
       {
         timeoutMs: this.timeoutPolicy.hydrationTimeoutMs,
-        fallbackDocumentNoField: this.listConfig.dataSource.documentNoField,
+        fallbackHeaderPKProp: this.listConfig.dataSource.headerPKProp,
         defaultTop: initialTop,
         allowWithoutParentKey: pageType === 'worksheet',
         onRequest: () => this.startCardLineLoading(),
@@ -1172,7 +1172,7 @@ export class ListPage implements OnInit, OnDestroy {
         header,
         {
           timeoutMs: 10000,
-          fallbackDocumentNoField: this.listConfig.dataSource.documentNoField,
+          fallbackHeaderPKProp: this.listConfig.dataSource.headerPKProp,
           defaultTop: backgroundTop,
           allowWithoutParentKey: pageType === 'worksheet',
         },
@@ -2777,10 +2777,10 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private buildNewHeaderSeed(): Record<string, unknown> {
-    const documentNoField = this.listConfig.dataSource.documentNoField;
+    const headerPKProp = this.listConfig.dataSource.headerPKProp;
     return this.documentConfigData.buildHeaderSeed(
       this.headerConfig.sections,
-      { ...(documentNoField ? { [documentNoField]: '' } : {}), ...this.listConfig.dataSource.newRecordDefaults },
+      { ...(headerPKProp ? { [headerPKProp]: '' } : {}), ...this.listConfig.dataSource.newRecordDefaults },
     );
   }
 
@@ -2823,13 +2823,13 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
-    const parentKeyField = this.lineConfig.dataSource.parentKeyField;
-    const documentNoField =
-      this.lineConfig.dataSource.documentNoField ?? this.listConfig.dataSource.documentNoField;
-    if (parentKeyField && !this.hasValue(row[parentKeyField])) {
-      row[parentKeyField] =
-        (documentNoField ? this.activeDocumentWindowConfig.headerData[documentNoField] : undefined) ??
-        this.activeDocumentWindowConfig.headerData[parentKeyField];
+    const lineFKProp = this.lineConfig.dataSource.lineFKProp;
+    const headerPKProp =
+      this.lineConfig.dataSource.headerPKProp ?? this.listConfig.dataSource.headerPKProp;
+    if (lineFKProp && !this.hasValue(row[lineFKProp])) {
+      row[lineFKProp] =
+        (headerPKProp ? this.activeDocumentWindowConfig.headerData[headerPKProp] : undefined) ??
+        this.activeDocumentWindowConfig.headerData[lineFKProp];
     }
 
     for (const [field, headerField] of Object.entries(this.lineConfig.dataSource.parentFieldMap ?? {})) {
@@ -3037,12 +3037,6 @@ export class ListPage implements OnInit, OnDestroy {
     return this.dataSourceResolver.getColumnField({ column });
   }
 
-  private resolveLineNoField(): string {
-    return this.dataSourceResolver.resolveLineNoField({
-      lineConfig: this.lineConfig,
-    });
-  }
-
   private ensureTrailingEmptyRows(minEmptyRows = 1): void {
     if (!this.lineConfig || !this.activeDocumentWindowConfig) {
       return;
@@ -3090,13 +3084,12 @@ export class ListPage implements OnInit, OnDestroy {
       return true;
     }
 
-    const lineNoField = this.resolveLineNoField();
     const protectedFields = new Set<string>([
       this.toText(this.lineConfig.dataSource.keyField).trim(),
-      this.toText(this.lineConfig.dataSource.parentKeyField).trim(),
-      this.toText(this.lineConfig.dataSource.documentNoField).trim(),
+      this.toText(this.lineConfig.dataSource.lineFKProp).trim(),
+      this.toText(this.lineConfig.dataSource.headerPKProp).trim(),
       ...Object.keys(this.lineConfig.dataSource.parentFieldMap ?? {}),
-      lineNoField,
+      ...this.lineConfig.columns.filter(column => column.readonly).map(column => column.field ?? column.id),
     ].filter((field) => field.length > 0));
 
     for (const column of this.lineConfig.columns) {

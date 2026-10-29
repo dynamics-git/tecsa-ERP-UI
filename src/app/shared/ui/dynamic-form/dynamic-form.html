@@ -35,7 +35,7 @@
               (change)="updateFieldValue(field, coerceInputValue(field, $any($event.target).value))"></textarea>
           } @else {
             <input
-              [type]="inputType(field)" [attr.inputmode]="field.valueType === 'decimal' ? 'decimal' : null" step="any" [attr.aria-required]="isRequired(field)"
+              [type]="inputType(field)" [attr.inputmode]="(field.valueType ?? field.type) === 'decimal' ? 'decimal' : null" step="any" [attr.aria-required]="isRequired(field)"
               [value]="getFieldValue(field)" [attr.aria-invalid]="errors.has(field.key) || null" [attr.aria-describedby]="errors.has(field.key) ? errorId(field) : null"
               [readOnly]="isFieldDisabled(field)"
               (focus)="notifyFieldInteracted(field)"

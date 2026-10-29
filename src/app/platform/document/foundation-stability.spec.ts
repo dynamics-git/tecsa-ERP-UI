@@ -138,16 +138,16 @@ describe('Shared document height and totals rendering', () => {
 });
 
 describe('PR uses supported header and line capabilities', () => {
-  it('disables header Delete on both command surfaces and preserves line Delete, autosave and server numbering', () => {
+  it('allows the supported header and line Delete APIs and preserves autosave and server numbering', () => {
     TestBed.configureTestingModule({ providers: [provideRouter([])] });
     TestBed.inject(SessionService).SuperAdmin = true;
     const assembler = TestBed.inject(DocumentPageCommandAssemblerService);
     const header = assembler.resolveHeaderToolbarButtons({ pageId: 'purchase-requisition', dataSource: purchaseRequisitionListConfig.dataSource, toolbarButtons: purchaseRequisitionHeaderConfig.toolbarButtons });
     const lines = assembler.resolveLineToolbarButtons({ pageId: 'purchase-requisition', lineConfig: purchaseRequisitionLineConfig });
-    expect(header.find(command => command.actionKey === 'cmd:delete')?.disabled).toBe(true);
+    expect(header.find(command => command.actionKey === 'cmd:delete')?.disabled).toBe(false);
     expect(lines.find(command => command.actionKey === 'cmd:line-delete')?.disabled).not.toBe(true);
     const standard = TestBed.inject(StandardListActionsService).resolve({ pageId: 'purchase-requisition', dataSource: purchaseRequisitionListConfig.dataSource });
-    expect(standard.delete).toMatchObject({ disabled: true });
+    expect(standard.delete).toMatchObject({ disabled: false });
     // PR uses the existing autosave default; pr-authoring.spec exercises writes and reopening.
     expect(purchaseRequisitionListConfig.autoSave).toBeUndefined();
     expect(purchaseRequisitionListConfig.dataSource.autoGenerateNumber).toBe(true);

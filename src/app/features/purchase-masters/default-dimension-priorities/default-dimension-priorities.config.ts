@@ -44,7 +44,6 @@ export const defaultDimensionPrioritiesLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: defaultDimensionPrioritiesDataSource,
   toolbarButtons: [],
   columns: [

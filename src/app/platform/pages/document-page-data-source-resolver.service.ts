@@ -32,17 +32,17 @@ export class DocumentPageDataSourceResolverService {
     }
 
     const clauses: string[] = [];
-    const parentKeyField = params.lineDataSource.parentKeyField;
-    const documentNoField =
-      params.lineDataSource.documentNoField ?? params.listDataSource.documentNoField;
-    const documentNo = documentNoField ? params.header[documentNoField] : undefined;
+    const lineFKProp = params.lineDataSource.lineFKProp;
+    const headerPKProp =
+      params.lineDataSource.headerPKProp ?? params.listDataSource.headerPKProp;
+    const documentNo = headerPKProp ? params.header[headerPKProp] : undefined;
 
-    if (parentKeyField && !params.lineDataSource.navigation) {
+    if (lineFKProp && !params.lineDataSource.navigation) {
       if (!params.hasValue(documentNo)) {
         return '';
       }
 
-      clauses.push(`${parentKeyField} eq ${params.toODataLiteral(documentNo)}`);
+      clauses.push(`${lineFKProp} eq ${params.toODataLiteral(documentNo)}`);
     }
 
     for (const [field, headerField] of Object.entries(params.lineDataSource.parentFieldMap ?? {})) {
@@ -217,10 +217,6 @@ export class DocumentPageDataSourceResolverService {
 
   getColumnField(params: { column: LineColumnConfig | undefined }): string {
     return this.valueMapper.toText(params.column?.field ?? params.column?.id).trim();
-  }
-
-  resolveLineNoField(params: { lineConfig?: LineConfig }): string {
-    return params.lineConfig?.lineKeyField ?? '';
   }
 
   resolveApiEndpoints(params: { source: string | string[] | undefined }): string[] {

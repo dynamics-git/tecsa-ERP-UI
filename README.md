@@ -57,3 +57,15 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+### Automatic page discovery
+
+Feature pages are discovered from matching component/config files, for example
+`features/purchasing/purchase-requisition/purchase-requisition.ts` and
+`purchase-requisition.config.ts`. The component exports its page config as usual.
+RunModal resolves the config's `pageId`; menus and direct routes use that same declaration.
+There is no manual page import list or per-page entry in `app.routes.ts`.
+
+Use `npm start` for development. Adding or deleting page folders updates discovery while
+the server runs. `npm run build`, `npm test`, and dependency installation generate the
+ignored `feature-pages.generated.ts` automatically. Do not edit or distribute that file manually.

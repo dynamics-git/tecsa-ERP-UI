@@ -44,7 +44,6 @@ export const dimensionValuesLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: dimensionValuesDataSource,
   toolbarButtons: [],
   columns: [

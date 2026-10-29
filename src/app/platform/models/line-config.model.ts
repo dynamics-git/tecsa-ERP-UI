@@ -62,8 +62,6 @@ export interface LineConfig {
   toolbarButtons?: CommandConfig[];
   columns: LineColumnConfig[];
   fields?: FieldConfig[];
-  lineKeyField?: string;
-  parentKeyField?: string;
   selectable?: boolean;
   editable?: boolean;
   supportsSubLines?: boolean;

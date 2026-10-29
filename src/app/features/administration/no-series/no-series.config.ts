@@ -12,7 +12,7 @@ export const noSeriesListConfig: ListPageConfig & { dataSource: DataSourceConfig
   dataSource: {
     endpoint: '/numberSeries',
     keyField: 'systemId',
-    documentNoField: 'code',
+    headerPKProp: 'code',
     defaultSort: 'code asc',
     pageSize: 25,
   },
@@ -69,7 +69,6 @@ export const noSeriesHeaderConfig: HeaderConfig = {
 
 export const noSeriesLineConfig: LineConfig = {
   placement: { mode: 'end' },
-  lineKeyField: 'lineNo',
   dataSource: {
     endpoint: '/numberSeries',
     keyField: 'systemId',

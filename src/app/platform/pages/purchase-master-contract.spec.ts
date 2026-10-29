@@ -9,7 +9,7 @@ import { provideRouter } from '@angular/router';
 import { describe, it, expect, vi } from 'vitest';
 import { firstValueFrom, of, throwError, Subject } from 'rxjs';
 import { routes } from '../../app.routes';
-import { runModalPageModules } from '../../features/run-modal-page-modules';
+import { featurePageModules } from '../../features/feature-pages.generated';
 import { SessionService } from '../../core/services/session.service';
 import { providePlatformGovernance } from '../../core/providers/platform-governance.provider';
 import { DATA_REST_SERVICE, DataSourceService } from '../../platform/data/data-source.service';
@@ -49,7 +49,7 @@ const pageIds = [
   'accounting-periods',
   'dimension-combinations',
 ];
-const registered = runModalPageModules.map((module) => Object.values(module)).flat();
+const registered = featurePageModules.map((module) => Object.values(module)).flat();
 const pages = pageIds.map(
   (id) => registered.find((value) => (value as ListPageConfig)?.pageId === id) as ListPageConfig,
 );
@@ -65,7 +65,7 @@ describe('Purchase master configuration integration', () => {
       expect(page.dataSource?.endpoint).toMatch(/^\/[A-Za-z]+$/);
       expect(page.menu?.route).toBe('/' + page.pageId);
       expect(page.dataSurface?.columns.length).toBeGreaterThanOrEqual(4);
-      const module = runModalPageModules.find((module) => Object.values(module).includes(page));
+      const module = featurePageModules.find((module) => Object.values(module).includes(page));
       const header = Object.entries(module!).find(([key]) => key.endsWith('HeaderConfig'))![1] as HeaderConfig;
       for (const field of header.sections.flatMap((section) => section.fields)) {
         expect(field.valueType ?? field.type).toBeDefined();

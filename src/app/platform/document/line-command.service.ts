@@ -28,8 +28,8 @@ export class LineCommandService {
     const calculated = Array.isArray(config.calculation) ? config.calculation : config.calculation?.rules ?? [];
     const protectedFields = new Set([
       'systemId', 'id', 'systemRowVersion', 'systemCreatedAt', 'systemCreatedBy', 'systemModifiedAt', 'systemModifiedBy',
-      'companyId', 'status', config.dataSource.keyField, config.lineKeyField, config.parentKeyField,
-      config.dataSource.parentKeyField, ...Object.keys(config.dataSource.parentFixedFields ?? {}), ...Object.keys(config.dataSource.parentFieldMap ?? {}),
+      'companyId', 'status', config.dataSource.keyField,
+      config.dataSource.lineFKProp, ...Object.keys(config.dataSource.parentFixedFields ?? {}), ...Object.keys(config.dataSource.parentFieldMap ?? {}),
       ...calculated.filter(rule => rule.targetSource !== 'header').map(rule => rule.target),
     ]);
     const values: Record<string, unknown> = {};

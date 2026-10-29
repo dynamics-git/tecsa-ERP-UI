@@ -1,7 +1,7 @@
 import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../models/field-state';
 import { Injectable } from '@angular/core';
 import { FieldConfig } from '../models/field-config.model';
-import { compareDecimalValues, isValidDateTime, normalizeFieldValue } from '../models/field-value';
+import { resolvedValueType, compareDecimalValues, isValidDateTime, normalizeFieldValue } from '../models/field-value';
 
 export interface FieldValidationResult {
   valid: boolean;
@@ -18,6 +18,7 @@ export class FieldValidationService {
       return { valid: true, errors: [] };
     }
 
+    const valueType = resolvedValueType(field);
     const errors: string[] = [];
     const text = this.toText(value);
 
@@ -26,16 +27,16 @@ export class FieldValidationService {
       return { valid: false, errors };
     }
 
-    if ((field.valueType === 'date' || field.type === 'date') && text.trim()) {
+    if ((valueType === 'date' || field.type === 'date') && text.trim()) {
       const date = new Date(text + 'T00:00:00Z');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text) {
         errors.push(`${field.label} must be a valid date (YYYY-MM-DD)`);
       }
     }
-    if (field.valueType === 'decimal' && text.trim() && !/^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
+    if (valueType === 'decimal' && text.trim() && !/^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
       errors.push(`${field.label} must be a decimal value`);
     }
-    const type = field.valueType ?? field.type;
+    const type = valueType ?? field.type;
     if (text.trim()) {
       if (type === 'datetime' && !isValidDateTime(text)) errors.push(field.label + ' must be a valid date and time');
       if (type === 'time' && !/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?$/.test(text)) errors.push(field.label + ' must be a valid time');
@@ -45,7 +46,7 @@ export class FieldValidationService {
     }
     const validation = field.validation ?? {};
 
-    if (field.valueType === 'decimal' && /^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
+    if (valueType === 'decimal' && /^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
       const [whole, fraction = ''] = text.trim().replace(/^[+-]/, '').split('.');
       const digits = whole.replace(/^0+/, '').length + fraction.length;
       if (validation.precision !== undefined && Math.max(1, digits) > validation.precision) errors.push(
@@ -64,11 +65,11 @@ export class FieldValidationService {
         validation.message ?? `${field.label} must be at most ${validation.max}`,
       );
     }
-    if (field.valueType !== 'decimal' && (field.type === 'number' || field.type === 'currency' || ['number', 'integer'].includes(field.valueType ?? ''))) {
+    if (valueType !== 'decimal' && (field.type === 'currency' || ['number', 'integer'].includes(valueType ?? ''))) {
       const numberValue = this.toNumber(value);
       if (text.trim().length && numberValue === null) errors.push(`${field.label} must be a number`);
       if (numberValue !== null) {
-        if (field.valueType === 'integer' && !Number.isSafeInteger(numberValue)) {
+        if (valueType === 'integer' && !Number.isSafeInteger(numberValue)) {
           errors.push(`${field.label} must be a safe whole number`);
         }
         if (validation.min !== undefined && numberValue < Number(validation.min)) {

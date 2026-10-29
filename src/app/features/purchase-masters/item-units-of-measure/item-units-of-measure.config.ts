@@ -61,7 +61,6 @@ export const itemUnitsOfMeasureLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: itemUnitsOfMeasureDataSource,
   toolbarButtons: [],
   columns: [

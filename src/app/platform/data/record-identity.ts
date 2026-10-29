@@ -33,7 +33,7 @@ export function resolvePageIdentity(row: unknown, config?: ListPageConfig): {pri
   const primary = config?.dataSurface?.columns.find(column => column.isPrimary);
   const defaults = resourceIdentity(config?.dataSource?.endpoint, config?.dataSource?.contractProfileKey);
   return resolveRecordIdentity(row, {
-    primaryField: config?.identity?.primaryField ?? config?.dataSource?.documentNoField ?? primary?.field ?? primary?.id ?? defaults.primaryField,
+    primaryField: config?.identity?.primaryField ?? config?.dataSource?.headerPKProp ?? primary?.field ?? primary?.id ?? defaults.primaryField,
     secondaryField: config?.identity?.secondaryField ?? primary?.subtitleField ?? defaults.secondaryField,
   });
 }

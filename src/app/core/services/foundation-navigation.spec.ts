@@ -37,6 +37,7 @@ describe('F1 navigation registrations', () => {
       'source-code-setup',
       'source-codes',
       'units-of-measure',
+      'users',
       'vat-business-posting-groups',
       'vat-posting-setup',
       'vat-product-posting-groups',

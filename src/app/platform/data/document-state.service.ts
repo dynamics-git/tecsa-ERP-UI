@@ -1,4 +1,4 @@
-import { normalizeFieldValue, fieldValuesEqual } from '../models/field-value';
+import { resolvedValueType, normalizeFieldValue, fieldValuesEqual } from '../models/field-value';
 import { Inject, Injectable, Optional } from '@angular/core';
 import { catchError, of, take } from 'rxjs';
 import { DOCUMENT_SAVE_PORT, DocumentSavePort, DocumentSaveResult } from './document-save.port';
@@ -506,9 +506,8 @@ export class DocumentStateService {
   }
 
   private resolveFieldValueType(field: FieldConfig): FieldValueType {
-    if (field.valueType) {
-      return field.valueType;
-    }
+    const semanticType = resolvedValueType(field);
+    if (semanticType) return semanticType;
 
     if (field.type === 'number' || field.type === 'currency') {
       return 'number';

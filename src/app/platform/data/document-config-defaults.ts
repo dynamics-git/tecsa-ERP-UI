@@ -1,3 +1,4 @@
+import { resolvedValueType } from '../models/field-value';
 import { ListPageColumnConfig } from '../models/page-config.model';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { HeaderConfig } from '../models/document-window-config.model';
@@ -28,7 +29,8 @@ export function lineConfigDefaults(config: LineConfig): LineConfig {
       ...legacy,
       key,
       label: column.label,
-      valueType: column.valueType ?? legacy?.valueType,
+      type: column.type ?? legacy?.type,
+      valueType: resolvedValueType(column) ?? resolvedValueType(legacy ?? {}),
       readonly: column.readonly ?? legacy?.readonly,
       required: column.required ?? legacy?.required,
       requiredWhen: column.requiredWhen ?? legacy?.requiredWhen,
@@ -46,7 +48,8 @@ export function lineConfigDefaults(config: LineConfig): LineConfig {
       requiredWhen: column.requiredWhen ?? resolvedFields.find((f) => f.key === (column.field ?? column.id))?.requiredWhen,
       readonlyWhen: column.readonlyWhen ?? resolvedFields.find((f) => f.key === (column.field ?? column.id))?.readonlyWhen,
       readonly: column.readonly ?? resolvedFields.find((f) => f.key === (column.field ?? column.id))?.readonly,
-      valueType: column.valueType ?? resolvedFields.find((f) => f.key === (column.field ?? column.id))?.valueType,
+      valueType: resolvedValueType(column) ?? resolvedFields.find((f) => f.key === (column.field ?? column.id))?.valueType,
+      cellType: column.cellType ?? (column.type === 'select' || column.type === 'dropdown' ? column.type : undefined),
     })),
   };
   const source = config.dataSource;
@@ -55,7 +58,7 @@ export function lineConfigDefaults(config: LineConfig): LineConfig {
   // Separate child collections may require their parent key in the payload.
   const relationFields = source.navigation
     ? []
-    : [source.parentKeyField, ...Object.keys(source.parentFixedFields ?? {}), ...Object.keys(source.parentFieldMap ?? {})].filter((field): field is string => !!field);
+    : [source.lineFKProp, ...Object.keys(source.parentFixedFields ?? {}), ...Object.keys(source.parentFieldMap ?? {})].filter((field): field is string => !!field);
   return {
     ...config,
     dataSource: {
@@ -91,7 +94,7 @@ export function listColumns(
     if (!field && !system && (!override.label || !override.type)) throw new Error('Declare the list field: ' + override.field);
     return {
       label: field?.label ?? system?.label ?? override.label!,
-      type: field?.valueType ?? (field?.type === 'boolean' ? 'boolean' : system?.type ?? override.type ?? 'text'),
+      type: (field ? resolvedValueType(field) : undefined) ?? system?.type ?? override.type ?? 'text',
       width: system?.width ?? (index === 0 ? '140px' : index === 1 ? '280px' : undefined),
       isPrimary: index === 0,
       ...(field?.options ? { filter: { type: 'select' as const, options: field.options } } : {}),

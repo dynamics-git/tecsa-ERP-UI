@@ -5,6 +5,7 @@ import { DynamicForm } from '../../shared/ui/dynamic-form/dynamic-form';
 import { DATA_REST_SERVICE } from '../data/data-source.service';
 import { FieldValidationService } from './field-validation.service';
 import { DocumentConfigDataService } from '../data/document-config-data.service';
+import { lineConfigDefaults, listColumns } from '../data/document-config-defaults';
 import { LineConfig } from '../models/line-config.model';
 import { DocumentStateService } from '../data/document-state.service';
 import { DocumentLines } from './document-lines/document-lines';
@@ -23,6 +24,39 @@ describe('Shared configurable field contract with synthetic records', () => {
     expect(fieldIsHidden({hiddenWhen:{field:'kind',values:['Service']}},{kind:'Service'})).toBe(true);
     expect(fieldIsReadonly({readonlyWhen:{field:'status',values:['Open'],negate:true}},{status:'Released'})).toBe(true);
   });
+  it('uses one field type for header and line declarations while preserving legacy valueType',()=>{
+    const canonical:FieldConfig={key:'amount',label:'Amount',type:'decimal',validation:{precision:6,scale:2}};
+    expect(validation.validateField(canonical,'12.34').valid).toBe(true);
+    expect(validation.validateField(canonical,'12.345').valid).toBe(false);
+    const legacy:FieldConfig={key:'amount',label:'Amount',valueType:'decimal',validation:{precision:6,scale:2}};
+    expect(validation.validateField(legacy,'12.345').valid).toBe(false);
+    expect(validation.validateField({key:'code',label:'Code',type:'text',required:true,readonlyAfterCreate:true},'',{systemId:'saved'}).valid).toBe(true);
+    expect(validation.validateField({key:'code',label:'Code',type:'text',required:true,readonlyAfterCreate:true},'',{}).valid).toBe(false);
+  });
+  it('uses canonical types for grid editors, payloads and list filters',()=>{
+    TestBed.configureTestingModule({imports:[DocumentLines]});
+    const config:LineConfig={placement:{mode:'end'},dataSource:{endpoint:'/examples'},columns:[
+      {id:'kind',label:'Kind',type:'dropdown',options:[{label:'Item',value:'item'}]},
+      {id:'amount',label:'Amount',type:'decimal'},
+      {id:'code',label:'Code',type:'code'},
+    ]};
+    const resolved=lineConfigDefaults(config);
+    expect(resolved.columns[0].cellType).toBe('dropdown');
+    expect(resolved.columns[1].valueType).toBe('decimal');
+    const data=TestBed.inject(DocumentConfigDataService);
+    expect(data.buildLineCreatePayload({kind:'item',amount:'9007199254740993.12',code:' ab '},config))
+      .toEqual({kind:'item',amount:'9007199254740993.12',code:'AB'});
+    const header={dialogTitle:'Example',toolbarButtons:[],sections:[{id:'general',fields:[{key:'amount',label:'Amount',type:'decimal' as const}]}]};
+    expect(listColumns(header,['amount'])[0].type).toBe('decimal');
+    const fixture=TestBed.createComponent(DocumentLines),grid=fixture.componentInstance;
+    fixture.componentRef.setInput('columns',config.columns);
+    fixture.componentRef.setInput('rows',[{kind:'item',amount:'9007199254740993.12',code:'AB'}]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('select')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('input[aria-label="Amount"]').getAttribute('inputmode')).toBe('decimal');
+    expect(grid.coerceCellValue(config.columns[1],'9007199254740993.12')).toBe('9007199254740993.12');
+    fixture.destroy();
+  });
   it('does not dirty records for repeated shared header events',()=>{
     const state=TestBed.inject(DocumentStateService),header={code:'PR'};
     expect(state.applyHeaderFieldChange(header,{fieldKey:'code',value:' pr ',previousValue:'PR'},{code:'code'})).toBe(false);
@@ -34,7 +68,7 @@ describe('Shared configurable field contract with synthetic records', () => {
     expect(data.buildHeaderData({description:null},sections)['description']).toBeNull();
     expect(data.buildHeaderData({description:''},sections)['description']).toBe('');
     expect(data.buildHeaderSeed(sections)['description']).toBe('Default');
-    const config:LineConfig={placement:{mode:'end'},lineKeyField:'lineNo',toolbarButtons:[],columns:[{id:'code',label:'Code',valueType:'code'},{id:'lineNo',label:'Line No.',readonly:true}],dataSource:{endpoint:'/lines',createFields:['code','lineNo'],requiredCreateFields:['code']}};
+    const config:LineConfig={placement:{mode:'end'},toolbarButtons:[],columns:[{id:'code',label:'Code',valueType:'code'},{id:'lineNo',label:'Line No.',readonly:true}],dataSource:{endpoint:'/lines',createFields:['code','lineNo'],requiredCreateFields:['code']}};
     expect(data.buildLineCreatePayload({code:' pr ',lineNo:10000,__entryPlaceholder:true},config)).toEqual({code:'PR'});
     expect(data.buildLineCreatePayload({code:'PR'},{...config,dataSource:{endpoint:'/lines',createFields:[]}})).toBeNull();
   });

@@ -113,8 +113,8 @@ export class RunModalHydrationResolverService {
       return undefined;
     }
 
-    const parentKeyField = this.toText(dataSource.parentKeyField).trim();
-    if (!parentKeyField.length) {
+    const lineFKProp = this.toText(dataSource.lineFKProp).trim();
+    if (!lineFKProp.length) {
       return dataSource;
     }
 
@@ -124,9 +124,9 @@ export class RunModalHydrationResolverService {
     }
 
     const sourceFieldCandidates = [
-      this.toText(dataSource.contextDocumentNoField).trim(),
-      this.toText(dataSource.documentNoField).trim(),
-      parentKeyField,
+      this.toText(dataSource.contextHeaderPKProp).trim(),
+      this.toText(dataSource.headerPKProp).trim(),
+      lineFKProp,
     ].filter((field) => field.length > 0);
 
     const parentValue = sourceFieldCandidates
@@ -137,7 +137,7 @@ export class RunModalHydrationResolverService {
       return dataSource;
     }
 
-    const clauses = [`${parentKeyField} eq ${this.toODataFilterLiteral(parentValue)}`];
+    const clauses = [`${lineFKProp} eq ${this.toODataFilterLiteral(parentValue)}`];
     for (const [field, headerField] of Object.entries(dataSource.parentFieldMap ?? {})) {
       const value = this.readFieldValue(contextRecord, headerField);
       if (value === undefined || value === null || value === '') throw new Error('The related record context is missing.');

@@ -61,7 +61,6 @@ export const glAccountDefaultDimensionsLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: glAccountDefaultDimensionsDataSource,
   toolbarButtons: [],
   columns: [

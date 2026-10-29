@@ -12,8 +12,8 @@ describe('Purchase Requisition server contract', () => {
     expect(line.columns.find(c => c.id === 'glAccountId')?.lookup?.endpoint).toBe('/glAccounts');
     expect(line.dataSource.navigation).toBeUndefined();
     expect(line.dataSource.endpoint).toBe('/purchaseRequisitionLines');
-    expect(line.dataSource.documentNoField).toBe('number');
-    expect(line.dataSource.parentKeyField).toBe('documentNumber');
+    expect(line.dataSource.headerPKProp).toBe('number');
+    expect(line.dataSource.lineFKProp).toBe('documentNumber');
     expect(line.dataSource.parentFieldMap).toEqual({documentType:'documentType'});
     expect(line.dataSource.invalidates).toEqual(['/purchaseRequisitions']);
   });

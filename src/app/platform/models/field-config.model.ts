@@ -1,25 +1,17 @@
 import type { RecordIdentityConfig } from './record-identity.model';
 import type { CommandConfig } from './command-config.model';
+import type { FieldValueType } from './field-value';
+export type { FieldValueType } from './field-value';
 
 export type FieldType =
-  | 'text'
-  | 'number'
-  | 'datetime'
-  | 'time'
-  | 'email'
-  | 'url'
-  | 'phone'
-  | 'date'
-  | 'boolean'
+  | FieldValueType
+  | 'password'
   | 'currency'
   | 'select'
   | 'dropdown'
   | 'lookup'
   | 'textarea'
   | 'badge';
-
-import type { FieldValueType } from './field-value';
-export type { FieldValueType } from './field-value';
 
 export interface FieldOptionConfig {
   label: string;
@@ -115,6 +107,7 @@ export interface FieldConfig {
   key: string;
   label: string;
   type?: FieldType;
+  /** Compatibility for older configs. New configs declare the field with type. */
   valueType?: FieldValueType;
   required?: boolean;
   readonly?: boolean;

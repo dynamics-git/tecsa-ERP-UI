@@ -52,11 +52,11 @@ export interface AttachmentsConfig {
 }
 
 export interface AttachmentContextConfig {
-  documentNoField?: string;
+  headerPKProp?: string;
   documentType?: string;
   documentStatusField?: string;
   useSelectedLineForHeaderAttachments?: boolean;
-  relatedDocumentNoField?: string;
+  relatedHeaderPKProp?: string;
   relatedDocumentType?: string;
   relatedLineNoField?: string;
 }

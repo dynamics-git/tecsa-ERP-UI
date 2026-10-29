@@ -297,7 +297,7 @@ export const vendorsListConfig: ListPageConfig & { dataSource: DataSourceConfig 
     defaultSort: 'number asc',
     autoGenerateNumber: true,
     lazyCreateOnFirstInput: true,
-    documentNoField: 'number',
+    headerPKProp: 'number',
     omitEmptyFields: ['number'],
   },
   dataSurface: {

@@ -7,8 +7,6 @@ import { MenuService } from '../../../core/services/menu.service';
 import { resolveRunModalConfigModule, resolvePageType } from '../../../core/services/run-modal-config-registry';
 import { DocumentPageCommandAssemblerService } from '../document-page-command-assembler.service';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
-import { EntityContractService } from '../../data/entity-contract.service';
-import { prCoreContract } from './pr-core-contract.fixture';
 import { DataSourceService, DATA_REST_SERVICE } from '../../data/data-source.service';
 import { LineCalculationService } from '../../document/line-calculation.service';
 import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
@@ -31,17 +29,16 @@ describe('PR reference page acceptance', () => {
 
   it('provides standard line commands without an empty toolbar declaration and uses the authorized API contract without PR permission aliases', () => {
     const permission={pageId:'purchase-requisition',ReadPermission:true,InsertPermission:false,ModifyPermission:false,DeletePermission:false,PostPermission:false};
-    TestBed.configureTestingModule({providers:[provideRouter([]),{provide:SessionService,useValue:{SuperAdmin:false,Permissions:[permission]}}]});
+    const apiPermission={apiPath:'/purchaseRequisitionLines',canRead:true,canCreate:false,canUpdate:false,canDelete:false};
+    TestBed.configureTestingModule({providers:[provideRouter([]),{provide:SessionService,useValue:{SuperAdmin:false,Permissions:[permission,apiPermission]}}]});
     const assembler=TestBed.inject(DocumentPageCommandAssemblerService);
     const commands=()=>assembler.resolveLineToolbarButtons({pageId:'purchase-requisition',lineConfig:purchaseRequisitionLineConfig});
     expect(purchaseRequisitionLineConfig.toolbarButtons).toBeUndefined();
     for(const action of ['cmd:line-new','cmd:line-delete']) expect(commands().find(command=>command.actionKey===action)?.disabled).toBe(true);
     expect(commands().find(command=>command.actionKey==='cmd:line-refresh')?.disabled).not.toBe(true);
-    permission.ModifyPermission=true;
+    apiPermission.canCreate=true;
+    apiPermission.canDelete=true;
     TestBed.inject(DataSourceService).getReadGeneration();
-    const contract=structuredClone(prCoreContract);
-    contract.endpoints=contract.endpoints.filter(endpoint=>!(endpoint.path.endsWith('/purchaseRequisitions') && endpoint.methods.includes('POST')));
-    TestBed.inject(EntityContractService).acceptMetadata({data:contract});
     expect(purchaseRequisitionLineConfig.dataSource.permissions).toBeUndefined();
     for(const action of ['cmd:line-new','cmd:line-delete']) expect(commands().find(command=>command.actionKey===action)?.disabled).not.toBe(true);
     const header=assembler.resolveHeaderToolbarButtons({pageId:'purchase-requisition',dataSource:purchaseRequisitionListConfig.dataSource,toolbarButtons:purchaseRequisitionHeaderConfig.toolbarButtons});
@@ -50,16 +47,18 @@ describe('PR reference page acceptance', () => {
     expect(header.find(command=>command.actionKey==='cmd:delete')?.disabled).toBe(true);
   });
 
-  it('loads every line page before totaling and binds the parent by systemId, not document number', async () => {
+  it('loads every line page before totaling and scopes the flat line API by document number and document type', async () => {
     const records=Array.from({length:125},(_,index)=>({systemId:'line-'+index,lineNo:(index+1)*10000,estimatedAmount:'1.25'}));
     const get=vi.fn((url:string)=>{
       const parsed=new URL(url,'http://test');
-      expect(parsed.pathname).toBe('/purchaseRequisitions/header-id/lines');
+      expect(parsed.pathname).toBe('/purchaseRequisitionLines');
+      expect(parsed.searchParams.get('$filter')).toContain("documentNumber eq 'PR-DIFFERENT'");
+      expect(parsed.searchParams.get('$filter')).toContain("documentType eq 'purchase_requisition'");
       const skip=Number(parsed.searchParams.get('$skip') ?? 0),top=Number(parsed.searchParams.get('$top'));
       return of({data:records.slice(skip,skip+top),meta:{total:records.length}});
     });
     TestBed.configureTestingModule({providers:[{provide:DATA_REST_SERVICE,useValue:{get}}]});
-    const rows=await TestBed.inject(DocumentHydrationOrchestratorService).loadLineRowsForHeader(purchaseRequisitionLineConfig.dataSource,{systemId:'header-id',number:'PR-DIFFERENT'});
+    const rows=await TestBed.inject(DocumentHydrationOrchestratorService).loadLineRowsForHeader(purchaseRequisitionLineConfig.dataSource,{systemId:'header-id',number:'PR-DIFFERENT',documentType:'purchase_requisition'}, {defaultTop:100});
     expect(get).toHaveBeenCalledTimes(2);
     expect(rows).toHaveLength(125);
     const totals=TestBed.inject(LineCalculationService).calculateLineTotals(rows,purchaseRequisitionLineConfig.totalsCalculation!);

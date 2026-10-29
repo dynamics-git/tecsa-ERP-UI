@@ -134,7 +134,7 @@ export const notificationRulesListConfig: ListPageConfig & { dataSource: DataSou
   dataSource: {
     endpoint: '/notificationRules',
     keyField: 'systemId',
-    documentNoField: 'code',
+    headerPKProp: 'code',
     defaultSort: 'code asc',
     supportsDelete: false,
     lazyCreateOnFirstInput: true,

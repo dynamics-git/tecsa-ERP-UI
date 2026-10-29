@@ -44,7 +44,6 @@ export const currencyExchangeRatesLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: currencyExchangeRatesDataSource,
   toolbarButtons: [],
   columns: [
