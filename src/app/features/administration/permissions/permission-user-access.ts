@@ -38,6 +38,10 @@ export class PermissionUserAccess implements OnChanges {
   get activeMemberships(): UserCompany[] { return this.memberships.filter(item => item.isActive); }
   get assignableRoles(): PermissionRole[] { return this.roles.filter(role => role.assignable && role.isActive); }
   get assignmentCompanies(): UserCompany[] { return this.activeMemberships; }
+  companyLabel(id: string): string {
+    const row = this.memberships.find(item => item.companyId === id);
+    return row?.company?.code ?? this.companies.find(item => item.systemId === id)?.code ?? id;
+  }
 
   async reload(): Promise<void> {
     const revision = ++this.requestId;
