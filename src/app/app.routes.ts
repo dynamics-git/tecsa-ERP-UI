@@ -39,6 +39,10 @@ import { PurchaseRequisitionPage } from './features/purchasing/purchase-requisit
 import { PurchasesPayablesSetupPage } from './features/setup/purchases-payables-setup/purchases-payables-setup';
 import { SalesReceivablesSetupPage } from './features/setup/sales-receivables-setup/sales-receivables-setup';
 
+import { UsersPage } from './features/administration/security/users/users';
+import { PermissionSetsPage } from './features/administration/security/permission-sets/permission-sets';
+import { PageConfigurationPage } from './features/administration/security/page-configuration/page-configuration';
+
 export const routes: Routes = [
   { path: 'welcome', component: PlatformRedirect },
   { path: 'start', component: PlatformRedirect, data:{registration:true} },
@@ -82,6 +86,9 @@ export const routes: Routes = [
       { path: 'item-default-dimensions', redirectTo: 'items', pathMatch: 'full' },
       { path: 'purchase-order', component: PurchaseOrderPage, data: { pageId: 'purchase-order' } },
       { path: 'no-series', component: NoSeriesPage, data: { pageId: 'no-series' } },
+      { path:'users', component:UsersPage, data:{pageId:'users'} },
+      { path:'permission-sets', component:PermissionSetsPage, data:{pageId:'permission-sets'} },
+      { path:'page-configuration', component:PageConfigurationPage, data:{pageId:'page-configuration'} },
       { path: 'purchase-requisition', component: PurchaseRequisitionPage, data: { pageId: 'purchase-requisition' } },
       { path: 'purchases-payables-setup', component: PurchasesPayablesSetupPage, data: { pageId: 'purchases-payables-setup' } },
       { path: 'sales-receivables-setup', component: SalesReceivablesSetupPage, data: { pageId: 'sales-receivables-setup' } },
