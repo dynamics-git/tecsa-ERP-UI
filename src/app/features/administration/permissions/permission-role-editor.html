@@ -1,0 +1,116 @@
+<div class="security-shade" (click)="closed.emit()">
+  <section class="security-panel" role="dialog" aria-modal="true" aria-label="Role permissions" (click)="$event.stopPropagation()">
+    <header class="security-top">
+      <div>
+        <h2 class="security-title">{{ role.code }} · {{ role.name }}</h2>
+        <div class="security-sub">Role Permissions · Read / Insert / Modify / Delete / Post · Buttons and Fields</div>
+      </div>
+      <div class="security-toolbar">
+        <button type="button" class="ts-btn ts-btn-secondary" (click)="load()" [disabled]="loading || saving">Refresh</button>
+        <button type="button" class="ts-btn ts-btn-ghost" (click)="closed.emit()">Close</button>
+      </div>
+    </header>
+    <nav class="security-tabs" aria-label="Permission category">
+      <button type="button" class="security-tab" [class.selected]="tab === 'pages'" (click)="tab='pages';search=''">Page Permissions</button>
+      <button type="button" class="security-tab" [class.selected]="tab === 'controls'" (click)="tab='controls';search=''">Buttons &amp; Fields</button>
+      <button type="button" class="security-tab" [class.selected]="tab === 'resources'" (click)="tab='resources';search=''">Backend Resources</button>
+    </nav>
+    <main class="security-body">
+      @if (readonlyRole) { <p class="security-muted">System Roles are maintained by ERP Core and cannot be edited here.</p> }
+      @if (loading) {
+        <p class="security-muted">Loading permissions…</p>
+      } @else {
+        <div class="security-control-row">
+          <input class="ts-control" type="search" [(ngModel)]="search" placeholder="Search page, module or resource" aria-label="Search permissions">
+          @if (tab === 'controls') {
+            <select class="ts-select" [(ngModel)]="selectedPageId" aria-label="Select page">
+              @for (page of pages; track page.pageId) {
+                <option [value]="page.pageId">{{ page.title }} ({{ page.pageId }})</option>
+              }
+            </select>
+          }
+        </div>
+        @if (tab === 'pages') {
+          <div class="security-wrap">
+            <table class="security-table">
+              <thead>
+                <tr><th>Page / Page ID</th><th>Module</th>
+                  @for (flag of pageFlags; track flag.key) { <th class="check-cell">{{flag.label}}</th> }
+                </tr>
+              </thead>
+              <tbody>
+                @for (page of visiblePages; track page.pageId) {
+                  <tr>
+                    <td><strong>{{page.title}}</strong><div class="security-key">{{page.pageId}}</div></td>
+                    <td class="security-muted">{{page.module || '—'}}</td>
+                    @for (flag of pageFlags; track flag.key) {
+                      <td class="check-cell"><input type="checkbox" [checked]="pageFlag(page.pageId,flag.key)"
+                        [attr.aria-label]="flag.label + ' ' + page.title"
+                        (change)="changePage(page.pageId,flag.key,$any($event.target).checked)" [disabled]="readonlyRole"></td>
+                    }
+                  </tr>
+                } @empty {
+                  <tr><td colspan="7" class="security-empty">No pages registered. Open Page Configuration and sync the existing UI configs.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else if (tab === 'controls') {
+          @if (selectedPage; as page) {
+            <p class="security-muted">Page: {{page.title}}. Checked means permitted; unconfigured controls inherit their page rights.</p>
+            <div class="security-wrap">
+              <table class="security-table">
+                <thead><tr><th>Surface</th><th>Target</th><th>Config Key</th>
+                  @for (flag of targetFlags; track flag.key) { <th class="check-cell">{{flag.label}}</th> }
+                </tr></thead>
+                <tbody>
+                  @for (item of page.targets; track item.systemId) {
+                    <tr>
+                      <td>{{item.surface}}</td><td>{{item.label}}</td><td class="security-key">{{item.targetKey}}</td>
+                      @for (flag of targetFlags; track flag.key) {
+                        <td class="check-cell"><input type="checkbox" [checked]="targetFlag(item.systemId,flag.key)"
+                          [attr.aria-label]="flag.label + ' ' + item.label"
+                          (change)="changeTarget(item.systemId,flag.key,$any($event.target).checked)"
+                          [disabled]="readonlyRole || !item.isActive"></td>
+                      }
+                    </tr>
+                  } @empty { <tr><td colspan="6" class="security-empty">No field or command targets registered.</td></tr> }
+                </tbody>
+              </table>
+            </div>
+          } @else { <p class="security-empty">Select a Page to view its fields and commands.</p> }
+        } @else {
+          <p class="security-muted">Backend resource rights are enforced by Laravel. Page rights never grant API access on their own.</p>
+          <div class="security-wrap">
+            <table class="security-table">
+              <thead><tr><th>Resource</th>
+                @for (flag of resourceFlags; track flag.key) { <th class="check-cell">{{flag.label}}</th> }
+              </tr></thead>
+              <tbody>
+                @for (resource of visibleResources; track resource) {
+                  <tr>
+                    <td class="security-key">{{resource}}</td>
+                    @for (flag of resourceFlags; track flag.key) {
+                      <td class="check-cell"><input type="checkbox" [checked]="resourceFlag(resource,flag.key)"
+                        [attr.aria-label]="flag.label + ' ' + resource"
+                        (change)="changeResource(resource,flag.key,$any($event.target).checked)" [disabled]="readonlyRole"></td>
+                    }
+                  </tr>
+                } @empty { <tr><td colspan="6" class="security-empty">No backend resources found.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+      @if (error) { <p class="security-error" role="alert">{{error}}</p> }
+      @if (success) { <p class="security-success" role="status">{{success}}</p> }
+    </main>
+    <footer class="security-footer">
+      <span class="security-muted" style="margin-right:auto">Permissions are effective only for the user's assigned companies.</span>
+      <button type="button" class="ts-btn ts-btn-secondary" (click)="closed.emit()">Close</button>
+      <button type="button" class="ts-btn ts-btn-primary" (click)="save()" [disabled]="readonlyRole || saving || loading">
+        {{saving ? 'Saving…' : 'Save Permissions'}}
+      </button>
+    </footer>
+  </section>
+</div>
