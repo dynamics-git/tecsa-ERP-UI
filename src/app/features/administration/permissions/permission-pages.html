@@ -1,0 +1,51 @@
+<section class="security-panel" style="width:100%;height:100%;box-shadow:none">
+  <header class="security-top">
+    <div><h1 class="security-title">Page Configuration</h1><div class="security-sub">Registered Pages · URLs · Header/Line/List · Worksheets &amp; Run Modal</div></div>
+    <div class="security-toolbar">
+      <button type="button" class="ts-btn ts-btn-secondary" (click)="reload()" [disabled]="loading || saving">Refresh</button>
+      <button type="button" class="ts-btn ts-btn-primary" (click)="sync()" [disabled]="loading || saving || !discovered.length">{{saving ? 'Synchronizing…' : 'Synchronize UI Configuration'}}</button>
+    </div>
+  </header>
+  <div class="security-body">
+    <p class="security-muted">Page IDs, URLs, fields and commands come from the existing TecSA configs. Only pages linked to approved backend resources are synchronized.</p>
+    <div class="security-control-row">
+      <input class="ts-control" type="search" [(ngModel)]="search" placeholder="Find page, module, URL" aria-label="Search pages">
+      <span class="security-muted">{{pages.length}} registered · {{discovered.length}} discovered</span>
+    </div>
+    @if (unmapped.length) { <p class="security-error">Not synchronized (no mapped backend resource): {{unmapped.join(', ')}}</p> }
+    @if (loading) { <p class="security-muted">Reading Page Configuration…</p> }
+    @else {
+      <div class="security-wrap">
+        <table class="security-table">
+          <thead><tr><th>Page ID / Title</th><th>Type</th><th>Module</th><th>URL</th><th>Resource</th><th>Controls</th></tr></thead>
+          <tbody>
+            @for (page of visiblePages; track page.pageId) {
+              <tr class="security-selection" [class.active]="page.pageId===selectedPageId" (click)="selectedPageId=page.pageId">
+                <td><strong>{{page.title}}</strong><div class="security-key">{{page.pageId}}</div></td><td>{{page.pageType}}</td>
+                <td>{{page.module || '—'}}</td><td class="security-key">{{page.route || 'Internal / Run Modal'}}</td>
+                <td class="security-key">{{page.resource || '—'}}</td><td>{{page.targets.length}}</td>
+              </tr>
+            } @empty { <tr><td colspan="6" class="security-empty">No registered pages yet. Synchronize UI Configuration.</td></tr> }
+          </tbody>
+        </table>
+      </div>
+      @if (selectedPage; as page) {
+        <div class="security-section">
+          <div class="security-section-title">{{page.title}} · Fields / Commands</div>
+          <div class="security-wrap">
+            <table class="security-table">
+              <thead><tr><th>Surface</th><th>Type</th><th>Key</th><th>Caption</th><th>Status</th></tr></thead>
+              <tbody>
+                @for (target of page.targets; track target.systemId) {
+                  <tr><td>{{target.surface}}</td><td>{{target.targetType}}</td><td class="security-key">{{target.targetKey}}</td><td>{{target.label}}</td><td>{{target.isActive ? 'Registered' : 'Inactive'}}</td></tr>
+                } @empty { <tr><td colspan="5" class="security-empty">No configured targets.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    }
+    @if (error) { <p class="security-error" role="alert">{{error}}</p> }
+    @if (message) { <p class="security-success" role="status">{{message}}</p> }
+  </div>
+</section>
