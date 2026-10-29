@@ -37,6 +37,9 @@ import * as dimensionCombinations from './purchase-masters/dimension-combination
 import * as itemDefaultDimensions from './purchase-masters/item-default-dimensions/item-default-dimensions';
 import * as purchaseOrder from './purchasing/purchase-order/purchase-order';
 import * as noSeries from './administration/no-series/no-series';
+import * as permissionRoles from './administration/permissions/permission-roles';
+import * as permissionUsers from './administration/permissions/permission-users';
+import * as permissionPages from './administration/permissions/permission-pages';
 import * as purchaseRequisition from './purchasing/purchase-requisition/purchase-requisition';
 import * as purchasesPayablesSetup from './setup/purchases-payables-setup/purchases-payables-setup';
 import * as salesReceivablesSetup from './setup/sales-receivables-setup/sales-receivables-setup';
@@ -81,6 +84,9 @@ export const runModalPageModules: RunModalConfigModule[] = [
   itemDefaultDimensions,
   purchaseOrder,
   noSeries,
+  permissionRoles,
+  permissionUsers,
+  permissionPages,
   purchaseRequisition,
   purchasesPayablesSetup,
   salesReceivablesSetup,

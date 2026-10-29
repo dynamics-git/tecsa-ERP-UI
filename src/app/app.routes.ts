@@ -35,6 +35,9 @@ import { LoginPage } from './features/auth/login/login';
 import { PlatformRedirect } from './features/auth/platform-redirect';
 import { authChildGuard, authGuard, unsavedChangesGuard } from './core/guards/auth.guard';
 import { NoSeriesPage } from './features/administration/no-series/no-series';
+import { PermissionRolesPage } from './features/administration/permissions/permission-roles';
+import { PermissionUsersPage } from './features/administration/permissions/permission-users';
+import { PermissionPagesPage } from './features/administration/permissions/permission-pages';
 import { PurchaseRequisitionPage } from './features/purchasing/purchase-requisition/purchase-requisition';
 import { PurchasesPayablesSetupPage } from './features/setup/purchases-payables-setup/purchases-payables-setup';
 import { SalesReceivablesSetupPage } from './features/setup/sales-receivables-setup/sales-receivables-setup';
@@ -82,6 +85,9 @@ export const routes: Routes = [
       { path: 'item-default-dimensions', redirectTo: 'items', pathMatch: 'full' },
       { path: 'purchase-order', component: PurchaseOrderPage, data: { pageId: 'purchase-order' } },
       { path: 'no-series', component: NoSeriesPage, data: { pageId: 'no-series' } },
+      { path: 'permission-roles', component: PermissionRolesPage, data: { pageId: 'permission-roles' } },
+      { path: 'permission-users', component: PermissionUsersPage, data: { pageId: 'permission-users' } },
+      { path: 'permission-pages', component: PermissionPagesPage, data: { pageId: 'permission-pages' } },
       { path: 'purchase-requisition', component: PurchaseRequisitionPage, data: { pageId: 'purchase-requisition' } },
       { path: 'purchases-payables-setup', component: PurchasesPayablesSetupPage, data: { pageId: 'purchases-payables-setup' } },
       { path: 'sales-receivables-setup', component: SalesReceivablesSetupPage, data: { pageId: 'sales-receivables-setup' } },
