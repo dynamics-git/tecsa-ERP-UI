@@ -1,6 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import type { DocumentPageCommandEvent } from '../../../platform/pages/list-page/list-page';
+import { ListPage, RunModalPageWindow, type DocumentPageCommandEvent } from '../../../platform/public-api';
 import { PermissionRole } from './permission-admin-api.service';
 import { PermissionRoleEditor } from './permission-role-editor';
 import { permissionRolesHeaderConfig, permissionRolesListConfig } from './permission-roles.config';
