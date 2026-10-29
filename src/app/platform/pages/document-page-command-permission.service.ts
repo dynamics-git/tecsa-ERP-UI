@@ -3,7 +3,6 @@ import { DataSourceService } from '../data/data-source.service';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { Injectable, Optional } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
-import { PermissionTargetService } from '../../core/services/permission-target.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
 // API action identities default centrally; explicit permission aliases remain supported.
@@ -14,12 +13,9 @@ export class DocumentPageCommandPermissionService {
     private readonly sessionService: SessionService,
     private readonly valueMapper: RuntimeValueMapperService,
     @Optional() private readonly dataSource?: DataSourceService,
-    @Optional() private readonly targets?: PermissionTargetService,
   ) {}
 
   apply(button: CommandConfig, pageId: string, source?: DataSourceConfig): CommandConfig {
-    const guard = this.guardTarget(button, pageId);
-    if (guard !== button) return guard;
     if (button.hidden === true) {
       return button;
     }
@@ -62,8 +58,6 @@ export class DocumentPageCommandPermissionService {
 
   applySourceOperation(button: CommandConfig, pageId: string, source: DataSourceConfig,
     operation: 'create' | 'update' | 'delete'): CommandConfig {
-    const guard = this.guardTarget(button, pageId);
-    if (guard !== button) return guard;
     const allowed = this.dataSource?.operationAllowed(source, operation);
     if (allowed === false) return {...button, disabled: true, tooltip: 'This operation is not available for your access.'};
     const override = source.permissions?.[operation];
@@ -76,8 +70,6 @@ export class DocumentPageCommandPermissionService {
     pageId: string,
     operation: 'create' | 'modify' | 'delete',
   ): CommandConfig {
-    const guard = this.guardTarget(button, pageId);
-    if (guard !== button) return guard;
     if (button.hidden || this.sessionService.SuperAdmin && !this.hasDeclaredPage(pageId)) return button;
     const flags = this.resolvePagePermissionFlags(pageId);
     const allowed =
@@ -89,21 +81,6 @@ export class DocumentPageCommandPermissionService {
     return allowed
       ? button
       : { ...button, disabled: true, tooltip: 'You do not have permission for this operation.' };
-  }
-
-  private guardTarget(button: CommandConfig, pageId: string): CommandConfig {
-    if (!this.targets || button.hidden) return button;
-    const action = this.normalizePopupCommandKey(button.actionKey);
-    const surface = button.surface ?? (action.startsWith('line-') ? 'line' : 'header');
-    if (!this.targets.allowed(pageId, surface, 'command', button.actionKey, 'canView') ||
-        (button.runModalPageId && !this.targets.allowed(pageId, 'runModal', 'page', button.runModalPageId, 'canView'))) {
-      return {...button, hidden: true, disabled: true};
-    }
-    if (!this.targets.allowed(pageId, surface, 'command', button.actionKey, 'canExecute') ||
-        (button.runModalPageId && !this.targets.allowed(pageId, 'runModal', 'page', button.runModalPageId, 'canExecute'))) {
-      return {...button, disabled: true, tooltip: button.tooltip ?? 'You do not have permission for this command.'};
-    }
-    return button;
   }
 
   private isCustomExecutableCommand(action: string): boolean {

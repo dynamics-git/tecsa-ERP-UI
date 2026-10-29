@@ -54,8 +54,6 @@ export interface BasePageConfig extends Record<string, unknown> {
   autoSave?: boolean;
   /** Related pages may use the permission scope of their owning resource. */
   permissionPageId?: string;
-  /** Trusted API permission resource for pages whose endpoint differs from resource identity. */
-  permissionResource?: string;
   /** Optional page override; shared resource/column metadata supplies defaults. */
   identity?: RecordIdentityConfig;
   title?: string;

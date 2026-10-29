@@ -1,6 +1,0 @@
-<app-list-page [listConfig]="listConfig" [headerConfig]="headerConfig"
-  [documentOnly]="!!runModal" [initialRecord]="runModal?.record"
-  (closeRequested)="runModal?.close()" (businessCommand)="handleCommand($event)"/>
-@if (selectedRole) {
-  <app-permission-role-editor [role]="selectedRole" (closed)="selectedRole=undefined"/>
-}

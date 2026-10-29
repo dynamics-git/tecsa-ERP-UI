@@ -478,15 +478,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
         }
 
         if (command.apiAction && this.config?.dataSource) return this.commandPermissions.apply(command, this.config.pageId ?? '', this.config.dataSource);
-        const basic = command.permissionOperation;
-        const allowedByOperation = basic === 'read' ? true
-          : basic === 'create' ? pagePermissions.canCreate
-          : basic === 'modify' ? pagePermissions.canUpdate
-          : basic === 'delete' ? pagePermissions.canDelete
-          : pagePermissions.canExecute;
-        const canExecute = basic && basic !== 'execute'
-          ? allowedByOperation
-          : this.canExecuteCommand(resolveCommandPermissionKey(command, this.config?.pageId ?? ''), allowedByOperation);
+        const canExecute = this.canExecuteCommand(resolveCommandPermissionKey(command, this.config?.pageId ?? ''), pagePermissions.canExecute);
         if (canExecute) {
           return command;
         }

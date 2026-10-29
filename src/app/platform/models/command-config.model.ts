@@ -52,8 +52,6 @@ export interface CommandConfig {
   tooltip?: string;
   /** Override the default Page ID + API Action ID permission identity. */
   permissionKey?: string;
-  /** Page CRUD grant for non-API administrative commands; defaults to execute. */
-  permissionOperation?: 'read' | 'create' | 'modify' | 'delete' | 'execute';
 }
 
 /** API actions have their own permission identity; ordinary legacy callbacks retain

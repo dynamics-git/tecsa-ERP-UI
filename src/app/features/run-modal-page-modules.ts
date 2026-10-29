@@ -1,3 +1,12 @@
+import * as userCompanies from './administration/security/user-companies/user-companies';
+import * as userPermissionSets from './administration/security/user-permission-sets/user-permission-sets';
+import * as userSessions from './administration/security/user-sessions/user-sessions';
+import * as permissionPageRights from './administration/security/permission-page-rights/permission-page-rights';
+import * as permissionResourceRights from './administration/security/permission-resource-rights/permission-resource-rights';
+import * as permissionTargetRights from './administration/security/permission-target-rights/permission-target-rights';
+import * as users from './administration/security/users/users';
+import * as permissionSets from './administration/security/permission-sets/permission-sets';
+import * as pageConfiguration from './administration/security/page-configuration/page-configuration';
 import * as notificationRules from './administration/notification-rules/notification-rules';
 import * as dimensionValueCombinations from './purchase-masters/dimension-value-combinations/dimension-value-combinations';
 import * as glAccountDefaultDimensions from './purchase-masters/gl-account-default-dimensions/gl-account-default-dimensions';
@@ -37,9 +46,6 @@ import * as dimensionCombinations from './purchase-masters/dimension-combination
 import * as itemDefaultDimensions from './purchase-masters/item-default-dimensions/item-default-dimensions';
 import * as purchaseOrder from './purchasing/purchase-order/purchase-order';
 import * as noSeries from './administration/no-series/no-series';
-import * as permissionRoles from './administration/permissions/permission-roles';
-import * as permissionUsers from './administration/permissions/permission-users';
-import * as permissionPages from './administration/permissions/permission-pages';
 import * as purchaseRequisition from './purchasing/purchase-requisition/purchase-requisition';
 import * as purchasesPayablesSetup from './setup/purchases-payables-setup/purchases-payables-setup';
 import * as salesReceivablesSetup from './setup/sales-receivables-setup/sales-receivables-setup';
@@ -84,11 +90,17 @@ export const runModalPageModules: RunModalConfigModule[] = [
   itemDefaultDimensions,
   purchaseOrder,
   noSeries,
-  permissionRoles,
-  permissionUsers,
-  permissionPages,
   purchaseRequisition,
   purchasesPayablesSetup,
   salesReceivablesSetup,
   notificationRules,
+  userCompanies,
+  userPermissionSets,
+  userSessions,
+  permissionPageRights,
+  permissionResourceRights,
+  permissionTargetRights,
+  users,
+  permissionSets,
+  pageConfiguration,
 ];

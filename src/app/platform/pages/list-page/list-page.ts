@@ -12,7 +12,6 @@ import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs'
 import { catchError, map, timeout } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
-import { PermissionTargetService } from '../../../core/services/permission-target.service';
 import { AttachmentsConfig, DocumentWindowConfig, HeaderConfig, LineTotalsConfig, DocumentStatusMessage } from '../../models/document-window-config.model';
 import { LineColumnConfig, LineConfig } from '../../models/line-config.model';
 import { CommandConfig } from '../../models/command-config.model';
@@ -117,7 +116,6 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly listLifecycle = inject(DocumentPageListLifecycleService);
   private readonly valueMapper = inject(RuntimeValueMapperService);
   private readonly sessionService = inject(SessionService);
-  private readonly permissionTargets = inject(PermissionTargetService);
   private readonly subscriptions = new Subscription();
   private readonly unsavedNavigation = inject(UnsavedChangesService);
   get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0 || this.hasInvalidLineDrafts; }
@@ -305,52 +303,6 @@ export class ListPage implements OnInit, OnDestroy {
     this.initializePage();
   }
 
-  /** Apply only explicit restricted control keys; the existing page config is
-   * untouched when no target override is present. UI hiding is never API security. */
-  private applyConfiguredTargetPermissions(): void {
-    const pageId = this.permissionPageId;
-    const allowed = (surface: 'list'|'header'|'line'|'runModal', type: 'field'|'column'|'command'|'page',
-      key: string, flag: 'canView'|'canEdit'|'canExecute'): boolean =>
-      this.permissionTargets.allowed(pageId, surface, type, key, flag);
-    const guardCommand = (surface: 'list'|'header'|'line', button: CommandConfig): CommandConfig => {
-      const visible = allowed(surface, 'command', button.actionKey, 'canView')
-        && (!button.runModalPageId || allowed('runModal', 'page', button.runModalPageId, 'canView'));
-      const executable = allowed(surface, 'command', button.actionKey, 'canExecute')
-        && (!button.runModalPageId || allowed('runModal', 'page', button.runModalPageId, 'canExecute'));
-      return {...button, surface, hidden: button.hidden || !visible, disabled: button.disabled || !executable};
-    };
-    this.headerConfig = {...this.headerConfig,
-      sections: this.headerConfig.sections.map(section => ({...section,
-        fields: section.fields.map(field => ({...field,
-          hidden: field.hidden || !allowed('header','field',field.key,'canView'),
-          readonly: field.readonly || !allowed('header','field',field.key,'canEdit'),
-        }))})),
-      toolbarButtons: this.headerConfig.toolbarButtons.map(button => guardCommand('header', button)),
-    };
-    if (this.lineConfig) {
-      this.lineConfig = {...this.lineConfig,
-        columns: this.lineConfig.columns.map(column => ({...column,
-          hidden: column.hidden || !allowed('line','field',column.id,'canView'),
-          readonly: column.readonly || !allowed('line','field',column.id,'canEdit'),
-        })),
-        toolbarButtons: this.lineConfig.toolbarButtons?.map(button => guardCommand('line',button)),
-      };
-    }
-    const standard = this.listConfig.standardActions;
-    this.listConfig = {...this.listConfig,
-      commands: this.listConfig.commands?.map(button => guardCommand('list',button)),
-      standardActions: {
-        ...standard,
-        new: (allowed('list','command','new','canView') && allowed('list','command','new','canExecute')) ? standard?.new : false,
-        delete: (allowed('list','command','delete','canView') && allowed('list','command','delete','canExecute')) ? standard?.delete : false,
-      },
-      dataSurface: this.listConfig.dataSurface ? {...this.listConfig.dataSurface,
-        columns: this.listConfig.dataSurface.columns.map(column => ({...column,
-          hidden: column.hidden || !allowed('list','column',column.field ?? column.id ?? '','canView'),
-        }))} : undefined,
-    };
-  }
-
   private initializePage(): void {
     const source = this.listConfig.dataSource;
     this.headerConfig = {...this.headerConfig, sections: this.headerConfig.sections.map(section => ({...section,
@@ -367,7 +319,6 @@ export class ListPage implements OnInit, OnDestroy {
         })};
     }
     this.pageId = this.listConfig.pageId ?? this.pageId;
-    this.applyConfiguredTargetPermissions();
     this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
     const permission = this.sessionService.Permissions.find(value => this.isRecord(value) && (value['pageId'] === this.permissionPageId || value['PageId'] === this.permissionPageId));
     const query = this.isRecord(permission) && this.isRecord(permission['query']) ? permission['query'] : undefined;
