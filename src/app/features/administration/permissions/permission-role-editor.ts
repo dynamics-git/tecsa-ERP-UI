@@ -24,6 +24,17 @@ export class PermissionRoleEditor implements OnChanges {
   pageRights: PageRight[] = [];
   resourceRights: ResourceRight[] = [];
   targetRights: TargetRight[] = [];
+  readonly pageFlags: ReadonlyArray<{ key: PageFlag; label: string }> = [
+    {key:'canRead',label:'Read'}, {key:'canCreate',label:'Insert'},
+    {key:'canModify',label:'Modify'}, {key:'canDelete',label:'Delete'}, {key:'canPost',label:'Post'},
+  ];
+  readonly resourceFlags: ReadonlyArray<{ key: ResourceFlag; label: string }> = [
+    {key:'canRead',label:'Read'}, {key:'canCreate',label:'Insert'},
+    {key:'canModify',label:'Modify'}, {key:'canDelete',label:'Delete'}, {key:'canExecute',label:'Execute'},
+  ];
+  readonly targetFlags: ReadonlyArray<{ key: TargetFlag; label: string }> = [
+    {key:'canView',label:'Visible'}, {key:'canEdit',label:'Editable'}, {key:'canExecute',label:'Execute'},
+  ];
   tab: 'pages' | 'controls' | 'resources' = 'pages';
   selectedPageId = '';
   search = '';
