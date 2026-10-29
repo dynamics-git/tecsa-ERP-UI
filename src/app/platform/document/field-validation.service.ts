@@ -1,18 +1,19 @@
-import { fieldIsRequired, fieldIsHidden } from '../models/field-state';
+import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../models/field-state';
 import { Injectable } from '@angular/core';
 import { FieldConfig } from '../models/field-config.model';
-import { compareDecimalValues, isValidDateTime } from '../models/field-value';
+import { compareDecimalValues, isValidDateTime, normalizeFieldValue } from '../models/field-value';
 
 export interface FieldValidationResult {
   valid: boolean;
   errors: string[];
+  updates?: Record<string, unknown>;
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class FieldValidationService {
-  validateField(field: FieldConfig | undefined, value: unknown, record: Record<string, unknown> = {}): FieldValidationResult {
+  validateField(field: FieldConfig | undefined, value: unknown, record: Record<string, unknown> = {}, custom = false, fields: FieldConfig[] = []): FieldValidationResult {
     if (!field || fieldIsHidden(field, record)) {
       return { valid: true, errors: [] };
     }
@@ -110,10 +111,45 @@ export class FieldValidationService {
       } catch { errors.push(field.label + ' has an invalid validation pattern configuration'); }
     }
 
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+    if (custom && !errors.length && validation.custom) {
+      try {
+        const message = validation.custom({value, record: Object.freeze(structuredClone({...record, [field.key]: value}))});
+        if (message !== undefined) errors.push(typeof message === 'string' && message.trim() ? message : field.label + ' has an invalid custom validator result');
+      } catch { errors.push(field.label + ' validation could not complete'); }
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (custom && !errors.length && validation.afterValidate) {
+      try {
+        const proposed = validation.afterValidate({value, record: Object.freeze(structuredClone({...record, [field.key]: value}))});
+        if (proposed !== undefined) {
+          if (!proposed || typeof proposed !== 'object' || Array.isArray(proposed) || 'then' in proposed) throw new Error();
+          const candidate = {...record,[field.key]:value,...proposed};
+          for (const [key, raw] of Object.entries(proposed)) {
+            const target = fields.find(f=>f.key===key);
+            if (!target || key===field.key || key.startsWith('__') || target.disabled || fieldIsReadonly(target,record) || fieldIsReadonly(target,candidate) || fieldIsHidden(target,candidate)) {
+              errors.push(field.label + ' cannot update field "' + key + '"'); continue;
+            }
+            const next = normalizeFieldValue(raw,target.valueType??target.type,target.defaultValue);
+            errors.push(...this.validateField(target,next,candidate).errors);
+            updates[key]=next;
+          }
+        }
+      } catch { errors.push(field.label + ' after-validation updates could not complete'); }
+    }
+    return {valid: errors.length===0, errors, updates: errors.length ? undefined : updates};
+  }
+
+  /** Editor-only remote validation. Whole-record save checks never invoke callbacks. */
+  async validateEditorAsync(field: FieldConfig, value: unknown, record: Record<string,unknown>, fields: FieldConfig[]): Promise<FieldValidationResult> {
+    const snapshot = structuredClone(record);
+    const preliminary = this.validateField({...field,validation:{...field.validation,afterValidate:undefined}},value,snapshot,true,fields);
+    if (!preliminary.valid) return preliminary;
+    try {
+      const message = await field.validation?.customAsync?.({value,record:Object.freeze({...snapshot,[field.key]:value})});
+      if (message !== undefined) return {valid:false,errors:[typeof message==='string' && message.trim() ? message : field.label+' has an invalid custom validator result']};
+      return this.validateField({...field,validation:{...field.validation,custom:undefined}},value,snapshot,true,fields);
+    } catch { return {valid:false,errors:[field.label+' validation could not complete. Try again.']}; }
   }
 
   private toText(value: unknown): string {

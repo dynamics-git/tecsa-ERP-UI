@@ -176,3 +176,88 @@ Use `displayColumn` on alternative line fields when one grid column must select 
 This renders Type followed by a single No. column. Use the existing LineConfig.typeField option when the API requires type and selected master changes to be saved together. The active lookup still searches/pages through the existing LookupSelect; the API still receives itemId or glAccountId, never a synthetic number field. Selected captions, clipboard codes, per-row validation, resize and quick-entry use that same binding. F8/Fill Down do not transfer identifiers between different bound fields. An unsupported discriminator has no editable binding. Omit displayColumn to retain existing behavior.
 
 Partners can add another supported type by adding its backend field declaration with the same displayColumn and its own editableWhen/lookup. The shared renderer contains no business type names. This UI mapping does not add backend support or grant permissions for an undeclared resource.
+
+## Optional editor hooks (PR reference)
+
+Ordinary pages do not need hooks. Configure them only for exceptional field logic.
+Header fields and line columns use the same `validation` object:
+
+```ts
+validation: {
+  custom: ({ record }) => record['itemId'] ? undefined : 'Choose No. first.',
+  afterValidate: ({ value }) => ({ description: 'Quantity ' + value })
+}
+```
+
+`custom` returns an error message or `undefined`. It runs for the edited field,
+not as a whole-document prerequisite on every autosave. The PR Quantity rule
+is an explicit page rule; Core does not assume Item or G/L business behavior.
+Existing `fill` remains the simple way to copy lookup description fields.
+
+For an API-dependent check, optionally supply
+`customAsync: (context) => Promise<string | undefined>` using your existing service.
+There is no built-in remote uniqueness rule or new endpoint. A rejected Promise
+leaves the input visible with a retry message. Return a message to show a specific
+validation error. Ordinary fields remain synchronous.
+
+Execution order:
+1. Normalize input and run built-in field validation.
+2. Run `custom`, then optional `customAsync`.
+3. Evaluate `afterValidate` against the candidate record (before lookup fill).
+4. Validate proposed updates to other declared editable fields.
+5. Apply existing fill, returned updates and dependent-lookup clearing.
+6. Emit the normal change event; existing calculations and persistence follow.
+
+Callbacks receive a snapshot and must not mutate it. `afterValidate` is synchronous;
+return updates rather than changing records directly. It cannot update an unknown,
+read-only, hidden or disabled field. Updated fields receive built-in validation;
+custom hooks are not recursively invoked, preventing callback loops.
+
+Pending async input is retained outside the saved record. A newer edit supersedes
+an older response. Changes to the record during the check invalidate its result;
+the user re-enters the retained value to validate it against the current record.
+Destroyed/replaced editors do not apply late results. Paste awaits validation and
+checks that target records still match before applying changes. Invalid drafts
+continue to participate in the existing unsaved-change confirmation.
+
+## Optional CRUD callbacks
+
+Use `dataSource.hooks` only when a page needs exceptional behavior:
+
+```ts
+hooks: {
+  beforeCreate: ({ payload }) =>
+    payload?.['description'] ? undefined : 'Enter Description.',
+  afterCreate: ({ record }) => { /* API confirmed creation; observe record */ },
+  onError: ({ error }) => { /* observe the original write failure */ }
+}
+```
+
+`beforeCreate`, `beforeUpdate`, `beforeDelete` are synchronous checks: return a
+message to prevent the request, or nothing to continue. They receive a payload
+snapshot; changing it does not transform the outgoing request. Do not start
+asynchronous work in these callbacks.
+
+`afterCreate`, `afterUpdate`, `afterDelete` observe successful API responses.
+They are not Laravel after-commit hooks. Exceptions in these observers are reported
+through Angular error handling, without retrying or failing an already confirmed
+write. `onError` observes failures within the write/hook execution and preserves the
+original error. It does not receive earlier field validation, unsupported-operation,
+missing-version or queue-context rejection errors. These continue through their
+existing shared error handling.
+
+CRUD hooks do not wrap Approve, Post or other domain commands. Backend services and
+transactions remain unchanged. No additional page permissions are introduced.
+
+## Pending saves and action safety
+
+Existing save tracking remains authoritative. New/Refresh cannot replace the active
+document while writes are pending. Submit and other configured API actions cannot
+run with pending writes or unsaved/invalid drafts, including while a prompt is open.
+Close retains the existing background-save/unsaved-confirmation behavior; failed
+writes retain edits. Manual Save does not accept pending or invalid editor drafts.
+These guards do not automatically retry a failed write or execute a deferred action.
+
+Verification: PR-focused component/mock-API tests cover editor validation, async
+responses, paste, lifecycle callbacks, retries, manual/autosave, pending writes and
+save/reopen. They are not evidence of live Laravel persistence or every ERP page.

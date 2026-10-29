@@ -137,7 +137,13 @@ export class RunModalHydrationResolverService {
       return dataSource;
     }
 
-    const contextFilter = `${parentKeyField} eq ${this.toODataFilterLiteral(parentValue)}`;
+    const clauses = [`${parentKeyField} eq ${this.toODataFilterLiteral(parentValue)}`];
+    for (const [field, headerField] of Object.entries(dataSource.parentFieldMap ?? {})) {
+      const value = this.readFieldValue(contextRecord, headerField);
+      if (value === undefined || value === null || value === '') throw new Error('The related record context is missing.');
+      clauses.push(`${field} eq ${this.toODataFilterLiteral(value)}`);
+    }
+    const contextFilter = clauses.join(' and ');
     return {
       ...dataSource,
       defaultFilter: dataSource.defaultFilter

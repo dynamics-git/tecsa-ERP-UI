@@ -660,6 +660,7 @@ export class DocumentWindow {
 
   handleLineAction(event: { actionKey: string; row?: Record<string, unknown>; payload?: unknown }): void {
     const payload = this.mergeLineActionPayload(event.row, event.payload);
+    if (event.actionKey === 'line-draft') { this.action.emit({actionKey:event.actionKey,payload}); return; }
     this.routeAction(event.actionKey, payload);
   }
 

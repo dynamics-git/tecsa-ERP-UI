@@ -168,6 +168,9 @@ export class DocumentConfigDataService {
       return null;
     }
 
+    // Never create a child until every explicitly mapped parent value is available.
+    if (Object.keys(lineConfig.dataSource.parentFieldMap ?? {}).some(field => !this.hasValue(payload[field]))) return null;
+
     const hasAnyValue = fields.some((field) => this.hasValue(payload[field]));
     if (!hasAnyValue) {
       return null;
@@ -286,6 +289,10 @@ export class DocumentConfigDataService {
       row[parentKeyField] = documentNoField
         ? headerData[documentNoField] ?? headerData[parentKeyField]
         : headerData[parentKeyField];
+    }
+
+    for (const [field, headerField] of Object.entries(lineConfig.dataSource.parentFieldMap ?? {})) {
+      if (!this.hasValue(row[field])) row[field] = headerData[headerField];
     }
 
     for (const [field, value] of Object.entries(lineConfig.dataSource.parentFixedFields ?? {})) {

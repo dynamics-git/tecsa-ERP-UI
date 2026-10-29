@@ -1,5 +1,5 @@
 import { moveQuickEntry } from '../quick-entry';
-import { FieldValidationService } from '../../../platform/document/field-validation.service';
+import { FieldValidationResult, FieldValidationService } from '../../../platform/document/field-validation.service';
 import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../../../platform/models/field-state';
 import { lookupQuery, clearDependentLookups } from '../../../platform/data/lookup-dependencies';
 import { resolveLookupIdentity } from '../../../platform/data/record-identity';
@@ -38,9 +38,12 @@ export class DynamicForm {
   readonly moveQuickEntry = moveQuickEntry;
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
   readonly errors = new Map<string,string>();
+  private destroyed = false;
+  private readonly validationRuns = new Map<string, object>();
   private readonly drafts = new Map<string,unknown>();
   errorId(field: FieldConfig): string { return this.lookupId + '-error-' + field.key; }
   validate(): boolean {
+    if (this.drafts.size) return false;
     this.errors.clear();
     for (const section of this.sections) for (const field of section.fields) {
       if (this.isHidden(field) || this.isFieldDisabled(field)) continue;
@@ -56,6 +59,7 @@ export class DynamicForm {
   private readonly pendingSelectedLookups = new Set<string>();
   ngOnChanges(changes?:SimpleChanges): void {
     if (changes?.['data'] && !changes['data'].firstChange) {
+      this.validationRuns.clear();
       for(const fieldKey of this.drafts.keys()) this.draftChanged.emit({fieldKey,invalid:false});
       this.drafts.clear();this.errors.clear();
       this.lookups.forEach(request => request.unsubscribe()); this.lookups.clear();
@@ -161,7 +165,7 @@ export class DynamicForm {
       error: () => { if (lookupQuery(field.lookup!, this.data, text).filter !== query.filter || this.lookupOpen !== field.key) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); },
     });
   }
-  ngOnDestroy(): void { this.lookupSearch?.unsubscribe(); this.lookups.forEach(subscription => subscription.unsubscribe()); }
+  ngOnDestroy(): void { this.destroyed=true; this.validationRuns.clear(); this.lookupSearch?.unsubscribe(); this.lookups.forEach(subscription => subscription.unsubscribe()); }
   @Input() sections: FormSectionConfig[] = [];
   @Input() dependencySections?: FormSectionConfig[];
   @Input() data: Record<string, unknown> = {};
@@ -227,16 +231,34 @@ export class DynamicForm {
     return field.width === 'wide';
   }
 
-  updateFieldValue(field: FieldConfig, value: unknown): void {
+  updateFieldValue(field: FieldConfig, value: unknown, accepted?: FieldValidationResult): void {
     if (this.isFieldDisabled(field) || this.isHidden(field)) return;
     value = normalizeFieldValue(value, field.valueType ?? field.type);
-    const result = this.validation.validateField(field,value,this.data);
+    const fields=(this.dependencySections ?? this.sections).flatMap(section=>section.fields);
+    if (field.validation?.customAsync && !accepted) {
+      const run={}, record=this.data, snapshot=JSON.stringify(record);
+      const inScope=this.source.captureWriteScope?.() ?? (()=>true);
+      this.validationRuns.set(field.key,run);
+      this.drafts.set(field.key,value); this.errors.set(field.key,'Validating…');
+      this.draftChanged.emit({fieldKey:field.key,invalid:true}); this.changes.markForCheck();
+      void this.validation.validateEditorAsync(field,value,record,fields).then(result=>{
+        if(this.destroyed || this.data!==record || this.validationRuns.get(field.key)!==run) return;
+        this.validationRuns.delete(field.key);
+        if(!inScope() || JSON.stringify(record)!==snapshot || this.isFieldDisabled(field) || this.isHidden(field)) {
+          this.errors.set(field.key,'Record changed during validation. Re-enter this value to validate again.');
+          this.changes.markForCheck(); return;
+        }
+        this.updateFieldValue(field,value,result);
+      });
+      return;
+    }
+    const result = accepted ?? this.validation.validateField(field,value,this.data,true,fields);
     if (!result.valid) { this.drafts.set(field.key,value); this.errors.set(field.key,result.errors[0]); this.draftChanged.emit({fieldKey:field.key,invalid:true}); this.changes.markForCheck(); return; }
     this.drafts.delete(field.key); this.errors.delete(field.key); this.draftChanged.emit({fieldKey:field.key,invalid:false}); this.changes.markForCheck();
     const previousValue = this.data[field.key];
     if (fieldValuesEqual(previousValue, value, field.valueType ?? field.type)) return;
     this.data[field.key] = value;
-    const updates = this.resolveTargetUpdates(field, value) ?? {};
+    const updates = {...this.resolveTargetUpdates(field, value), ...result.updates};
     const previousUpdates: Record<string, unknown> = {};
 
     if (updates) {

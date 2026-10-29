@@ -55,7 +55,7 @@ export function lineConfigDefaults(config: LineConfig): LineConfig {
   // Separate child collections may require their parent key in the payload.
   const relationFields = source.navigation
     ? []
-    : [source.parentKeyField, ...Object.keys(source.parentFixedFields ?? {})].filter((field): field is string => !!field);
+    : [source.parentKeyField, ...Object.keys(source.parentFixedFields ?? {}), ...Object.keys(source.parentFieldMap ?? {})].filter((field): field is string => !!field);
   return {
     ...config,
     dataSource: {

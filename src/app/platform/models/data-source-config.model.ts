@@ -1,5 +1,28 @@
+export interface DataWriteContext {
+  readonly operation: 'create' | 'update' | 'delete';
+  readonly endpoint: string;
+  readonly id: unknown;
+  readonly payload: Readonly<Record<string, unknown>> | undefined;
+}
+export interface DataWriteSuccess extends DataWriteContext {
+  readonly record: Readonly<Record<string, unknown>> | undefined;
+}
+export interface DataWriteFailure extends DataWriteContext { readonly error: unknown; }
+/** Optional synchronous callbacks. Before callbacks may return an error to veto a write.
+ * After callbacks observe confirmed API success; they are not database transaction hooks. */
+export interface DataWriteHooks {
+  beforeCreate?: (context: DataWriteContext) => string | void;
+  beforeUpdate?: (context: DataWriteContext) => string | void;
+  beforeDelete?: (context: DataWriteContext) => string | void;
+  afterCreate?: (context: DataWriteSuccess) => undefined;
+  afterUpdate?: (context: DataWriteSuccess) => undefined;
+  afterDelete?: (context: DataWriteSuccess) => undefined;
+  onError?: (context: DataWriteFailure) => undefined;
+}
+
 export interface DataSourceConfig {
   endpoint: string;
+  hooks?: DataWriteHooks;
   /** Additional resource families changed by business policies during CRUD. Commands invalidate all reads. */
   invalidates?: string[];
   /** REST is the ERP contract. Legacy syntax is an explicit compatibility option. */
@@ -17,6 +40,8 @@ export interface DataSourceConfig {
   keyField?: string;
   parentKeyField?: string;
   parentFixedFields?: Record<string, unknown>;
+  /** Additional child API field → header field bindings, independent of record identity. */
+  parentFieldMap?: Record<string, string>;
   createFields?: string[];
   updateBlockedFields?: string[];
   documentNoField?: string;

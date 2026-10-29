@@ -45,6 +45,10 @@ export class DocumentPageDataSourceResolverService {
       clauses.push(`${parentKeyField} eq ${params.toODataLiteral(documentNo)}`);
     }
 
+    for (const [field, headerField] of Object.entries(params.lineDataSource.parentFieldMap ?? {})) {
+      if (!params.hasValue(params.header[headerField])) return '';
+      clauses.push(`${field} eq ${params.toODataLiteral(params.header[headerField])}`);
+    }
     for (const [field, value] of Object.entries(params.lineDataSource.parentFixedFields ?? {})) {
       clauses.push(`${field} eq ${params.toODataLiteral(value)}`);
     }
@@ -67,6 +71,13 @@ export class DocumentPageDataSourceResolverService {
     }
 
     const baseDataSource = params.lineConfig.dataSource;
+    const missingParentFields = Object.values(baseDataSource.parentFieldMap ?? {}).filter(field => !params.hasValue(params.header[field]));
+    if (missingParentFields.length) {
+      const saved = params.hasValue(params.header[baseDataSource.keyField ?? 'systemId']);
+      return { dataSource: baseDataSource, lineContextReady: false, reason: saved
+        ? `The header response is missing ${missingParentFields.join(', ')}. Lines cannot load until the API returns these fields.`
+        : 'Complete header creation before entering lines.' };
+    }
     const relation = baseDataSource.navigation;
     if (!relation) {
       return { dataSource: baseDataSource, lineContextReady: true };
