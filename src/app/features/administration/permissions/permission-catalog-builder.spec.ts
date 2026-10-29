@@ -43,6 +43,18 @@ describe('Permission Page Config discovery', () => {
     expect(result.unmapped).toEqual(['sample-order']);
   });
 
+  it('uses a declared backend permission resource when endpoint differs', () => {
+    const setup = {
+      ...sample,
+      sampleListConfig: {...sample.sampleListConfig,
+        pageId: 'permission-pages', dataSource: {endpoint:'/permissionPages'},
+        permissionResource: 'permission_sets',
+      },
+    };
+    const result = discoverPermissionCatalog([setup], ['permission_sets']);
+    expect(result.mapped[0].resource).toBe('permission_sets');
+  });
+
   it('does not create duplicate control identities', () => {
     const result = discoverPermissionCatalog([sample], ['purchase_orders']);
     const ids = result.mapped[0].targets.map(t => [t.surface,t.targetType,t.targetKey].join('|'));

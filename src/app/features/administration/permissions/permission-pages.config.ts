@@ -2,6 +2,7 @@ import { DataSourceConfig, ListPageConfig } from '../../../platform/public-api';
 
 export const permissionPagesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   pageId: 'permission-pages',
+  permissionResource: 'permission_sets',
   pageType: 'list',
   title: 'Page Configuration',
   module: 'Administration',

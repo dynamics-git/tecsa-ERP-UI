@@ -72,7 +72,8 @@ export function discoverPermissionCatalog(
     }
 
     const rawEndpoint = page.dataSource?.endpoint?.replace(/^\/+/, '').split(/[/?]/)[0] ?? '';
-    const resource = rawEndpoint.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+    const resource = page.permissionResource ??
+      rawEndpoint.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
     if (!allowed.has(resource)) {
       unmapped.push(page.pageId);
       continue; // Never register a page with an unknown resource and lock out users.
