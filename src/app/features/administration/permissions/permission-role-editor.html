@@ -109,7 +109,7 @@
       <span class="security-muted" style="margin-right:auto">Permissions are effective only for the user's assigned companies.</span>
       <button type="button" class="ts-btn ts-btn-secondary" (click)="closed.emit()">Close</button>
       <button type="button" class="ts-btn ts-btn-primary" (click)="save()" [disabled]="readonlyRole || saving || loading">
-        {{saving ? 'Saving…' : 'Save Permissions'}}
+        {{saving ? 'Saving…' : (tab === 'pages' ? 'Save Page Rights' : tab === 'controls' ? 'Save Control Rights' : 'Save Resource Rights')}}
       </button>
     </footer>
   </section>
