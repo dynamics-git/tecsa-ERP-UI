@@ -1,7 +1,6 @@
 import { Component, Input, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import type { DocumentPageCommandEvent } from '../../../platform/pages/list-page/list-page';
+import { ListPage, RunModalPageWindow, type DocumentPageCommandEvent } from '../../../platform/public-api';
 import { PermissionAdminApi, UserRecord } from './permission-admin-api.service';
 import { PermissionUserAccess } from './permission-user-access';
 import { permissionUsersHeaderConfig, permissionUsersListConfig } from './permission-users.config';
