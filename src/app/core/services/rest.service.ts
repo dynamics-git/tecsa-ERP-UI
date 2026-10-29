@@ -102,7 +102,10 @@ export class RestService {
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const base = environment.apiBaseUrl.replace(/\/$/, '');
     // The Laravel API scopes records by /companies/{companyId}/, not companies(id).
-    if (/^\/companies(?:\/|\?|$)/.test(normalizedEndpoint)) {
+    // These ERP security APIs are shared routes (outside companies/{companyId}).
+    // Never guess scope from the caller; only the server-defined prefixes bypass
+    // business company routing. Permission middleware still authorizes each call.
+    if (/^\/(?:companies|users|permissionSets|permissionPages|permissionResources|auth\/sessions)(?:\/|\?|$)/.test(normalizedEndpoint)) {
       return `${base}${normalizedEndpoint}`;
     }
     const companyId = this.sessionService.Company;
