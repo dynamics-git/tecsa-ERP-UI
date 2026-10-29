@@ -349,6 +349,14 @@ export class AuthService {
       return bindings.length ? bindings : [page];
     });
 
+    // A registered Page Catalog entry must replace a legacy generic-resource
+    // binding with the same Page ID; otherwise .find() could pick older grants.
+    const catalogIds = new Set(pages.flatMap(page => {
+      const record = this.toRecord(page);
+      if (!record || record['targets'] === undefined) return [];
+      return [this.readFirstString(record, ['pageId', 'PageId'])];
+    }));
+
     pages.forEach((page) => {
       const pageRecord = this.toRecord(page);
       if (!pageRecord) {
@@ -356,6 +364,7 @@ export class AuthService {
       }
 
       const pageId = this.readFirstString(pageRecord, ['pageId', 'PageId']);
+      if (catalogIds.has(pageId) && pageRecord['targets'] === undefined) return;
       const pageName = this.readFirstString(pageRecord, ['pageName', 'PageName']) || pageId;
       const pageCode = this.readFirstString(pageRecord, ['pageCode', 'PageCode']) || pageName;
       const canRead = this.readBoolean(pageRecord, 'canRead');
