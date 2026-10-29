@@ -128,8 +128,11 @@ export class PermissionRoleEditor implements OnChanges {
       const id = this.role.systemId;
       await this.api.saveResourceRights(id, this.resourceRights.filter(row =>
         row.canRead || row.canCreate || row.canModify || row.canDelete || row.canExecute));
-      await this.api.savePageRights(id, this.pageRights.filter(row =>
-        row.canRead || row.canCreate || row.canModify || row.canDelete || row.canPost));
+      // Persist even all-false rows to explicitly deny a Page for this Role.
+      // Unconfigured catalog pages retain their existing backend-only behavior.
+      await this.api.savePageRights(id, this.pages.map(page =>
+        this.pageRights.find(row => row.pageId === page.pageId) ??
+          {pageId:page.pageId,canRead:false,canCreate:false,canModify:false,canDelete:false,canPost:false}));
       await this.api.saveTargetRights(id, this.targetRights.filter(row =>
         !row.canView || !row.canEdit || !row.canExecute));
       await this.load();
