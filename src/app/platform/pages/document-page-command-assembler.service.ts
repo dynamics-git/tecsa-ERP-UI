@@ -48,6 +48,7 @@ export class DocumentPageCommandAssemblerService {
     return this
       .mergePopupDefaultCommands(defaults, configured)
       .map((button) => {
+        button = {...button, surface: 'header'};
         const action = this.normalizePopupCommandKey(button.actionKey);
         const unsupported = (action === 'new' && !supportsCreate) || (action === 'delete' && !supportsDelete);
         const guarded = unsupported ? {...button, disabled: true} : button;
@@ -103,6 +104,7 @@ export class DocumentPageCommandAssemblerService {
     return this
       .mergePopupDefaultCommands(defaults, configured)
       .map((button) => {
+        button = {...button, surface: 'line'};
         const action = this.normalizePopupCommandKey(button.actionKey);
         button = ((action === 'line-new' || action === 'line-insert' || action === 'line-copy' || action === 'line-paste') && !supportsCreate) || (action === 'line-delete' && !supportsDelete) ? {...button, disabled: true} : button;
         const source = params.lineConfig!.dataSource;
@@ -119,7 +121,7 @@ export class DocumentPageCommandAssemblerService {
 
     return params.toolbarButtons
       .map((button) => ({ ...button }))
-      .map((button) => this.applyPopupCommandPermission(button, params.pageId));
+      .map((button) => this.applyPopupCommandPermission({...button, surface: 'detail'}, params.pageId));
   }
 
   private applyPopupCommandPermission(button: CommandConfig, pageId: string): CommandConfig {

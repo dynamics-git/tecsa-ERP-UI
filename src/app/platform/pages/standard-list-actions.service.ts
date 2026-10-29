@@ -27,6 +27,7 @@ export class StandardListActionsService {
         ...override,
         label: override.label ?? labels[key],
         actionKey: key,
+        surface: 'list',
         disabled: unsupported || override.disabled === true,
         tooltip: unsupported ? `${labels[key]} is not supported for this page.` : override.tooltip,
       };

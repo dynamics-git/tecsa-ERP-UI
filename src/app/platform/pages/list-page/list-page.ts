@@ -317,7 +317,7 @@ export class ListPage implements OnInit, OnDestroy {
         && (!button.runModalPageId || allowed('runModal', 'page', button.runModalPageId, 'canView'));
       const executable = allowed(surface, 'command', button.actionKey, 'canExecute')
         && (!button.runModalPageId || allowed('runModal', 'page', button.runModalPageId, 'canExecute'));
-      return {...button, hidden: button.hidden || !visible, disabled: button.disabled || !executable};
+      return {...button, surface, hidden: button.hidden || !visible, disabled: button.disabled || !executable};
     };
     this.headerConfig = {...this.headerConfig,
       sections: this.headerConfig.sections.map(section => ({...section,
