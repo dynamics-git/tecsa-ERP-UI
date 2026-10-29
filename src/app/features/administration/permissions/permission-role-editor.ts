@@ -126,19 +126,25 @@ export class PermissionRoleEditor implements OnChanges {
     this.saving = true; this.error = ''; this.success = '';
     try {
       const id = this.role.systemId;
-      await this.api.saveResourceRights(id, this.resourceRights.filter(row =>
-        row.canRead || row.canCreate || row.canModify || row.canDelete || row.canExecute));
-      // Persist even all-false rows to explicitly deny a Page for this Role.
-      // Unconfigured catalog pages retain their existing backend-only behavior.
-      await this.api.savePageRights(id, this.pages.map(page =>
-        this.pageRights.find(row => row.pageId === page.pageId) ??
-          {pageId:page.pageId,canRead:false,canCreate:false,canModify:false,canDelete:false,canPost:false}));
-      await this.api.saveTargetRights(id, this.targetRights.filter(row =>
-        !row.canView || !row.canEdit || !row.canExecute));
+      // Save only the current collection, not unrelated tabs. Each backend PUT
+      // replaces one complete collection transactionally.
+      if (this.tab === 'resources') {
+        await this.api.saveResourceRights(id, this.resourceRights.filter(row =>
+          row.canRead || row.canCreate || row.canModify || row.canDelete || row.canExecute));
+      } else if (this.tab === 'pages') {
+        // All-false records explicitly restrict pages; pages with no saved
+        // policy retain backend resource permissions until first configured.
+        await this.api.savePageRights(id, this.pages.map(page =>
+          this.pageRights.find(row => row.pageId === page.pageId) ??
+            {pageId:page.pageId,canRead:false,canCreate:false,canModify:false,canDelete:false,canPost:false}));
+      } else {
+        await this.api.saveTargetRights(id, this.targetRights.filter(row =>
+          !row.canView || !row.canEdit || !row.canExecute));
+      }
       await this.load();
       this.success = 'Permission changes saved.';
     } catch (e) {
-      this.error = 'Permission update incomplete. Some lines may have saved. Reload and review. ' + this.errorText(e);
+      this.error = 'Permission save failed. ' + this.errorText(e);
     } finally { this.saving = false; }
   }
 
