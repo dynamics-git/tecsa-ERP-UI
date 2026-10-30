@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { dimensionsFactBoxConfig } from './dimensions.factbox.config';
+
+// Header form.
 export const dimensionsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Dimensions',
   toolbarButtons: [
@@ -21,8 +29,7 @@ export const dimensionsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 20,
@@ -48,36 +55,47 @@ export const dimensionsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const dimensionsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const dimensionsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'dimensions',
   pageType: 'card',
-  autoSave: true,
   title: 'Dimensions',
-  module: 'Finance',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'name',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Dimensions',
-    icon: 'ts-icon ts-icon-dimensions',
-    route: '/dimensions',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/dimensions',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'name',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Dimensions',
+    icon: 'ts-icon ts-icon-dimensions',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/dimensions',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(dimensionsHeaderConfig, [
-      'code',
-      'name',
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'name',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: dimensionsFactBoxConfig,
 };

@@ -1,4 +1,10 @@
-import { DataSourceConfig, HeaderConfig, ListPageConfig, LineConfig } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  LineConfig,
+  ListPageConfig,
+} from '../../../platform/public-api';
+import { currencyExchangeRatesFactBoxConfig } from './currency-exchange-rates.factbox.config';
 const currencyExchangeRatesDataSource: DataSourceConfig = {
   endpoint: '/currencies',
   keyField: 'systemId',
@@ -10,54 +16,57 @@ const currencyExchangeRatesDataSource: DataSourceConfig = {
   pageSize: 20,
 };
 
+// Header form.
+export const currencyExchangeRatesHeaderConfig: HeaderConfig = {
+  dialogTitle: 'Currency Exchange Rates',
+  toolbarButtons: [],
+  sections: [],
+};
+
+// List page.
 export const currencyExchangeRatesListConfig: ListPageConfig & {
   dataSource: DataSourceConfig;
 } = {
   pageId: 'currency-exchange-rates',
   pageType: 'worksheet',
-  autoSave: true,
   title: 'Currency Exchange Rates',
-  module: 'Finance',
-  permissionPageId: 'currencies-lines',
+  autoSave: true,
+  dataSource: currencyExchangeRatesDataSource,
   identity: {
     primaryField: 'code',
     secondaryField: 'description',
   },
-  dataSource: currencyExchangeRatesDataSource,
+  module: 'Finance',
+  permissionPageId: 'currencies-lines',
   tools: {
     search: false,
     filter: false,
     columns: false,
     export: false,
   },
-  factBox: {
-    enabled: true,
-  },
+  factBox: currencyExchangeRatesFactBoxConfig,
 };
-export const currencyExchangeRatesHeaderConfig: HeaderConfig = {
-  dialogTitle: 'Currency Exchange Rates',
-  toolbarButtons: [],
-  sections: [],
-};
+
+// Document lines.
 export const currencyExchangeRatesLineConfig: LineConfig = {
-  permissionPageId: 'currencies-lines',
   placement: {
     mode: 'end',
   },
   dataSource: currencyExchangeRatesDataSource,
+  permissionPageId: 'currencies-lines',
   toolbarButtons: [],
   columns: [
     {
       id: 'startingDate',
       label: 'Starting Date',
-      valueType: 'date',
+      type: 'date',
       required: true,
       readonlyAfterCreate: true,
     },
     {
       id: 'foreignAmount',
       label: 'Foreign Amount',
-      valueType: 'decimal',
+      type: 'decimal',
       defaultValue: '1',
       validation: {
         precision: 20,
@@ -68,7 +77,7 @@ export const currencyExchangeRatesLineConfig: LineConfig = {
     {
       id: 'localAmount',
       label: 'Local Amount',
-      valueType: 'decimal',
+      type: 'decimal',
       required: true,
       validation: {
         precision: 20,
@@ -79,7 +88,7 @@ export const currencyExchangeRatesLineConfig: LineConfig = {
     {
       id: 'isActive',
       label: 'Is Active',
-      valueType: 'boolean',
+      type: 'boolean',
       defaultValue: true,
     },
   ],

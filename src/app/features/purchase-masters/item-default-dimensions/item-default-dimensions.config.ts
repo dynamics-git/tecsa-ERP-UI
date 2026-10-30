@@ -1,4 +1,10 @@
-import { DataSourceConfig, HeaderConfig, ListPageConfig, LineConfig } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  LineConfig,
+  ListPageConfig,
+} from '../../../platform/public-api';
+import { itemDefaultDimensionsFactBoxConfig } from './item-default-dimensions.factbox.config';
 const itemDefaultDimensionsDataSource: DataSourceConfig = {
   endpoint: '/items',
   keyField: 'systemId',
@@ -10,30 +16,7 @@ const itemDefaultDimensionsDataSource: DataSourceConfig = {
   pageSize: 20,
 };
 
-export const itemDefaultDimensionsListConfig: ListPageConfig & {
-  dataSource: DataSourceConfig;
-} = {
-  pageId: 'item-default-dimensions',
-  pageType: 'worksheet',
-  autoSave: true,
-  title: 'Item Dimensions',
-  module: 'Inventory',
-  permissionPageId: 'item-default-dimensions-lines',
-  identity: {
-    primaryField: 'number',
-    secondaryField: 'description',
-  },
-  dataSource: itemDefaultDimensionsDataSource,
-  tools: {
-    search: false,
-    filter: false,
-    columns: false,
-    export: false,
-  },
-  factBox: {
-    enabled: true,
-  },
-};
+// Header form.
 export const itemDefaultDimensionsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Item Dimensions',
   toolbarButtons: [
@@ -56,17 +39,44 @@ export const itemDefaultDimensionsHeaderConfig: HeaderConfig = {
   ],
   sections: [],
 };
-export const itemDefaultDimensionsLineConfig: LineConfig = {
+
+// List page.
+export const itemDefaultDimensionsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
+  pageId: 'item-default-dimensions',
+  pageType: 'worksheet',
+  title: 'Item Dimensions',
+  autoSave: true,
+  dataSource: itemDefaultDimensionsDataSource,
+  identity: {
+    primaryField: 'number',
+    secondaryField: 'description',
+  },
+  module: 'Inventory',
   permissionPageId: 'item-default-dimensions-lines',
+  tools: {
+    search: false,
+    filter: false,
+    columns: false,
+    export: false,
+  },
+  factBox: itemDefaultDimensionsFactBoxConfig,
+};
+
+// Document lines.
+export const itemDefaultDimensionsLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
   dataSource: itemDefaultDimensionsDataSource,
+  permissionPageId: 'item-default-dimensions-lines',
   toolbarButtons: [],
   columns: [
     {
       id: 'dimensionId',
       label: 'Dimension',
+      type: 'lookup',
       valueType: 'guid',
       required: true,
       readonlyAfterCreate: true,
@@ -77,11 +87,11 @@ export const itemDefaultDimensionsLineConfig: LineConfig = {
         searchFields: ['code', 'name'],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
       id: 'dimensionValueId',
       label: 'Dimension Value',
+      type: 'lookup',
       valueType: 'guid',
       defaultValue: null,
       lookup: {
@@ -99,30 +109,28 @@ export const itemDefaultDimensionsLineConfig: LineConfig = {
         ],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
-      cellType: 'select',
       id: 'valuePosting',
       label: 'Value Posting',
-      valueType: 'text',
+      type: 'dropdown',
       defaultValue: 'optional',
       options: [
         {
-          value: 'optional',
           label: 'Optional',
+          value: 'optional',
         },
         {
-          value: 'code_mandatory',
           label: 'Code mandatory',
+          value: 'code_mandatory',
         },
         {
-          value: 'same_code',
           label: 'Same code',
+          value: 'same_code',
         },
         {
-          value: 'no_code',
           label: 'No code',
+          value: 'no_code',
         },
       ],
     },

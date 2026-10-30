@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { accountingPeriodsListConfig, accountingPeriodsHeaderConfig } from './accounting-periods.config';
+import {
+  accountingPeriodsListConfig,
+  accountingPeriodsHeaderConfig,
+} from './accounting-periods.config';
 export * from './accounting-periods.config';
 
 @Component({

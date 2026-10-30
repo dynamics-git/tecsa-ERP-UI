@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { inventoryPostingSetupListConfig, inventoryPostingSetupHeaderConfig } from './inventory-posting-setup.config';
+import {
+  inventoryPostingSetupListConfig,
+  inventoryPostingSetupHeaderConfig,
+} from './inventory-posting-setup.config';
 export * from './inventory-posting-setup.config';
 
 @Component({

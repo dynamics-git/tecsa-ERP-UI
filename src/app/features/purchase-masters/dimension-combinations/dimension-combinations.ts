@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { dimensionCombinationsListConfig, dimensionCombinationsHeaderConfig } from './dimension-combinations.config';
+import {
+  dimensionCombinationsListConfig,
+  dimensionCombinationsHeaderConfig,
+} from './dimension-combinations.config';
 export * from './dimension-combinations.config';
 
 @Component({

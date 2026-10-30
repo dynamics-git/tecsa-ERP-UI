@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { dimensionCombinationsFactBoxConfig } from './dimension-combinations.factbox.config';
+
+// Header form.
 export const dimensionCombinationsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Dimension Combinations',
   toolbarButtons: [
@@ -21,22 +29,21 @@ export const dimensionCombinationsHeaderConfig: HeaderConfig = {
         {
           key: 'combinationType',
           label: 'Combination Type',
-          type: 'select',
-          valueType: 'text',
-          required: true,
+          type: 'dropdown',
           defaultValue: 'no_limitation',
+          required: true,
           options: [
             {
-              value: 'no_limitation',
               label: 'No limitation',
+              value: 'no_limitation',
             },
             {
-              value: 'limited',
               label: 'Limited',
+              value: 'limited',
             },
             {
-              value: 'blocked',
               label: 'Blocked',
+              value: 'blocked',
             },
           ],
         },
@@ -81,35 +88,47 @@ export const dimensionCombinationsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const dimensionCombinationsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const dimensionCombinationsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'dimension-combinations',
   pageType: 'card',
-  autoSave: true,
   title: 'Dimension Combinations',
-  module: 'Finance',
-  identity: {
-    primaryField: '__display_dimension1Id',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Dimensions',
-    icon: 'ts-icon ts-icon-dimension-combinations',
-    route: '/dimension-combinations',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/dimensionCombinations',
     keyField: 'systemId',
     defaultSort: 'dimension1Id asc',
   },
+  identity: {
+    primaryField: '__display_dimension1Id',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Dimensions',
+    icon: 'ts-icon ts-icon-dimension-combinations',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/dimension-combinations',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(dimensionCombinationsHeaderConfig, [
-      'dimension1Id',
-      { field: 'dimension2Id', width: '140px' },
-      { field: 'combinationType', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'dimension1Id',
+      },
+      {
+        field: 'dimension2Id',
+        width: '140px',
+      },
+      {
+        field: 'combinationType',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: dimensionCombinationsFactBoxConfig,
 };

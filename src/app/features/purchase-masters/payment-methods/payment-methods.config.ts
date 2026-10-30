@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { paymentMethodsFactBoxConfig } from './payment-methods.factbox.config';
+
+// Header form.
 export const paymentMethodsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Payment Methods',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 10,
@@ -29,21 +36,20 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
         {
           key: 'balancingAccountType',
           label: 'Balancing Account Type',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           defaultValue: 'none',
           options: [
             {
-              value: 'none',
               label: 'None',
+              value: 'none',
             },
             {
-              value: 'gl_account',
               label: 'Gl account',
+              value: 'gl_account',
             },
             {
-              value: 'bank_account',
               label: 'Bank account',
+              value: 'bank_account',
             },
           ],
         },
@@ -65,6 +71,11 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
           type: 'lookup',
           valueType: 'guid',
           defaultValue: null,
+          hiddenWhen: {
+            field: 'balancingAccountType',
+            values: ['gl_account'],
+            negate: true,
+          },
           lookup: {
             endpoint: '/glAccounts',
             valueField: 'systemId',
@@ -72,11 +83,6 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
             searchFields: ['number', 'name'],
           },
           displayFormat: '[number] — [name]',
-          hiddenWhen: {
-            field: 'balancingAccountType',
-            values: ['gl_account'],
-            negate: true,
-          },
         },
         {
           key: 'balancingBankAccountId',
@@ -84,6 +90,11 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
           type: 'lookup',
           valueType: 'guid',
           defaultValue: null,
+          hiddenWhen: {
+            field: 'balancingAccountType',
+            values: ['bank_account'],
+            negate: true,
+          },
           lookup: {
             endpoint: '/bankAccounts',
             valueField: 'systemId',
@@ -91,50 +102,65 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
             searchFields: ['number', 'name'],
           },
           displayFormat: '[number] — [name]',
-          hiddenWhen: {
-            field: 'balancingAccountType',
-            values: ['bank_account'],
-            negate: true,
-          },
         },
       ],
     },
   ],
 };
 
-export const paymentMethodsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const paymentMethodsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'payment-methods',
   pageType: 'card',
-  autoSave: true,
   title: 'Payment Methods',
-  module: 'Finance',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Currencies & Payments',
-    icon: 'ts-icon ts-icon-payment-methods',
-    route: '/payment-methods',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/paymentMethods',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Currencies & Payments',
+    icon: 'ts-icon ts-icon-payment-methods',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/payment-methods',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(paymentMethodsHeaderConfig, [
-      'code',
-      'description',
-      { field: 'balancingAccountType', width: '140px' },
-      { field: 'balancingGlAccountId', width: '140px' },
-      { field: 'balancingBankAccountId', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'balancingAccountType',
+        width: '140px',
+      },
+      {
+        field: 'balancingGlAccountId',
+        width: '140px',
+      },
+      {
+        field: 'balancingBankAccountId',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: paymentMethodsFactBoxConfig,
 };

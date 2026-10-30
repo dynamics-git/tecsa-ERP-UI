@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { generalPostingSetupFactBoxConfig } from './general-posting-setup.factbox.config';
+
+// Header form.
 export const generalPostingSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'General Posting Setup',
   toolbarButtons: [],
@@ -250,39 +258,63 @@ export const generalPostingSetupHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const generalPostingSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const generalPostingSetupListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'general-posting-setup',
   pageType: 'card',
-  autoSave: true,
   title: 'General Posting Setup',
-  module: 'Finance',
-  identity: {
-    primaryField: '__display_generalBusinessPostingGroupId',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Posting Setup',
-    icon: 'ts-icon ts-icon-general-posting-setup',
-    route: '/general-posting-setup',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/generalPostingSetup',
     keyField: 'systemId',
     defaultSort: 'generalBusinessPostingGroupId asc',
   },
+  identity: {
+    primaryField: '__display_generalBusinessPostingGroupId',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Posting Setup',
+    icon: 'ts-icon ts-icon-general-posting-setup',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/general-posting-setup',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(generalPostingSetupHeaderConfig, [
-      'generalBusinessPostingGroupId',
-      { field: 'generalProductPostingGroupId', width: '140px' },
-      { field: 'purchaseAccountId', width: '140px' },
-      { field: 'purchaseCreditMemoAccountId', width: '140px' },
-      { field: 'cogsAccountId', width: '140px' },
-      { field: 'directCostAppliedAccountId', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'generalBusinessPostingGroupId',
+      },
+      {
+        field: 'generalProductPostingGroupId',
+        width: '140px',
+      },
+      {
+        field: 'purchaseAccountId',
+        width: '140px',
+      },
+      {
+        field: 'purchaseCreditMemoAccountId',
+        width: '140px',
+      },
+      {
+        field: 'cogsAccountId',
+        width: '140px',
+      },
+      {
+        field: 'directCostAppliedAccountId',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: generalPostingSetupFactBoxConfig,
 };

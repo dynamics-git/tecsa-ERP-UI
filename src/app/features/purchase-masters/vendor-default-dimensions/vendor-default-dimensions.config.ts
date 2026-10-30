@@ -1,4 +1,10 @@
-import { DataSourceConfig, HeaderConfig, ListPageConfig, LineConfig } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  LineConfig,
+  ListPageConfig,
+} from '../../../platform/public-api';
+import { vendorDefaultDimensionsFactBoxConfig } from './vendor-default-dimensions.factbox.config';
 const vendorDefaultDimensionsDataSource: DataSourceConfig = {
   endpoint: '/vendors',
   keyField: 'systemId',
@@ -10,30 +16,7 @@ const vendorDefaultDimensionsDataSource: DataSourceConfig = {
   pageSize: 20,
 };
 
-export const vendorDefaultDimensionsListConfig: ListPageConfig & {
-  dataSource: DataSourceConfig;
-} = {
-  pageId: 'vendor-default-dimensions',
-  pageType: 'worksheet',
-  autoSave: true,
-  title: 'Vendor Dimensions',
-  module: 'Purchase',
-  permissionPageId: 'vendors-lines',
-  identity: {
-    primaryField: 'number',
-    secondaryField: 'name',
-  },
-  dataSource: vendorDefaultDimensionsDataSource,
-  tools: {
-    search: false,
-    filter: false,
-    columns: false,
-    export: false,
-  },
-  factBox: {
-    enabled: true,
-  },
-};
+// Header form.
 export const vendorDefaultDimensionsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Vendor Dimensions',
   toolbarButtons: [
@@ -56,17 +39,44 @@ export const vendorDefaultDimensionsHeaderConfig: HeaderConfig = {
   ],
   sections: [],
 };
-export const vendorDefaultDimensionsLineConfig: LineConfig = {
+
+// List page.
+export const vendorDefaultDimensionsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
+  pageId: 'vendor-default-dimensions',
+  pageType: 'worksheet',
+  title: 'Vendor Dimensions',
+  autoSave: true,
+  dataSource: vendorDefaultDimensionsDataSource,
+  identity: {
+    primaryField: 'number',
+    secondaryField: 'name',
+  },
+  module: 'Purchase',
   permissionPageId: 'vendors-lines',
+  tools: {
+    search: false,
+    filter: false,
+    columns: false,
+    export: false,
+  },
+  factBox: vendorDefaultDimensionsFactBoxConfig,
+};
+
+// Document lines.
+export const vendorDefaultDimensionsLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
   dataSource: vendorDefaultDimensionsDataSource,
+  permissionPageId: 'vendors-lines',
   toolbarButtons: [],
   columns: [
     {
       id: 'dimensionId',
       label: 'Dimension',
+      type: 'lookup',
       valueType: 'guid',
       required: true,
       readonlyAfterCreate: true,
@@ -77,11 +87,11 @@ export const vendorDefaultDimensionsLineConfig: LineConfig = {
         searchFields: ['code', 'name'],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
       id: 'dimensionValueId',
       label: 'Dimension Value',
+      type: 'lookup',
       valueType: 'guid',
       defaultValue: null,
       lookup: {
@@ -99,30 +109,28 @@ export const vendorDefaultDimensionsLineConfig: LineConfig = {
         ],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
-      cellType: 'select',
       id: 'valuePosting',
       label: 'Value Posting',
-      valueType: 'text',
+      type: 'dropdown',
       defaultValue: 'optional',
       options: [
         {
-          value: 'optional',
           label: 'Optional',
+          value: 'optional',
         },
         {
-          value: 'code_mandatory',
           label: 'Code mandatory',
+          value: 'code_mandatory',
         },
         {
-          value: 'same_code',
           label: 'Same code',
+          value: 'same_code',
         },
         {
-          value: 'no_code',
           label: 'No code',
+          value: 'no_code',
         },
       ],
     },

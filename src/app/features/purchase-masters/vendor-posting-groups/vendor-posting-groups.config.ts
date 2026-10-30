@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { vendorPostingGroupsFactBoxConfig } from './vendor-posting-groups.factbox.config';
+
+// Header form.
 export const vendorPostingGroupsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Vendor Posting Groups',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const vendorPostingGroupsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 20,
@@ -197,40 +204,63 @@ export const vendorPostingGroupsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const vendorPostingGroupsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const vendorPostingGroupsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'vendor-posting-groups',
   pageType: 'card',
-  autoSave: true,
   title: 'Vendor Posting Groups',
-  module: 'Purchase',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Purchase',
-    group: 'Setup',
-    icon: 'ts-icon ts-icon-vendor-posting-groups',
-    route: '/vendor-posting-groups',
-    moduleIcon: 'ts-icon ts-icon-purchase-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/vendorPostingGroups',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Purchase',
+  menu: {
+    module: 'Purchase',
+    group: 'Setup',
+    icon: 'ts-icon ts-icon-vendor-posting-groups',
+    moduleIcon: 'ts-icon ts-icon-purchase-module',
+    route: '/vendor-posting-groups',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(vendorPostingGroupsHeaderConfig, [
-      'code',
-      'description',
-      { field: 'payablesAccountId', width: '140px' },
-      { field: 'paymentDiscountDebitAccountId', width: '140px' },
-      { field: 'paymentDiscountCreditAccountId', width: '140px' },
-      { field: 'invoiceRoundingAccountId', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'payablesAccountId',
+        width: '140px',
+      },
+      {
+        field: 'paymentDiscountDebitAccountId',
+        width: '140px',
+      },
+      {
+        field: 'paymentDiscountCreditAccountId',
+        width: '140px',
+      },
+      {
+        field: 'invoiceRoundingAccountId',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: vendorPostingGroupsFactBoxConfig,
 };

@@ -1,5 +1,12 @@
 import { itemsFactBoxConfig } from './items.factbox.config';
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+
+// Header form.
 export const itemsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Items',
   toolbarButtons: [
@@ -32,74 +39,137 @@ export const itemsHeaderConfig: HeaderConfig = {
         {
           key: 'number',
           label: 'No.',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           readonlyAfterCreate: true,
-          validation: { maxLength: 20 },
+          validation: {
+            maxLength: 20,
+          },
         },
-        { key: 'description', label: 'Description', type: 'text', required: true, validation: { maxLength: 100 } },
-        { key: 'description2', label: 'Description2', type: 'text', validation: { maxLength: 50 } },
-        { key: 'searchDescription', label: 'Search Description', type: 'text', validation: { maxLength: 100 } },
+        {
+          key: 'description',
+          label: 'Description',
+          type: 'text',
+          required: true,
+          validation: {
+            maxLength: 100,
+          },
+        },
+        {
+          key: 'description2',
+          label: 'Description2',
+          type: 'text',
+          validation: {
+            maxLength: 50,
+          },
+        },
+        {
+          key: 'searchDescription',
+          label: 'Search Description',
+          type: 'text',
+          validation: {
+            maxLength: 100,
+          },
+        },
         {
           key: 'itemType',
           label: 'Item Type',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           defaultValue: 'inventory',
           options: [
-            { value: 'inventory', label: 'Inventory' },
-            { value: 'service', label: 'Service' },
-            { value: 'non_inventory', label: 'Non inventory' },
+            {
+              label: 'Inventory',
+              value: 'inventory',
+            },
+            {
+              label: 'Service',
+              value: 'service',
+            },
+            {
+              label: 'Non inventory',
+              value: 'non_inventory',
+            },
           ],
         },
         {
           key: 'costingMethod',
           label: 'Costing Method',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           defaultValue: 'fifo',
           options: [
-            { value: 'fifo', label: 'Fifo' },
-            { value: 'lifo', label: 'Lifo' },
-            { value: 'specific', label: 'Specific' },
-            { value: 'average', label: 'Average' },
-            { value: 'standard', label: 'Standard' },
+            {
+              label: 'Fifo',
+              value: 'fifo',
+            },
+            {
+              label: 'Lifo',
+              value: 'lifo',
+            },
+            {
+              label: 'Specific',
+              value: 'specific',
+            },
+            {
+              label: 'Average',
+              value: 'average',
+            },
+            {
+              label: 'Standard',
+              value: 'standard',
+            },
           ],
         },
         {
           key: 'unitCost',
           label: 'Unit Cost',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0',
-          validation: { precision: 20, scale: 6 },
+          validation: {
+            precision: 20,
+            scale: 6,
+          },
         },
         {
           key: 'standardCost',
           label: 'Standard Cost',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0',
-          validation: { precision: 20, scale: 6 },
+          validation: {
+            precision: 20,
+            scale: 6,
+          },
         },
         {
           key: 'lastDirectCost',
           label: 'Last Direct Cost',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0',
-          validation: { precision: 20, scale: 6 },
+          validation: {
+            precision: 20,
+            scale: 6,
+          },
         },
         {
           key: 'unitPrice',
           label: 'Unit Price',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0',
-          validation: { precision: 20, scale: 6 },
+          validation: {
+            precision: 20,
+            scale: 6,
+          },
         },
-        { key: 'blocked', label: 'Blocked', type: 'boolean', defaultValue: false },
-        { key: 'preventNegativeInventory', label: 'Prevent Negative Inventory', type: 'boolean', defaultValue: true },
+        {
+          key: 'blocked',
+          label: 'Blocked',
+          type: 'boolean',
+          defaultValue: false,
+        },
+        {
+          key: 'preventNegativeInventory',
+          label: 'Prevent Negative Inventory',
+          type: 'boolean',
+          defaultValue: true,
+        },
       ],
     },
     {
@@ -167,41 +237,64 @@ export const itemsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const itemsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const itemsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'items',
   pageType: 'card',
-  autoSave: true,
   title: 'Items',
-  module: 'Inventory',
-  identity: { primaryField: 'number', secondaryField: 'description' },
-  menu: {
-    module: 'Inventory',
-    group: 'Items',
-    route: '/items',
-    icon: 'ts-icon ts-icon-items',
-    moduleIcon: 'ts-icon ts-icon-inventory-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/items',
     keyField: 'systemId',
+    headerPKProp: 'number',
     defaultSort: 'number asc',
     autoGenerateNumber: true,
     lazyCreateOnFirstInput: true,
-    headerPKProp: 'number',
     omitEmptyFields: ['number'],
   },
+  identity: {
+    primaryField: 'number',
+    secondaryField: 'description',
+  },
+  module: 'Inventory',
+  menu: {
+    module: 'Inventory',
+    group: 'Items',
+    icon: 'ts-icon ts-icon-items',
+    moduleIcon: 'ts-icon ts-icon-inventory-module',
+    route: '/items',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(itemsHeaderConfig, [
-      'number',
-      'description',
-      'itemType',
-      'baseUnitOfMeasureId',
-      'costingMethod',
-      'unitCost',
-      'unitPrice',
-      'blocked',
-      'systemModifiedAt',
+      {
+        field: 'number',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'itemType',
+      },
+      {
+        field: 'baseUnitOfMeasureId',
+      },
+      {
+        field: 'costingMethod',
+      },
+      {
+        field: 'unitCost',
+      },
+      {
+        field: 'unitPrice',
+      },
+      {
+        field: 'blocked',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
   factBox: itemsFactBoxConfig,

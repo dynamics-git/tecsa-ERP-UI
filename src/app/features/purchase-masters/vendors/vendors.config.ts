@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { vendorsFactBoxConfig } from './vendors.factbox.config';
+
+// Header form.
 export const vendorsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Vendors',
   toolbarButtons: [
@@ -21,8 +29,7 @@ export const vendorsHeaderConfig: HeaderConfig = {
         {
           key: 'number',
           label: 'Number',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           readonlyAfterCreate: true,
           validation: {
             maxLength: 20,
@@ -72,21 +79,20 @@ export const vendorsHeaderConfig: HeaderConfig = {
         {
           key: 'blocked',
           label: 'Blocked',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           defaultValue: 'none',
           options: [
             {
-              value: 'none',
               label: 'None',
+              value: 'none',
             },
             {
-              value: 'payment',
               label: 'Payment',
+              value: 'payment',
             },
             {
-              value: 'all',
               label: 'All',
+              value: 'all',
             },
           ],
         },
@@ -229,8 +235,7 @@ export const vendorsHeaderConfig: HeaderConfig = {
         {
           key: 'countryCode',
           label: 'Country Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           validation: {
             maxLength: 10,
           },
@@ -255,7 +260,6 @@ export const vendorsHeaderConfig: HeaderConfig = {
           key: 'email',
           label: 'Email',
           type: 'email',
-          valueType: 'email',
           validation: {
             maxLength: 255,
           },
@@ -264,7 +268,6 @@ export const vendorsHeaderConfig: HeaderConfig = {
           key: 'website',
           label: 'Website',
           type: 'url',
-          valueType: 'url',
           validation: {
             maxLength: 255,
           },
@@ -274,46 +277,75 @@ export const vendorsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const vendorsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const vendorsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'vendors',
   pageType: 'card',
-  autoSave: true,
   title: 'Vendors',
-  module: 'Purchase',
+  autoSave: true,
+  dataSource: {
+    endpoint: '/vendors',
+    keyField: 'systemId',
+    headerPKProp: 'number',
+    defaultSort: 'number asc',
+    autoGenerateNumber: true,
+    lazyCreateOnFirstInput: true,
+    omitEmptyFields: ['number'],
+  },
   identity: {
     primaryField: 'number',
     secondaryField: 'name',
   },
+  module: 'Purchase',
   menu: {
     module: 'Purchase',
     group: 'Masters',
     icon: 'ts-icon ts-icon-vendors',
-    route: '/vendors',
     moduleIcon: 'ts-icon ts-icon-purchase-module',
-  },
-  dataSource: {
-    endpoint: '/vendors',
-    keyField: 'systemId',
-    defaultSort: 'number asc',
-    autoGenerateNumber: true,
-    lazyCreateOnFirstInput: true,
-    headerPKProp: 'number',
-    omitEmptyFields: ['number'],
+    route: '/vendors',
   },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(vendorsHeaderConfig, [
-      'number',
-      'name',
-      { field: 'contact', width: '140px' },
-      { field: 'email', width: '240px' },
-      { field: 'city', width: '140px' },
-      { field: 'countryCode', width: '140px' },
-      { field: 'paymentTermsId', width: '140px' },
-      { field: 'currencyId', width: '140px' },
-      { field: 'blocked', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'number',
+      },
+      {
+        field: 'name',
+      },
+      {
+        field: 'contact',
+        width: '140px',
+      },
+      {
+        field: 'email',
+        width: '240px',
+      },
+      {
+        field: 'city',
+        width: '140px',
+      },
+      {
+        field: 'countryCode',
+        width: '140px',
+      },
+      {
+        field: 'paymentTermsId',
+        width: '140px',
+      },
+      {
+        field: 'currencyId',
+        width: '140px',
+      },
+      {
+        field: 'blocked',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: vendorsFactBoxConfig,
 };

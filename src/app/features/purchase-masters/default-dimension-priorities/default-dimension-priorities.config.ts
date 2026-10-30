@@ -1,4 +1,10 @@
-import { DataSourceConfig, HeaderConfig, ListPageConfig, LineConfig } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  LineConfig,
+  ListPageConfig,
+} from '../../../platform/public-api';
+import { defaultDimensionPrioritiesFactBoxConfig } from './default-dimension-priorities.factbox.config';
 const defaultDimensionPrioritiesDataSource: DataSourceConfig = {
   endpoint: '/sourceCodes',
   keyField: 'systemId',
@@ -10,77 +16,79 @@ const defaultDimensionPrioritiesDataSource: DataSourceConfig = {
   pageSize: 20,
 };
 
+// Header form.
+export const defaultDimensionPrioritiesHeaderConfig: HeaderConfig = {
+  dialogTitle: 'Default Dimension Priorities',
+  toolbarButtons: [],
+  sections: [],
+};
+
+// List page.
 export const defaultDimensionPrioritiesListConfig: ListPageConfig & {
   dataSource: DataSourceConfig;
 } = {
   pageId: 'default-dimension-priorities',
   pageType: 'worksheet',
-  autoSave: true,
   title: 'Default Dimension Priorities',
-  module: 'Administration',
-  permissionPageId: 'source-codes-lines',
+  autoSave: true,
+  dataSource: defaultDimensionPrioritiesDataSource,
   identity: {
     primaryField: 'code',
     secondaryField: 'description',
   },
-  dataSource: defaultDimensionPrioritiesDataSource,
+  module: 'Administration',
+  permissionPageId: 'source-codes-lines',
   tools: {
     search: false,
     filter: false,
     columns: false,
     export: false,
   },
-  factBox: {
-    enabled: true,
-  },
+  factBox: defaultDimensionPrioritiesFactBoxConfig,
 };
-export const defaultDimensionPrioritiesHeaderConfig: HeaderConfig = {
-  dialogTitle: 'Default Dimension Priorities',
-  toolbarButtons: [],
-  sections: [],
-};
+
+// Document lines.
 export const defaultDimensionPrioritiesLineConfig: LineConfig = {
-  permissionPageId: 'source-codes-lines',
   placement: {
     mode: 'end',
   },
   dataSource: defaultDimensionPrioritiesDataSource,
+  permissionPageId: 'source-codes-lines',
   toolbarButtons: [],
   columns: [
     {
-      cellType: 'select',
       id: 'sourceType',
       label: 'Source Type',
-      valueType: 'text',
+      type: 'dropdown',
       required: true,
       readonlyAfterCreate: true,
       options: [
         {
-          value: 'gl_account',
           label: 'Gl account',
+          value: 'gl_account',
         },
         {
-          value: 'vendor',
           label: 'Vendor',
+          value: 'vendor',
         },
         {
-          value: 'item',
           label: 'Item',
+          value: 'item',
         },
         {
-          value: 'customer',
           label: 'Customer',
+          value: 'customer',
         },
         {
-          value: 'bank_account',
           label: 'Bank account',
+          value: 'bank_account',
         },
       ],
     },
     {
       id: 'priority',
       label: 'Priority',
-      valueType: 'integer',
+      type: 'integer',
       required: true,
       validation: {
         min: 1,
@@ -90,7 +98,7 @@ export const defaultDimensionPrioritiesLineConfig: LineConfig = {
     {
       id: 'isActive',
       label: 'Is Active',
-      valueType: 'boolean',
+      type: 'boolean',
       defaultValue: true,
     },
   ],

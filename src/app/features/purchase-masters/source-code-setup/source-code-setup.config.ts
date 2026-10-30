@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { sourceCodeSetupFactBoxConfig } from './source-code-setup.factbox.config';
+
+// Header form.
 export const sourceCodeSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'Source Code Setup',
   toolbarButtons: [],
@@ -110,47 +118,71 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const sourceCodeSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const sourceCodeSetupListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'source-code-setup',
   pageType: 'setup',
-  autoSave: true,
   title: 'Source Code Setup',
-  module: 'Administration',
+  autoSave: true,
+  dataSource: {
+    endpoint: '/sourceCodeSetup',
+    keyField: 'systemId',
+    singleton: true,
+    defaultSort: 'generalJournalSourceCodeId asc',
+    supportsCreate: false,
+  },
   identity: {
     primaryField: '__display_generalJournalSourceCodeId',
   },
+  module: 'Administration',
   menu: {
     module: 'Administration',
     group: 'Setup',
     icon: 'ts-icon ts-icon-source-code-setup',
-    route: '/source-code-setup',
     moduleIcon: 'ts-icon ts-icon-administration-module',
-  },
-  dataSource: {
-    endpoint: '/sourceCodeSetup',
-    keyField: 'systemId',
-    supportsCreate: false,
-    singleton: true,
-    defaultSort: 'generalJournalSourceCodeId asc',
+    route: '/source-code-setup',
   },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(sourceCodeSetupHeaderConfig, [
-      'generalJournalSourceCodeId',
-      { field: 'salesSourceCodeId', width: '140px' },
-      { field: 'purchasesSourceCodeId', width: '140px' },
-      { field: 'cashReceiptSourceCodeId', width: '140px' },
-      { field: 'paymentJournalSourceCodeId', width: '140px' },
-      { field: 'itemJournalSourceCodeId', width: '140px' },
-      { field: 'exchangeAdjustmentSourceCodeId', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'generalJournalSourceCodeId',
+      },
+      {
+        field: 'salesSourceCodeId',
+        width: '140px',
+      },
+      {
+        field: 'purchasesSourceCodeId',
+        width: '140px',
+      },
+      {
+        field: 'cashReceiptSourceCodeId',
+        width: '140px',
+      },
+      {
+        field: 'paymentJournalSourceCodeId',
+        width: '140px',
+      },
+      {
+        field: 'itemJournalSourceCodeId',
+        width: '140px',
+      },
+      {
+        field: 'exchangeAdjustmentSourceCodeId',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
   tools: {
     filter: false,
     advancedFilter: false,
     export: false,
     columns: false,
   },
+  factBox: sourceCodeSetupFactBoxConfig,
 };

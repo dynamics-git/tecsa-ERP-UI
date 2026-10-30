@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { warehouseBinsFactBoxConfig } from './warehouse-bins.factbox.config';
+
+// Header form.
 export const warehouseBinsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Warehouse Bins',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const warehouseBinsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           readonlyAfterCreate: true,
           validation: {
@@ -36,21 +43,20 @@ export const warehouseBinsHeaderConfig: HeaderConfig = {
         {
           key: 'binRole',
           label: 'Bin Role',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           defaultValue: 'storage',
           options: [
             {
-              value: 'receiving',
               label: 'Receiving',
+              value: 'receiving',
             },
             {
-              value: 'storage',
               label: 'Storage',
+              value: 'storage',
             },
             {
-              value: 'pick',
               label: 'Pick',
+              value: 'pick',
             },
           ],
         },
@@ -100,39 +106,60 @@ export const warehouseBinsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const warehouseBinsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const warehouseBinsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'warehouse-bins',
   pageType: 'card',
-  autoSave: true,
   title: 'Warehouse Bins',
-  module: 'Warehouse',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Warehouse',
-    group: 'Storage',
-    icon: 'ts-icon ts-icon-warehouse-bins',
-    route: '/warehouse-bins',
-    moduleIcon: 'ts-icon ts-icon-warehouse-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/warehouseBins',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Warehouse',
+  menu: {
+    module: 'Warehouse',
+    group: 'Storage',
+    icon: 'ts-icon ts-icon-warehouse-bins',
+    moduleIcon: 'ts-icon ts-icon-warehouse-module',
+    route: '/warehouse-bins',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(warehouseBinsHeaderConfig, [
-      'locationId',
-      { field: 'code', width: '140px' },
-      { field: 'zoneId', width: '140px' },
-      { field: 'description', width: '280px' },
-      { field: 'isActive', width: '140px' },
-      { field: 'binRole', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'locationId',
+      },
+      {
+        field: 'code',
+        width: '140px',
+      },
+      {
+        field: 'zoneId',
+        width: '140px',
+      },
+      {
+        field: 'description',
+        width: '280px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'binRole',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: warehouseBinsFactBoxConfig,
 };

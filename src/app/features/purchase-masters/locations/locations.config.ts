@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { locationsFactBoxConfig } from './locations.factbox.config';
+
+// Header form.
 export const locationsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Locations',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const locationsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 10,
@@ -89,8 +96,7 @@ export const locationsHeaderConfig: HeaderConfig = {
         {
           key: 'countryCode',
           label: 'Country Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           validation: {
             maxLength: 10,
           },
@@ -100,39 +106,59 @@ export const locationsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const locationsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const locationsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'locations',
   pageType: 'card',
-  autoSave: true,
   title: 'Locations',
-  module: 'Warehouse',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'name',
-  },
-  menu: {
-    module: 'Warehouse',
-    group: 'Locations',
-    icon: 'ts-icon ts-icon-locations',
-    route: '/locations',
-    moduleIcon: 'ts-icon ts-icon-warehouse-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/locations',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'name',
+  },
+  module: 'Warehouse',
+  menu: {
+    module: 'Warehouse',
+    group: 'Locations',
+    icon: 'ts-icon ts-icon-locations',
+    moduleIcon: 'ts-icon ts-icon-warehouse-module',
+    route: '/locations',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(locationsHeaderConfig, [
-      'code',
-      'name',
-      { field: 'city', width: '140px' },
-      { field: 'state', width: '140px' },
-      { field: 'countryCode', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'name',
+      },
+      {
+        field: 'city',
+        width: '140px',
+      },
+      {
+        field: 'state',
+        width: '140px',
+      },
+      {
+        field: 'countryCode',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: locationsFactBoxConfig,
 };

@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { unitsOfMeasureFactBoxConfig } from './units-of-measure.factbox.config';
+
+// Header form.
 export const unitsOfMeasureHeaderConfig: HeaderConfig = {
   dialogTitle: 'Units of Measure',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const unitsOfMeasureHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 10,
@@ -45,37 +52,51 @@ export const unitsOfMeasureHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const unitsOfMeasureListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const unitsOfMeasureListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'units-of-measure',
   pageType: 'card',
-  autoSave: true,
   title: 'Units of Measure',
-  module: 'Inventory',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Inventory',
-    group: 'Items',
-    icon: 'ts-icon ts-icon-units-of-measure',
-    route: '/units-of-measure',
-    moduleIcon: 'ts-icon ts-icon-inventory-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/unitsOfMeasure',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Inventory',
+  menu: {
+    module: 'Inventory',
+    group: 'Items',
+    icon: 'ts-icon ts-icon-units-of-measure',
+    moduleIcon: 'ts-icon ts-icon-inventory-module',
+    route: '/units-of-measure',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(unitsOfMeasureHeaderConfig, [
-      'code',
-      'description',
-      { field: 'internationalStandardCode', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'internationalStandardCode',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: unitsOfMeasureFactBoxConfig,
 };
