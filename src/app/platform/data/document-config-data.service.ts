@@ -1,6 +1,6 @@
 import { lineConfigDefaults } from './document-config-defaults';
 import type { DataSourceConfig } from '../models/data-source-config.model';
-import { resolvedValueType, normalizeFieldValue } from '../models/field-value';
+import { fieldDefaultValue, resolvedValueType, normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { FormSectionConfig } from '../models/field-config.model';
 import { LineConfig, LineColumnConfig } from '../models/line-config.model';
@@ -36,7 +36,7 @@ export class DocumentConfigDataService {
       for (const field of section.fields) {
         const source = record[field.key];
         data[field.key] =
-          source === undefined ? (field.defaultValue !== undefined ? field.defaultValue : '') : source;
+          source === undefined ? (field.defaultValue !== undefined ? fieldDefaultValue(field) : '') : source;
 
         const optionsKey = this.getOptionsDataKey(field.key, field.optionsDataKey);
         data[optionsKey] = dropdownRecords[optionsKey] ?? data[optionsKey] ?? [];
@@ -56,7 +56,7 @@ export class DocumentConfigDataService {
         }
 
         if (field.defaultValue !== undefined) {
-          data[field.key] = field.defaultValue;
+          data[field.key] = fieldDefaultValue(field);
           continue;
         }
 
@@ -115,7 +115,7 @@ export class DocumentConfigDataService {
         continue;
       }
 
-      if (column.defaultValue !== undefined) { row[field] = column.defaultValue; continue; }
+      if (column.defaultValue !== undefined) { row[field] = fieldDefaultValue(column); continue; }
       if (field === typeField) {
         row[field] = defaultType;
         continue;

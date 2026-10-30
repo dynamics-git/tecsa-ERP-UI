@@ -134,7 +134,7 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           label: 'Request Date',
           type: 'date',
           required: true,
-          defaultValue: new Date().toLocaleDateString('en-CA'),
+          defaultValue: () => new Date().toLocaleDateString('en-CA'),
         },
         {
           key: 'requiredDate',

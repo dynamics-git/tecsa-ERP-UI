@@ -7,7 +7,7 @@ import { LookupSelect } from '../lookup-select/lookup-select';
 import { normalizeFieldValue, fieldValuesEqual, fieldInputType, fieldEditorValue } from '../../../platform/models/field-value';
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output, ChangeDetectorRef, SimpleChanges } from '@angular/core';
-import { FieldConfig, FormSectionConfig } from '../../../platform/models/field-config.model';
+import { FieldChangeSource, FieldConfig, FormSectionConfig } from '../../../platform/models/field-config.model';
 import { DataSourceService } from '../../../platform/data/data-source.service';
 import { Subscription, timer, switchMap } from 'rxjs';
 
@@ -231,8 +231,31 @@ export class DynamicForm {
     return field.width === 'wide';
   }
 
-  updateFieldValue(field: FieldConfig, value: unknown, accepted?: FieldValidationResult): void {
-    if (this.isFieldDisabled(field) || this.isHidden(field)) return;
+  private readonly codeValidations = new Set<string>();
+  private evaluatingField = false;
+  validateField(fieldKey: string, value: unknown): Promise<FieldValidationResult> {
+    const field = (this.dependencySections ?? this.sections).flatMap(section => section.fields).find(field => field.key === fieldKey);
+    if (!field) return Promise.resolve({valid: false, errors: ['Unknown field: ' + fieldKey]});
+    if (this.evaluatingField || this.codeValidations.has(fieldKey) || this.validationRuns.has(fieldKey)) {
+      return Promise.resolve({valid:false,errors:['Field validation is already running. Return dependent fields from afterValidate.']});
+    }
+    this.codeValidations.add(fieldKey);
+    try {
+      return Promise.resolve(this.updateFieldValue(field, value, undefined, 'code')).finally(() => this.codeValidations.delete(fieldKey));
+    } catch (error) {
+      this.codeValidations.delete(fieldKey);
+      throw error;
+    }
+  }
+
+  private evaluateField(field: FieldConfig, value: unknown, fields: FieldConfig[], source: FieldChangeSource): FieldValidationResult {
+    this.evaluatingField = true;
+    try { return this.validation.validateField(field,value,this.data,true,fields,source); }
+    finally { this.evaluatingField = false; }
+  }
+
+  updateFieldValue(field: FieldConfig, value: unknown, accepted?: FieldValidationResult, source: FieldChangeSource = 'user'): FieldValidationResult | Promise<FieldValidationResult> {
+    if (this.isFieldDisabled(field) || this.isHidden(field)) return {valid: false, errors: [field.label + ' is not editable.']};
     value = normalizeFieldValue(value, field.valueType ?? field.type);
     const fields=(this.dependencySections ?? this.sections).flatMap(section=>section.fields);
     if (field.validation?.customAsync && !accepted) {
@@ -241,22 +264,21 @@ export class DynamicForm {
       this.validationRuns.set(field.key,run);
       this.drafts.set(field.key,value); this.errors.set(field.key,'Validating…');
       this.draftChanged.emit({fieldKey:field.key,invalid:true}); this.changes.markForCheck();
-      void this.validation.validateEditorAsync(field,value,record,fields).then(result=>{
-        if(this.destroyed || this.data!==record || this.validationRuns.get(field.key)!==run) return;
+      return this.validation.validateEditorAsync(field,value,record,fields,source).then(result=>{
+        if(this.destroyed || this.data!==record || this.validationRuns.get(field.key)!==run) return {valid:false,errors:['Validation was superseded.']};
         this.validationRuns.delete(field.key);
         if(!inScope() || JSON.stringify(record)!==snapshot || this.isFieldDisabled(field) || this.isHidden(field)) {
           this.errors.set(field.key,'Record changed during validation. Re-enter this value to validate again.');
-          this.changes.markForCheck(); return;
+          this.changes.markForCheck(); return {valid:false,errors:['Record changed during validation. Re-enter this value to validate again.']};
         }
-        this.updateFieldValue(field,value,result);
+        return this.updateFieldValue(field,value,result,source);
       });
-      return;
     }
-    const result = accepted ?? this.validation.validateField(field,value,this.data,true,fields);
-    if (!result.valid) { this.drafts.set(field.key,value); this.errors.set(field.key,result.errors[0]); this.draftChanged.emit({fieldKey:field.key,invalid:true}); this.changes.markForCheck(); return; }
+    const result = accepted ?? this.evaluateField(field,value,fields,source);
+    if (!result.valid) { this.drafts.set(field.key,value); this.errors.set(field.key,result.errors[0]); this.draftChanged.emit({fieldKey:field.key,invalid:true}); this.changes.markForCheck(); return result; }
     this.drafts.delete(field.key); this.errors.delete(field.key); this.draftChanged.emit({fieldKey:field.key,invalid:false}); this.changes.markForCheck();
     const previousValue = this.data[field.key];
-    if (fieldValuesEqual(previousValue, value, field.valueType ?? field.type)) return;
+    if (fieldValuesEqual(previousValue, value, field.valueType ?? field.type)) return result;
     this.data[field.key] = value;
     const updates = {...this.resolveTargetUpdates(field, value), ...result.updates};
     const previousUpdates: Record<string, unknown> = {};
@@ -285,6 +307,7 @@ export class DynamicForm {
       updates,
       previousUpdates: Object.keys(previousUpdates).length ? previousUpdates : undefined,
     });
+    return result;
   }
 
   isFieldDisabled(field: FieldConfig): boolean {

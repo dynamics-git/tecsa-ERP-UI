@@ -1,7 +1,7 @@
 import { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
 import { lookupQuery } from './lookup-dependencies';
 import { Inject, Injectable, InjectionToken, Optional, ErrorHandler } from '@angular/core';
-import { Observable, defer, firstValueFrom, from, of } from 'rxjs';
+import { Observable, Subject, defer, firstValueFrom, from, of } from 'rxjs';
 import { finalize, map, shareReplay, catchError, timeout } from 'rxjs/operators';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
@@ -14,6 +14,11 @@ export interface DataRestService {
   put?(endpoint: string, payload: unknown, ifMatch?: string): Observable<unknown>;
   patch(endpoint: string, payload: unknown, ifMatch?: string): Observable<unknown>;
   delete(endpoint: string, ifMatch?: string): Observable<unknown>;
+}
+
+export interface DataMutation {
+  readonly endpoint: string;
+  readonly resources: readonly string[];
 }
 export const DATA_REST_SERVICE = new InjectionToken<DataRestService>('RestService');
 export interface DataSourceLoadOptions {
@@ -29,6 +34,9 @@ export interface DataPage { value: Record<string, unknown>[]; meta: Record<strin
 /** Shared REST, concurrency and company isolation boundary for all page types. */
 @Injectable({ providedIn: 'root' })
 export class DataSourceService {
+  private readonly mutationEvents = new Subject<DataMutation>();
+  readonly mutations = this.mutationEvents.asObservable();
+  sameResource(left: string, right: string): boolean { return this.resourcePath(left) === this.resourcePath(right); }
   private readonly lists = new Map<string, { response: unknown; at: number }>();
   private readonly requests = new Map<string, Observable<unknown>>();
   private readonly versions = new Map<string, string>();
@@ -330,7 +338,12 @@ export class DataSourceService {
         if (!request) throw new Error('The configured data provider does not support PUT.');
           const response = await firstValueFrom(request);
           if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
-          this.recordMutation(endpoint, config.invalidates);
+          const meta = this.asRecord(this.asRecord(response)?.['meta']);
+          const changedResources = Array.isArray(meta?.['changedResources'])
+            ? meta['changedResources'].filter((path): path is string => typeof path === 'string' && /^\/[A-Za-z0-9_/-]+$/.test(path)).slice(0,100)
+            : [];
+          this.recordMutation(endpoint, [...(config.invalidates ?? []), ...changedResources]);
+          this.mutationEvents.next({endpoint, resources: [...(config.invalidates ?? []), ...changedResources]});
           // Number allocation can change a separate series resource through server business policies.
           if (operation === 'create' && config.autoGenerateNumber) this.invalidateReadCache();
           if (operation === 'delete' || response == null) { this.versions.delete(identity); this.notifyWriteHook(after ? ()=>after({...hookContext,record:undefined}) : undefined); return response; }

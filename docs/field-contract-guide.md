@@ -212,6 +212,28 @@ Partners can add another supported type by adding its backend field declaration 
 ## Optional editor hooks (PR reference)
 
 Ordinary pages do not need hooks. Configure them only for exceptional field logic.
+
+Developer TS can call `await page.validate('fieldName', value)` or
+`await page.validateLine(row, 'fieldName', value)` on its shared `ListPage`.
+The result contains `valid` and `errors`. It uses the existing editor and save
+policy, including readonly checks, asynchronous validation and conflict handling.
+Validation completion and API-save completion remain separate. Do not assign
+directly to page records to request persistence.
+
+Field callbacks receive `field`, `value`, `previousValue`, `record`,
+`previousRecord` and `source` (`user` or `code`). Record snapshots protect the
+current editor from callback mutation. Return same-record updates through
+`afterValidate`; callback chaining does not implicitly rerun custom target rules.
+Callbacks must not initiate independent writes.
+
+For a default evaluated for every new record, use `defaultValue: () => value`.
+For example, `defaultValue: () => new Date().toLocaleDateString('en-CA')` evaluates
+the date at record initialization. Existing saved values are preserved.
+
+Persistent header-to-line rules belong to the backend field lifecycle. The
+server reports changed API resources in `meta.changedResources`; core refreshes
+clean loaded lines and their versions without overwriting local changes.
+This is separate from `parentFieldMap`, which defines ownership filters.
 Header fields and line columns use the same `validation` object:
 
 ```ts

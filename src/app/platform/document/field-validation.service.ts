@@ -1,6 +1,6 @@
 import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../models/field-state';
 import { Injectable } from '@angular/core';
-import { FieldConfig } from '../models/field-config.model';
+import { FieldChangeSource, FieldConfig, FieldValidationContext } from '../models/field-config.model';
 import { resolvedValueType, compareDecimalValues, isValidDateTime, normalizeFieldValue } from '../models/field-value';
 
 export interface FieldValidationResult {
@@ -13,7 +13,7 @@ export interface FieldValidationResult {
   providedIn: 'root'
 })
 export class FieldValidationService {
-  validateField(field: FieldConfig | undefined, value: unknown, record: Record<string, unknown> = {}, custom = false, fields: FieldConfig[] = []): FieldValidationResult {
+  validateField(field: FieldConfig | undefined, value: unknown, record: Record<string, unknown> = {}, custom = false, fields: FieldConfig[] = [], source: FieldChangeSource = 'user'): FieldValidationResult {
     if (!field || fieldIsHidden(field, record)) {
       return { valid: true, errors: [] };
     }
@@ -114,7 +114,7 @@ export class FieldValidationService {
 
     if (custom && !errors.length && validation.custom) {
       try {
-        const message = validation.custom({value, record: Object.freeze(structuredClone({...record, [field.key]: value}))});
+        const message = validation.custom(this.context(field, value, record, source));
         if (message !== undefined) errors.push(typeof message === 'string' && message.trim() ? message : field.label + ' has an invalid custom validator result');
       } catch { errors.push(field.label + ' validation could not complete'); }
     }
@@ -122,7 +122,7 @@ export class FieldValidationService {
     const updates: Record<string, unknown> = {};
     if (custom && !errors.length && validation.afterValidate) {
       try {
-        const proposed = validation.afterValidate({value, record: Object.freeze(structuredClone({...record, [field.key]: value}))});
+        const proposed = validation.afterValidate(this.context(field, value, record, source));
         if (proposed !== undefined) {
           if (!proposed || typeof proposed !== 'object' || Array.isArray(proposed) || 'then' in proposed) throw new Error();
           const candidate = {...record,[field.key]:value,...proposed};
@@ -142,15 +142,26 @@ export class FieldValidationService {
   }
 
   /** Editor-only remote validation. Whole-record save checks never invoke callbacks. */
-  async validateEditorAsync(field: FieldConfig, value: unknown, record: Record<string,unknown>, fields: FieldConfig[]): Promise<FieldValidationResult> {
+  async validateEditorAsync(field: FieldConfig, value: unknown, record: Record<string,unknown>, fields: FieldConfig[], source: FieldChangeSource = 'user'): Promise<FieldValidationResult> {
     const snapshot = structuredClone(record);
-    const preliminary = this.validateField({...field,validation:{...field.validation,afterValidate:undefined}},value,snapshot,true,fields);
+    const preliminary = this.validateField({...field,validation:{...field.validation,afterValidate:undefined}},value,snapshot,true,fields,source);
     if (!preliminary.valid) return preliminary;
     try {
-      const message = await field.validation?.customAsync?.({value,record:Object.freeze({...snapshot,[field.key]:value})});
+      const message = await field.validation?.customAsync?.(this.context(field,value,snapshot,source));
       if (message !== undefined) return {valid:false,errors:[typeof message==='string' && message.trim() ? message : field.label+' has an invalid custom validator result']};
-      return this.validateField({...field,validation:{...field.validation,custom:undefined}},value,snapshot,true,fields);
+      return this.validateField({...field,validation:{...field.validation,custom:undefined}},value,snapshot,true,fields,source);
     } catch { return {valid:false,errors:[field.label+' validation could not complete. Try again.']}; }
+  }
+
+  private context(field: FieldConfig, value: unknown, record: Record<string, unknown>, source: FieldChangeSource): FieldValidationContext {
+    return Object.freeze({
+      field: field.key,
+      value,
+      previousValue: structuredClone(record[field.key]),
+      previousRecord: Object.freeze(structuredClone(record)),
+      record: Object.freeze(structuredClone({...record, [field.key]: value})),
+      source,
+    });
   }
 
   private toText(value: unknown): string {

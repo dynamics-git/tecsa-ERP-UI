@@ -51,9 +51,15 @@ export interface FieldLookupConfig {
 }
 
 /** Pure, synchronous editor validation. Return an error message or undefined. */
+export type FieldChangeSource = 'user' | 'code';
+
 export interface FieldValidationContext {
+  readonly field: string;
   readonly value: unknown;
+  readonly previousValue: unknown;
   readonly record: Readonly<Record<string, unknown>>;
+  readonly previousRecord: Readonly<Record<string, unknown>>;
+  readonly source: FieldChangeSource;
 }
 
 export interface FieldValidationConfig {

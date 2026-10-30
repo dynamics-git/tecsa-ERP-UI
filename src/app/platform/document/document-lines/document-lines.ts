@@ -22,6 +22,7 @@ import {
   SimpleChanges,
   ChangeDetectorRef,
 } from '@angular/core';
+import { FieldChangeSource } from '../../models/field-config.model';
 import { LineColumnConfig } from '../../models/line-config.model';
 import { DataSourceService } from '../../data/data-source.service';
 import { Subscription, timer, switchMap, from, firstValueFrom, timeout } from 'rxjs';
@@ -106,10 +107,17 @@ export class DocumentLines {
   @Input() preferenceKey = '';
   private destroyed = false;
   private readonly validationRuns = new WeakMap<Record<string,unknown>,Map<string,object>>();
+  private readonly codeValidations = new WeakMap<Record<string,unknown>,Set<string>>();
+  private evaluatingField = false;
   private readonly invalidDrafts = new WeakMap<Record<string, unknown>, Map<string, {value: unknown; error: string}>>();
-  private validateEdit(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, accepted?: FieldValidationResult): FieldValidationResult | undefined {
+  private validateEdit(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, accepted?: FieldValidationResult, source: FieldChangeSource = 'user'): FieldValidationResult | undefined {
     const key = column.field ?? column.id;
-    const result = accepted ?? this.validation.validateField({...column, key}, value, row, true, this.columns.map(c=>({...c,key:c.field??c.id,disabled:this.isReadonly(c,row)})));
+    let result = accepted;
+    if (!result) {
+      this.evaluatingField = true;
+      try { result = this.validation.validateField({...column, key}, value, row, true, this.columns.map(c=>({...c,key:c.field??c.id,disabled:this.isReadonly(c,row)})),source); }
+      finally { this.evaluatingField = false; }
+    }
     const drafts = this.invalidDrafts.get(row) ?? new Map();
     const hadDraft = drafts.has(key);
     if (!result.valid) drafts.set(key, {value, error: result.errors[0]}); else drafts.delete(key);
@@ -760,9 +768,19 @@ export class DocumentLines {
     return { updatedFields: this.columns.map(column => column.field ?? column.id).filter(key => key !== field && !Object.is(before[key], row[key])), invalidated: dependent.invalidated };
   }
 
-  updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, allowBulk = true, accepted?: FieldValidationResult): void {
+  validate(row: Record<string, unknown>, field: string, value: unknown): Promise<FieldValidationResult> {
+    const column = this.columns.find(column => (column.field ?? column.id) === field);
+    if (!column || !this.rows.includes(row)) return Promise.resolve({valid:false,errors:['Unknown line or field: ' + field]});
+    const active = this.codeValidations.get(row) ?? new Set<string>();
+    if (this.evaluatingField || active.has(field) || this.validationRuns.get(row)?.has(field)) return Promise.resolve({valid:false,errors:['Line validation is already running. Return dependent fields from afterValidate.']});
+    active.add(field);this.codeValidations.set(row,active);
+    try { return Promise.resolve(this.updateCellValue(column,row,value,false,undefined,'code')).finally(() => active.delete(field)); }
+    catch (error) { active.delete(field);throw error; }
+  }
+
+  updateCellValue(column: LineColumnConfig, row: Record<string, unknown>, value: unknown, allowBulk = true, accepted?: FieldValidationResult, source: FieldChangeSource = 'user'): FieldValidationResult | Promise<FieldValidationResult> {
     if (this.isReadonly(column, row)) {
-      return;
+      return {valid:false,errors:[column.label + ' is not editable.']};
     }
 
     const field = column.field ?? column.id;
@@ -774,19 +792,18 @@ export class DocumentLines {
       const headerSnapshot=JSON.stringify(this.headerData);
       runs.set(field,run);this.validationRuns.set(row,runs);
       this.validateEdit(column,row,value,{valid:false,errors:['Validating…']});
-      void this.validation.validateEditorAsync({...column,key:field},value,row,this.columns.map(c=>({...c,key:c.field??c.id,disabled:this.isReadonly(c,row)}))).then(result=>{
-        if(this.destroyed || runs.get(field)!==run || this.rows!==rows || !this.rows.includes(row))return;
+      return this.validation.validateEditorAsync({...column,key:field},value,row,this.columns.map(c=>({...c,key:c.field??c.id,disabled:this.isReadonly(c,row)})),source).then(result=>{
+        if(this.destroyed || runs.get(field)!==run || this.rows!==rows || !this.rows.includes(row))return {valid:false,errors:['Validation was superseded.']};
         runs.delete(field);
         if(!inScope() || JSON.stringify(this.headerData)!==headerSnapshot || JSON.stringify(row)!==snapshot || this.isReadonly(column,row)) {
-          this.validateEdit(column,row,value,{valid:false,errors:['Record changed during validation. Re-enter this value to validate again.']});return;
+          const stale={valid:false,errors:['Record changed during validation. Re-enter this value to validate again.']};this.validateEdit(column,row,value,stale);return stale;
         }
-        this.updateCellValue(column,row,value,allowBulk,result);
+        return this.updateCellValue(column,row,value,allowBulk,result,source);
       });
-      return;
     }
-    const validation = this.validateEdit(column, row, value, accepted);
-    if (!validation) return;
-    if (fieldValuesEqual(previousValue, value, resolvedValueType(column))) return;
+    const validation = this.validateEdit(column, row, value, accepted, source);
+    if (!validation) return {valid:false,errors:[this.cellError(row,column)]};
+    if (fieldValuesEqual(previousValue, value, resolvedValueType(column))) return validation;
     const touched = this.touchedFields.get(row) ?? new Set<string>(); touched.add(field); this.touchedFields.set(row,touched);
     const rowIndex = this.rows.indexOf(row);
     const selectedRecord = this.resolveSelectedRecord(column, row, value);
@@ -829,10 +846,11 @@ export class DocumentLines {
         this.rowChanged.emit({ row: this.rows[change.rowIndex], column, ...change });
       }
       this.rowChanged.emit({ row, column, value, previousValue, rowIndex, updatedFields });
-      return;
+      return validation;
     }
 
     this.rowChanged.emit({ row, column, value, previousValue, rowIndex, updatedFields });
+    return validation;
   }
 
   private invalidateLookupRows(row: Record<string, unknown>, fields: string[]): void {

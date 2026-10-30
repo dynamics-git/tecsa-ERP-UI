@@ -5,7 +5,7 @@ engine, a backend page registry, or another form renderer.
 
 ## One feature-page pattern
 
-All 41 registered pages have the same file responsibilities, including related
+All feature pages have the same file responsibilities, including related
 worksheets opened only inside a popup:
 
 - Page config: the complete declaration, including pageType, data source, list
@@ -53,8 +53,9 @@ numbering-range lines and remains a document.
 
 ## Registration, permissions and presentation
 
-Register each routed master module once in features/run-modal-page-modules.ts.
-The module exports its feature component and re-exports its page configurations. One registered module declares one page.
+The page-discovery script finds feature folders and generates the ignored page
+imports. Do not maintain a manual import list. The module exports its feature
+component and re-exports its page configurations. One discovered module declares one page.
 Menu placement belongs to the page definition and its owning business module.
 
 The backend discovers effective permissions from its server entity catalogue.
@@ -71,3 +72,24 @@ or disable it rather than duplicating every form field.
 
 Use the foundation public API from feature code. Run local UI tests, a build,
 import-boundary checks and token checks for changes to this shared foundation.
+
+## Developer field changes
+
+Use `ListPage.validate(field, value)` and `ListPage.validateLine(row, field, value)`
+for programmatic edits. These call the existing editors, so type conversion,
+validation, dependent fields, dirty tracking and the configured save policy are
+the same as typing. Awaiting the result confirms field validation; it does not
+promise that an asynchronous autosave has completed. Manual-save pages still
+wait for Save. Direct object assignment is not the record editing API.
+
+Reuse `validation.custom`, `customAsync` and `afterValidate`. Their context
+contains field, proposed value, previous value, proposed record, previous record
+and source (`user` or `code`). Callbacks are pure: return other same-record
+values from `afterValidate`; do not start saves from validation callbacks.
+
+Required header-to-line business updates run through backend model field rules
+inside the operation transaction. They cover all matching database rows, not
+only loaded UI rows. A successful response may include `meta.changedResources`;
+core invalidates those reads and refreshes clean loaded lines after the header
+save. Unsaved values are retained. `parentFieldMap` remains relationship binding,
+not an update-all-lines instruction. No `copyToLines` property is supported.

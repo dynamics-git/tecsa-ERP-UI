@@ -1,6 +1,10 @@
 /** Shared value semantics. Invalid input is preserved for validation, never silently zeroed. */
 const FIELD_VALUE_TYPES = ['text', 'code', 'number', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'time', 'guid', 'email', 'url', 'phone'] as const;
 export type FieldValueType = (typeof FIELD_VALUE_TYPES)[number];
+/** Evaluate dynamic defaults for each new record, rather than at module load time. */
+export function fieldDefaultValue(field: {defaultValue?: unknown}): unknown {
+  return typeof field.defaultValue === 'function' ? field.defaultValue() : field.defaultValue;
+}
 /** Semantic types used by both form fields and line columns. */
 export function resolvedValueType(field: {type?: string; valueType?: FieldValueType}): FieldValueType | undefined {
   if (field.valueType) return field.valueType;
