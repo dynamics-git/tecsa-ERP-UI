@@ -115,7 +115,6 @@ export const paymentMethodsListConfig: ListPageConfig & {
   pageId: 'payment-methods',
   pageType: 'card',
   title: 'Payment Methods',
-  autoSave: true,
   dataSource: {
     endpoint: '/paymentMethods',
     keyField: 'systemId',

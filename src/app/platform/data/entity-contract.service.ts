@@ -69,6 +69,12 @@ export class EntityContractService {
   }
 
   private metadata?: CoreMetadata;
+  /** Published source identity for config-derived field protection; no endpoint naming guesses. */
+  sourceName(source: DataSourceConfig): string | undefined {
+    const entity = this.entity(source);
+    return entity ? Object.entries(this.metadata?.entities ?? {}).find(([, value]) => value === entity)?.[0] : undefined;
+  }
+
   clearMetadata(): void {
     this.metadata = undefined;
   }

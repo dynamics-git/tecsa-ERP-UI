@@ -95,7 +95,6 @@ export const dimensionCombinationsListConfig: ListPageConfig & {
   pageId: 'dimension-combinations',
   pageType: 'card',
   title: 'Dimension Combinations',
-  autoSave: true,
   dataSource: {
     endpoint: '/dimensionCombinations',
     keyField: 'systemId',

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { of } from 'rxjs';
 import { LineCalculationService } from './line-calculation.service';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../data/document-config-defaults';
+import { MINIMUM_LINE_GRID_ROWS } from '../models/line-config.model';
 import { DocumentWindow } from './document-window/document-window';
 import { DATA_REST_SERVICE } from '../data/data-source.service';
 import { DocumentPageCommandAssemblerService } from '../pages/document-page-command-assembler.service';
@@ -85,6 +86,22 @@ describe('Shared document height and totals rendering', () => {
       fixture.destroy();
     });
   }
+  it('keeps empty grid lines visible independently of edit permissions without adding records', () => {
+    const fixture = create(0);
+    const body = () => fixture.nativeElement.querySelector('app-document-lines tbody');
+    expect(body().querySelectorAll('.empty-grid-row')).toHaveLength(MINIMUM_LINE_GRID_ROWS);
+    expect(body().querySelectorAll('input,button,select')).toHaveLength(0);
+    expect(fixture.componentInstance.enteredLineCount).toBe(0);
+    fixture.componentRef.setInput('lineColumns', [{id:'quantity',label:'Quantity',valueType:'decimal',readonly:true}]);
+    fixture.detectChanges();
+    expect(body().querySelectorAll('.empty-grid-row')).toHaveLength(MINIMUM_LINE_GRID_ROWS);
+    fixture.componentRef.setInput('lineRows', [{quantity:'5'}]);
+    fixture.detectChanges();
+    expect(body().querySelectorAll('.empty-grid-row')).toHaveLength(0);
+    expect(fixture.componentInstance.enteredLineCount).toBe(1);
+    fixture.destroy();
+  });
+
   it('places shared line tools after the row arrow, not in a General toolbar group, and copies the clicked row', () => {
     const fixture = create(2);
     const commands = [

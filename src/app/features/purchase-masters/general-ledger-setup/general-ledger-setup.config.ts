@@ -227,7 +227,6 @@ export const generalLedgerSetupListConfig: ListPageConfig & {
   pageId: 'general-ledger-setup',
   pageType: 'setup',
   title: 'General Ledger Setup',
-  autoSave: true,
   dataSource: {
     endpoint: '/generalLedgerSetup',
     keyField: 'systemId',

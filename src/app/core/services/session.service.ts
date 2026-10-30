@@ -2,6 +2,7 @@ import { WorkspaceContext } from './workspace-context';
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, Subject } from 'rxjs';
+import type { PagePermissionRule } from './page-access.service';
 import { environment } from '../../../environments/environment';
 
 export type PermissionMatrix = {
@@ -20,6 +21,8 @@ export type SessionContext = {
   defaultAccessCenter?: unknown;
   accessCenters?: unknown[];
   permissions?: unknown[];
+  pagePermissions?: PagePermissionRule[];
+  companySuper?: boolean;
   superAdmin?: boolean;
   showAllAccessCenters?: boolean;
   showAccessCenterSelection?: boolean;
@@ -41,6 +44,8 @@ export class SessionService {
   private readonly defaultAccessCenterKey = `${this.prefix}default-access-center`;
   private readonly accessCentersKey = `${this.prefix}access-centers`;
   private readonly permissionsKey = `${this.prefix}permissions`;
+  private readonly pagePermissionsKey = `${this.prefix}page-permissions`;
+  private readonly companySuperKey = `${this.prefix}company-super`;
   private readonly superAdminKey = `${this.prefix}super-admin`;
   private readonly showAllAccessCentersKey = `${this.prefix}show-all-access-centers`;
   private readonly showAccessCenterSelectionKey = `${this.prefix}show-access-center-selection`;
@@ -52,6 +57,7 @@ export class SessionService {
   private readonly accessTokenKey = this.workspace.storageKey('access-token');
 
   readonly permissionsLoaded$ = new BehaviorSubject<boolean>(false);
+  readonly permissionRefreshRequested$ = new Subject<void>();
   readonly accessCenterChanged$ = new Subject<unknown>();
   readonly userProfileChanged$ = new Subject<unknown>();
 
@@ -153,6 +159,18 @@ export class SessionService {
     return this.readBoolean(this.superAdminKey);
   }
 
+  get PagePermissions(): PagePermissionRule[] {
+    const value = this.readJson(this.pagePermissionsKey);
+    return Array.isArray(value) ? value as PagePermissionRule[] : [];
+  }
+
+  set PagePermissions(value: PagePermissionRule[]) {
+    this.writeJson(this.pagePermissionsKey, value);
+  }
+
+  get CompanySuper(): boolean { return this.readBoolean(this.companySuperKey); }
+  set CompanySuper(value: boolean) { this.writeBoolean(this.companySuperKey, value); }
+
   set SuperAdmin(value: boolean) {
     this.writeBoolean(this.superAdminKey, value);
   }
@@ -246,13 +264,13 @@ export class SessionService {
       this.AccessCenters = context.accessCenters;
     }
 
-    if (context.permissions !== undefined) {
-      this.Permissions = context.permissions;
-    }
+    if (context.pagePermissions !== undefined) this.PagePermissions = context.pagePermissions;
+    if (context.companySuper !== undefined) this.CompanySuper = context.companySuper;
 
     if (context.superAdmin !== undefined) {
       this.SuperAdmin = context.superAdmin;
     }
+    if (context.permissions !== undefined) this.Permissions = context.permissions;
 
     if (context.showAllAccessCenters !== undefined) {
       this.ShowAllAccessCenters = context.showAllAccessCenters;
@@ -306,6 +324,8 @@ export class SessionService {
       this.defaultAccessCenterKey,
       this.accessCentersKey,
       this.permissionsKey,
+      this.pagePermissionsKey,
+      this.companySuperKey,
       this.superAdminKey,
       this.showAllAccessCentersKey,
       this.showAccessCenterSelectionKey,

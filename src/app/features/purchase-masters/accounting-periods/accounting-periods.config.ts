@@ -48,7 +48,6 @@ export const accountingPeriodsListConfig: ListPageConfig & {
   pageId: 'accounting-periods',
   pageType: 'card',
   title: 'Accounting Periods',
-  autoSave: true,
   dataSource: {
     endpoint: '/accountingPeriods',
     keyField: 'systemId',

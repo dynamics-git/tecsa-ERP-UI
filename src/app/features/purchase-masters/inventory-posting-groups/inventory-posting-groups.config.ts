@@ -51,7 +51,6 @@ export const inventoryPostingGroupsListConfig: ListPageConfig & {
   pageId: 'inventory-posting-groups',
   pageType: 'card',
   title: 'Inventory Posting Groups',
-  autoSave: true,
   dataSource: {
     endpoint: '/inventoryPostingGroups',
     keyField: 'systemId',

@@ -47,7 +47,6 @@ export const itemDefaultDimensionsListConfig: ListPageConfig & {
   pageId: 'item-default-dimensions',
   pageType: 'worksheet',
   title: 'Item Dimensions',
-  autoSave: true,
   dataSource: itemDefaultDimensionsDataSource,
   identity: {
     primaryField: 'number',

@@ -47,7 +47,6 @@ export const itemUnitsOfMeasureListConfig: ListPageConfig & {
   pageId: 'item-units-of-measure',
   pageType: 'worksheet',
   title: 'Item Units of Measure',
-  autoSave: true,
   dataSource: itemUnitsOfMeasureDataSource,
   identity: {
     primaryField: 'number',

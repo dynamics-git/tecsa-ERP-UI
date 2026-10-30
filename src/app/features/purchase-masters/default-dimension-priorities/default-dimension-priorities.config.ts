@@ -30,7 +30,6 @@ export const defaultDimensionPrioritiesListConfig: ListPageConfig & {
   pageId: 'default-dimension-priorities',
   pageType: 'worksheet',
   title: 'Default Dimension Priorities',
-  autoSave: true,
   dataSource: defaultDimensionPrioritiesDataSource,
   identity: {
     primaryField: 'code',

@@ -284,7 +284,6 @@ export const vendorsListConfig: ListPageConfig & {
   pageId: 'vendors',
   pageType: 'card',
   title: 'Vendors',
-  autoSave: true,
   dataSource: {
     endpoint: '/vendors',
     keyField: 'systemId',

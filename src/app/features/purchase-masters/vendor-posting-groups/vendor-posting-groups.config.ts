@@ -211,7 +211,6 @@ export const vendorPostingGroupsListConfig: ListPageConfig & {
   pageId: 'vendor-posting-groups',
   pageType: 'card',
   title: 'Vendor Posting Groups',
-  autoSave: true,
   dataSource: {
     endpoint: '/vendorPostingGroups',
     keyField: 'systemId',

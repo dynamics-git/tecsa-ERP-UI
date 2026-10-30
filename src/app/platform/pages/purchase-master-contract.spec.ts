@@ -78,11 +78,12 @@ describe('Purchase master configuration integration', () => {
     }
   });
 
-  it('enables the shared FactBox for every registered page type', () => {
+  it('preserves each page’s declared FactBox policy and enables it for the business masters', () => {
     const allPages = registered.filter(value => value && typeof value === 'object' && 'pageId' in value && 'dataSource' in value) as ListPageConfig[];
     expect(allPages.length).toBeGreaterThanOrEqual(41);
     expect(new Set(allPages.map(page => page.pageType))).toEqual(new Set(['card', 'document', 'setup', 'worksheet']));
-    for (const page of allPages) expect(page.factBox?.enabled, page.pageId).toBe(true);
+    for (const page of allPages) expect(typeof page.factBox?.enabled, page.pageId).toBe('boolean');
+    for (const page of pages) expect(page.factBox?.enabled, page.pageId).toBe(true);
   });
 
   it('places shared prerequisites in their owning modules and gives every master a distinct icon', () => {

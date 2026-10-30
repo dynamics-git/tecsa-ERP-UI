@@ -167,7 +167,6 @@ export const inventoryPostingSetupListConfig: ListPageConfig & {
   pageId: 'inventory-posting-setup',
   pageType: 'card',
   title: 'Inventory Posting Setup',
-  autoSave: true,
   dataSource: {
     endpoint: '/inventoryPostingSetup',
     keyField: 'systemId',

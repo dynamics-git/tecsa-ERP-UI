@@ -27,6 +27,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { SessionService } from '../../../core/services/session.service';
+import { PageAccessService } from '../../../core/services/page-access.service';
 import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
 import { CommandConfig, StandardCommandConfig, resolveCommandPermissionKey } from '../../models/command-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
@@ -61,6 +62,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   readonly saves = inject(RunModalService);
   private readonly factBoxHost = inject(FactBoxHostService);
   private readonly sessionService = inject(SessionService);
+  private readonly pageAccess = inject(PageAccessService);
   private readonly commandPermissions = inject(DocumentPageCommandPermissionService);
   private readonly standardActions = inject(StandardListActionsService);
   private readonly listExport = inject(ListExportService);
@@ -148,7 +150,8 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   private preferenceScope = '';
 
   get configurableColumns(): DisplayColumn[] {
-    const columns = (this.config?.dataSurface?.columns ?? []).filter(column => column.hidden !== true);
+    const columns = (this.config?.dataSurface?.columns ?? []).filter(column => column.hidden !== true &&
+      this.pageAccess.field(this.config?.pageId ?? '', 'header', column.field ?? column.id ?? '').visible);
     const positions = new Map(this.columnOrder.map((key, index) => [key, index]));
     return [...columns].sort((a, b) => (positions.get(this.getColumnKey(a)) ?? 999) - (positions.get(this.getColumnKey(b)) ?? 999));
   }
@@ -480,6 +483,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
     const pagePermissions = this.resolvePagePermissionFlags();
     return (this.config?.commands ?? [])
       .map((command) => {
+        command = this.commandPermissions.apply(command, this.config?.pageId ?? '', this.config?.dataSource, 'list');
         if (command.hidden === true) {
           return command;
         }
@@ -993,6 +997,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
 
   getCellValue(row: unknown, column: DisplayColumn): string {
     const key = column.field ?? column.id ?? '';
+    if (!this.pageAccess.field(this.config?.pageId ?? '', 'header', key).visible) return '';
     const caption = this.read(row, '__display_' + key);
     if (typeof caption === 'string') return caption;
     const value = this.read(row, key);
@@ -1006,6 +1011,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   getSubtitle(row: unknown, column: DisplayColumn): string {
+    if (!this.pageAccess.field(this.config?.pageId ?? '', 'header', column.subtitleField ?? '').visible) return '';
     const value = this.read(row, column.subtitleField ?? '');
     return value === undefined || value === null ? '' : String(value);
   }

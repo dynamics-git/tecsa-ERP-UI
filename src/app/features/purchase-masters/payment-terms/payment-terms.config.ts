@@ -85,7 +85,6 @@ export const paymentTermsListConfig: ListPageConfig & {
   pageId: 'payment-terms',
   pageType: 'card',
   title: 'Payment Terms',
-  autoSave: true,
   dataSource: {
     endpoint: '/paymentTerms',
     keyField: 'systemId',

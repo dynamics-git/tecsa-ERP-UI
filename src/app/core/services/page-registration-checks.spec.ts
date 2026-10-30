@@ -59,7 +59,8 @@ describe('One shared ERP page declaration pattern', () => {
       expect(page.dataSource?.endpoint, page.pageId).toBeTruthy();
       if (page.pageType === 'card') {
         expect(header.sections.length, page.pageId).toBeGreaterThan(0);
-        expect(lines, page.pageId).toHaveLength(0);
+        expect(lines.length, page.pageId).toBeLessThanOrEqual(1);
+        if (lines.length) expect((lines[0][1] as LineConfig).columns.length, page.pageId).toBeGreaterThan(0);
         expect(page.dataSurface?.columns.length, page.pageId).toBeGreaterThan(0);
       } else if (page.pageType === 'document') {
         expect(header.sections.length, page.pageId).toBeGreaterThan(0);
@@ -68,7 +69,7 @@ describe('One shared ERP page declaration pattern', () => {
         expect(header.sections, page.pageId).toEqual([]);
         expect(lines, page.pageId).toHaveLength(1);
         expect((lines[0][1] as LineConfig).columns.length, page.pageId).toBeGreaterThan(0);
-        expect(page.dataSource?.navigation, page.pageId).toBeDefined();
+        expect(!!page.dataSource?.navigation || !!(page.dataSource?.headerPKProp && page.dataSource?.lineFKProp), page.pageId).toBe(true);
         expect(page.menu, page.pageId).toBeUndefined();
       } else if (page.pageType === 'setup') {
         expect(page.dataSource?.singleton, page.pageId).toBe(true);
@@ -94,6 +95,25 @@ describe('One shared ERP page declaration pattern', () => {
       expect(contracts.resolveSource(page.dataSource!)).toEqual(page.dataSource);
     }
   });
+  it('uses one lookup declaration and shared autosave defaults throughout discovered configs', () => {
+    for (const module of featurePageModules) {
+      const page = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig;
+      const header = Object.entries(module).find(([name]) => name.endsWith('HeaderConfig'))?.[1] as HeaderConfig;
+      const line = Object.entries(module).find(([name]) => name.endsWith('LineConfig'))?.[1] as LineConfig | undefined;
+      const fields = [...header.sections.flatMap(section => section.fields), ...(line?.columns ?? [])];
+      for (const field of fields) {
+        if (!field.lookup) continue;
+        for (const duplicate of ['api', 'optionsEndpoints', 'valueField', 'labelField', 'bindValue', 'bindLabel'] as const)
+          expect((field as unknown as Record<string, unknown>)[duplicate], page.pageId + ': ' + ('key' in field ? field.key : field.id) + '.' + duplicate).toBeUndefined();
+        expect(field.lookup.endpoint, page.pageId).toBeTruthy();
+        expect(field.lookup.displayField, page.pageId).toBeTruthy();
+      }
+      const commands = [...(page.commands ?? []), ...header.toolbarButtons, ...(line?.toolbarButtons ?? [])];
+      const manual = commands.some(command => /^(?:cmd:)?(?:save|apply)$/i.test(command.actionKey));
+      if (!manual) expect(page.autoSave, page.pageId).not.toBe(true);
+    }
+  });
+
   it('requires a real component for a valid page instead of a config-only registration', () => {
     expect(() => buildPageRegistry([{ exampleListConfig: { pageId: 'example', pageType: 'worksheet' } }])).toThrow(
       'Page example must declare exactly one feature component.',

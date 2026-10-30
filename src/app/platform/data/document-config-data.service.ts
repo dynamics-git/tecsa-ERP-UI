@@ -76,6 +76,7 @@ export class DocumentConfigDataService {
   ): Record<string, unknown>[] {
     const records = lineSource.filter((line): line is Record<string, unknown> => this.isRecord(line));
     if (!records.length) {
+      if (lineConfig.editable === false || lineConfig.dataSource.supportsCreate === false) return [];
       return [this.createEmptyLineRow(lineConfig, headerData, registry, optionFieldMap)];
     }
 

@@ -30,7 +30,6 @@ export const dimensionValuesListConfig: ListPageConfig & {
   pageId: 'dimension-values',
   pageType: 'worksheet',
   title: 'Dimension Values',
-  autoSave: true,
   dataSource: dimensionValuesDataSource,
   identity: {
     primaryField: 'code',

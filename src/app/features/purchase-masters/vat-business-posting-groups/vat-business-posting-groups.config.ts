@@ -51,7 +51,6 @@ export const vatBusinessPostingGroupsListConfig: ListPageConfig & {
   pageId: 'vat-business-posting-groups',
   pageType: 'card',
   title: 'VAT Business Posting Groups',
-  autoSave: true,
   dataSource: {
     endpoint: '/vatBusinessPostingGroups',
     keyField: 'systemId',

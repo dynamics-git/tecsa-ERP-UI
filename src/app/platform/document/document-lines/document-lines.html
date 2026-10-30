@@ -1,5 +1,5 @@
 <div class="line-grid-wrap" [class.worksheet-grid]="worksheet" tabindex="0" (keydown)="handleGridKeydown($event)" (copy)="handleCopy($event)" (scroll)="closeRowMenu()">
-  <table class="line-grid" [class.with-selection]="showSelection">
+  <table class="line-grid" [class.with-selection]="showSelection" [class.sized-columns]="fixedColumnLayout">
     <thead>
       <tr>
         @if (showSelection) {
@@ -29,6 +29,9 @@
               }
             </div>
           </th>
+        }
+        @if (fixedColumnLayout) {
+          <th class="row-fill-col" aria-hidden="true"></th>
         }
       </tr>
     </thead>
@@ -99,7 +102,25 @@
               @if (cellError(row,column); as error) { <span class="cell-error" role="alert" [id]="editorId + '-error-' + rowIndex + '-' + column.id">{{ error }}</span> }
             </td>
           }
+          @if (fixedColumnLayout) {
+            <td class="row-fill-col" aria-hidden="true"></td>
+          }
         </tr>
+      } @empty {
+        @for (index of emptyGridRows; track index) {
+          <tr class="empty-grid-row" aria-hidden="true">
+            @if (showSelection) {
+              <td class="row-pointer-col"></td>
+              <td class="row-check-col"></td>
+            }
+            @for (column of visibleColumns; track column.id) {
+              <td [class.line-icon-col]="column.cellType === 'icon'" [style.width]="getColumnWidthStyle(column)"></td>
+            }
+            @if (fixedColumnLayout) {
+              <td class="row-fill-col"></td>
+            }
+          </tr>
+        }
       }
     </tbody>
   </table>

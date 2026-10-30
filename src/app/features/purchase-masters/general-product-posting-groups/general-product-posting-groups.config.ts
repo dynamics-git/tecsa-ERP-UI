@@ -71,7 +71,6 @@ export const generalProductPostingGroupsListConfig: ListPageConfig & {
   pageId: 'general-product-posting-groups',
   pageType: 'card',
   title: 'General Product Posting Groups',
-  autoSave: true,
   dataSource: {
     endpoint: '/generalProductPostingGroups',
     keyField: 'systemId',

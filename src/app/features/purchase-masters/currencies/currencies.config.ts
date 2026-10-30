@@ -184,7 +184,6 @@ export const currenciesListConfig: ListPageConfig & {
   pageId: 'currencies',
   pageType: 'card',
   title: 'Currencies',
-  autoSave: true,
   dataSource: {
     endpoint: '/currencies',
     keyField: 'systemId',

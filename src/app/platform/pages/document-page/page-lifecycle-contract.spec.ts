@@ -14,7 +14,7 @@ import { providePlatformGovernance } from '../../../core/providers/platform-gove
 
 describe('Page lifecycle with synthetic data, no operational records',()=>{
  const record={id:'fixture-1',code:'PR',description:'Purchase Requisition',systemRowVersion:1};
- function create(type:'card'|'document'|'setup'|'worksheet',response?:Subject<unknown>,autoSave=false,headerConfig?:typeof purchasesPayablesSetupHeaderConfig){
+ function create(type:'card'|'document'|'setup'|'worksheet',response?:Subject<unknown>,autoSave?:boolean,headerConfig?:typeof purchasesPayablesSetupHeaderConfig){
   let current = structuredClone(record);
   const get=vi.fn((endpoint:string)=>endpoint.endsWith('/apiCapabilities') ? of({data:{contractVersion:'1.0',entities:{},endpoints:[]}}) : response ?? of(endpoint.includes('lines')?{data:[{id:'line-1',lineNo:10000,quantity:2,systemRowVersion:1}]}:{data:current}));
   const patch=vi.fn((endpoint:string,body:Record<string,unknown>)=>{if(!endpoint.includes('lines')) current={...current,...body,systemRowVersion:current.systemRowVersion+1};return of({data:endpoint.includes('lines')?{id:'line-1',...body,systemRowVersion:2}:current});});
@@ -41,7 +41,7 @@ describe('Page lifecycle with synthetic data, no operational records',()=>{
   ['Purchases',purchasesPayablesSetupListConfig,purchasesPayablesSetupHeaderConfig],
   ['Sales',salesReceivablesSetupListConfig,salesReceivablesSetupHeaderConfig],
  ] as const)it(name+' setup autosaves real edits without a Save toolbar command',async()=>{
-  expect(list.autoSave).toBe(true);
+  expect(list.autoSave).toBeUndefined();
   const {f,patch}=create('setup',undefined,list.autoSave,header);
   await vi.waitFor(()=>expect(f.componentInstance.inlineDocumentWindowConfig?.contentReady).toBe(true));
   await f.whenStable();f.detectChanges();
@@ -64,7 +64,7 @@ describe('Page lifecycle with synthetic data, no operational records',()=>{
   await f.componentInstance.requestClose();expect(confirm).toHaveBeenCalledOnce();expect(closed).toBe(false);expect(patch).not.toHaveBeenCalled();f.destroy();
  });
  it('manual save writes only edited header fields and does not patch untouched lines or placeholders',async()=>{
-  const {f,patch}=create('document');await f.whenStable();f.detectChanges();
+  const {f,patch}=create('document',undefined,false);await f.whenStable();f.detectChanges();
   const form=f.debugElement.query(By.directive(DynamicForm)).componentInstance as DynamicForm;
   form.updateFieldValue(form.sections[0].fields[1],'Updated description');
   expect(patch).not.toHaveBeenCalled();

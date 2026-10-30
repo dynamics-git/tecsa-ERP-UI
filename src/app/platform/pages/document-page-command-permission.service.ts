@@ -4,6 +4,7 @@ import { DataSourceConfig } from '../models/data-source-config.model';
 import { Injectable, Optional } from '@angular/core';
 import { SessionService } from '../../core/services/session.service';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
+import { PageAccessService } from '../../core/services/page-access.service';
 
 // API action identities default centrally; explicit permission aliases remain supported.
 // This governs the visual availability of document commands, not API authorization.
@@ -13,9 +14,11 @@ export class DocumentPageCommandPermissionService {
     private readonly sessionService: SessionService,
     private readonly valueMapper: RuntimeValueMapperService,
     @Optional() private readonly dataSource?: DataSourceService,
+    @Optional() private readonly access?: PageAccessService,
   ) {}
 
-  apply(button: CommandConfig, pageId: string, source?: DataSourceConfig): CommandConfig {
+  apply(button: CommandConfig, pageId: string, source?: DataSourceConfig, surface?: string): CommandConfig {
+    button = this.applyTargetRule(button, pageId, surface);
     if (button.hidden === true) {
       return button;
     }
@@ -58,6 +61,9 @@ export class DocumentPageCommandPermissionService {
 
   applySourceOperation(button: CommandConfig, pageId: string, source: DataSourceConfig,
     operation: 'create' | 'update' | 'delete'): CommandConfig {
+    button = this.applyTargetRule(button, pageId);
+    if (this.access && !this.access.page(pageId, operation === 'update' ? 'Modify' : operation === 'create' ? 'Create' : 'Delete'))
+      return {...button, disabled: true, tooltip: 'You do not have permission for this operation.'};
     const allowed = this.dataSource?.operationAllowed(source, operation);
     if (allowed === false) return {...button, disabled: true, tooltip: 'This operation is not available for your access.'};
     const override = source.permissions?.[operation];
@@ -70,6 +76,9 @@ export class DocumentPageCommandPermissionService {
     pageId: string,
     operation: 'create' | 'modify' | 'delete',
   ): CommandConfig {
+    button = this.applyTargetRule(button, pageId, undefined, operation === 'modify' ? 'Modify' : operation === 'create' ? 'Create' : 'Delete');
+    if (this.access && !this.access.page(pageId, operation === 'modify' ? 'Modify' : operation === 'create' ? 'Create' : 'Delete'))
+      return {...button, disabled: true, tooltip: 'You do not have permission for this operation.'};
     if (button.hidden || this.sessionService.SuperAdmin && !this.hasDeclaredPage(pageId)) return button;
     const flags = this.resolvePagePermissionFlags(pageId);
     const allowed =
@@ -101,6 +110,20 @@ export class DocumentPageCommandPermissionService {
       'line-refresh',
     ]);
     return !standard.has(action);
+  }
+
+  private applyTargetRule(button: CommandConfig, pageId: string, area?: string, requiredOperation?: 'Create' | 'Modify' | 'Delete'): CommandConfig {
+    if (!this.access) return button;
+    const action = this.normalizePopupCommandKey(button.actionKey);
+    const surface = button.surface ?? area ?? (action.startsWith('line-') ? 'line' : 'header');
+    if (!this.access.page(pageId, 'Read') || !this.access.allows(pageId, 'command', surface, button.actionKey, 'Read'))
+      return {...button, hidden: true};
+    if (!this.access.allows(pageId, 'command', surface, button.actionKey, 'Execute'))
+      return {...button, disabled: true, tooltip: 'You do not have permission for this command.'};
+    const operation = requiredOperation ?? (['new', 'line-new', 'line-insert', 'line-copy', 'line-paste'].includes(action) ? 'Create' :
+      ['delete', 'line-delete'].includes(action) ? 'Delete' : ['save', 'apply', 'edit'].includes(action) ? 'Modify' : undefined);
+    if (operation && !this.access.page(pageId, operation)) return {...button, disabled: true};
+    return button;
   }
 
   private canExecutePopupCommand(button: CommandConfig, pageId: string, fallbackCanExecute: boolean): boolean {

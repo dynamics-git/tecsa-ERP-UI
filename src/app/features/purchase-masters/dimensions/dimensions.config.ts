@@ -62,7 +62,6 @@ export const dimensionsListConfig: ListPageConfig & {
   pageId: 'dimensions',
   pageType: 'card',
   title: 'Dimensions',
-  autoSave: true,
   dataSource: {
     endpoint: '/dimensions',
     keyField: 'systemId',

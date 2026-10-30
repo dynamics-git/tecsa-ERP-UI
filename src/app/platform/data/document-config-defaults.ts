@@ -64,9 +64,12 @@ export function lineConfigDefaults(config: LineConfig): LineConfig {
     dataSource: {
       ...source,
       createFields: (source.createFields ?? [...new Set([...writable, ...relationFields])])
-        .filter(key => !config.columns.some(column => (column.field ?? column.id) === key && column.readonly)),
+        .filter(key => !config.columns.some(column => (column.field ?? column.id) === key && column.readonly) ||
+          config.columns.some(column => (column.field ?? column.id) === key && !column.readonly)),
       updateFields: (source.updateFields ?? columns.filter(column => !column.readonlyAfterCreate).map(column => column.field ?? column.id))
-        .filter(key => !source.updateBlockedFields?.includes(key) && !config.columns.some(column => (column.field ?? column.id) === key && (column.readonly || column.readonlyAfterCreate))),
+        .filter(key => !source.updateBlockedFields?.includes(key) &&
+          (!config.columns.some(column => (column.field ?? column.id) === key && (column.readonly || column.readonlyAfterCreate)) ||
+           config.columns.some(column => (column.field ?? column.id) === key && !column.readonly && !column.readonlyAfterCreate))),
       requiredCreateFields:
         source.requiredCreateFields ?? (config.fields ?? []).filter((field) => field.required && !field.readonly).map((field) => field.key),
       meaningfulFields:

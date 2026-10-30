@@ -1,3 +1,4 @@
+import { MINIMUM_LINE_GRID_ROWS } from '../../models/line-config.model';
 import { CommandConfig } from '../../models/command-config.model';
 import { moveQuickEntry } from '../../../shared/ui/quick-entry';
 import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token';
@@ -37,6 +38,9 @@ type LineOption = { label: string; value: unknown; record?: Record<string, unkno
   styleUrl: './document-lines.scss',
 })
 export class DocumentLines {
+  // Presentation only: never inserted into rows, selection, totals or save payloads.
+  readonly emptyGridRows = Array.from({length: MINIMUM_LINE_GRID_ROWS}, (_, index) => index);
+
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
   private readonly hydration = inject(DocumentHydrationOrchestratorService);
   private readonly timeoutPolicy = inject(RUNTIME_TIMEOUT_POLICY);
@@ -584,6 +588,11 @@ export class DocumentLines {
 
   isActiveRow(rowIndex: number): boolean {
     return this.activeRowIndex === rowIndex;
+  }
+
+  /** Fixed data widths leave surplus space after the data, never inside row controls. */
+  get fixedColumnLayout(): boolean {
+    return this.showSelection && this.visibleColumns.length > 0 && this.visibleColumns.every(column => !!this.getColumnWidthStyle(column));
   }
 
   getColumnWidthStyle(column: LineColumnConfig): string | null {

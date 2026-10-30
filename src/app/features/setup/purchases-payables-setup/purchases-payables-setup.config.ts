@@ -21,8 +21,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -36,8 +34,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -51,8 +47,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -66,8 +60,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -81,8 +73,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -96,8 +86,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -111,8 +99,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -126,8 +112,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -141,8 +125,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -156,8 +138,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -171,8 +151,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -186,8 +164,6 @@ export const purchasesPayablesSetupHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'description'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
       ],
@@ -230,7 +206,6 @@ export const purchasesPayablesSetupListConfig: ListPageConfig & {
   pageId: 'purchases-payables-setup',
   pageType: 'setup',
   title: 'Purchases & Payables Setup',
-  autoSave: true,
   dataSource: {
     endpoint: '/purchasesPayablesSetup',
     keyField: 'systemId',

@@ -261,6 +261,11 @@
   }
 }
 
+// An unsized trailing cell absorbs surplus width when every data column is sized.
+// Otherwise fixed table layout proportionally enlarges the pointer/selection columns.
+.line-grid.sized-columns { width: 100%; }
+.line-grid .row-fill-col { padding: 0; border-inline: 0; }
+
 .worksheet-grid { height: 100%; min-height: 240px; }
 .worksheet-grid .line-grid { width: 100%; min-width: 900px; }
 .line-grid input[type='checkbox'] { width: 18px; height: 18px; min-height: 0; accent-color: var(--ts-border-focus); }
@@ -284,3 +289,6 @@
 .line-row-menu button { display:block; width:100%; padding:var(--ts-space-2) var(--ts-space-3); text-align:start; border:0; border-radius:var(--ts-radius-sm); background:transparent; color:inherit; font:inherit; font-size:var(--ts-font-body); cursor:pointer; }
 .line-row-menu button:hover, .line-row-menu button:focus-visible { background:var(--ts-row-hover-bg); }
 .line-row-menu button:disabled { color:var(--ts-muted); cursor:default; }
+
+// Empty data keeps the same row/column surface without creating editable records.
+.line-grid .empty-grid-row { pointer-events: none; }

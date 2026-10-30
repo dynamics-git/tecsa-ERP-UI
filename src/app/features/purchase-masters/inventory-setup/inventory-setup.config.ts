@@ -143,7 +143,6 @@ export const inventorySetupListConfig: ListPageConfig & {
   pageId: 'inventory-setup',
   pageType: 'setup',
   title: 'Inventory Setup',
-  autoSave: true,
   dataSource: {
     endpoint: '/inventorySetup',
     keyField: 'systemId',

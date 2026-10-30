@@ -16,6 +16,7 @@ import { RunModalPageDefinitionResolverService } from './run-modal-page-definiti
 import { RunModalStackService } from './run-modal-stack.service';
 import { RunModalBindingStateService } from './run-modal-binding-state.service';
 import { SessionService } from '../../core/services/session.service';
+import { PageAccessService } from '../../core/services/page-access.service';
 
 export interface RunModalRequest {
   pageId: string; context?: RunModalContext; mode?: PopupMode; size?: PopupSize;
@@ -34,6 +35,7 @@ type ListBinding = { pageId: string; module: PageModule; source: DataSourceConfi
 /** Window navigation only. DocumentPage owns editing for every entry window. */
 @Injectable({ providedIn: 'root' })
 export class RunModalService {
+  private readonly pageAccess = inject(PageAccessService);
   private readonly stack = inject(RunModalStackService);
   private readonly definitions = inject(RunModalPageDefinitionResolverService);
   private readonly assembler = inject(RunModalConfigAssemblerService);
@@ -137,14 +139,29 @@ export class RunModalService {
       const grant = value as Record<string, unknown>;
       return grant?.['pageId'] === (config.permissionPageId ?? definition.pageId) && grant['canRead'] === true;
     });
-    if (!permitted) { this.failure = 'permission-denied'; return false; }
+    if (!permitted || !this.pageAccess.page(definition.pageId, 'Read')) { this.failure = 'permission-denied'; return false; }
     const id = request.popupId ?? `run-modal-${definition.pageId}-${crypto.randomUUID()}`;
     const context = request.context ?? {};
     if (context['recordMappingComplete'] === false) { this.failure = 'related-record-missing'; return false; }
     const target = config.pageType === 'worksheet' || config.dataSource.singleton ? 'entry' : request.target ?? 'list';
     if (target === 'entry') {
-      const candidate = config.pageType === 'worksheet' ? context['activeLine'] ?? context['headerData'] : context['headerData'];
-      const record = candidate && typeof candidate === 'object' ? candidate as Record<string, unknown> : {};
+      // Explicit command mapping identifies the target record even when a line is selected.
+      const candidate = context['recordMappingComplete'] === true ? context['headerData'] :
+        config.pageType === 'worksheet' ? context['activeLine'] ?? context['headerData'] : context['headerData'];
+      let record = candidate && typeof candidate === 'object' ? candidate as Record<string, unknown> : {};
+      // A related card is resolved by its configured business key. Its record key
+      // comes from the API response and is used only for subsequent CRUD identity.
+      if (context['recordMappingComplete'] === true && config.pageType !== 'worksheet' &&
+          !config.dataSource.singleton && record[config.dataSource.keyField ?? 'systemId'] == null && config.dataSource.headerPKProp) {
+        try {
+          const source = this.contextualSource({...config.dataSource, lineFKProp: config.dataSource.headerPKProp}, {headerData: record});
+          const page = await firstValueFrom(this.data.loadList(source, {top: 2}).pipe(timeout<unknown>(this.policy.requestTimeoutMs))) as DataPage;
+          if (page.value.length !== 1) { this.failure = 'related-record-missing'; return false; }
+          record = page.value[0];
+        } catch {
+          this.failure = 'related-record-missing'; return false;
+        }
+      }
       if (config.pageType === 'worksheet' && config.dataSource.navigation) {
         try { this.data.relation(config.dataSource, record); }
         catch { this.failure = 'parent-context-missing'; return false; }
@@ -244,19 +261,7 @@ export class RunModalService {
     });
   }
   private contextualSource(source: DataSourceConfig, context: RunModalContext): DataSourceConfig {
-    if (source.navigation) return this.data.relation(source, (context['activeLine'] ?? context['headerData'] ?? {}) as Record<string, unknown>);
-    if (!source.lineFKProp) return source;
-    const record = (context['headerData'] ?? context['activeLine'] ?? {}) as Record<string, unknown>;
-    const value = record[source.contextHeaderPKProp ?? source.headerPKProp ?? source.lineFKProp];
-    if (value === undefined || value === null || value === '') throw new Error('The related record context is missing.');
-    const clauses = [`${source.lineFKProp} eq '${String(value).replace(/'/g, "''")}'`];
-    for (const [field, headerField] of Object.entries(source.parentFieldMap ?? {})) {
-      const mapped = record[headerField];
-      if (mapped === undefined || mapped === null || mapped === '') throw new Error('The related record context is missing.');
-      const literal = typeof mapped === 'number' || typeof mapped === 'boolean' ? String(mapped) : `'${String(mapped).replace(/'/g, "''")}'`;
-      clauses.push(`${field} eq ${literal}`);
-    }
-    const predicate = clauses.join(' and ');
-    return { ...source, defaultFilter: source.defaultFilter ? `(${source.defaultFilter}) and (${predicate})` : predicate };
+    const record = (context['recordMappingComplete'] === true ? context['headerData'] : context['activeLine'] ?? context['headerData']) ?? {};
+    return this.data.relation(source, record as Record<string, unknown>);
   }
 }

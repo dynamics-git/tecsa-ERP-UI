@@ -5,6 +5,7 @@ import type { FactBoxContext } from '../../models/fact-box-context.model';
 import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
 import { automaticDetailFields, detailValue } from '../../pages/fact-box-display';
 import { SessionService } from '../../../core/services/session.service';
+import { PageAccessService } from '../../../core/services/page-access.service';
 import type { FactBoxConfig } from '../../models/fact-box-config.model';
 import { LoadingIndicator } from '../../../shared/ui/loading-indicator/loading-indicator';
 import type { CommandConfig } from '../../models/command-config.model';
@@ -103,6 +104,7 @@ export class DocumentWindow {
   @Input() footerSections?: FooterSectionConfig[];
   @Input() attachments?: AttachmentsConfig;
   private readonly session = inject(SessionService);
+  private readonly access = inject(PageAccessService);
   private readonly forms = viewChildren(DynamicForm);
   validateHeaderForms(): boolean { return this.forms().map(form => form.validate()).every(Boolean); }
   validate(field: string, value: unknown): Promise<FieldValidationResult> {
@@ -367,7 +369,8 @@ export class DocumentWindow {
       const sections: FactBoxSectionConfig[] = this.factBoxConfig.sections.map(section => ({
         id: section.id, title: section.title, layout: section.layout, collapsed: section.collapsed,
         subtitle: section.subtitle, buttons: section.buttons,
-        rows: (section.fields ?? []).map(field => ({label: field.label, value: this.formatDetail(field)})),
+        rows: (section.fields ?? []).filter(field => this.access.field(this.preferenceKey, this.worksheet ? 'line' : 'header', field.field ?? '').visible)
+          .map(field => ({label: field.label, value: this.formatDetail(field)})),
       }));
       // Explicit header summaries must not suppress configured active-line details.
       const lineSections = new Map<string, FactBoxDraftSection>();
@@ -395,6 +398,7 @@ export class DocumentWindow {
   }
 
   private formatDetail(field: {field?: string; label: string; type?: string}): string {
+    if (field.field && !this.access.field(this.preferenceKey, this.worksheet ? 'line' : 'header', field.field).visible) return '';
     if (this.worksheet) {
       const row = this.factBoxRecord;
       if (!row) return '';

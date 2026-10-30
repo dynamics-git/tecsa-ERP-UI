@@ -52,8 +52,6 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
             displayField: 'name',
             searchFields: ['code', 'name'],
           },
-          valueField: 'code',
-          labelField: 'name',
         },
         {
           key: 'channel',
@@ -113,8 +111,6 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
             displayField: 'name',
             searchFields: ['name', 'userName'],
           },
-          valueField: 'systemId',
-          labelField: 'name',
         },
         {
           key: 'recipientPermissionSetId',
@@ -136,8 +132,6 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
             displayField: 'code',
             searchFields: ['code', 'name'],
           },
-          valueField: 'systemId',
-          labelField: 'code',
         },
       ],
     },

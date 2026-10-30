@@ -1,6 +1,6 @@
-import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
+import { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, Observable, throwError } from 'rxjs';
+import { catchError, Observable, throwError, tap } from 'rxjs';
 import { SessionService } from '../services/session.service';
 import { WorkspaceContext } from '../services/workspace-context';
 import { environment } from '../../../environments/environment';
@@ -25,6 +25,12 @@ export class HttpInterceptorService implements HttpInterceptor {
       : request;
 
     return next.handle(requestWithToken.clone({url:this.workspace.apiUrl(requestWithToken.url,base)})).pipe(
+      tap(event => {
+        if (event instanceof HttpResponse && isApiRequest && !['GET', 'HEAD'].includes(request.method) &&
+          /\/(?:permissionSets|permissionSetPermissions|userPermissionSets|pagePermissions|companyUsers)(?:\/|\?|$)/.test(request.url)) {
+          this.sessionService.permissionRefreshRequested$.next();
+        }
+      }),
       catchError((error: unknown) => {
         if (!isLogin && this.isUnauthorized(error)) {
           this.sessionService.logout('unauthorized');

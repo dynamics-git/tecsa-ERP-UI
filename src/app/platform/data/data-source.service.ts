@@ -289,7 +289,20 @@ export class DataSourceService {
   }
   relation(config: DataSourceConfig, header: Record<string, unknown>): DataSourceConfig {
     const navigation = config.navigation;
-    if (!navigation) return config;
+    if (!navigation) {
+      if (!config.lineFKProp) return config;
+      const bindings = {[config.lineFKProp]: config.contextHeaderPKProp ?? config.headerPKProp ?? config.lineFKProp, ...config.parentFieldMap};
+      const values: Record<string, unknown> = {...config.parentFixedFields};
+      for (const [field, headerField] of Object.entries(bindings)) {
+        if (!this.present(header[headerField])) throw new Error('The related record context is missing.');
+        values[field] = header[headerField];
+      }
+      const predicate = Object.entries(values).map(([field, value]) => {
+        const literal = typeof value === 'number' || typeof value === 'boolean' ? String(value) : `'${String(value).replace(/'/g, "''")}'`;
+        return `${field} eq ${literal}`;
+      }).join(' and ');
+      return {...config, defaultFilter: config.defaultFilter ? `(${config.defaultFilter}) and (${predicate})` : predicate};
+    }
     const id = navigation.parentIdFields?.map(field => header[field]).find(value => this.present(value));
     if (!this.present(id)) throw new Error('Save the header before editing lines.');
     return { ...config, navigation: undefined, endpoint: `${this.recordEndpoint({ endpoint: navigation.parentEndpoint, addressStyle: config.addressStyle }, id)}/${navigation.childCollection}` };

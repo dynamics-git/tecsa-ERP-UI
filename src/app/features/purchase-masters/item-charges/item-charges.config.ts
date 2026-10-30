@@ -71,7 +71,6 @@ export const itemChargesListConfig: ListPageConfig & {
   pageId: 'item-charges',
   pageType: 'card',
   title: 'Item Charges',
-  autoSave: true,
   dataSource: {
     endpoint: '/itemCharges',
     keyField: 'systemId',

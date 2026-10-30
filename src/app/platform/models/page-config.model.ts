@@ -50,7 +50,7 @@ export interface BasePageConfig extends Record<string, unknown> {
   pageId?: string;
   /** Entry surface: card/document pages browse a list before opening a record; setup/worksheet open directly. */
   pageType?: PageType;
-  /** Explicit save policy. New page configurations should use true for autosave. */
+  /** Optional save-policy override. Omit for shared autosave when no Save/Apply command is declared. */
   autoSave?: boolean;
   /** Related pages may use the permission scope of their owning resource. */
   permissionPageId?: string;
