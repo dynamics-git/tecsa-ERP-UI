@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { warehouseZonesFactBoxConfig } from './warehouse-zones.factbox.config';
+
+// Header form.
 export const warehouseZonesHeaderConfig: HeaderConfig = {
   dialogTitle: 'Warehouse Zones',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const warehouseZonesHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           readonlyAfterCreate: true,
           validation: {
@@ -59,37 +66,52 @@ export const warehouseZonesHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const warehouseZonesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const warehouseZonesListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'warehouse-zones',
   pageType: 'card',
-  autoSave: true,
   title: 'Warehouse Zones',
-  module: 'Warehouse',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Warehouse',
-    group: 'Storage',
-    icon: 'ts-icon ts-icon-warehouse-zones',
-    route: '/warehouse-zones',
-    moduleIcon: 'ts-icon ts-icon-warehouse-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/warehouseZones',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Warehouse',
+  menu: {
+    module: 'Warehouse',
+    group: 'Storage',
+    icon: 'ts-icon ts-icon-warehouse-zones',
+    moduleIcon: 'ts-icon ts-icon-warehouse-module',
+    route: '/warehouse-zones',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(warehouseZonesHeaderConfig, [
-      'locationId',
-      { field: 'code', width: '140px' },
-      { field: 'description', width: '280px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'locationId',
+      },
+      {
+        field: 'code',
+        width: '140px',
+      },
+      {
+        field: 'description',
+        width: '280px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: warehouseZonesFactBoxConfig,
 };

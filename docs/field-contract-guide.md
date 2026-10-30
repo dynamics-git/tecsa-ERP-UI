@@ -1,8 +1,11 @@
 # Field configuration: current supported contract
 
-Use valueType for stored value semantics. Use type only to select a particular editor (lookup, dropdown, textarea, etc.).
+Use `type` consistently on header fields and line columns. For example, use
+`type: 'text'`, `type: 'decimal'`, `type: 'lookup'`, or `type: 'dropdown'`.
+Older `valueType` and `cellType` declarations remain compatible; PR and Users are
+the references for new pages.
 
-| valueType | Behaviour |
+| type | Behaviour |
 | --- | --- |
 | text | Preserves text |
 | code | Trims surrounding spaces and uppercases on field commit and payload construction |
@@ -19,7 +22,7 @@ Use valueType for stored value semantics. Use type only to select a particular e
 ## Header
 
 ```ts
-{ key: 'code', label: 'Code', valueType: 'code', required: true,
+{ key: 'code', label: 'Code', type: 'code', required: true,
   validation: { maxLength: 20 } }
 ```
 
@@ -28,16 +31,45 @@ Use valueType for stored value semantics. Use type only to select a particular e
 Declare type and validation on each column once. The platform derives validation fields and writable-field defaults. Existing separate fields arrays remain supported for older pages.
 
 ```ts
-{ id: 'startingNo', label: 'Starting No.', valueType: 'code',
+{ id: 'startingNo', label: 'Starting No.', type: 'code',
   required: true, validation: { maxLength: 20 } }
-{ id: 'incrementBy', label: 'Increment By', valueType: 'integer',
+{ id: 'incrementBy', label: 'Increment By', type: 'integer',
   defaultValue: 1, required: true, validation: { min: 1 } }
 ```
 
-No. Series is the reference at src/app/features/administration/no-series/no-series.config.ts.
+Use the Users config for a card and the Purchase Requisition config for a document with lines.
 Do not duplicate field conversion or payload construction inside feature configuration.
 Explicit conflicting column/field value types fail during configuration resolution.
 Read-only line numbers remain backend assigned.
+
+Keep the same expanded property layout in both pages: `key` (header) or `id`
+(line), `label`, `type`, then the applicable field rules. These bind to API field
+names; changing a caption does not rename an API field. Page settings use
+`pageId`, `pageType`, `title`, `dataSource`, `identity`, `module`, `menu`,
+`dataSurface`, optional views, then `factBox`. Put `endpoint` and `keyField`
+together in every page's `dataSource`, explicitly declaring `keyField: 'systemId'`
+for the record key. Parent–line binding is declared separately through
+`headerPKProp`, `lineFKProp`, and `parentFieldMap`.
+
+Use `keyField` for each record's API identity, `headerPKProp` for the field on
+the header, and `lineFKProp` for its matching field on the line. There is no
+separate line-key declaration. Backend-assigned line numbers are ordinary
+readonly columns; shared payload handling excludes readonly fields.
+
+Declare toolbar buttons directly in `toolbarButtons`, with `label`, `actionKey`,
+`group`, `order`, and `apiAction` where applicable. Declare list columns as
+objects with `field`, followed by optional presentation overrides. Use
+`type: 'dropdown'` for choice fields and `{ label, value }` for their options.
+Keep business rules specific to the page without adding alternate names for
+shared settings. List settings stay in the page config; the component stays a
+thin wrapper around the shared page component.
+
+For a required create-only field, declare `required: true` and
+`readonlyAfterCreate: true`. Shared record handling determines whether the
+record is saved, excludes the field from updates, and does not require it on
+existing records. Do not repeat `systemId` empty-value checks in each field.
+Page configs do not remap API operation permissions. Shared access handling
+uses the authenticated API context.
 
 ## Boundaries
 
@@ -59,7 +91,7 @@ Defaults come from an existing entity contract profile's optional identity metad
 identity: { primaryField: 'code', secondaryField: 'description' }
 ```
 
-No identity block is required on each page. Primary-field precedence is optional page identity override, dataSource.documentNoField, the isPrimary column, then resource metadata. Secondary-field precedence is optional page identity override, the primary column's subtitleField, then resource metadata. An empty-string override suppresses a field. Without a declared secondary field, the subtitle is omitted.
+No identity block is required on each page. Primary-field precedence is optional page identity override, dataSource.headerPKProp, the isPrimary column, then resource metadata. Secondary-field precedence is optional page identity override, the primary column's subtitleField, then resource metadata. An empty-string override suppresses a field. Without a declared secondary field, the subtitle is omitted.
 
 No. Series declares reusable resource defaults in entity-contract-profiles.ts and explicitly documents code/description in its page configuration. Purchase Requisition explicitly uses number/purpose. Page identity overrides remain optional for other pages. Singleton setup and worksheet titles keep their page context. New records without a display key use New plus the page title. Record captions update after a valid header change.
 
@@ -180,6 +212,28 @@ Partners can add another supported type by adding its backend field declaration 
 ## Optional editor hooks (PR reference)
 
 Ordinary pages do not need hooks. Configure them only for exceptional field logic.
+
+Developer TS can call `await page.validate('fieldName', value)` or
+`await page.validateLine(row, 'fieldName', value)` on its shared `ListPage`.
+The result contains `valid` and `errors`. It uses the existing editor and save
+policy, including readonly checks, asynchronous validation and conflict handling.
+Validation completion and API-save completion remain separate. Do not assign
+directly to page records to request persistence.
+
+Field callbacks receive `field`, `value`, `previousValue`, `record`,
+`previousRecord` and `source` (`user` or `code`). Record snapshots protect the
+current editor from callback mutation. Return same-record updates through
+`afterValidate`; callback chaining does not implicitly rerun custom target rules.
+Callbacks must not initiate independent writes.
+
+For a default evaluated for every new record, use `defaultValue: () => value`.
+For example, `defaultValue: () => new Date().toLocaleDateString('en-CA')` evaluates
+the date at record initialization. Existing saved values are preserved.
+
+Persistent header-to-line rules belong to the backend field lifecycle. The
+server reports changed API resources in `meta.changedResources`; core refreshes
+clean loaded lines and their versions without overwriting local changes.
+This is separate from `parentFieldMap`, which defines ownership filters.
 Header fields and line columns use the same `validation` object:
 
 ```ts

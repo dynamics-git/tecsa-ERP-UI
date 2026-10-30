@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { salesReceivablesSetupListConfig, salesReceivablesSetupHeaderConfig } from './sales-receivables-setup.config';
+import {
+  salesReceivablesSetupListConfig,
+  salesReceivablesSetupHeaderConfig,
+} from './sales-receivables-setup.config';
 export * from './sales-receivables-setup.config';
 
 @Component({

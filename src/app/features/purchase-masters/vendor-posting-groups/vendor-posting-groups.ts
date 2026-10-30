@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { vendorPostingGroupsListConfig, vendorPostingGroupsHeaderConfig } from './vendor-posting-groups.config';
+import {
+  vendorPostingGroupsListConfig,
+  vendorPostingGroupsHeaderConfig,
+} from './vendor-posting-groups.config';
 export * from './vendor-posting-groups.config';
 
 @Component({

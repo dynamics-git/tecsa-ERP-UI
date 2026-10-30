@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { inventoryPostingGroupsFactBoxConfig } from './inventory-posting-groups.factbox.config';
+
+// Header form.
 export const inventoryPostingGroupsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Inventory Posting Groups',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const inventoryPostingGroupsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 20,
@@ -37,36 +44,47 @@ export const inventoryPostingGroupsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const inventoryPostingGroupsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const inventoryPostingGroupsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'inventory-posting-groups',
   pageType: 'card',
-  autoSave: true,
   title: 'Inventory Posting Groups',
-  module: 'Inventory',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Inventory',
-    group: 'Setup',
-    icon: 'ts-icon ts-icon-inventory-posting-groups',
-    route: '/inventory-posting-groups',
-    moduleIcon: 'ts-icon ts-icon-inventory-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/inventoryPostingGroups',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Inventory',
+  menu: {
+    module: 'Inventory',
+    group: 'Setup',
+    icon: 'ts-icon ts-icon-inventory-posting-groups',
+    moduleIcon: 'ts-icon ts-icon-inventory-module',
+    route: '/inventory-posting-groups',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(inventoryPostingGroupsHeaderConfig, [
-      'code',
-      'description',
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: inventoryPostingGroupsFactBoxConfig,
 };

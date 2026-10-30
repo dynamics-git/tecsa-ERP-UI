@@ -1,10 +1,9 @@
-import type { FieldValueType } from './field-value';
 import type { ListFilterFieldConfig } from './list-filter-config.model';
-import { FieldFactBoxConfig } from './field-config.model';
+import { FieldFactBoxConfig, FieldType } from './field-config.model';
 
 export type DataSurfaceMode = 'table';
 
-export type DataSurfaceColumnType = FieldValueType | 'currency' | 'badge';
+export type DataSurfaceColumnType = FieldType;
 
 export interface DataSurfaceColumnConfig {
   id?: string;

@@ -5,7 +5,7 @@ import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@a
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
-import { provideErpRest } from './core/api/erp-rest.provider';
+import { dataRestProvider } from './core/api/rest.provider';
 import { HttpInterceptorService } from './core/interceptors/http-interceptor';
 import { DocumentSaveService } from './core/services/document-save.service';
 import { DOCUMENT_SAVE_PORT } from './platform/public-api';
@@ -26,7 +26,7 @@ export const appConfig: ApplicationConfig = {
       useClass: DocumentSaveService
     },
     ...providePlatformGovernance(),
-    provideErpRest(),
+    dataRestProvider,
     provideRouter(routes)
   ]
 };

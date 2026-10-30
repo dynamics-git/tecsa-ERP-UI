@@ -1,10 +1,22 @@
 import { EntityContractService } from '../../platform/data/entity-contract.service';
 import { describe, expect, it } from 'vitest';
-import { buildPageRegistry } from './run-modal-config-registry';
-import { runModalPageModules } from '../../features/run-modal-page-modules';
+import { buildPageRegistry, getFeaturePageRoutes, resolvePageModule } from './page-registry';
+import { featurePageModules } from '../../features/feature-pages.generated';
 import { HeaderConfig, LineConfig, ListPageConfig } from '../../platform/public-api';
 
 describe('One shared ERP page declaration pattern', () => {
+  it('resolves every discovered page by ID and derives routes from its own menu config', () => {
+    const routes = getFeaturePageRoutes();
+    for (const module of featurePageModules) {
+      const page = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig;
+      expect(resolvePageModule(page.pageId!), page.pageId).toBe(module);
+      if (page.menu?.route) {
+        const route = routes.find(route => route.path === page.menu!.route!.replace(/^\//, ''));
+        expect(route?.data?.['pageId'], page.pageId).toBe(page.pageId);
+        expect(Object.values(module), page.pageId).toContain(route?.component);
+      }
+    }
+  });
   it('rejects duplicate IDs instead of silently replacing a page', () => {
     const first = { firstListConfig: { pageId: 'items', pageType: 'card' } };
     const second = { secondListConfig: { pageId: ' ITEMS ', pageType: 'card' } };
@@ -31,8 +43,8 @@ describe('One shared ERP page declaration pattern', () => {
   });
 
   it('checks every registered master, setup, document and related worksheet against the same contracts', () => {
-    expect(buildPageRegistry(runModalPageModules).size).toBe(42);
-    for (const module of runModalPageModules) {
+    expect(buildPageRegistry(featurePageModules).size).toBe(featurePageModules.length);
+    for (const module of featurePageModules) {
       const declarations = Object.entries(module).filter(
         ([, value]) => value && typeof value === 'object' && 'pageId' in value,
       );
@@ -67,7 +79,7 @@ describe('One shared ERP page declaration pattern', () => {
   });
   it('preserves discoverable page, permission mapping, field and action identities across shared defaults', () => {
     const contracts = new EntityContractService();
-    for (const module of runModalPageModules) {
+    for (const module of featurePageModules) {
       const page = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig;
       const header = Object.entries(module).find(([key]) => key.endsWith('HeaderConfig'))![1] as HeaderConfig;
       const line = Object.entries(module).find(([key]) => key.endsWith('LineConfig'))?.[1] as LineConfig | undefined;
@@ -86,7 +98,7 @@ describe('One shared ERP page declaration pattern', () => {
     expect(() => buildPageRegistry([{ exampleListConfig: { pageId: 'example', pageType: 'worksheet' } }])).toThrow(
       'Page example must declare exactly one feature component.',
     );
-    for (const module of runModalPageModules) {
+    for (const module of featurePageModules) {
       expect(
         Object.entries(module).filter(([key, value]) => key.endsWith('Page') && typeof value === 'function'),
       ).toHaveLength(1);

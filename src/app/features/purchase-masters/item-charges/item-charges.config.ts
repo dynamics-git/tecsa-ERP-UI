@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { itemChargesFactBoxConfig } from './item-charges.factbox.config';
+
+// Header form.
 export const itemChargesHeaderConfig: HeaderConfig = {
   dialogTitle: 'Item Charges',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const itemChargesHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 20,
@@ -57,37 +64,51 @@ export const itemChargesHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const itemChargesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const itemChargesListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'item-charges',
   pageType: 'card',
-  autoSave: true,
   title: 'Item Charges',
-  module: 'Inventory',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Inventory',
-    group: 'Items',
-    icon: 'ts-icon ts-icon-item-charges',
-    route: '/item-charges',
-    moduleIcon: 'ts-icon ts-icon-inventory-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/itemCharges',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Inventory',
+  menu: {
+    module: 'Inventory',
+    group: 'Items',
+    icon: 'ts-icon ts-icon-item-charges',
+    moduleIcon: 'ts-icon ts-icon-inventory-module',
+    route: '/item-charges',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(itemChargesHeaderConfig, [
-      'code',
-      'description',
-      { field: 'generalProductPostingGroupId', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'generalProductPostingGroupId',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: itemChargesFactBoxConfig,
 };

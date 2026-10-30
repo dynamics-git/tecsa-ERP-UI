@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { inventorySetupFactBoxConfig } from './inventory-setup.factbox.config';
+
+// Header form.
 export const inventorySetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'Inventory Setup',
   toolbarButtons: [],
@@ -128,49 +136,79 @@ export const inventorySetupHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const inventorySetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const inventorySetupListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'inventory-setup',
   pageType: 'setup',
-  autoSave: true,
   title: 'Inventory Setup',
-  module: 'Inventory',
+  autoSave: true,
+  dataSource: {
+    endpoint: '/inventorySetup',
+    keyField: 'systemId',
+    singleton: true,
+    defaultSort: 'itemNoSeriesId asc',
+    supportsCreate: false,
+  },
   identity: {
     primaryField: '__display_itemNoSeriesId',
   },
+  module: 'Inventory',
   menu: {
     module: 'Inventory',
     group: 'Setup',
     icon: 'ts-icon ts-icon-inventory-setup',
-    route: '/inventory-setup',
     moduleIcon: 'ts-icon ts-icon-inventory-module',
-  },
-  dataSource: {
-    endpoint: '/inventorySetup',
-    keyField: 'systemId',
-    supportsCreate: false,
-    singleton: true,
-    defaultSort: 'itemNoSeriesId asc',
+    route: '/inventory-setup',
   },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(inventorySetupHeaderConfig, [
-      'itemNoSeriesId',
-      { field: 'transferOrderNoSeriesId', width: '140px' },
-      { field: 'inTransitLocationId', width: '140px' },
-      { field: 'postedTransferShipmentNoSeriesId', width: '140px' },
-      { field: 'postedTransferReceiptNoSeriesId', width: '140px' },
-      { field: 'warehouseBinMovementNoSeriesId', width: '140px' },
-      { field: 'warehousePickWorksheetNoSeriesId', width: '140px' },
-      { field: 'locationMandatory', width: '140px' },
-      { field: 'allowNegativeInventory', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'itemNoSeriesId',
+      },
+      {
+        field: 'transferOrderNoSeriesId',
+        width: '140px',
+      },
+      {
+        field: 'inTransitLocationId',
+        width: '140px',
+      },
+      {
+        field: 'postedTransferShipmentNoSeriesId',
+        width: '140px',
+      },
+      {
+        field: 'postedTransferReceiptNoSeriesId',
+        width: '140px',
+      },
+      {
+        field: 'warehouseBinMovementNoSeriesId',
+        width: '140px',
+      },
+      {
+        field: 'warehousePickWorksheetNoSeriesId',
+        width: '140px',
+      },
+      {
+        field: 'locationMandatory',
+        width: '140px',
+      },
+      {
+        field: 'allowNegativeInventory',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
   tools: {
     filter: false,
     advancedFilter: false,
     export: false,
     columns: false,
   },
+  factBox: inventorySetupFactBoxConfig,
 };

@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { generalLedgerSetupFactBoxConfig } from './general-ledger-setup.factbox.config';
+
+// Header form.
 export const generalLedgerSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'General Ledger Setup',
   toolbarButtons: [],
@@ -11,13 +19,11 @@ export const generalLedgerSetupHeaderConfig: HeaderConfig = {
           key: 'allowPostingFrom',
           label: 'Allow Posting From',
           type: 'date',
-          valueType: 'date',
         },
         {
           key: 'allowPostingTo',
           label: 'Allow Posting To',
           type: 'date',
-          valueType: 'date',
         },
         {
           key: 'paymentDiscountGracePeriod',
@@ -35,8 +41,7 @@ export const generalLedgerSetupHeaderConfig: HeaderConfig = {
         {
           key: 'paymentTolerancePercent',
           label: 'Payment Tolerance Percent',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           validation: {
             min: 0,
             max: 100,
@@ -47,8 +52,7 @@ export const generalLedgerSetupHeaderConfig: HeaderConfig = {
         {
           key: 'maxPaymentToleranceAmount',
           label: 'Max Payment Tolerance Amount',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           validation: {
             min: 0,
             precision: 20,
@@ -58,8 +62,7 @@ export const generalLedgerSetupHeaderConfig: HeaderConfig = {
         {
           key: 'applicationRoundingPrecision',
           label: 'Application Rounding Precision',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           validation: {
             precision: 20,
             scale: 10,
@@ -217,51 +220,87 @@ export const generalLedgerSetupHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const generalLedgerSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const generalLedgerSetupListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'general-ledger-setup',
   pageType: 'setup',
-  autoSave: true,
   title: 'General Ledger Setup',
-  module: 'Finance',
+  autoSave: true,
+  dataSource: {
+    endpoint: '/generalLedgerSetup',
+    keyField: 'systemId',
+    singleton: true,
+    defaultSort: 'allowPostingFrom asc',
+    supportsCreate: false,
+  },
   identity: {
     primaryField: 'allowPostingFrom',
   },
+  module: 'Finance',
   menu: {
     module: 'Finance',
     group: 'General Ledger',
     icon: 'ts-icon ts-icon-general-ledger-setup',
-    route: '/general-ledger-setup',
     moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
-  dataSource: {
-    endpoint: '/generalLedgerSetup',
-    keyField: 'systemId',
-    supportsCreate: false,
-    singleton: true,
-    defaultSort: 'allowPostingFrom asc',
+    route: '/general-ledger-setup',
   },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(generalLedgerSetupHeaderConfig, [
-      'allowPostingFrom',
-      { field: 'allowPostingTo', width: '140px' },
-      { field: 'localCurrencyId', width: '140px' },
-      { field: 'globalDimension1Id', width: '140px' },
-      { field: 'globalDimension2Id', width: '140px' },
-      { field: 'shortcutDimension3Id', width: '140px' },
-      { field: 'shortcutDimension4Id', width: '140px' },
-      { field: 'shortcutDimension5Id', width: '140px' },
-      { field: 'shortcutDimension6Id', width: '140px' },
-      { field: 'shortcutDimension7Id', width: '140px' },
-      { field: 'shortcutDimension8Id', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'allowPostingFrom',
+      },
+      {
+        field: 'allowPostingTo',
+        width: '140px',
+      },
+      {
+        field: 'localCurrencyId',
+        width: '140px',
+      },
+      {
+        field: 'globalDimension1Id',
+        width: '140px',
+      },
+      {
+        field: 'globalDimension2Id',
+        width: '140px',
+      },
+      {
+        field: 'shortcutDimension3Id',
+        width: '140px',
+      },
+      {
+        field: 'shortcutDimension4Id',
+        width: '140px',
+      },
+      {
+        field: 'shortcutDimension5Id',
+        width: '140px',
+      },
+      {
+        field: 'shortcutDimension6Id',
+        width: '140px',
+      },
+      {
+        field: 'shortcutDimension7Id',
+        width: '140px',
+      },
+      {
+        field: 'shortcutDimension8Id',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
   tools: {
     filter: false,
     advancedFilter: false,
     export: false,
     columns: false,
   },
+  factBox: generalLedgerSetupFactBoxConfig,
 };

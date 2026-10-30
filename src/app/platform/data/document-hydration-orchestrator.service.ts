@@ -10,7 +10,7 @@ import { DocumentResponseNormalizerService } from './document-response-normalize
 
 type LineLoadOptions = {
   timeoutMs?: number;
-  fallbackDocumentNoField?: string;
+  fallbackHeaderPKProp?: string;
   defaultTop?: number;
   allowWithoutParentKey?: boolean;
   onRequest?: () => void;
@@ -217,7 +217,7 @@ export class DocumentHydrationOrchestratorService {
     const target = String(contextRecordId).trim().toLowerCase();
     const keyCandidates = [
       this.toText(dataSourceConfig.keyField).trim(),
-      this.toText(dataSourceConfig.documentNoField).trim(),
+      this.toText(dataSourceConfig.headerPKProp).trim(),
       'systemId',
       'SystemId',
       'id',
@@ -281,22 +281,22 @@ export class DocumentHydrationOrchestratorService {
     }
 
     const clauses: string[] = [];
-    const parentKeyField = this.toText(lineDataSource.parentKeyField).trim();
-    if (parentKeyField.length) {
-      const documentNoField =
-        this.toText(lineDataSource.documentNoField).trim() ||
-        this.toText(options.fallbackDocumentNoField).trim() ||
-        parentKeyField;
+    const lineFKProp = this.toText(lineDataSource.lineFKProp).trim();
+    if (lineFKProp.length) {
+      const headerPKProp =
+        this.toText(lineDataSource.headerPKProp).trim() ||
+        this.toText(options.fallbackHeaderPKProp).trim() ||
+        lineFKProp;
 
-      const parentValue = this.hasValue(headerData[documentNoField])
-        ? headerData[documentNoField]
-        : headerData[parentKeyField];
+      const parentValue = this.hasValue(headerData[headerPKProp])
+        ? headerData[headerPKProp]
+        : headerData[lineFKProp];
 
       if (!this.hasValue(parentValue)) {
         return [];
       }
 
-      clauses.push(`${parentKeyField} eq ${this.toODataFilterLiteral(parentValue)}`);
+      clauses.push(`${lineFKProp} eq ${this.toODataFilterLiteral(parentValue)}`);
     } else if (!options.allowWithoutParentKey) {
       return [];
     }
@@ -341,6 +341,8 @@ export class DocumentHydrationOrchestratorService {
           .loadList(config, { top, skip: rows.length, useCache: true, maxAgeMs, onRequest })
           .pipe(timeout<unknown>(timeoutMs)),
       )) as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
+      // A stale total must not make us reread an empty page without advancing.
+      if (response.value.length === 0) return rows;
       rows.push(...response.value);
       const complete =
         typeof response.meta['total'] === 'number'

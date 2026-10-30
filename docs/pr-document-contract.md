@@ -8,13 +8,14 @@ The PR line collection is `/purchaseRequisitionLines`. The page explicitly match
 - Header `number` to line `documentNumber`.
 - Header `documentType` to line `documentType`.
 
-The optional shared `parentFieldMap` maps child API field names to header response field names. Existing `parentKeyField`, `documentNoField`, fixed fields and navigation configuration remain supported. Missing mapped values prevent child creation. No document-type constant is supplied by the frontend.
+The optional shared `parentFieldMap` maps child API field names to header response field names. Existing `lineFKProp`, `headerPKProp`, fixed fields and navigation configuration remain supported. Missing mapped values prevent child creation. No document-type constant is supplied by the frontend.
 
 ```ts
 dataSource: {
   endpoint: '/purchaseRequisitionLines',
-  documentNoField: 'number',
-  parentKeyField: 'documentNumber',
+  keyField: 'systemId',
+  headerPKProp: 'number',
+  lineFKProp: 'documentNumber',
   parentFieldMap: { documentType: 'documentType' },
   invalidates: ['/purchaseRequisitions'],
   defaultSort: 'lineNo asc',
@@ -29,6 +30,10 @@ The matching backend must return both `documentType` and `documentTypeLabel`, an
 
 ## Verification and limits
 
-Production build and import/token lint passed during implementation. TypeScript compilation passed after the final label binding. Test suites were not rerun after the user instructed us to stop test execution. The earlier PR frontend run had 32 passing tests and two reopen/totals failures; these have NOT been confirmed resolved. Fixtures were updated to the new contract. No claim of verified live autosave/close/reopen is made.
+The shared naming correction passed all 437 UI tests across 50 files. The full
+run used two workers to avoid machine-load timeouts; the tests and assertions
+were unchanged. Focused PR authoring, background-save and field-contract checks
+also passed. Import and style guardrails passed. Browser visual review remains
+pending; automated component checks are not a claim of manual visual review.
 
 This is an implementation note, not the complete partner SDK manual. The requested comprehensive developer PDF remains outstanding.

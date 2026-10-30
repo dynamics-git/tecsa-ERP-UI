@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { generalPostingSetupListConfig, generalPostingSetupHeaderConfig } from './general-posting-setup.config';
+import {
+  generalPostingSetupListConfig,
+  generalPostingSetupHeaderConfig,
+} from './general-posting-setup.config';
 export * from './general-posting-setup.config';
 
 @Component({

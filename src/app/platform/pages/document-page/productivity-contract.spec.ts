@@ -22,7 +22,7 @@ describe('Shared document and worksheet line productivity integration',()=>{
   f.componentRef.setInput('pageId','productivity-fixture');f.componentRef.setInput('documentOnly',true);f.componentRef.setInput('initialRecord',header);
   f.componentRef.setInput('listConfig',{pageId:'productivity-fixture',pageType:worksheet?'worksheet':'document',autoSave,title:'Fixture',dataSource:{endpoint:'/fixtures',keyField:'id'},dataSurface:{columns:[{field:'code',label:'Code'}]}});
   f.componentRef.setInput('headerConfig',{toolbarButtons:[{label:'Save',actionKey:'cmd:save'}],sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code'}]}]});
-  f.componentRef.setInput('lineConfig',{placement:{mode:'end'},lineKeyField:'lineNo',toolbarButtons:[],
+  f.componentRef.setInput('lineConfig',{placement:{mode:'end'},toolbarButtons:[],
    dataSource:{endpoint:'/lines',keyField:'id',supportsCreate,navigation:{parentEndpoint:'/fixtures',parentIdFields:['id'],childCollection:'lines'},createFields:['description','quantity'],updateFields:['description','quantity'],meaningfulFields:['description'],requiredCreateFields:['description','quantity']},
    calculation:[{target:'amount',formula:'quantity * 2',precision:6}],columns:[{id:'lineNo',label:'Line No.',readonly:true,valueType:'integer'},{id:'description',label:'Description',valueType:'text'},{id:'quantity',label:'Quantity',valueType:'decimal',required:true},{id:'amount',label:'Amount',readonly:true,valueType:'decimal'}]});
   f.detectChanges();await f.whenStable();await vi.waitFor(()=>expect(f.componentInstance.popupLoading).toBe(false));f.detectChanges();

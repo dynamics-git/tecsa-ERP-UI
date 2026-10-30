@@ -1,4 +1,10 @@
-import { DataSourceConfig, HeaderConfig, ListPageConfig, LineConfig } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  LineConfig,
+  ListPageConfig,
+} from '../../../platform/public-api';
+import { dimensionValuesFactBoxConfig } from './dimension-values.factbox.config';
 const dimensionValuesDataSource: DataSourceConfig = {
   endpoint: '/dimensions',
   keyField: 'systemId',
@@ -10,48 +16,50 @@ const dimensionValuesDataSource: DataSourceConfig = {
   pageSize: 20,
 };
 
+// Header form.
+export const dimensionValuesHeaderConfig: HeaderConfig = {
+  dialogTitle: 'Dimension Values',
+  toolbarButtons: [],
+  sections: [],
+};
+
+// List page.
 export const dimensionValuesListConfig: ListPageConfig & {
   dataSource: DataSourceConfig;
 } = {
   pageId: 'dimension-values',
   pageType: 'worksheet',
-  autoSave: true,
   title: 'Dimension Values',
-  module: 'Finance',
-  permissionPageId: 'dimensions-lines',
+  autoSave: true,
+  dataSource: dimensionValuesDataSource,
   identity: {
     primaryField: 'code',
     secondaryField: 'name',
   },
-  dataSource: dimensionValuesDataSource,
+  module: 'Finance',
+  permissionPageId: 'dimensions-lines',
   tools: {
     search: false,
     filter: false,
     columns: false,
     export: false,
   },
-  factBox: {
-    enabled: true,
-  },
+  factBox: dimensionValuesFactBoxConfig,
 };
-export const dimensionValuesHeaderConfig: HeaderConfig = {
-  dialogTitle: 'Dimension Values',
-  toolbarButtons: [],
-  sections: [],
-};
+
+// Document lines.
 export const dimensionValuesLineConfig: LineConfig = {
-  permissionPageId: 'dimensions-lines',
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: dimensionValuesDataSource,
+  permissionPageId: 'dimensions-lines',
   toolbarButtons: [],
   columns: [
     {
       id: 'code',
       label: 'Code',
-      valueType: 'code',
+      type: 'code',
       required: true,
       validation: {
         maxLength: 20,
@@ -60,7 +68,7 @@ export const dimensionValuesLineConfig: LineConfig = {
     {
       id: 'name',
       label: 'Name',
-      valueType: 'text',
+      type: 'text',
       required: true,
       validation: {
         maxLength: 100,
@@ -69,7 +77,7 @@ export const dimensionValuesLineConfig: LineConfig = {
     {
       id: 'isActive',
       label: 'Is Active',
-      valueType: 'boolean',
+      type: 'boolean',
       defaultValue: true,
     },
   ],

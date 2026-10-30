@@ -2,11 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DocumentRecordService } from '../data/document-record.service';
-import { RunModalConfigModule } from './run-modal-config.token';
+import { PageModule } from './run-modal-config.token';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
 export type RunModalPayloadBindingContext = {
-  module: RunModalConfigModule;
+  module: PageModule;
 };
 
 @Injectable({
@@ -52,7 +52,7 @@ export class RunModalPayloadBuilderService {
     documentWindowConfig: DocumentWindowConfig;
     dataSource: DataSourceConfig;
     changePayload?: unknown;
-    pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
+    pickObjectFromModule: (module: PageModule, suffix: string) => Record<string, unknown> | undefined;
     readFieldValue: (record: Record<string, unknown>, field: string) => unknown;
     firstPresentValue: (values: unknown[]) => unknown;
   }): Record<string, unknown> {
@@ -96,7 +96,7 @@ export class RunModalPayloadBuilderService {
     row: Record<string, unknown>;
     documentWindowConfig: DocumentWindowConfig;
     dataSource: DataSourceConfig;
-    pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
+    pickObjectFromModule: (module: PageModule, suffix: string) => Record<string, unknown> | undefined;
     firstPresentValue: (values: unknown[]) => unknown;
   }): Record<string, unknown> {
     this.ensureLineParentFields({
@@ -151,11 +151,11 @@ export class RunModalPayloadBuilderService {
       }
     }
 
-    const parentKeyField = this.toText(params.dataSource.parentKeyField).trim();
+    const lineFKProp = this.toText(params.dataSource.lineFKProp).trim();
     if (
-      parentKeyField.length
-      && (allowedFields?.includes(parentKeyField) ?? false)
-      && !this.hasMeaningfulPayloadValue(payload[parentKeyField])
+      lineFKProp.length
+      && (allowedFields?.includes(lineFKProp) ?? false)
+      && !this.hasMeaningfulPayloadValue(payload[lineFKProp])
     ) {
       return {};
     }
@@ -191,15 +191,15 @@ export class RunModalPayloadBuilderService {
     firstPresentValue: (values: unknown[]) => unknown;
   }): void {
     const headerData = params.documentWindowConfig.headerData ?? {};
-    const parentKeyField = this.toText(params.dataSource.parentKeyField).trim();
-    if (parentKeyField.length && !this.hasMeaningfulPayloadValue(params.row[parentKeyField])) {
-      const documentNoField = this.toText(params.dataSource.documentNoField).trim();
+    const lineFKProp = this.toText(params.dataSource.lineFKProp).trim();
+    if (lineFKProp.length && !this.hasMeaningfulPayloadValue(params.row[lineFKProp])) {
+      const headerPKProp = this.toText(params.dataSource.headerPKProp).trim();
       const parentValue = params.firstPresentValue([
-        headerData[parentKeyField],
-        documentNoField ? headerData[documentNoField] : undefined,
+        headerData[lineFKProp],
+        headerPKProp ? headerData[headerPKProp] : undefined,
       ]);
       if (parentValue !== undefined) {
-        params.row[parentKeyField] = parentValue;
+        params.row[lineFKProp] = parentValue;
       }
     }
 
@@ -210,15 +210,6 @@ export class RunModalPayloadBuilderService {
       payload: params.row,
       fixedFields: params.dataSource.parentFixedFields,
     });
-  }
-
-  resolveLineKeyField(params: {
-    binding: RunModalPayloadBindingContext;
-    pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
-  }): string {
-    const lineConfig = params.pickObjectFromModule(params.binding.module, 'LineConfig');
-    const configured = this.toText(lineConfig?.['lineKeyField']).trim();
-    return configured;
   }
 
   isBlockedLineField(field: string, dataSource: DataSourceConfig): boolean {

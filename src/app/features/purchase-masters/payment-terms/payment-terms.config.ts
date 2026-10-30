@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { paymentTermsFactBoxConfig } from './payment-terms.factbox.config';
+
+// Header form.
 export const paymentTermsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Payment Terms',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const paymentTermsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 10,
@@ -45,8 +52,7 @@ export const paymentTermsHeaderConfig: HeaderConfig = {
         {
           key: 'discountPercent',
           label: 'Discount Percent',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0',
           validation: {
             min: 0,
@@ -72,39 +78,59 @@ export const paymentTermsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const paymentTermsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const paymentTermsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'payment-terms',
   pageType: 'card',
-  autoSave: true,
   title: 'Payment Terms',
-  module: 'Finance',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Currencies & Payments',
-    icon: 'ts-icon ts-icon-payment-terms',
-    route: '/payment-terms',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/paymentTerms',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Currencies & Payments',
+    icon: 'ts-icon ts-icon-payment-terms',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/payment-terms',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(paymentTermsHeaderConfig, [
-      'code',
-      'description',
-      { field: 'dueDateCalculation', width: '140px' },
-      { field: 'discountDateCalculation', width: '140px' },
-      { field: 'discountPercent', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'dueDateCalculation',
+        width: '140px',
+      },
+      {
+        field: 'discountDateCalculation',
+        width: '140px',
+      },
+      {
+        field: 'discountPercent',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: paymentTermsFactBoxConfig,
 };

@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { glAccountsFactBoxConfig } from './gl-accounts.factbox.config';
+
+// Header form.
 export const glAccountsHeaderConfig: HeaderConfig = {
   dialogTitle: 'G/L Accounts',
   toolbarButtons: [
@@ -21,8 +29,7 @@ export const glAccountsHeaderConfig: HeaderConfig = {
         {
           key: 'number',
           label: 'Number',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 20,
@@ -48,77 +55,74 @@ export const glAccountsHeaderConfig: HeaderConfig = {
         {
           key: 'accountType',
           label: 'Account Type',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           defaultValue: 'posting',
           options: [
             {
-              value: 'posting',
               label: 'Posting',
+              value: 'posting',
             },
             {
-              value: 'heading',
               label: 'Heading',
+              value: 'heading',
             },
             {
-              value: 'total',
               label: 'Total',
+              value: 'total',
             },
             {
-              value: 'begin_total',
               label: 'Begin total',
+              value: 'begin_total',
             },
             {
-              value: 'end_total',
               label: 'End total',
+              value: 'end_total',
             },
           ],
         },
         {
           key: 'incomeBalance',
           label: 'Income Balance',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           options: [
             {
-              value: 'income_statement',
               label: 'Income statement',
+              value: 'income_statement',
             },
             {
-              value: 'balance_sheet',
               label: 'Balance sheet',
+              value: 'balance_sheet',
             },
           ],
         },
         {
           key: 'accountCategory',
           label: 'Account Category',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           options: [
             {
-              value: 'assets',
               label: 'Assets',
+              value: 'assets',
             },
             {
-              value: 'liabilities',
               label: 'Liabilities',
+              value: 'liabilities',
             },
             {
-              value: 'equity',
               label: 'Equity',
+              value: 'equity',
             },
             {
-              value: 'income',
               label: 'Income',
+              value: 'income',
             },
             {
-              value: 'cost_of_goods_sold',
               label: 'Cost of goods sold',
+              value: 'cost_of_goods_sold',
             },
             {
-              value: 'expense',
               label: 'Expense',
+              value: 'expense',
             },
           ],
         },
@@ -147,40 +151,63 @@ export const glAccountsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const glAccountsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const glAccountsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'gl-accounts',
   pageType: 'card',
-  autoSave: true,
   title: 'G/L Accounts',
-  module: 'Finance',
-  identity: {
-    primaryField: 'number',
-    secondaryField: 'name',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'General Ledger',
-    icon: 'ts-icon ts-icon-gl-accounts',
-    route: '/gl-accounts',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/glAccounts',
     keyField: 'systemId',
     defaultSort: 'number asc',
   },
+  identity: {
+    primaryField: 'number',
+    secondaryField: 'name',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'General Ledger',
+    icon: 'ts-icon ts-icon-gl-accounts',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/gl-accounts',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(glAccountsHeaderConfig, [
-      'number',
-      'name',
-      { field: 'accountType', width: '140px' },
-      { field: 'incomeBalance', width: '140px' },
-      { field: 'accountCategory', width: '140px' },
-      { field: 'directPosting', width: '140px' },
-      { field: 'blocked', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'number',
+      },
+      {
+        field: 'name',
+      },
+      {
+        field: 'accountType',
+        width: '140px',
+      },
+      {
+        field: 'incomeBalance',
+        width: '140px',
+      },
+      {
+        field: 'accountCategory',
+        width: '140px',
+      },
+      {
+        field: 'directPosting',
+        width: '140px',
+      },
+      {
+        field: 'blocked',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: glAccountsFactBoxConfig,
 };

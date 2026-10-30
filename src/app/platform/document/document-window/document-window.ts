@@ -5,12 +5,13 @@ import type { FactBoxContext } from '../../models/fact-box-context.model';
 import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
 import { automaticDetailFields, detailValue } from '../../pages/fact-box-display';
 import { SessionService } from '../../../core/services/session.service';
-import type { ListFactBoxConfig } from '../../models/list-fact-box-config.model';
+import type { FactBoxConfig } from '../../models/fact-box-config.model';
 import { LoadingIndicator } from '../../../shared/ui/loading-indicator/loading-indicator';
 import type { CommandConfig } from '../../models/command-config.model';
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, inject, viewChildren } from '@angular/core';
 import { DynamicForm } from '../../../shared/ui/dynamic-form/dynamic-form';
+import { FieldValidationResult } from '../field-validation.service';
 import { FactBox } from '../../../shared/ui/fact-box/fact-box';
 import { ViewChild } from '@angular/core';
 import { DocumentLines } from '../document-lines/document-lines';
@@ -104,8 +105,17 @@ export class DocumentWindow {
   private readonly session = inject(SessionService);
   private readonly forms = viewChildren(DynamicForm);
   validateHeaderForms(): boolean { return this.forms().map(form => form.validate()).every(Boolean); }
+  validate(field: string, value: unknown): Promise<FieldValidationResult> {
+    if (this.interactionLocked) return Promise.resolve({valid:false,errors:['Wait for the current operation to finish.']});
+    const form = this.forms().find(form => form.sections.some(section => section.fields.some(item => item.key === field)));
+    return form?.validateField(field,value) ?? Promise.resolve({valid:false,errors:['Unknown field: ' + field]});
+  }
+  validateLine(row: Record<string,unknown>, field: string, value: unknown): Promise<FieldValidationResult> {
+    if (this.interactionLocked) return Promise.resolve({valid:false,errors:['Wait for the current operation to finish.']});
+    return this.lineEditor?.validate(row,field,value) ?? Promise.resolve({valid:false,errors:['Line editor is unavailable.']});
+  }
   @Input() preferenceKey = '';
-  @Input() factBoxConfig?: ListFactBoxConfig;
+  @Input() factBoxConfig?: FactBoxConfig;
   @Input() factBoxDataSource?: DataSourceConfig;
   private readonly factBoxSource = inject(DataSourceService);
   @Input() factBoxSections?: FactBoxSectionConfig[];

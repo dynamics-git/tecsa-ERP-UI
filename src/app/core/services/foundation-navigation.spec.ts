@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { routes } from '../../app.routes';
 import { MenuService } from './menu.service';
 import { PermissionService } from './permission.service';
-import { getRegisteredRunModalPageIds } from './run-modal-config-registry';
+import { getRegisteredPageIds } from './page-registry';
 
 describe('F1 navigation registrations', () => {
   it('registers the supported pages and keeps menu/search destinations consistent with routes', () => {
@@ -37,6 +37,7 @@ describe('F1 navigation registrations', () => {
       'source-code-setup',
       'source-codes',
       'units-of-measure',
+      'users',
       'vat-business-posting-groups',
       'vat-posting-setup',
       'vat-product-posting-groups',
@@ -45,7 +46,7 @@ describe('F1 navigation registrations', () => {
       'warehouse-bins',
       'warehouse-zones',
     ];
-    expect(getRegisteredRunModalPageIds()).toEqual(
+    expect(getRegisteredPageIds()).toEqual(
       [
         ...expected,
         'item-units-of-measure',

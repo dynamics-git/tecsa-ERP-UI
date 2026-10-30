@@ -12,7 +12,7 @@ afterEach(()=>TestBed.resetTestingModule());
 describe('PR reference for optional shared field validation',()=>{
  it('checks only the edited Quantity, with no rule imposed by ordinary save validation',()=>{
   const validation=new FieldValidationService();
-  const field={...quantity,type:undefined,key:'quantity'};
+  const field={...quantity,key:'quantity'};
   expect(validation.validateField(field,'2',{},true).errors[0]).toContain('Choose Type');
   expect(validation.validateField(field,'2',{lineType:'item'},true).errors[0]).toContain('Choose No.');
   expect(validation.validateField(field,'2',{lineType:'item',itemId:123},true).valid).toBe(true);
@@ -22,7 +22,7 @@ describe('PR reference for optional shared field validation',()=>{
  });
  it('runs built-in validation first and handles validator failures without accepting the edit',()=>{
   const validation=new FieldValidationService(), custom=vi.fn(()=>undefined);
-  const field={...quantity,type:undefined,key:'quantity',validation:{custom}};
+  const field={...quantity,key:'quantity',validation:{custom}};
   expect(validation.validateField(field,'bad',{},true).valid).toBe(false);
   expect(custom).not.toHaveBeenCalled();
   expect(validation.validateField({...field,validation:{custom:()=>{throw new Error('test');}}},'2',{},true).valid).toBe(false);
@@ -31,7 +31,7 @@ describe('PR reference for optional shared field validation',()=>{
   TestBed.configureTestingModule({imports:[DynamicForm],providers:[provideRouter([])]});
   const f=TestBed.createComponent(DynamicForm), form=f.componentInstance;
   const custom=vi.fn(({record}: {record:Readonly<Record<string,unknown>>})=>record['itemId']===123 ? undefined : 'Choose No.');
-  const field={key:'quantity',label:'Quantity',valueType:quantity.valueType,validation:{custom},targets:[{key:'description',source:'description'}]};
+  const field={key:'quantity',label:'Quantity',type:quantity.type,validation:{custom},targets:[{key:'description',source:'description'}]};
   f.componentRef.setInput('sections',[{id:'general',fields:[field]}]);
   f.componentRef.setInput('data',{quantity:'1'});f.detectChanges();
   const changed=vi.spyOn(form.fieldChanged,'emit');
@@ -69,7 +69,7 @@ describe('PR reference for optional shared field validation',()=>{
 
  it('allows afterValidate updates only to declared writable fields and validates their values',()=>{
   const validation=new FieldValidationService();
-  const field={...quantity,type:undefined,key:'quantity',validation:{afterValidate:()=>({description:'Reviewed'})}};
+  const field={...quantity,key:'quantity',validation:{afterValidate:()=>({description:'Reviewed'})}};
   const fields=[field,{key:'description',label:'Description',validation:{maxLength:20}}];
   expect(validation.validateField(field,'2',{itemId:123},true,fields).updates).toEqual({description:'Reviewed'});
   expect(validation.validateField(field,'2',{},true,[field,{key:'description',label:'Description',readonly:true}]).valid).toBe(false);

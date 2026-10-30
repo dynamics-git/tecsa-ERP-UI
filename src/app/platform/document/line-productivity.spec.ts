@@ -31,7 +31,7 @@ describe('Shared power-user line behavior',()=>{
   it('copies only editable create fields, excluding ownership, identity, status and calculations',()=>{
     TestBed.configureTestingModule({providers:[{provide:RecordDeleteService,useValue:{}}]});
     const service=TestBed.runInInjectionContext(()=>new LineCommandService());
-    const config:LineConfig={placement:{mode:'end'},toolbarButtons:[],lineKeyField:'lineNo',dataSource:{endpoint:'/lines',keyField:'systemId',parentKeyField:'documentId',createFields:['systemId','lineNo','documentId','quantity','amount','status','hiddenValue','restricted']},columns:[
+    const config:LineConfig={placement:{mode:'end'},toolbarButtons:[],dataSource:{endpoint:'/lines',keyField:'systemId',lineFKProp:'documentId',createFields:['systemId','lineNo','documentId','quantity','amount','status','hiddenValue','restricted']},columns:[
       {id:'systemId',label:'ID'},{id:'lineNo',label:'Line'},{id:'documentId',label:'Parent'},quantity,{id:'amount',label:'Amount'},
       {id:'status',label:'Status'},{id:'hiddenValue',label:'Hidden',hidden:true},{id:'restricted',label:'Restricted'}],
       calculation:[{target:'amount',formula:'quantity * 2'}]};

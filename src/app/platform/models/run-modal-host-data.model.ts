@@ -2,7 +2,7 @@ import type { ConfirmationDialogConfig } from './confirmation-dialog-config.mode
 import type { DocumentWindowConfig } from './document-window-config.model';
 import type { ListPageConfig } from './page-config.model';
 import type { PopupConfig } from './popup-config.model';
-import type { RunModalConfigModule } from '../run-modal/run-modal-config.token';
+import type { PageModule } from '../run-modal/run-modal-config.token';
 
 export type DocumentLayoutMode = 'header-line' | 'header-only' | 'line-only';
 
@@ -25,7 +25,7 @@ export interface RunModalListState {
 
 export interface RunModalHostData {
   backgroundSave?: boolean;
-  runtimePage?: { pageId: string; module: RunModalConfigModule; record: Record<string, unknown> };
+  runtimePage?: { pageId: string; module: PageModule; record: Record<string, unknown> };
   documentWindowConfig?: DocumentWindowConfig;
   runModalList?: RunModalListState;
   confirmationDialogConfig?: ConfirmationDialogConfig;

@@ -1,6 +1,6 @@
 import type { Type } from '@angular/core';
 import type { DataSourceConfig } from './data-source-config.model';
-import type { ListFactBoxConfig } from './list-fact-box-config.model';
+import type { FactBoxConfig } from './fact-box-config.model';
 import { FormSectionConfig } from './field-config.model';
 import type { LineColumnConfig } from './line-config.model';
 import { CommandConfig } from './command-config.model';
@@ -52,11 +52,11 @@ export interface AttachmentsConfig {
 }
 
 export interface AttachmentContextConfig {
-  documentNoField?: string;
+  headerPKProp?: string;
   documentType?: string;
   documentStatusField?: string;
   useSelectedLineForHeaderAttachments?: boolean;
-  relatedDocumentNoField?: string;
+  relatedHeaderPKProp?: string;
   relatedDocumentType?: string;
   relatedLineNoField?: string;
 }
@@ -135,7 +135,7 @@ export interface DocumentWindowConfig {
   footerSections?: FooterSectionConfig[];
   attachments?: AttachmentsConfig;
   factBoxSections?: FactBoxSectionConfig[];
-  factBoxConfig?: ListFactBoxConfig;
+  factBoxConfig?: FactBoxConfig;
   factBoxDataSource?: DataSourceConfig;
   statusMessage?: DocumentStatusMessage;
   contentReady?: boolean;

@@ -10,7 +10,7 @@ import { DataSourceService, DataPage } from '../data/data-source.service';
 import { ApiErrorService } from '../data/api-error.service';
 import { RUNTIME_TIMEOUT_POLICY } from '../data/runtime-timeout-policy.token';
 import { ListFilterStateService } from '../pages/list-filter-state.service';
-import { RunModalConfigModule, RunModalContext } from './run-modal-config.token';
+import { PageModule, RunModalContext } from './run-modal-config.token';
 import { RunModalConfigAssemblerService } from './run-modal-config-assembler.service';
 import { RunModalPageDefinitionResolverService } from './run-modal-page-definition-resolver.service';
 import { RunModalStackService } from './run-modal-stack.service';
@@ -29,7 +29,7 @@ export interface BackgroundSaveOwner {
 }
 interface SaveNotice { id: string; pageId: string; label: string; state: 'saving'|'saved'|'error'|'unknown'; message: string; checking?: boolean; valid(): boolean; }
 
-type ListBinding = { pageId: string; module: RunModalConfigModule; source: DataSourceConfig; context: RunModalContext; rows: unknown[]; loading: boolean; hasMore: boolean; cursor?: string; generation: number };
+type ListBinding = { pageId: string; module: PageModule; source: DataSourceConfig; context: RunModalContext; rows: unknown[]; loading: boolean; hasMore: boolean; cursor?: string; generation: number };
 
 /** Window navigation only. DocumentPage owns editing for every entry window. */
 @Injectable({ providedIn: 'root' })
@@ -71,7 +71,7 @@ export class RunModalService {
       if (this.deferredSaves.get(window.id)?.hidden && owner.state().pending) this.notice(window.id,{state:'unknown',message:'Save confirmation is taking longer than expected. Check the server status before retrying.'});
     }, this.policy.requestTimeoutMs);
     this.deferredSaves.set(window.id,{record,owner,hidden:false,timer,valid});
-    const label = String(owner.state().record[initial.source.documentNoField ?? 'number'] ?? owner.state().record['code'] ?? window.title ?? initial.before[initial.source.keyField ?? 'systemId'] ?? 'Record');
+    const label = String(owner.state().record[initial.source.headerPKProp ?? 'number'] ?? owner.state().record['code'] ?? window.title ?? initial.before[initial.source.keyField ?? 'systemId'] ?? 'Record');
     this.notices.update(items => [...items.filter(item => item.id !== window.id),{id:window.id,pageId:this.entryPages.get(window.id)!,label,state:'saving',message:'Saving changes…',valid}]);
     return true;
   }
@@ -245,11 +245,11 @@ export class RunModalService {
   }
   private contextualSource(source: DataSourceConfig, context: RunModalContext): DataSourceConfig {
     if (source.navigation) return this.data.relation(source, (context['activeLine'] ?? context['headerData'] ?? {}) as Record<string, unknown>);
-    if (!source.parentKeyField) return source;
+    if (!source.lineFKProp) return source;
     const record = (context['headerData'] ?? context['activeLine'] ?? {}) as Record<string, unknown>;
-    const value = record[source.contextDocumentNoField ?? source.documentNoField ?? source.parentKeyField];
+    const value = record[source.contextHeaderPKProp ?? source.headerPKProp ?? source.lineFKProp];
     if (value === undefined || value === null || value === '') throw new Error('The related record context is missing.');
-    const clauses = [`${source.parentKeyField} eq '${String(value).replace(/'/g, "''")}'`];
+    const clauses = [`${source.lineFKProp} eq '${String(value).replace(/'/g, "''")}'`];
     for (const [field, headerField] of Object.entries(source.parentFieldMap ?? {})) {
       const mapped = record[headerField];
       if (mapped === undefined || mapped === null || mapped === '') throw new Error('The related record context is missing.');

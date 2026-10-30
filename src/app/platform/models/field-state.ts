@@ -5,8 +5,8 @@ export function matchesFieldCondition(condition: FieldCondition | undefined, rec
  const match = condition.values.some(expected=>Object.is(value,expected));
  return condition.negate ? !match : match;
 }
-export function fieldIsRequired(field: {required?:boolean;requiredWhen?:FieldCondition},record:Record<string,unknown>):boolean {
- return field.required === true || matchesFieldCondition(field.requiredWhen,record);
+export function fieldIsRequired(field: {required?:boolean;requiredWhen?:FieldCondition;readonly?:boolean;readonlyAfterCreate?:boolean;readonlyWhen?:FieldCondition},record:Record<string,unknown>):boolean {
+ return !fieldIsReadonly(field, record) && (field.required === true || matchesFieldCondition(field.requiredWhen,record));
 }
 export function fieldIsHidden(field: {hidden?:boolean;hiddenWhen?:FieldCondition},record:Record<string,unknown>):boolean {
  return field.hidden === true || matchesFieldCondition(field.hiddenWhen,record);

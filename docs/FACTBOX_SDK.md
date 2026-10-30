@@ -10,7 +10,7 @@ command dispatcher, popup service or component registry is introduced.
 Items is the reference: features/purchase-masters/items/items.factbox.config.ts.
 Import it into the existing page config as factBox: itemsFactBoxConfig.
 
-    const factBox: ListFactBoxConfig = {
+    const factBox: FactBoxConfig = {
       enabled: true,
       label: 'Item information',
       overview: true,

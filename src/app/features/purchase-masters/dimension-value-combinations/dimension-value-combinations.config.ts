@@ -1,4 +1,10 @@
-import { DataSourceConfig, HeaderConfig, ListPageConfig, LineConfig } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  LineConfig,
+  ListPageConfig,
+} from '../../../platform/public-api';
+import { dimensionValueCombinationsFactBoxConfig } from './dimension-value-combinations.factbox.config';
 const dimensionValueCombinationsDataSource: DataSourceConfig = {
   endpoint: '/dimensionCombinations',
   keyField: 'systemId',
@@ -10,46 +16,49 @@ const dimensionValueCombinationsDataSource: DataSourceConfig = {
   pageSize: 20,
 };
 
+// Header form.
+export const dimensionValueCombinationsHeaderConfig: HeaderConfig = {
+  dialogTitle: 'Dimension Value Combinations',
+  toolbarButtons: [],
+  sections: [],
+};
+
+// List page.
 export const dimensionValueCombinationsListConfig: ListPageConfig & {
   dataSource: DataSourceConfig;
 } = {
   pageId: 'dimension-value-combinations',
   pageType: 'worksheet',
-  autoSave: true,
   title: 'Dimension Value Combinations',
-  module: 'Finance',
-  permissionPageId: 'dimension-combinations-lines',
+  autoSave: true,
+  dataSource: dimensionValueCombinationsDataSource,
   identity: {
     primaryField: '__display_dimension1Id',
   },
-  dataSource: dimensionValueCombinationsDataSource,
+  module: 'Finance',
+  permissionPageId: 'dimension-combinations-lines',
   tools: {
     search: false,
     filter: false,
     columns: false,
     export: false,
   },
-  factBox: {
-    enabled: true,
-  },
+  factBox: dimensionValueCombinationsFactBoxConfig,
 };
-export const dimensionValueCombinationsHeaderConfig: HeaderConfig = {
-  dialogTitle: 'Dimension Value Combinations',
-  toolbarButtons: [],
-  sections: [],
-};
+
+// Document lines.
 export const dimensionValueCombinationsLineConfig: LineConfig = {
-  permissionPageId: 'dimension-combinations-lines',
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: dimensionValueCombinationsDataSource,
+  permissionPageId: 'dimension-combinations-lines',
   toolbarButtons: [],
   columns: [
     {
       id: 'dimension1ValueId',
       label: 'Dimension1 Value',
+      type: 'lookup',
       valueType: 'guid',
       required: true,
       readonlyAfterCreate: true,
@@ -69,11 +78,11 @@ export const dimensionValueCombinationsLineConfig: LineConfig = {
         ],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
       id: 'dimension2ValueId',
       label: 'Dimension2 Value',
+      type: 'lookup',
       valueType: 'guid',
       required: true,
       readonlyAfterCreate: true,
@@ -93,20 +102,20 @@ export const dimensionValueCombinationsLineConfig: LineConfig = {
         ],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
       id: 'isBlocked',
       label: 'Is Blocked',
-      valueType: 'boolean',
+      type: 'boolean',
       defaultValue: true,
     },
     {
       id: 'dimension1Id',
       label: 'Dimension1',
+      type: 'lookup',
       valueType: 'guid',
-      readonly: true,
       defaultValue: null,
+      readonly: true,
       lookup: {
         endpoint: '/dimensions',
         valueField: 'systemId',
@@ -114,14 +123,14 @@ export const dimensionValueCombinationsLineConfig: LineConfig = {
         searchFields: ['code', 'name'],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
       id: 'dimension2Id',
       label: 'Dimension2',
+      type: 'lookup',
       valueType: 'guid',
-      readonly: true,
       defaultValue: null,
+      readonly: true,
       lookup: {
         endpoint: '/dimensions',
         valueField: 'systemId',
@@ -129,7 +138,6 @@ export const dimensionValueCombinationsLineConfig: LineConfig = {
         searchFields: ['code', 'name'],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
   ],
 };

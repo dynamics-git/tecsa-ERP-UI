@@ -1,3 +1,5 @@
+import { ColumnReorder, ColumnReorderEvent } from '../../../shared/directives/column-reorder.directive';
+import { ColumnResize } from '../../../shared/directives/column-resize.directive';
 import { writeTabularText } from '../../data/tabular-text';
 import { RunModalService } from '../../run-modal/run-modal.service';
 import { FactBoxHostService } from '../../../shared/ui/fact-box-toggle/fact-box-host.service';
@@ -44,12 +46,6 @@ type ActiveSort = {
   direction: SortDirection;
 };
 
-type ActiveResize = {
-  field: string;
-  startX: number;
-  startWidth: number;
-};
-
 type ListRenderEntry = {key: string; row?: unknown; group?: {key: string; label: string; rows: unknown[]}};
 
 type ListDensity = 'compact' | 'comfortable' | 'spacious';
@@ -57,7 +53,7 @@ type ListDensity = 'compact' | 'comfortable' | 'spacious';
 @Component({
   selector: 'app-list-grid',
   standalone: true,
-  imports: [FactBoxToggle, LoadingIndicator,  CommandBar, ListFactBox, ListFilterPanel],
+  imports: [ColumnReorder, ColumnResize, FactBoxToggle, LoadingIndicator,  CommandBar, ListFactBox, ListFilterPanel],
   templateUrl: './list-grid.html',
   styleUrl: './list-grid.scss',
 })
@@ -93,7 +89,6 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   factboxOpen = true;
   private activeViewId?: string;
   private activeSort?: ActiveSort;
-  private activeResize?: ActiveResize;
   private readonly resizedColumnWidths = new Map<string, number>();
 
   private readonly personalization = inject(ListPersonalizationService);
@@ -163,9 +158,8 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   get savedViewsEnabled(): boolean { return this.config?.tools?.savedViews !== false && this.config?.personalization?.enabled !== false; }
   get factBoxEnabled(): boolean { return this.config?.factBox?.enabled !== false; }
   columnWidthNumber(column: DisplayColumn): number { return this.parseColumnWidth(this.getColumnWidth(column)); }
-  resizeColumn(column: DisplayColumn, delta: number): void {
-    this.resizedColumnWidths.set(this.getColumnKey(column), Math.min(800, Math.max(72, this.columnWidthNumber(column) + delta)));
-    this.persistPersonalization();
+  setColumnWidth(column: DisplayColumn, width: number): void {
+    this.resizedColumnWidths.set(this.getColumnKey(column), width);
   }
   onRowKey(event: KeyboardEvent, row: unknown): void {
     if (event.target !== event.currentTarget) return;
@@ -268,6 +262,19 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
     if (index < 0 || next < 0 || next >= keys.length) return;
     [keys[index], keys[next]] = [keys[next]!, keys[index]!];
     this.columnOrder = keys;
+    this.persistPersonalization();
+  }
+
+  reorderColumn(event: ColumnReorderEvent): void {
+    const previous = this.configurableColumns.map(column => this.getColumnKey(column));
+    const frozen = this.columns.filter(column => this.isFrozen(column)).map(column => this.getColumnKey(column));
+    const keys = previous.filter(key => key !== event.sourceKey);
+    const index = keys.indexOf(event.targetKey);
+    if (index < 0 || !previous.includes(event.sourceKey)) return;
+    keys.splice(index + (event.after ? 1 : 0), 0, event.sourceKey);
+    if (keys.every((key, position) => key === previous[position])) return;
+    this.columnOrder = keys;
+    if (frozen.length) this.frozenThrough = keys.filter(key => frozen.includes(key)).at(-1) ?? '';
     this.persistPersonalization();
   }
 
@@ -894,39 +901,6 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
       direction: this.currentSort?.direction === 'asc' ? 'desc' : 'asc',
     };
     this.command.emit({ actionKey: 'sortChanged', payload: { sort: `${field} ${this.activeSort.direction}` } });
-  }
-
-  startColumnResize(event: PointerEvent, column: DisplayColumn): void {
-    if (this.config?.dataSurface?.resizable === false) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const field = this.getColumnKey(column);
-    if (!field.length) {
-      return;
-    }
-
-    this.activeResize = {
-      field,
-      startX: event.clientX,
-      startWidth: this.parseColumnWidth(this.getColumnWidth(column)),
-    };
-  }
-
-  @HostListener('window:pointermove', ['$event'])
-  handleColumnResizeMove(event: PointerEvent): void {
-    if (!this.activeResize) {
-      return;
-    }
-
-    const nextWidth = Math.max(72, this.activeResize.startWidth + event.clientX - this.activeResize.startX);
-    this.resizedColumnWidths.set(this.activeResize.field, Math.round(nextWidth));
-  }
-
-  @HostListener('window:pointerup')
-  stopColumnResize(): void {
-    if (this.activeResize) this.persistPersonalization();
-    this.activeResize = undefined;
   }
 
   private parseColumnWidth(width: string): number {

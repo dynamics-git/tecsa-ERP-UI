@@ -14,9 +14,9 @@ export class HttpInterceptorService implements HttpInterceptor {
     const base = environment.apiBaseUrl.replace(/\/$/, '');
     const isLogin = request.url === `${base}/auth/login`;
     const isSignup = request.url.startsWith(`${base}/saas/registration/`);
-    const isErpApi = request.url.startsWith(`${base}/`);
+    const isApiRequest = request.url.startsWith(`${base}/`);
     const hasAuthorizationHeader = request.headers.has('Authorization');
-    const requestWithToken = token && isErpApi && !isLogin && !isSignup && !hasAuthorizationHeader
+    const requestWithToken = token && isApiRequest && !isLogin && !isSignup && !hasAuthorizationHeader
       ? request.clone({
         setHeaders: {
           Authorization: `Bearer ${token}`,

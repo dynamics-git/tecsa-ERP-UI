@@ -6,7 +6,7 @@ import { MenuItem } from '../../core/models/menu-item.model';
 import { MenuSearchItem } from '../../core/models/menu-item.model';
 import { GlobalSearchPopupService } from '../../core/services/global-search-popup.service';
 import { MenuService } from '../../core/services/menu.service';
-import { shouldOpenFromMenuAsRunModal } from '../../core/services/run-modal-config-registry';
+import { shouldOpenFromMenuAsRunModal } from '../../core/services/page-registry';
 import { SessionService } from '../../core/services/session.service';
 import { DrawerService } from '../../platform/public-api';
 import { ModuleMenuPanel } from '../module-menu-panel/module-menu-panel';

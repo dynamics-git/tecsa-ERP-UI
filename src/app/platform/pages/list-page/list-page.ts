@@ -29,7 +29,7 @@ import { DocumentRecordService } from '../../data/document-record.service';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { DocumentResponseNormalizerService } from '../../data/document-response-normalizer.service';
 import { DocumentStateService } from '../../data/document-state.service';
-import { FieldValidationService } from '../../document/field-validation.service';
+import { FieldValidationResult, FieldValidationService } from '../../document/field-validation.service';
 import { LineCalculationService } from '../../document/line-calculation.service';
 import { LineCommandService } from '../../document/line-command.service';
 import { LineMasterRegistry, LineMasterService } from '../../data/line-master.service';
@@ -65,7 +65,7 @@ type CreateLineOptions = {
   onSettled?: (success: boolean) => void;
 };
 
-export interface DocumentPageCommandEvent {
+export interface PageCommandEvent {
   actionKey: string;
   payload?: unknown;
   context: {
@@ -117,6 +117,10 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly valueMapper = inject(RuntimeValueMapperService);
   private readonly sessionService = inject(SessionService);
   private readonly subscriptions = new Subscription();
+  private relatedLinesRefresh?: DocumentWindowConfig;
+  private relatedLinesTimer?: ReturnType<typeof setTimeout>;
+  private relatedLinesGeneration = 0;
+  private destroyed = false;
   private readonly unsavedNavigation = inject(UnsavedChangesService);
   get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0 || this.hasInvalidLineDrafts; }
   get hasPendingWrites(): boolean { return this.deleting || this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0 || this.lineBatchPending; }
@@ -181,6 +185,13 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly loadingLineOptionKeys = new Set<string>();
 
   @ViewChild(DocumentWindow) private documentWindow?: DocumentWindow;
+  /** Validate a developer-supplied value through the active editor and its normal save policy. */
+  validate(field: string, value: unknown): Promise<FieldValidationResult> {
+    return this.documentWindow?.validate(field,value) ?? Promise.resolve({valid:false,errors:['Open a record before changing fields.']});
+  }
+  validateLine(row: Record<string,unknown>, field: string, value: unknown): Promise<FieldValidationResult> {
+    return this.documentWindow?.validateLine(row,field,value) ?? Promise.resolve({valid:false,errors:['Open a record before changing lines.']});
+  }
   @Input() pageId = 'document';
   @Input() listConfig: RequiredListConfig = {} as RequiredListConfig;
   @Input() setupConfig?: RequiredListConfig;
@@ -189,7 +200,7 @@ export class ListPage implements OnInit, OnDestroy {
   @Input() documentOnly = false;
   @Input() initialRecord?: Record<string, unknown>;
   @Output() closeRequested = new EventEmitter<void>();
-  @Output() businessCommand = new EventEmitter<DocumentPageCommandEvent>();
+  @Output() businessCommand = new EventEmitter<PageCommandEvent>();
 
   error?: string;
   hasMore = true;
@@ -234,6 +245,7 @@ export class ListPage implements OnInit, OnDestroy {
     if (!this.isWorksheetPage && !this.usesManualSaveMode()) {
       this.dirty = this.unsavedFields.size > 0 || this.autosavePending > 0;
     }
+    this.scheduleRelatedLinesRefresh();
   }
   private mergeAutosaveResponse(record: Record<string, unknown>, saved: Record<string, unknown>): void {
     const pending = Object.fromEntries([...(this.unsavedFields.get(record)?.keys() ?? [])].map(field => [field, record[field]]));
@@ -290,6 +302,17 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.subscriptions.add(this.dataSource.mutations.subscribe(change => {
+      const entry = this.activeDocumentWindowConfig;
+      if (!entry?.headerData || !this.lineConfig) return;
+      const id = this.resolvePersistedRecordId(entry.headerData, this.listConfig.dataSource);
+      if (id != null && change.endpoint === this.dataSource.recordEndpoint(this.listConfig.dataSource,id)
+          && change.resources.some(resource => this.dataSource.sameResource(resource,this.lineConfig!.dataSource.endpoint))) {
+        this.relatedLinesRefresh = entry;
+        this.relatedLinesGeneration++;
+      }
+      this.scheduleRelatedLinesRefresh();
+    }));
     this.unsavedNavigation.register(this,{changed:()=>this.hasUnsavedChanges,saving:()=>this.hasPendingWrites});
     if (!this.listConfig?.dataSource && this.setupConfig?.dataSource) {
       this.listConfig = this.setupConfig;
@@ -366,6 +389,9 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    clearTimeout(this.relatedLinesTimer);
+    this.relatedLinesRefresh = undefined;
     this.unsavedNavigation.release(this);
     if (!this.documentOnly) this.listFilterState.release(this.listFilterScope);
     if (!this.documentOnly) {
@@ -490,7 +516,9 @@ export class ListPage implements OnInit, OnDestroy {
     this.pendingListSyncRecord = undefined;
     this.openDocumentPopup(record, []);
     if (!persisted) { this.stopPopupLoading(); return; }
-    if (this.activeDocumentWindowConfig) { this.activeDocumentWindowConfig.lineRows = []; this.activeDocumentWindowConfig.contentReady = false; }
+    // Keep the existing blank entry rows visible while the saved document hydrates.
+    // The loading scope locks their editors until the server's rows replace them.
+    if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
     // Loading starts only when the shared read actually has to await the server.
     // Header, selected labels and child rows each retain their own request deadline.
     // Do not cut off a healthy multi-request hydration with one aggregate request timeout.
@@ -856,7 +884,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.setEntryStatus({ tone: 'error', title: 'Save failed', message: this.getErrorMessage(error) });
       this.changeDetector.detectChanges();
       return false;
-    } finally { this.savingEntry = false; this.runModal.notifyBackground(this.initialRecord); }
+    } finally { this.savingEntry = false; this.runModal.notifyBackground(this.initialRecord); this.scheduleRelatedLinesRefresh(); }
   }
 
   private get documentLabel(): string {
@@ -1135,7 +1163,7 @@ export class ListPage implements OnInit, OnDestroy {
       header,
       {
         timeoutMs: this.timeoutPolicy.hydrationTimeoutMs,
-        fallbackDocumentNoField: this.listConfig.dataSource.documentNoField,
+        fallbackHeaderPKProp: this.listConfig.dataSource.headerPKProp,
         defaultTop: initialTop,
         allowWithoutParentKey: pageType === 'worksheet',
         onRequest: () => this.startCardLineLoading(),
@@ -1172,7 +1200,7 @@ export class ListPage implements OnInit, OnDestroy {
         header,
         {
           timeoutMs: 10000,
-          fallbackDocumentNoField: this.listConfig.dataSource.documentNoField,
+          fallbackHeaderPKProp: this.listConfig.dataSource.headerPKProp,
           defaultTop: backgroundTop,
           allowWithoutParentKey: pageType === 'worksheet',
         },
@@ -2245,6 +2273,58 @@ export class ListPage implements OnInit, OnDestroy {
     this.refreshActiveLines();
   }
 
+  private scheduleRelatedLinesRefresh(): void {
+    if (!this.relatedLinesRefresh || this.relatedLinesTimer) return;
+    this.relatedLinesTimer = setTimeout(() => {
+      this.relatedLinesTimer = undefined;
+      void this.refreshRelatedLines();
+    },0);
+  }
+
+  /** A server field rule may have changed lines outside the current UI page. */
+  private async refreshRelatedLines(): Promise<void> {
+    if (this.destroyed) return;
+    const entry = this.relatedLinesRefresh;
+    if (!entry || entry !== this.activeDocumentWindowConfig || !entry.headerData || !this.lineConfig) {
+      this.relatedLinesRefresh = undefined;
+      return;
+    }
+    if (this.hasPendingWrites || this.hasInvalidLineDrafts
+        || (entry.lineRows ?? []).some(row => this.unsavedFields.has(row))) return;
+    const inScope = this.dataSource.captureWriteScope();
+    const rows = entry.lineRows ?? [];
+    const snapshots = new Map(rows.map(row => [row,JSON.stringify(row)]));
+    const header = structuredClone(entry.headerData);
+    const lineConfig = this.lineConfig;
+    const generation = this.relatedLinesGeneration;
+    this.relatedLinesRefresh = undefined;
+    try {
+      const records = await this.documentHydration.loadLineRowsForHeader(lineConfig.dataSource,header,{
+        timeoutMs:this.timeoutPolicy.hydrationTimeoutMs,
+        fallbackHeaderPKProp:this.listConfig.dataSource.headerPKProp,
+        defaultTop:Math.max(rows.filter(row => !row['__entryPlaceholder']).length,this.resolveInitialLineFetchTop(lineConfig.dataSource)),
+        reuseSnapshot:false,
+      });
+      if (this.destroyed || generation !== this.relatedLinesGeneration || !inScope() || entry !== this.activeDocumentWindowConfig || rows !== entry.lineRows) return;
+      const fresh = await this.documentHydration.resolveLineLookups(records,lineConfig.columns,header,
+        () => !this.destroyed && generation === this.relatedLinesGeneration && inScope() && entry === this.activeDocumentWindowConfig);
+      if (this.destroyed || generation !== this.relatedLinesGeneration || !inScope() || entry !== this.activeDocumentWindowConfig || rows !== entry.lineRows) return;
+      const key = lineConfig.dataSource.keyField ?? 'systemId';
+      for (const row of rows) {
+        const updated = fresh.find(record => record[key] != null && record[key] === row[key]);
+        if (updated && !this.unsavedFields.has(row) && !this.hasInvalidLineDrafts && snapshots.get(row) === JSON.stringify(row)) Object.assign(row,updated);
+      }
+      entry.lineTotals = this.buildLineTotals(rows,entry.headerData);
+      this.changeDetector.detectChanges();
+    } catch {
+      if (!this.destroyed && generation === this.relatedLinesGeneration && inScope() && entry === this.activeDocumentWindowConfig) {
+        this.relatedLinesRefresh = entry;
+        this.setEntryStatus({tone:'error',title:'Refresh required',message:'The header was saved. Refresh lines to load the related changes.'});
+        this.changeDetector.detectChanges();
+      }
+    }
+  }
+
   private refreshActiveEntry(): void {
     this.dataSource.invalidateReadCache();
     if (this.listConfig.dataSource.singleton) { this.openEntry(); return; }
@@ -2597,6 +2677,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.lineBatchPending = true;
       const finish = () => {
         this.lineBatchPending = false;
+        this.scheduleRelatedLinesRefresh();
         this.runModal.notifyBackground(this.initialRecord);
         this.changeDetector.markForCheck();
       };
@@ -2777,10 +2858,10 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private buildNewHeaderSeed(): Record<string, unknown> {
-    const documentNoField = this.listConfig.dataSource.documentNoField;
+    const headerPKProp = this.listConfig.dataSource.headerPKProp;
     return this.documentConfigData.buildHeaderSeed(
       this.headerConfig.sections,
-      { ...(documentNoField ? { [documentNoField]: '' } : {}), ...this.listConfig.dataSource.newRecordDefaults },
+      { ...(headerPKProp ? { [headerPKProp]: '' } : {}), ...this.listConfig.dataSource.newRecordDefaults },
     );
   }
 
@@ -2823,13 +2904,13 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
-    const parentKeyField = this.lineConfig.dataSource.parentKeyField;
-    const documentNoField =
-      this.lineConfig.dataSource.documentNoField ?? this.listConfig.dataSource.documentNoField;
-    if (parentKeyField && !this.hasValue(row[parentKeyField])) {
-      row[parentKeyField] =
-        (documentNoField ? this.activeDocumentWindowConfig.headerData[documentNoField] : undefined) ??
-        this.activeDocumentWindowConfig.headerData[parentKeyField];
+    const lineFKProp = this.lineConfig.dataSource.lineFKProp;
+    const headerPKProp =
+      this.lineConfig.dataSource.headerPKProp ?? this.listConfig.dataSource.headerPKProp;
+    if (lineFKProp && !this.hasValue(row[lineFKProp])) {
+      row[lineFKProp] =
+        (headerPKProp ? this.activeDocumentWindowConfig.headerData[headerPKProp] : undefined) ??
+        this.activeDocumentWindowConfig.headerData[lineFKProp];
     }
 
     for (const [field, headerField] of Object.entries(this.lineConfig.dataSource.parentFieldMap ?? {})) {
@@ -3037,12 +3118,6 @@ export class ListPage implements OnInit, OnDestroy {
     return this.dataSourceResolver.getColumnField({ column });
   }
 
-  private resolveLineNoField(): string {
-    return this.dataSourceResolver.resolveLineNoField({
-      lineConfig: this.lineConfig,
-    });
-  }
-
   private ensureTrailingEmptyRows(minEmptyRows = 1): void {
     if (!this.lineConfig || !this.activeDocumentWindowConfig) {
       return;
@@ -3090,13 +3165,12 @@ export class ListPage implements OnInit, OnDestroy {
       return true;
     }
 
-    const lineNoField = this.resolveLineNoField();
     const protectedFields = new Set<string>([
       this.toText(this.lineConfig.dataSource.keyField).trim(),
-      this.toText(this.lineConfig.dataSource.parentKeyField).trim(),
-      this.toText(this.lineConfig.dataSource.documentNoField).trim(),
+      this.toText(this.lineConfig.dataSource.lineFKProp).trim(),
+      this.toText(this.lineConfig.dataSource.headerPKProp).trim(),
       ...Object.keys(this.lineConfig.dataSource.parentFieldMap ?? {}),
-      lineNoField,
+      ...this.lineConfig.columns.filter(column => column.readonly).map(column => column.field ?? column.id),
     ].filter((field) => field.length > 0));
 
     for (const column of this.lineConfig.columns) {

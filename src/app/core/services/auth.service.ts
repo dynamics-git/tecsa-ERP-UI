@@ -2,7 +2,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { runModalPageModules } from '../../features/run-modal-page-modules';
+import { featurePageModules } from '../../features/feature-pages.generated';
 import type { DataSourceConfig, ListPageConfig, LineConfig } from '../../platform/public-api';
 import { ApiAuthService } from './api-auth.service';
 import { RestService } from './rest.service';
@@ -327,7 +327,7 @@ export class AuthService {
           ? source.navigation.parentEndpoint + '/{parentId}/' + source.navigation.childCollection
           : source.endpoint;
       const bindings: Record<string, unknown>[] = [];
-      for (const module of runModalPageModules) {
+      for (const module of featurePageModules) {
         const config = Object.values(module).find(
           (value) => value && typeof value === 'object' && 'pageId' in value,
         ) as ListPageConfig | undefined;
@@ -365,6 +365,7 @@ export class AuthService {
 
       permissions.push({
         query: pageRecord['query'],
+        apiPath: pageRecord['apiPath'],
         PageId: pageId,
         pageId,
         ObjectName: pageCode,

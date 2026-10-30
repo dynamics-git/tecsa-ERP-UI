@@ -23,7 +23,7 @@ describe('Config-driven deletion across page surfaces',()=>{
   f.componentRef.setInput('initialRecord',structuredClone(header));
   f.componentRef.setInput('listConfig',{pageId:'delete-fixture',pageType:options.worksheet?'worksheet':options.list?'list':'document',title:'Fixture',dataSource:{endpoint:'/fixtures',keyField:'id',...options.source},dataSurface:{columns:[{field:'code',label:'Code'}]}});
   f.componentRef.setInput('headerConfig',{dialogTitle:'Fixture',toolbarButtons:[],sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code'}]}]});
-  f.componentRef.setInput('lineConfig',{placement:{mode:'end'},lineKeyField:'lineNo',toolbarButtons:[],dataSource:{endpoint:'/lines',keyField:'id',navigation:{parentEndpoint:'/fixtures',parentIdFields:['id'],childCollection:'lines'},...options.lineSource},columns:[{id:'lineNo',label:'Line No.',readonly:true,valueType:'integer'}],fields:[]});
+  f.componentRef.setInput('lineConfig',{placement:{mode:'end'},toolbarButtons:[],dataSource:{endpoint:'/lines',keyField:'id',navigation:{parentEndpoint:'/fixtures',parentIdFields:['id'],childCollection:'lines'},...options.lineSource},columns:[{id:'lineNo',label:'Line No.',readonly:true,valueType:'integer'}],fields:[]});
   f.detectChanges();await f.whenStable();
   await vi.waitFor(()=>expect(f.componentInstance.popupLoading).toBe(false));f.detectChanges();
   return {f,remove,confirm,session};

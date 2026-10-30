@@ -4,9 +4,19 @@ import {
   ListPageConfig,
   listColumns,
 } from '../../../platform/public-api';
+import { notificationRulesFactBoxConfig } from './notification-rules.factbox.config';
+
+// Header form.
 export const notificationRulesHeaderConfig: HeaderConfig = {
   dialogTitle: 'Notification Setup',
-  toolbarButtons: [{ label: 'Save', actionKey: 'cmd:save', isPrimary: true, order: 5 }],
+  toolbarButtons: [
+    {
+      label: 'Save',
+      actionKey: 'cmd:save',
+      isPrimary: true,
+      order: 5,
+    },
+  ],
   sections: [
     {
       id: 'general',
@@ -15,32 +25,47 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          valueType: 'code',
+          type: 'code',
           required: true,
           readonlyAfterCreate: true,
         },
-        { key: 'name', label: 'Name', required: true },
-        { key: 'enabled', label: 'Enabled', type: 'boolean', defaultValue: true },
+        {
+          key: 'name',
+          label: 'Name',
+          type: 'text',
+          required: true,
+        },
+        {
+          key: 'enabled',
+          label: 'Enabled',
+          type: 'boolean',
+          defaultValue: true,
+        },
         {
           key: 'eventKey',
           label: 'Event',
           type: 'lookup',
           required: true,
-          valueField: 'code',
-          labelField: 'name',
           lookup: {
             endpoint: '/notificationEvents',
             valueField: 'code',
             displayField: 'name',
             searchFields: ['code', 'name'],
           },
+          valueField: 'code',
+          labelField: 'name',
         },
         {
           key: 'channel',
           label: 'Channel',
-          type: 'select',
+          type: 'dropdown',
           defaultValue: 'in_app',
-          options: [{ value: 'in_app', label: 'In-app' }],
+          options: [
+            {
+              label: 'In-app',
+              value: 'in_app',
+            },
+          ],
         },
       ],
     },
@@ -51,12 +76,21 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
         {
           key: 'recipientMode',
           label: 'Send to',
-          type: 'select',
+          type: 'dropdown',
           defaultValue: 'event',
           options: [
-            { value: 'event', label: 'Recipients supplied by the event' },
-            { value: 'user', label: 'Specific user' },
-            { value: 'permission_set', label: 'Users with a permission set' },
+            {
+              label: 'Recipients supplied by the event',
+              value: 'event',
+            },
+            {
+              label: 'Specific user',
+              value: 'user',
+            },
+            {
+              label: 'Users with a permission set',
+              value: 'permission_set',
+            },
           ],
         },
         {
@@ -64,32 +98,46 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
           label: 'User',
           type: 'lookup',
           defaultValue: null,
-          valueField: 'systemId',
-          labelField: 'name',
-          hiddenWhen: { field: 'recipientMode', values: ['user'], negate: true },
-          requiredWhen: { field: 'recipientMode', values: ['user'] },
+          requiredWhen: {
+            field: 'recipientMode',
+            values: ['user'],
+          },
+          hiddenWhen: {
+            field: 'recipientMode',
+            values: ['user'],
+            negate: true,
+          },
           lookup: {
             endpoint: '/notificationRecipients',
             valueField: 'systemId',
             displayField: 'name',
             searchFields: ['name', 'userName'],
           },
+          valueField: 'systemId',
+          labelField: 'name',
         },
         {
           key: 'recipientPermissionSetId',
           label: 'Permission set',
           type: 'lookup',
           defaultValue: null,
-          valueField: 'systemId',
-          labelField: 'code',
-          hiddenWhen: { field: 'recipientMode', values: ['permission_set'], negate: true },
-          requiredWhen: { field: 'recipientMode', values: ['permission_set'] },
+          requiredWhen: {
+            field: 'recipientMode',
+            values: ['permission_set'],
+          },
+          hiddenWhen: {
+            field: 'recipientMode',
+            values: ['permission_set'],
+            negate: true,
+          },
           lookup: {
             endpoint: '/notificationPermissionSets',
             valueField: 'systemId',
             displayField: 'code',
             searchFields: ['code', 'name'],
           },
+          valueField: 'systemId',
+          labelField: 'code',
         },
       ],
     },
@@ -100,6 +148,7 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
         {
           key: 'titleTemplate',
           label: 'Title',
+          type: 'text',
           defaultValue: '{{actorName}} mentioned you',
           required: true,
         },
@@ -107,34 +156,29 @@ export const notificationRulesHeaderConfig: HeaderConfig = {
           key: 'messageTemplate',
           label: 'Message',
           type: 'textarea',
+          defaultValue: 'Open {{recordLabel}} to view the note.',
+          required: true,
           width: 'wide',
           placeholder:
             'Use registered event tokens, for example {{actorName}} and {{recordLabel}}.',
-          defaultValue: 'Open {{recordLabel}} to view the note.',
-          required: true,
         },
       ],
     },
   ],
 };
-export const notificationRulesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+
+// List page.
+export const notificationRulesListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'notification-rules',
   pageType: 'card',
-  autoSave: false,
   title: 'Notification Setup',
-  module: 'Administration',
-  identity: { primaryField: 'code', secondaryField: 'name' },
-  menu: {
-    module: 'Administration',
-    group: 'Collaboration',
-    route: '/notification-rules',
-    icon: 'ts-icon ts-icon-bell',
-    moduleIcon: 'ts-icon ts-icon-administration-module',
-  },
+  autoSave: false,
   dataSource: {
     endpoint: '/notificationRules',
     keyField: 'systemId',
-    documentNoField: 'code',
+    headerPKProp: 'code',
     defaultSort: 'code asc',
     supportsDelete: false,
     lazyCreateOnFirstInput: true,
@@ -147,16 +191,39 @@ export const notificationRulesListConfig: ListPageConfig & { dataSource: DataSou
       messageTemplate: 'Open {{recordLabel}} to view the note.',
     },
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'name',
+  },
+  module: 'Administration',
+  menu: {
+    module: 'Administration',
+    group: 'Collaboration',
+    icon: 'ts-icon ts-icon-bell',
+    moduleIcon: 'ts-icon ts-icon-administration-module',
+    route: '/notification-rules',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(notificationRulesHeaderConfig, [
-      'code',
-      'name',
-      'eventKey',
-      'enabled',
-      'channel',
-      'recipientMode',
+      {
+        field: 'code',
+      },
+      {
+        field: 'name',
+      },
+      {
+        field: 'eventKey',
+      },
+      {
+        field: 'enabled',
+      },
+      {
+        field: 'channel',
+      },
+      {
+        field: 'recipientMode',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: notificationRulesFactBoxConfig,
 };

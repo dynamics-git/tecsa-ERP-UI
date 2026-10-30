@@ -42,8 +42,8 @@ export class DocumentRecordService {
 
     keyCandidates.push(...this.contractService.getDeleteKeyCandidates(config));
 
-    if (config?.documentNoField) {
-      keyCandidates.push(config.documentNoField);
+    if (config?.headerPKProp) {
+      keyCandidates.push(config.headerPKProp);
     }
 
     for (const key of [...new Set(keyCandidates)]) {

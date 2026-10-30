@@ -1,6 +1,6 @@
 import { lineConfigDefaults } from './document-config-defaults';
 import type { DataSourceConfig } from '../models/data-source-config.model';
-import { normalizeFieldValue } from '../models/field-value';
+import { fieldDefaultValue, resolvedValueType, normalizeFieldValue } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { FormSectionConfig } from '../models/field-config.model';
 import { LineConfig, LineColumnConfig } from '../models/line-config.model';
@@ -36,7 +36,7 @@ export class DocumentConfigDataService {
       for (const field of section.fields) {
         const source = record[field.key];
         data[field.key] =
-          source === undefined ? (field.defaultValue !== undefined ? field.defaultValue : '') : source;
+          source === undefined ? (field.defaultValue !== undefined ? fieldDefaultValue(field) : '') : source;
 
         const optionsKey = this.getOptionsDataKey(field.key, field.optionsDataKey);
         data[optionsKey] = dropdownRecords[optionsKey] ?? data[optionsKey] ?? [];
@@ -56,11 +56,11 @@ export class DocumentConfigDataService {
         }
 
         if (field.defaultValue !== undefined) {
-          data[field.key] = field.defaultValue;
+          data[field.key] = fieldDefaultValue(field);
           continue;
         }
 
-        data[field.key] = field.valueType === 'number' ? 0 : '';
+        data[field.key] = resolvedValueType(field) === 'number' ? 0 : '';
       }
     }
 
@@ -115,18 +115,18 @@ export class DocumentConfigDataService {
         continue;
       }
 
-      if (column.defaultValue !== undefined) { row[field] = column.defaultValue; continue; }
+      if (column.defaultValue !== undefined) { row[field] = fieldDefaultValue(column); continue; }
       if (field === typeField) {
         row[field] = defaultType;
         continue;
       }
 
-      if (column.valueType === 'number') {
+      if (resolvedValueType(column) === 'number') {
         row[field] = 0;
         continue;
       }
 
-      if (column.valueType === 'boolean') {
+      if (resolvedValueType(column) === 'boolean') {
         row[field] = false;
         continue;
       }
@@ -155,16 +155,15 @@ export class DocumentConfigDataService {
     if ((lineConfig.dataSource.requiredCreateFields ?? []).some(field => !this.hasValue(row[field]))) return null;
     const payload: Record<string, unknown> = {};
     for (const field of fields) {
-      if (field === lineConfig.lineKeyField) continue; // Assigned by the backend.
       const column = lineConfig.columns.find(c => (c.field ?? c.id) === field);
       // An untouched empty lookup is omitted so existing API defaults can apply.
       // Explicit clears use the same resolved empty-value semantics as updates.
       if (edited && column?.lookup && !edited.has(field) && !this.hasValue(row[field])) continue;
-      payload[field] = normalizeFieldValue(row[field], column?.valueType, column?.defaultValue);
+      payload[field] = normalizeFieldValue(row[field], resolvedValueType(column ?? {}), column?.defaultValue);
     }
 
-    const parentKeyField = lineConfig.dataSource.parentKeyField?.trim();
-    if (parentKeyField && fields.includes(parentKeyField) && !this.hasValue(payload[parentKeyField])) {
+    const lineFKProp = lineConfig.dataSource.lineFKProp?.trim();
+    if (lineFKProp && fields.includes(lineFKProp) && !this.hasValue(payload[lineFKProp])) {
       return null;
     }
 
@@ -203,12 +202,12 @@ export class DocumentConfigDataService {
     const payload: Record<string, unknown> = {};
 
     for (const field of new Set(fields)) {
-      if (!field.trim() || !allowed.has(field) || blocked.has(field) || field === lineConfig.lineKeyField) {
+      if (!field.trim() || !allowed.has(field) || blocked.has(field)) {
         continue;
       }
 
       const column = lineConfig.columns.find(c => (c.field ?? c.id) === field);
-      payload[field] = normalizeFieldValue(row[field], column?.valueType, column?.defaultValue);
+      payload[field] = normalizeFieldValue(row[field], resolvedValueType(column ?? {}), column?.defaultValue);
     }
 
     return payload;
@@ -238,8 +237,8 @@ export class DocumentConfigDataService {
       return this.lineMasters.resolveType(value, registry);
     }
 
-    if (column.valueType === 'number') {
-      return normalizeFieldValue(value, column.valueType);
+    if (resolvedValueType(column) === 'number') {
+      return normalizeFieldValue(value, resolvedValueType(column));
     }
 
     return value ?? '';
@@ -282,13 +281,13 @@ export class DocumentConfigDataService {
     headerData: Record<string, unknown>,
     lineConfig: LineConfig,
   ): void {
-    const parentKeyField = lineConfig.dataSource.parentKeyField;
-    const documentNoField = lineConfig.dataSource.documentNoField;
+    const lineFKProp = lineConfig.dataSource.lineFKProp;
+    const headerPKProp = lineConfig.dataSource.headerPKProp;
 
-    if (parentKeyField && !this.hasValue(row[parentKeyField])) {
-      row[parentKeyField] = documentNoField
-        ? headerData[documentNoField] ?? headerData[parentKeyField]
-        : headerData[parentKeyField];
+    if (lineFKProp && !this.hasValue(row[lineFKProp])) {
+      row[lineFKProp] = headerPKProp
+        ? headerData[headerPKProp] ?? headerData[lineFKProp]
+        : headerData[lineFKProp];
     }
 
     for (const [field, headerField] of Object.entries(lineConfig.dataSource.parentFieldMap ?? {})) {

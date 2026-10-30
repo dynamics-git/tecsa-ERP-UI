@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
-import { RunModalConfigModule, RunModalConfigResolver } from './run-modal-config.token';
+import { PageModule, RunModalConfigResolver } from './run-modal-config.token';
 import { RunModalPageDefinitionResolverService } from './run-modal-page-definition-resolver.service';
 
 describe('RunModal page-definition resolver', () => {
@@ -8,7 +8,7 @@ describe('RunModal page-definition resolver', () => {
     new RunModalPageDefinitionResolverService(resolver, new RuntimeValueMapperService());
 
   it('normalizes and resolves a registered page while preserving the module instance', async () => {
-    const module: RunModalConfigModule = { purchaseOrderListConfig: { pageId: 'Purchase-Order' } };
+    const module: PageModule = { purchaseOrderListConfig: { pageId: 'Purchase-Order' } };
     const load = vi.fn(async () => module);
     const value = await create(load).resolve('  PURCHASE-ORDER  ');
     expect(load).toHaveBeenCalledOnce();

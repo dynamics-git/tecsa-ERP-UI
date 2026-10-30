@@ -1,17 +1,19 @@
-import { PageType, RunModalConfigModule } from '../../platform/public-api';
-import { runModalPageModules } from '../../features/run-modal-page-modules';
+import { Type } from '@angular/core';
+import { Routes } from '@angular/router';
+import { PageType, PageModule } from '../../platform/public-api';
+import { featurePageModules } from '../../features/feature-pages.generated';
 
 type PageOpenTarget = 'list' | 'entry';
 type PageTypeName = PageType;
 
 type RegisteredPageConfig = {
-  moduleRef: RunModalConfigModule;
+  moduleRef: PageModule;
   pageType?: PageTypeName;
 };
 
-const registeredPages = buildPageRegistry(runModalPageModules);
+const registeredPages = buildPageRegistry(featurePageModules);
 
-export function buildPageRegistry(modules: RunModalConfigModule[]): Map<string, RegisteredPageConfig> {
+export function buildPageRegistry(modules: PageModule[]): Map<string, RegisteredPageConfig> {
   const registry = new Map<string, RegisteredPageConfig>();
 
   for (const moduleRef of modules) {
@@ -71,12 +73,12 @@ function normalizePageType(value: unknown): PageTypeName | undefined {
   return undefined;
 }
 
-export function resolveRunModalConfigModule(pageId: string): RunModalConfigModule | undefined {
-  return registeredPages.get(normalizePageId(pageId))?.moduleRef as RunModalConfigModule | undefined;
+export function resolvePageModule(pageId: string): PageModule | undefined {
+  return registeredPages.get(normalizePageId(pageId))?.moduleRef as PageModule | undefined;
 }
 
-export async function loadRunModalConfigModule(pageId: string): Promise<RunModalConfigModule | undefined> {
-  return resolveRunModalConfigModule(pageId);
+export async function loadPageModule(pageId: string): Promise<PageModule | undefined> {
+  return resolvePageModule(pageId);
 }
 
 export function resolvePageType(pageId: string): PageTypeName | undefined {
@@ -97,10 +99,21 @@ export function resolveRunModalOpenTarget(pageId: string): PageOpenTarget {
   return 'list';
 }
 
-export function getRegisteredRunModalPageIds(): string[] {
+export function getRegisteredPageIds(): string[] {
   return [...registeredPages.keys()].sort();
 }
 
 export function isPageIdRegistered(pageId: string): boolean {
   return registeredPages.has(normalizePageId(pageId));
+}
+
+/** Menus and direct URLs use the same discovered page declaration as RunModal. */
+export function getFeaturePageRoutes(): Routes {
+  return [...registeredPages.entries()].flatMap(([pageId, {moduleRef}]) => {
+    const config = Object.values(moduleRef).find(value => isRecord(value) && value['pageId'] === pageId) as {menu?: {route?: string}} | undefined;
+    const route = config?.menu?.route;
+    if (!route) return [];
+    const component = Object.entries(moduleRef).find(([name, value]) => name.endsWith('Page') && typeof value === 'function')![1] as Type<unknown>;
+    return [{path: route.replace(/^\//, ''), component, data: {pageId}}];
+  });
 }

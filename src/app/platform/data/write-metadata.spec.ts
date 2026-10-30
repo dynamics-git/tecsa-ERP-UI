@@ -38,7 +38,7 @@ describe('Write metadata without duplicate page block lists',()=>{
     const pr=lineConfigDefaults({...purchaseRequisitionLineConfig,dataSource:source});
     const row={lineType:'item',itemId:123,quantity:'2',estimatedUnitCost:'5',qtyPerUnitOfMeasure:'10',estimatedAmount:'10',convertedQuantity:'0',remainingQuantity:'2'};
     expect(service.buildLineUpdatePayload(row,Object.keys(row),pr)).toEqual({lineType:'item',itemId:123,quantity:'2',estimatedUnitCost:'5'});
-    const draft=service.createEmptyLineRow(pr,{}, {defaultType:'item',emptyType:' ',byType:{}},{});
+    const draft=service.createEmptyLineRow(pr,{number:'PR-TEST',documentType:'purchase_requisition'}, {defaultType:'item',emptyType:' ',byType:{}},{});
     expect(pr.dataSource.meaningfulFields!.some(key=>!!draft[key])).toBe(false);
     expect(pr.dataSource.meaningfulFields).toContain('description');
     expect(pr.dataSource.meaningfulFields).not.toContain('estimatedAmount');
@@ -46,7 +46,7 @@ describe('Write metadata without duplicate page block lists',()=>{
     // Description-first drafts must not wait for an Item/G/L selection.
     draft['description']='Draft before selecting a master';
     const payload=service.buildLineCreatePayload(draft,pr,['description']);
-    expect(payload).toMatchObject({description:'Draft before selecting a master',lineType:'item',quantity:'1'});
+    expect(payload).toMatchObject({description:'Draft before selecting a master',lineType:'item',quantity:'1',documentNumber:'PR-TEST',documentType:'purchase_requisition'});
     expect(payload).not.toHaveProperty('itemId');
     expect(payload).not.toHaveProperty('estimatedAmount');
     draft['itemId']=123;

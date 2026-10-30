@@ -3,16 +3,53 @@
 Use the existing shared ListPage runtime. Do not create a feature-owned CRUD
 engine, a backend page registry, or another form renderer.
 
+## Shared names
+
+Use RestService for API calls and RunModal for opening a page in a modal.
+Reusable DOM interactions belong in shared/directives/. ColumnReorder owns
+header dragging, indicators and edge scrolling; ColumnResize owns pointer and
+keyboard resizing. ListGrid binds these directives and retains column state and
+preference persistence. Do not put new drag/pointer lifecycle handlers in ListGrid.
+page-registry.ts resolves discovered pages by pageId for both routes and RunModal;
+new pages do not need manual registry entries. PageModule describes the discovered
+exports, and PageCommandEvent carries page commands.
+
+Page declarations use ListPageConfig, HeaderConfig, LineConfig and FactBoxConfig.
+The Angular application wires the existing REST adapter with dataRestProvider;
+feature pages do not configure providers or implement ordinary CRUD.
+
+Code identifiers do not use an ERP prefix. Product names, deployment environment
+variables, existing storage namespaces and historical migration references keep
+their existing spelling.
+
 ## One feature-page pattern
 
-All 41 registered pages have the same file responsibilities, including related
+All feature pages have the same file responsibilities, including related
 worksheets opened only inside a popup:
 
-- Page config: the complete declaration, including pageType, data source, list
-  columns, card/line fields, FactBox, lookups, menu and actions.
+- Page config: header form, list page and optional document lines, in that order.
+  Declare data sources, columns, fields, lookups, menu and actions here.
+- FactBox config: the page's FactBox declaration, imported by its list config.
 - Page TS: the thin Angular component, configuration bindings and genuine
   page-specific business handlers. No ordinary REST/CRUD implementation.
 - Page HTML: pass those declarations to the existing shared ListPage renderer.
+
+Use Users and Purchase Requisition as the reference for every configured page:
+
+- Keep each field and column object expanded, with one property per line.
+- List declarations start with pageId, pageType, title, optional autoSave,
+  dataSource, identity and module/menu; presentation and actions follow, then factBox.
+- Declare record identity once as dataSource.keyField. headerPKProp and lineFKProp
+  describe the business relationship independently of each record's key.
+- Use explicit object entries in listColumns(headerConfig, [...]). Reuse header
+  labels and types; keep overrides only for actual list presentation differences.
+- Use type for ordinary field semantics (code, decimal, date, boolean, etc.) and
+  lookup/dropdown for those editors. Use valueType only when the editor needs
+  different value semantics, such as a lookup whose selected value is a guid.
+- Related worksheets share one local data source between list and line configs.
+  Keep their parent navigation and existing save/operation settings intact.
+- Keep feature TS limited to bindings and existing business-command hooks. Do not
+  add new placeholder handlers or repeat CRUD, validation or query behavior there.
 
 Routing and RunModal instantiate that same feature component. Related worksheet
 components are actively used by the popup host; they are not empty scaffolding.
@@ -53,8 +90,9 @@ numbering-range lines and remains a document.
 
 ## Registration, permissions and presentation
 
-Register each routed master module once in features/run-modal-page-modules.ts.
-The module exports its feature component and re-exports its page configurations. One registered module declares one page.
+The page-discovery script finds feature folders and generates the ignored page
+imports. Do not maintain a manual import list. The module exports its feature
+component and re-exports its page configurations. One discovered module declares one page.
 Menu placement belongs to the page definition and its owning business module.
 
 The backend discovers effective permissions from its server entity catalogue.
@@ -71,3 +109,24 @@ or disable it rather than duplicating every form field.
 
 Use the foundation public API from feature code. Run local UI tests, a build,
 import-boundary checks and token checks for changes to this shared foundation.
+
+## Developer field changes
+
+Use `ListPage.validate(field, value)` and `ListPage.validateLine(row, field, value)`
+for programmatic edits. These call the existing editors, so type conversion,
+validation, dependent fields, dirty tracking and the configured save policy are
+the same as typing. Awaiting the result confirms field validation; it does not
+promise that an asynchronous autosave has completed. Manual-save pages still
+wait for Save. Direct object assignment is not the record editing API.
+
+Reuse `validation.custom`, `customAsync` and `afterValidate`. Their context
+contains field, proposed value, previous value, proposed record, previous record
+and source (`user` or `code`). Callbacks are pure: return other same-record
+values from `afterValidate`; do not start saves from validation callbacks.
+
+Required header-to-line business updates run through backend model field rules
+inside the operation transaction. They cover all matching database rows, not
+only loaded UI rows. A successful response may include `meta.changedResources`;
+core invalidates those reads and refreshes clean loaded lines after the header
+save. Unsaved values are retained. `parentFieldMap` remains relationship binding,
+not an update-all-lines instruction. No `copyToLines` property is supported.

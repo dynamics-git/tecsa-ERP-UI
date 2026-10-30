@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { generalLedgerSetupListConfig, generalLedgerSetupHeaderConfig } from './general-ledger-setup.config';
+import {
+  generalLedgerSetupListConfig,
+  generalLedgerSetupHeaderConfig,
+} from './general-ledger-setup.config';
 export * from './general-ledger-setup.config';
 
 @Component({

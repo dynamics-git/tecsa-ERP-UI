@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { accountingPeriodsFactBoxConfig } from './accounting-periods.factbox.config';
+
+// Header form.
 export const accountingPeriodsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Accounting Periods',
   toolbarButtons: [],
@@ -11,7 +19,6 @@ export const accountingPeriodsHeaderConfig: HeaderConfig = {
           key: 'startingDate',
           label: 'Starting Date',
           type: 'date',
-          valueType: 'date',
           required: true,
         },
         {
@@ -34,38 +41,59 @@ export const accountingPeriodsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const accountingPeriodsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const accountingPeriodsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'accounting-periods',
   pageType: 'card',
-  autoSave: true,
   title: 'Accounting Periods',
-  module: 'Finance',
-  identity: {
-    primaryField: 'startingDate',
-    secondaryField: 'name',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'General Ledger',
-    icon: 'ts-icon ts-icon-accounting-periods',
-    route: '/accounting-periods',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/accountingPeriods',
     keyField: 'systemId',
     defaultSort: 'startingDate asc',
   },
+  identity: {
+    primaryField: 'startingDate',
+    secondaryField: 'name',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'General Ledger',
+    icon: 'ts-icon ts-icon-accounting-periods',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/accounting-periods',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(accountingPeriodsHeaderConfig, [
-      'startingDate',
-      'name',
-      { field: 'newFiscalYear', width: '140px' },
-      { field: 'closed', label: 'Closed', type: 'boolean', width: '140px' },
-      { field: 'dateLocked', label: 'Date Locked', type: 'boolean', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'startingDate',
+      },
+      {
+        field: 'name',
+      },
+      {
+        field: 'newFiscalYear',
+        width: '140px',
+      },
+      {
+        field: 'closed',
+        label: 'Closed',
+        type: 'boolean',
+        width: '140px',
+      },
+      {
+        field: 'dateLocked',
+        label: 'Date Locked',
+        type: 'boolean',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: accountingPeriodsFactBoxConfig,
 };

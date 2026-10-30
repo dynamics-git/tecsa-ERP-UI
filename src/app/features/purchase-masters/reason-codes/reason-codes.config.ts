@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { reasonCodesFactBoxConfig } from './reason-codes.factbox.config';
+
+// Header form.
 export const reasonCodesHeaderConfig: HeaderConfig = {
   dialogTitle: 'Reason Codes',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const reasonCodesHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 10,
@@ -37,36 +44,47 @@ export const reasonCodesHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const reasonCodesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const reasonCodesListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'reason-codes',
   pageType: 'card',
-  autoSave: true,
   title: 'Reason Codes',
-  module: 'Administration',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Administration',
-    group: 'Codes',
-    icon: 'ts-icon ts-icon-reason-codes',
-    route: '/reason-codes',
-    moduleIcon: 'ts-icon ts-icon-administration-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/reasonCodes',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Administration',
+  menu: {
+    module: 'Administration',
+    group: 'Codes',
+    icon: 'ts-icon ts-icon-reason-codes',
+    moduleIcon: 'ts-icon ts-icon-administration-module',
+    route: '/reason-codes',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(reasonCodesHeaderConfig, [
-      'code',
-      'description',
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: reasonCodesFactBoxConfig,
 };

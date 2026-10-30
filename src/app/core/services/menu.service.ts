@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { MenuItem, MenuSearchItem } from '../models/menu-item.model';
 import { PermissionService } from './permission.service';
-import { isPageIdRegistered } from './run-modal-config-registry';
-import { runModalPageModules } from '../../features/run-modal-page-modules';
+import { isPageIdRegistered } from './page-registry';
+import { featurePageModules } from '../../features/feature-pages.generated';
 import { ListPageConfig } from '../../platform/models/page-config.model';
 
 @Injectable({
@@ -13,7 +13,7 @@ export class MenuService {
 
   private buildConfiguredMenu(): MenuItem[] {
     const modules = new Map<string, MenuItem>();
-    for (const bucket of runModalPageModules) {
+    for (const bucket of featurePageModules) {
       for (const value of Object.values(bucket)) {
         const page = value as ListPageConfig | undefined;
         if (!page?.menu || !page.pageId) continue;

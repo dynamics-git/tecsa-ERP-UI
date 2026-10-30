@@ -1,4 +1,10 @@
-import { DataSourceConfig, HeaderConfig, ListPageConfig, LineConfig } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  LineConfig,
+  ListPageConfig,
+} from '../../../platform/public-api';
+import { glAccountDefaultDimensionsFactBoxConfig } from './gl-account-default-dimensions.factbox.config';
 const glAccountDefaultDimensionsDataSource: DataSourceConfig = {
   endpoint: '/glAccounts',
   keyField: 'systemId',
@@ -10,30 +16,7 @@ const glAccountDefaultDimensionsDataSource: DataSourceConfig = {
   pageSize: 20,
 };
 
-export const glAccountDefaultDimensionsListConfig: ListPageConfig & {
-  dataSource: DataSourceConfig;
-} = {
-  pageId: 'gl-account-default-dimensions',
-  pageType: 'worksheet',
-  autoSave: true,
-  title: 'G/L Account Dimensions',
-  module: 'Finance',
-  permissionPageId: 'gl-accounts-lines',
-  identity: {
-    primaryField: 'number',
-    secondaryField: 'name',
-  },
-  dataSource: glAccountDefaultDimensionsDataSource,
-  tools: {
-    search: false,
-    filter: false,
-    columns: false,
-    export: false,
-  },
-  factBox: {
-    enabled: true,
-  },
-};
+// Header form.
 export const glAccountDefaultDimensionsHeaderConfig: HeaderConfig = {
   dialogTitle: 'G/L Account Dimensions',
   toolbarButtons: [
@@ -56,18 +39,44 @@ export const glAccountDefaultDimensionsHeaderConfig: HeaderConfig = {
   ],
   sections: [],
 };
-export const glAccountDefaultDimensionsLineConfig: LineConfig = {
+
+// List page.
+export const glAccountDefaultDimensionsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
+  pageId: 'gl-account-default-dimensions',
+  pageType: 'worksheet',
+  title: 'G/L Account Dimensions',
+  autoSave: true,
+  dataSource: glAccountDefaultDimensionsDataSource,
+  identity: {
+    primaryField: 'number',
+    secondaryField: 'name',
+  },
+  module: 'Finance',
   permissionPageId: 'gl-accounts-lines',
+  tools: {
+    search: false,
+    filter: false,
+    columns: false,
+    export: false,
+  },
+  factBox: glAccountDefaultDimensionsFactBoxConfig,
+};
+
+// Document lines.
+export const glAccountDefaultDimensionsLineConfig: LineConfig = {
   placement: {
     mode: 'end',
   },
-  lineKeyField: 'systemId',
   dataSource: glAccountDefaultDimensionsDataSource,
+  permissionPageId: 'gl-accounts-lines',
   toolbarButtons: [],
   columns: [
     {
       id: 'dimensionId',
       label: 'Dimension',
+      type: 'lookup',
       valueType: 'guid',
       required: true,
       readonlyAfterCreate: true,
@@ -78,11 +87,11 @@ export const glAccountDefaultDimensionsLineConfig: LineConfig = {
         searchFields: ['code', 'name'],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
       id: 'dimensionValueId',
       label: 'Dimension Value',
+      type: 'lookup',
       valueType: 'guid',
       defaultValue: null,
       lookup: {
@@ -100,30 +109,28 @@ export const glAccountDefaultDimensionsLineConfig: LineConfig = {
         ],
       },
       displayFormat: '[code] — [name]',
-      cellType: 'dropdown',
     },
     {
-      cellType: 'select',
       id: 'valuePosting',
       label: 'Value Posting',
-      valueType: 'text',
+      type: 'dropdown',
       defaultValue: 'optional',
       options: [
         {
-          value: 'optional',
           label: 'Optional',
+          value: 'optional',
         },
         {
-          value: 'code_mandatory',
           label: 'Code mandatory',
+          value: 'code_mandatory',
         },
         {
-          value: 'same_code',
           label: 'Same code',
+          value: 'same_code',
         },
         {
-          value: 'no_code',
           label: 'No code',
+          value: 'no_code',
         },
       ],
     },

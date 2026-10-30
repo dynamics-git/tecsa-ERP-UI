@@ -200,6 +200,7 @@ describe('TecSA Laravel company-aware login', () => {
     expect(entries.find((entry) => entry['pageId'] === 'items-lines')?.['canDelete']).toBe(false);
     expect(entries.find((entry) => entry['pageId'] === 'item-units-of-measure')?.['canUpdate']).toBe(false);
     expect(entries.find((entry) => entry['pageId'] === 'no-series')?.['canDelete']).toBe(true);
+    expect(entries.find((entry) => entry['pageId'] === 'no-series')?.['apiPath']).toBe('/numberSeries');
     expect(session.SuperAdmin).toBe(true);
   });
 });

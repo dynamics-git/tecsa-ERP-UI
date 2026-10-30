@@ -125,7 +125,7 @@ export class DocumentSaveService implements DocumentSavePort {
       return this.dataSource.updateRecord(lineDataSource, rowId, payload, row);
     }
 
-    if (lineDataSource.supportsCreate === false || !this.shouldCreateLine(payload, lineDataSource.parentKeyField)) {
+    if (lineDataSource.supportsCreate === false || !this.shouldCreateLine(payload, lineDataSource.lineFKProp)) {
       return null;
     }
 
@@ -160,18 +160,18 @@ export class DocumentSaveService implements DocumentSavePort {
 
     delete payload['Number'];
 
-    const parentKeyField = lineDataSource.parentKeyField?.trim();
-    if (parentKeyField) {
+    const lineFKProp = lineDataSource.lineFKProp?.trim();
+    if (lineFKProp) {
       const parentValue = this.firstPresentValue([
-        payload[parentKeyField],
-        lineDataSource.documentNoField ? headerData[lineDataSource.documentNoField] : undefined,
-        headerData[parentKeyField],
+        payload[lineFKProp],
+        lineDataSource.headerPKProp ? headerData[lineDataSource.headerPKProp] : undefined,
+        headerData[lineFKProp],
         headerData['Number'],
         headerData['No']
       ]);
 
       if (parentValue !== null && parentValue !== undefined && String(parentValue).trim().length > 0) {
-        payload[parentKeyField] = parentValue;
+        payload[lineFKProp] = parentValue;
       }
     }
 
@@ -197,8 +197,8 @@ export class DocumentSaveService implements DocumentSavePort {
     }
   }
 
-  private shouldCreateLine(payload: Record<string, unknown>, parentKeyField?: string): boolean {
-    const parentKey = parentKeyField?.trim();
+  private shouldCreateLine(payload: Record<string, unknown>, lineFKProp?: string): boolean {
+    const parentKey = lineFKProp?.trim();
 
     for (const [key, value] of Object.entries(payload)) {
       if (parentKey && key === parentKey) {

@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { currenciesFactBoxConfig } from './currencies.factbox.config';
+
+// Header form.
 export const currenciesHeaderConfig: HeaderConfig = {
   dialogTitle: 'Currencies',
   toolbarButtons: [
@@ -21,8 +29,7 @@ export const currenciesHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 10,
@@ -40,8 +47,7 @@ export const currenciesHeaderConfig: HeaderConfig = {
         {
           key: 'isoCode',
           label: 'Iso Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           validation: {
             maxLength: 3,
           },
@@ -57,8 +63,7 @@ export const currenciesHeaderConfig: HeaderConfig = {
         {
           key: 'amountRoundingPrecision',
           label: 'Amount Rounding Precision',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0.01',
           validation: {
             precision: 20,
@@ -69,8 +74,7 @@ export const currenciesHeaderConfig: HeaderConfig = {
         {
           key: 'unitAmountRoundingPrecision',
           label: 'Unit Amount Rounding Precision',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0.00001',
           validation: {
             precision: 20,
@@ -81,8 +85,7 @@ export const currenciesHeaderConfig: HeaderConfig = {
         {
           key: 'invoiceRoundingPrecision',
           label: 'Invoice Rounding Precision',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0.01',
           validation: {
             precision: 20,
@@ -93,8 +96,7 @@ export const currenciesHeaderConfig: HeaderConfig = {
         {
           key: 'applicationRoundingPrecision',
           label: 'Application Rounding Precision',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0.01',
           validation: {
             precision: 20,
@@ -175,40 +177,63 @@ export const currenciesHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const currenciesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const currenciesListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'currencies',
   pageType: 'card',
-  autoSave: true,
   title: 'Currencies',
-  module: 'Finance',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Currencies & Payments',
-    icon: 'ts-icon ts-icon-currencies',
-    route: '/currencies',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/currencies',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Currencies & Payments',
+    icon: 'ts-icon ts-icon-currencies',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/currencies',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(currenciesHeaderConfig, [
-      'code',
-      'description',
-      { field: 'isoCode', width: '140px' },
-      { field: 'symbol', width: '140px' },
-      { field: 'amountRoundingPrecision', width: '140px' },
-      { field: 'unitAmountRoundingPrecision', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'isoCode',
+        width: '140px',
+      },
+      {
+        field: 'symbol',
+        width: '140px',
+      },
+      {
+        field: 'amountRoundingPrecision',
+        width: '140px',
+      },
+      {
+        field: 'unitAmountRoundingPrecision',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: currenciesFactBoxConfig,
 };

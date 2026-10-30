@@ -1,5 +1,15 @@
 /** Shared value semantics. Invalid input is preserved for validation, never silently zeroed. */
-export type FieldValueType = 'text' | 'code' | 'number' | 'integer' | 'decimal' | 'boolean' | 'date' | 'datetime' | 'time' | 'guid' | 'email' | 'url' | 'phone';
+const FIELD_VALUE_TYPES = ['text', 'code', 'number', 'integer', 'decimal', 'boolean', 'date', 'datetime', 'time', 'guid', 'email', 'url', 'phone'] as const;
+export type FieldValueType = (typeof FIELD_VALUE_TYPES)[number];
+/** Evaluate dynamic defaults for each new record, rather than at module load time. */
+export function fieldDefaultValue(field: {defaultValue?: unknown}): unknown {
+  return typeof field.defaultValue === 'function' ? field.defaultValue() : field.defaultValue;
+}
+/** Semantic types used by both form fields and line columns. */
+export function resolvedValueType(field: {type?: string; valueType?: FieldValueType}): FieldValueType | undefined {
+  if (field.valueType) return field.valueType;
+  return FIELD_VALUE_TYPES.some(type => type === field.type) ? field.type as FieldValueType : undefined;
+}
 export function normalizeFieldValue(value: unknown, type?: string, defaultValue?: unknown): unknown {
   // A resolved null default represents an empty nullable editor; preserve all other inputs.
   if (value === '' && defaultValue === null) return null;
@@ -70,7 +80,7 @@ export function compareDecimalValues(left: string, right: string): -1 | 0 | 1 | 
 /** Native editors share one type mapping in forms and editable grids. */
 export function fieldInputType(type?: string): string {
   if (type === 'datetime') return 'datetime-local';
-  if (['date', 'time', 'email', 'url'].includes(type ?? '')) return type!;
+  if (['date', 'time', 'email', 'url', 'password'].includes(type ?? '')) return type!;
   if (type === 'phone') return 'tel';
   if (['number', 'integer', 'currency'].includes(type ?? '')) return 'number';
   // Decimal strings remain text to preserve arbitrary precision through the DOM.

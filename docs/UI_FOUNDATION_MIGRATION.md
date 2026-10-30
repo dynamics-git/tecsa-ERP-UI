@@ -103,7 +103,7 @@ Paths are relative to the repository root. This includes the old public API repl
 | `src/app/shared/erp-core/models/line-calculation-config.model.ts` | `src/app/platform/models/line-calculation-config.model.ts` |
 | `src/app/shared/erp-core/models/line-config.model.ts` | `src/app/platform/models/line-config.model.ts` |
 | `src/app/shared/erp-core/models/list-filter-config.model.ts` | `src/app/platform/models/list-filter-config.model.ts` |
-| `src/app/shared/erp-core/models/list-page-factbox-config.model.ts` | `src/app/platform/models/list-fact-box-config.model.ts` |
+| `src/app/shared/erp-core/models/list-page-factbox-config.model.ts` | `src/app/platform/models/fact-box-config.model.ts` |
 | `src/app/shared/erp-core/models/page-config.model.ts` | `src/app/platform/models/page-config.model.ts` |
 | `src/app/shared/erp-core/models/popup-config.model.ts` | `src/app/platform/models/popup-config.model.ts` |
 | `src/app/shared/erp-core/models/popup-host-data.model.ts` | `src/app/platform/models/run-modal-host-data.model.ts` |

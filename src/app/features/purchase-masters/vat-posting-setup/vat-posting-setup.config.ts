@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { vatPostingSetupFactBoxConfig } from './vat-posting-setup.factbox.config';
+
+// Header form.
 export const vatPostingSetupHeaderConfig: HeaderConfig = {
   dialogTitle: 'VAT Posting Setup',
   toolbarButtons: [],
@@ -10,33 +18,31 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
         {
           key: 'vatCalculationType',
           label: 'Vat Calculation Type',
-          type: 'select',
-          valueType: 'text',
+          type: 'dropdown',
           defaultValue: 'normal',
           options: [
             {
-              value: 'normal',
               label: 'Normal',
+              value: 'normal',
             },
             {
-              value: 'reverse_charge',
               label: 'Reverse charge',
+              value: 'reverse_charge',
             },
             {
-              value: 'full',
               label: 'Full',
+              value: 'full',
             },
             {
-              value: 'sales_tax',
               label: 'Sales tax',
+              value: 'sales_tax',
             },
           ],
         },
         {
           key: 'vatPercent',
           label: 'Vat Percent',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0',
           validation: {
             min: 0,
@@ -106,8 +112,7 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
         {
           key: 'nonDeductibleVatPercent',
           label: 'Non Deductible VAT Percent',
-          type: 'number',
-          valueType: 'decimal',
+          type: 'decimal',
           defaultValue: '0',
           validation: {
             min: 0,
@@ -219,40 +224,64 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const vatPostingSetupListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const vatPostingSetupListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'vat-posting-setup',
   pageType: 'card',
-  autoSave: true,
   title: 'VAT Posting Setup',
-  module: 'Finance',
-  identity: {
-    primaryField: '__display_vatBusinessPostingGroupId',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Tax Setup',
-    icon: 'ts-icon ts-icon-vat-posting-setup',
-    route: '/vat-posting-setup',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/vatPostingSetup',
     keyField: 'systemId',
     defaultSort: 'vatBusinessPostingGroupId asc',
   },
+  identity: {
+    primaryField: '__display_vatBusinessPostingGroupId',
+    secondaryField: 'description',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Tax Setup',
+    icon: 'ts-icon ts-icon-vat-posting-setup',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/vat-posting-setup',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(vatPostingSetupHeaderConfig, [
-      'vatBusinessPostingGroupId',
-      { field: 'vatProductPostingGroupId', width: '140px' },
-      { field: 'vatCalculationType', width: '140px' },
-      { field: 'vatPercent', width: '140px' },
-      { field: 'nonDeductibleVatPercent', width: '140px' },
-      { field: 'purchaseVatAccountId', width: '140px' },
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'vatBusinessPostingGroupId',
+      },
+      {
+        field: 'vatProductPostingGroupId',
+        width: '140px',
+      },
+      {
+        field: 'vatCalculationType',
+        width: '140px',
+      },
+      {
+        field: 'vatPercent',
+        width: '140px',
+      },
+      {
+        field: 'nonDeductibleVatPercent',
+        width: '140px',
+      },
+      {
+        field: 'purchaseVatAccountId',
+        width: '140px',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: vatPostingSetupFactBoxConfig,
 };

@@ -1,4 +1,12 @@
-import { HeaderConfig, DataSourceConfig, ListPageConfig, listColumns } from '../../../platform/public-api';
+import {
+  DataSourceConfig,
+  HeaderConfig,
+  ListPageConfig,
+  listColumns,
+} from '../../../platform/public-api';
+import { vatBusinessPostingGroupsFactBoxConfig } from './vat-business-posting-groups.factbox.config';
+
+// Header form.
 export const vatBusinessPostingGroupsHeaderConfig: HeaderConfig = {
   dialogTitle: 'VAT Business Posting Groups',
   toolbarButtons: [],
@@ -10,8 +18,7 @@ export const vatBusinessPostingGroupsHeaderConfig: HeaderConfig = {
         {
           key: 'code',
           label: 'Code',
-          type: 'text',
-          valueType: 'code',
+          type: 'code',
           required: true,
           validation: {
             maxLength: 20,
@@ -37,36 +44,47 @@ export const vatBusinessPostingGroupsHeaderConfig: HeaderConfig = {
   ],
 };
 
-export const vatBusinessPostingGroupsListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
+// List page.
+export const vatBusinessPostingGroupsListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'vat-business-posting-groups',
   pageType: 'card',
-  autoSave: true,
   title: 'VAT Business Posting Groups',
-  module: 'Finance',
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
-  menu: {
-    module: 'Finance',
-    group: 'Tax Setup',
-    icon: 'ts-icon ts-icon-vat-business-posting-groups',
-    route: '/vat-business-posting-groups',
-    moduleIcon: 'ts-icon ts-icon-finance-module',
-  },
+  autoSave: true,
   dataSource: {
     endpoint: '/vatBusinessPostingGroups',
     keyField: 'systemId',
     defaultSort: 'code asc',
   },
+  identity: {
+    primaryField: 'code',
+    secondaryField: 'description',
+  },
+  module: 'Finance',
+  menu: {
+    module: 'Finance',
+    group: 'Tax Setup',
+    icon: 'ts-icon ts-icon-vat-business-posting-groups',
+    moduleIcon: 'ts-icon ts-icon-finance-module',
+    route: '/vat-business-posting-groups',
+  },
   dataSurface: {
-    idField: 'systemId',
     columns: listColumns(vatBusinessPostingGroupsHeaderConfig, [
-      'code',
-      'description',
-      { field: 'isActive', width: '140px' },
-      'systemModifiedAt',
+      {
+        field: 'code',
+      },
+      {
+        field: 'description',
+      },
+      {
+        field: 'isActive',
+        width: '140px',
+      },
+      {
+        field: 'systemModifiedAt',
+      },
     ]),
   },
-  factBox: { enabled: true },
+  factBox: vatBusinessPostingGroupsFactBoxConfig,
 };

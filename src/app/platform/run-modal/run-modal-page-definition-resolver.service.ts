@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@angular/core';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 import {
   RUN_MODAL_CONFIG_RESOLVER,
-  RunModalConfigModule,
+  PageModule,
   RunModalConfigResolver,
 } from './run-modal-config.token';
 
@@ -10,7 +10,7 @@ import {
 // Missing/failed registrations must not mutate any RunModal stack state.
 export interface RunModalPageDefinition {
   pageId: string;
-  module: RunModalConfigModule;
+  module: PageModule;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -27,7 +27,7 @@ export class RunModalPageDefinitionResolverService {
       return undefined;
     }
 
-    const module = await this.loadRunModalConfigModule(normalized);
+    const module = await this.loadPageModule(normalized);
     if (!module) {
       return undefined;
     }
@@ -42,9 +42,9 @@ export class RunModalPageDefinitionResolverService {
     };
   }
 
-  private async loadRunModalConfigModule(
+  private async loadPageModule(
     pageId: string,
-  ): Promise<RunModalConfigModule | undefined> {
+  ): Promise<PageModule | undefined> {
     const normalized = pageId.trim().toLowerCase();
     if (!normalized.length) {
       return undefined;
@@ -62,7 +62,7 @@ export class RunModalPageDefinitionResolverService {
     return undefined;
   }
 
-  private moduleDeclaresPageId(module: RunModalConfigModule, normalizedPageId: string): boolean {
+  private moduleDeclaresPageId(module: PageModule, normalizedPageId: string): boolean {
     const bucket = this.valueMapper.isRecord(module) ? module : undefined;
     if (!bucket) {
       return false;

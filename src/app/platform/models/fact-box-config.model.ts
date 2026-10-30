@@ -50,7 +50,7 @@ export interface FactBoxPanelConfig {
   buttons?: CommandConfig[];
 }
 
-export interface ListFactBoxConfig {
+export interface FactBoxConfig {
   overview?: boolean;
   notes?: boolean;
   attachments?: boolean;

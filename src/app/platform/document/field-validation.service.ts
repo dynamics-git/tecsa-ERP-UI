@@ -1,7 +1,7 @@
 import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../models/field-state';
 import { Injectable } from '@angular/core';
-import { FieldConfig } from '../models/field-config.model';
-import { compareDecimalValues, isValidDateTime, normalizeFieldValue } from '../models/field-value';
+import { FieldChangeSource, FieldConfig, FieldValidationContext } from '../models/field-config.model';
+import { resolvedValueType, compareDecimalValues, isValidDateTime, normalizeFieldValue } from '../models/field-value';
 
 export interface FieldValidationResult {
   valid: boolean;
@@ -13,11 +13,12 @@ export interface FieldValidationResult {
   providedIn: 'root'
 })
 export class FieldValidationService {
-  validateField(field: FieldConfig | undefined, value: unknown, record: Record<string, unknown> = {}, custom = false, fields: FieldConfig[] = []): FieldValidationResult {
+  validateField(field: FieldConfig | undefined, value: unknown, record: Record<string, unknown> = {}, custom = false, fields: FieldConfig[] = [], source: FieldChangeSource = 'user'): FieldValidationResult {
     if (!field || fieldIsHidden(field, record)) {
       return { valid: true, errors: [] };
     }
 
+    const valueType = resolvedValueType(field);
     const errors: string[] = [];
     const text = this.toText(value);
 
@@ -26,16 +27,16 @@ export class FieldValidationService {
       return { valid: false, errors };
     }
 
-    if ((field.valueType === 'date' || field.type === 'date') && text.trim()) {
+    if ((valueType === 'date' || field.type === 'date') && text.trim()) {
       const date = new Date(text + 'T00:00:00Z');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text) {
         errors.push(`${field.label} must be a valid date (YYYY-MM-DD)`);
       }
     }
-    if (field.valueType === 'decimal' && text.trim() && !/^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
+    if (valueType === 'decimal' && text.trim() && !/^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
       errors.push(`${field.label} must be a decimal value`);
     }
-    const type = field.valueType ?? field.type;
+    const type = valueType ?? field.type;
     if (text.trim()) {
       if (type === 'datetime' && !isValidDateTime(text)) errors.push(field.label + ' must be a valid date and time');
       if (type === 'time' && !/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?$/.test(text)) errors.push(field.label + ' must be a valid time');
@@ -45,7 +46,7 @@ export class FieldValidationService {
     }
     const validation = field.validation ?? {};
 
-    if (field.valueType === 'decimal' && /^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
+    if (valueType === 'decimal' && /^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(text.trim())) {
       const [whole, fraction = ''] = text.trim().replace(/^[+-]/, '').split('.');
       const digits = whole.replace(/^0+/, '').length + fraction.length;
       if (validation.precision !== undefined && Math.max(1, digits) > validation.precision) errors.push(
@@ -64,11 +65,11 @@ export class FieldValidationService {
         validation.message ?? `${field.label} must be at most ${validation.max}`,
       );
     }
-    if (field.valueType !== 'decimal' && (field.type === 'number' || field.type === 'currency' || ['number', 'integer'].includes(field.valueType ?? ''))) {
+    if (valueType !== 'decimal' && (field.type === 'currency' || ['number', 'integer'].includes(valueType ?? ''))) {
       const numberValue = this.toNumber(value);
       if (text.trim().length && numberValue === null) errors.push(`${field.label} must be a number`);
       if (numberValue !== null) {
-        if (field.valueType === 'integer' && !Number.isSafeInteger(numberValue)) {
+        if (valueType === 'integer' && !Number.isSafeInteger(numberValue)) {
           errors.push(`${field.label} must be a safe whole number`);
         }
         if (validation.min !== undefined && numberValue < Number(validation.min)) {
@@ -113,7 +114,7 @@ export class FieldValidationService {
 
     if (custom && !errors.length && validation.custom) {
       try {
-        const message = validation.custom({value, record: Object.freeze(structuredClone({...record, [field.key]: value}))});
+        const message = validation.custom(this.context(field, value, record, source));
         if (message !== undefined) errors.push(typeof message === 'string' && message.trim() ? message : field.label + ' has an invalid custom validator result');
       } catch { errors.push(field.label + ' validation could not complete'); }
     }
@@ -121,7 +122,7 @@ export class FieldValidationService {
     const updates: Record<string, unknown> = {};
     if (custom && !errors.length && validation.afterValidate) {
       try {
-        const proposed = validation.afterValidate({value, record: Object.freeze(structuredClone({...record, [field.key]: value}))});
+        const proposed = validation.afterValidate(this.context(field, value, record, source));
         if (proposed !== undefined) {
           if (!proposed || typeof proposed !== 'object' || Array.isArray(proposed) || 'then' in proposed) throw new Error();
           const candidate = {...record,[field.key]:value,...proposed};
@@ -141,15 +142,26 @@ export class FieldValidationService {
   }
 
   /** Editor-only remote validation. Whole-record save checks never invoke callbacks. */
-  async validateEditorAsync(field: FieldConfig, value: unknown, record: Record<string,unknown>, fields: FieldConfig[]): Promise<FieldValidationResult> {
+  async validateEditorAsync(field: FieldConfig, value: unknown, record: Record<string,unknown>, fields: FieldConfig[], source: FieldChangeSource = 'user'): Promise<FieldValidationResult> {
     const snapshot = structuredClone(record);
-    const preliminary = this.validateField({...field,validation:{...field.validation,afterValidate:undefined}},value,snapshot,true,fields);
+    const preliminary = this.validateField({...field,validation:{...field.validation,afterValidate:undefined}},value,snapshot,true,fields,source);
     if (!preliminary.valid) return preliminary;
     try {
-      const message = await field.validation?.customAsync?.({value,record:Object.freeze({...snapshot,[field.key]:value})});
+      const message = await field.validation?.customAsync?.(this.context(field,value,snapshot,source));
       if (message !== undefined) return {valid:false,errors:[typeof message==='string' && message.trim() ? message : field.label+' has an invalid custom validator result']};
-      return this.validateField({...field,validation:{...field.validation,custom:undefined}},value,snapshot,true,fields);
+      return this.validateField({...field,validation:{...field.validation,custom:undefined}},value,snapshot,true,fields,source);
     } catch { return {valid:false,errors:[field.label+' validation could not complete. Try again.']}; }
+  }
+
+  private context(field: FieldConfig, value: unknown, record: Record<string, unknown>, source: FieldChangeSource): FieldValidationContext {
+    return Object.freeze({
+      field: field.key,
+      value,
+      previousValue: structuredClone(record[field.key]),
+      previousRecord: Object.freeze(structuredClone(record)),
+      record: Object.freeze(structuredClone({...record, [field.key]: value})),
+      source,
+    });
   }
 
   private toText(value: unknown): string {
