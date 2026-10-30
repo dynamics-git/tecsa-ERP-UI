@@ -24,11 +24,12 @@
   --ts-border-strong: #b8c4d3;
   --ts-border-focus: #3d6696;
 
-  /* text */
-  --ts-text: #273341;
-  --ts-text-soft: #526173;
-  --ts-muted: #657386;
-  --ts-muted-light: #738195;
+  /* Foreground hierarchy: record values/titles, labels/actions, metadata, hints/icons.
+     All four remain readable on the shared white, soft and selected surfaces. */
+  --ts-text: #20262e;
+  --ts-text-soft: #374151;
+  --ts-muted: #4b5563;
+  --ts-muted-light: #5f6b7a;
   --ts-text-inverse: #ffffff;
 
   /* semantic states */

@@ -341,6 +341,8 @@ export class DocumentHydrationOrchestratorService {
           .loadList(config, { top, skip: rows.length, useCache: true, maxAgeMs, onRequest })
           .pipe(timeout<unknown>(timeoutMs)),
       )) as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
+      // A stale total must not make us reread an empty page without advancing.
+      if (response.value.length === 0) return rows;
       rows.push(...response.value);
       const complete =
         typeof response.meta['total'] === 'number'

@@ -516,7 +516,9 @@ export class ListPage implements OnInit, OnDestroy {
     this.pendingListSyncRecord = undefined;
     this.openDocumentPopup(record, []);
     if (!persisted) { this.stopPopupLoading(); return; }
-    if (this.activeDocumentWindowConfig) { this.activeDocumentWindowConfig.lineRows = []; this.activeDocumentWindowConfig.contentReady = false; }
+    // Keep the existing blank entry rows visible while the saved document hydrates.
+    // The loading scope locks their editors until the server's rows replace them.
+    if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
     // Loading starts only when the shared read actually has to await the server.
     // Header, selected labels and child rows each retain their own request deadline.
     // Do not cut off a healthy multi-request hydration with one aggregate request timeout.

@@ -209,14 +209,10 @@
     position: relative;
     padding: 0 8px;
     border-bottom: 1px solid var(--ts-border);
-    color: var(--ts-muted);
+    color: var(--ts-text-soft);
     letter-spacing: 0;
     text-align: left;
     overflow: hidden;
-  }
-
-  th.sorted {
-    color: var(--ts-text-soft);
   }
 
   .th-sort {
@@ -538,7 +534,9 @@
 .list-statusbar { flex: 0 0 auto; min-height: 32px; padding: 4px 10px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ts-border-soft); color: var(--ts-muted); font-size: var(--ts-font-caption); }
 .workspace-layout.filters-open { grid-template-columns: minmax(0, 1fr) 320px; }
 .workspace-layout > app-list-filter-panel { grid-column: 2; grid-row: 1; min-height: 0; }
-button:disabled { cursor: default; opacity: 0.45; }
+button:disabled { cursor: default; }
+// Unsortable headings remain readable; unavailable actions still look disabled.
+button:disabled:not(.th-sort) { opacity: 0.45; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 960px) {
   .dataset-strip { flex-direction: row; align-items: center; }
