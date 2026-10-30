@@ -1,4 +1,5 @@
 import type { FactBoxConfig } from '../../../platform/public-api';
+
 export const usersFactBoxConfig: FactBoxConfig = {
   enabled: true,
   label: 'User information',
