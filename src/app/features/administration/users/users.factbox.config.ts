@@ -1,5 +1,5 @@
-import type { ListFactBoxConfig } from '../../../platform/public-api';
-export const usersFactBoxConfig: ListFactBoxConfig = {
+import type { FactBoxConfig } from '../../../platform/public-api';
+export const usersFactBoxConfig: FactBoxConfig = {
   enabled: true,
   label: 'User information',
   overview: true,

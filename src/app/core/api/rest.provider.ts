@@ -2,7 +2,7 @@ import { Provider } from '@angular/core';
 import { DATA_REST_SERVICE, DataRestService } from '../../platform/data/data-source.service';
 import { RestService } from '../services/rest.service';
 
-export const provideErpRest = (): Provider => ({
+export const dataRestProvider: Provider = {
   provide: DATA_REST_SERVICE,
   deps: [RestService],
   useFactory: (restService: RestService): DataRestService => ({
@@ -12,4 +12,4 @@ export const provideErpRest = (): Provider => ({
     patch: (endpoint: string, payload: unknown, ifMatch?: string) => restService.patch(endpoint, payload, ifMatch),
     delete: (endpoint: string, ifMatch?: string) => restService.delete(endpoint, { ifMatch })
   })
-});
+};

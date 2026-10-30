@@ -9,7 +9,7 @@ import { DocumentRecordService } from '../data/document-record.service';
 import { DocumentResponseNormalizerService } from '../data/document-response-normalizer.service';
 import { DataSourceService } from '../data/data-source.service';
 import { RunModalConfigAssemblerService } from './run-modal-config-assembler.service';
-import { RunModalConfigModule, RunModalContext } from './run-modal-config.token';
+import { PageModule, RunModalContext } from './run-modal-config.token';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
 
 @Injectable({
@@ -71,7 +71,7 @@ export class RunModalHydrationResolverService {
   }
 
   resolveNavigationDataSource(
-    module: RunModalConfigModule,
+    module: PageModule,
     context: RunModalContext,
   ): DataSourceConfig | undefined {
     const baseDataSource = this.pickDataSource(module);
@@ -163,7 +163,7 @@ export class RunModalHydrationResolverService {
   }
 
   async loadRelatedLineRows(
-    module: RunModalConfigModule,
+    module: PageModule,
     headerData: Record<string, unknown>,
   ): Promise<Record<string, unknown>[]> {
     const lineDataSource = this.pickLineDataSource(module);
@@ -183,11 +183,11 @@ export class RunModalHydrationResolverService {
   }
 
   async hydrateRelatedLines(params: {
-    module: RunModalConfigModule;
+    module: PageModule;
     documentWindowConfig: DocumentWindowConfig;
-    pickLineDataSource: (module: RunModalConfigModule) => DataSourceConfig | undefined;
+    pickLineDataSource: (module: PageModule) => DataSourceConfig | undefined;
     loadRelatedLineRows: (
-      module: RunModalConfigModule,
+      module: PageModule,
       headerData: Record<string, unknown>,
     ) => Promise<Record<string, unknown>[]>;
     mapRecordsToLineRows: (
@@ -220,22 +220,22 @@ export class RunModalHydrationResolverService {
   }
 
   async hydrateFromApi(params: {
-    module: RunModalConfigModule;
+    module: PageModule;
     documentWindowConfig: DocumentWindowConfig;
     context: RunModalContext;
     dataSource?: DataSourceConfig;
-    resolveEntryHydrationTop: (module: RunModalConfigModule, dataSource: DataSourceConfig) => number;
-    isWorksheetPage: (module: RunModalConfigModule) => boolean;
+    resolveEntryHydrationTop: (module: PageModule, dataSource: DataSourceConfig) => number;
+    isWorksheetPage: (module: PageModule) => boolean;
     mergeHeaderFromFirstRecord: (record: Record<string, unknown>, documentWindowConfig: DocumentWindowConfig) => void;
     mapRecordsToLineRows: (
       records: Record<string, unknown>[],
       documentWindowConfig: DocumentWindowConfig,
     ) => Record<string, unknown>[];
     hydrateRelatedLines: (
-      module: RunModalConfigModule,
+      module: PageModule,
       documentWindowConfig: DocumentWindowConfig,
     ) => Promise<{ lineHydrateFailed: boolean; lineHydrateMessage?: string }>;
-    pickLineDataSource: (module: RunModalConfigModule) => DataSourceConfig | undefined;
+    pickLineDataSource: (module: PageModule) => DataSourceConfig | undefined;
   }): Promise<{ lineHydrateFailed: boolean; lineHydrateMessage?: string }> {
     if (!params.dataSource?.endpoint?.trim()) {
       return { lineHydrateFailed: false };
@@ -293,11 +293,11 @@ export class RunModalHydrationResolverService {
     }
   }
 
-  private pickDataSource(module: RunModalConfigModule): DataSourceConfig | undefined {
+  private pickDataSource(module: PageModule): DataSourceConfig | undefined {
     return this.configAssembler.pickDataSource({ module });
   }
 
-  private pickLineDataSource(module: RunModalConfigModule): DataSourceConfig | undefined {
+  private pickLineDataSource(module: PageModule): DataSourceConfig | undefined {
     return this.configAssembler.pickLineDataSource({ module });
   }
 

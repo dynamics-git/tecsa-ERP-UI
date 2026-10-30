@@ -3,7 +3,7 @@ import type { ListPersonalizationConfig } from './list-personalization-config.mo
 import { CommandConfig, StandardCommandConfig } from './command-config.model';
 import { DataSourceConfig } from './data-source-config.model';
 import { DataSurfaceColumnConfig, DataSurfaceConfig } from './data-surface-config.model';
-import { ListFactBoxConfig } from './list-fact-box-config.model';
+import { FactBoxConfig } from './fact-box-config.model';
 import { ListFilterConfig } from './list-filter-config.model';
 import { PopupConfig } from './popup-config.model';
 
@@ -83,7 +83,7 @@ export interface ListPageConfig extends BasePageConfig {
   standardActions?: StandardCommandConfig;
   dataSurface?: DataSurfaceConfig;
   behavior?: ListPageBehaviorConfig;
-  factBox?: ListFactBoxConfig;
+  factBox?: FactBoxConfig;
 }
 
 // Setup pages share the same shape today; this alias keeps naming explicit.

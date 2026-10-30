@@ -1,6 +1,6 @@
-import type { ListFactBoxConfig } from '../../../platform/public-api';
+import type { FactBoxConfig } from '../../../platform/public-api';
 /** One data-driven FactBox for PR List and Document; the document adds selected-line fields from LineConfig. */
-export const purchaseRequisitionFactBoxConfig: ListFactBoxConfig = {
+export const purchaseRequisitionFactBoxConfig: FactBoxConfig = {
   enabled: true,
   label: 'Requisition information',
   overview: true,

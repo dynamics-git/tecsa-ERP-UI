@@ -3,10 +3,10 @@ import { MenuSearchItem } from '../models/menu-item.model';
 import { ConfirmationService, RunModalService } from '../../platform/public-api';
 import { RunModalContext } from '../../platform/run-modal/run-modal-config.token';
 import {
-	getRegisteredRunModalPageIds,
-	loadRunModalConfigModule,
+	getRegisteredPageIds,
+	loadPageModule,
 	resolveRunModalOpenTarget,
-} from './run-modal-config-registry';
+} from './page-registry';
 import { SessionService } from './session.service';
 
 @Injectable({
@@ -34,7 +34,7 @@ export class GlobalSearchPopupService {
 			return false;
 		}
 
-		await loadRunModalConfigModule(pageId);
+		await loadPageModule(pageId);
 		const target = forcedTarget ?? resolveRunModalOpenTarget(pageId);
 		const resolvedContext = context ?? await this.resolveDefaultRunModalContext(pageId);
 		const opened = await this.runModal.open({
@@ -48,7 +48,7 @@ export class GlobalSearchPopupService {
 
 		if (!opened) {
 			const reason = this.runModal.getLastOpenFailureReason();
-			const registeredPages = getRegisteredRunModalPageIds();
+			const registeredPages = getRegisteredPageIds();
 			const registeredDetail = registeredPages.length ? ` Registered: ${registeredPages.join(', ')}` : ' Registered: none';
 			const detail = reason ? ` (${reason}).${registeredDetail}` : `.${registeredDetail}`;
 			await this.confirmation.message(`Unable to open page${detail}.`);
@@ -63,7 +63,7 @@ export class GlobalSearchPopupService {
 			return undefined;
 		}
 
-		const moduleRef = await loadRunModalConfigModule(pageId);
+		const moduleRef = await loadPageModule(pageId);
 		const pageConfig = this.findPageConfig(moduleRef as Record<string, unknown> | undefined, pageId);
 		const dataSource = this.toRecord(pageConfig?.['dataSource']);
 		const endpoint = this.toText(dataSource?.['endpoint']).trim().toLowerCase();

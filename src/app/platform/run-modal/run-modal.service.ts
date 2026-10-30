@@ -10,7 +10,7 @@ import { DataSourceService, DataPage } from '../data/data-source.service';
 import { ApiErrorService } from '../data/api-error.service';
 import { RUNTIME_TIMEOUT_POLICY } from '../data/runtime-timeout-policy.token';
 import { ListFilterStateService } from '../pages/list-filter-state.service';
-import { RunModalConfigModule, RunModalContext } from './run-modal-config.token';
+import { PageModule, RunModalContext } from './run-modal-config.token';
 import { RunModalConfigAssemblerService } from './run-modal-config-assembler.service';
 import { RunModalPageDefinitionResolverService } from './run-modal-page-definition-resolver.service';
 import { RunModalStackService } from './run-modal-stack.service';
@@ -29,7 +29,7 @@ export interface BackgroundSaveOwner {
 }
 interface SaveNotice { id: string; pageId: string; label: string; state: 'saving'|'saved'|'error'|'unknown'; message: string; checking?: boolean; valid(): boolean; }
 
-type ListBinding = { pageId: string; module: RunModalConfigModule; source: DataSourceConfig; context: RunModalContext; rows: unknown[]; loading: boolean; hasMore: boolean; cursor?: string; generation: number };
+type ListBinding = { pageId: string; module: PageModule; source: DataSourceConfig; context: RunModalContext; rows: unknown[]; loading: boolean; hasMore: boolean; cursor?: string; generation: number };
 
 /** Window navigation only. DocumentPage owns editing for every entry window. */
 @Injectable({ providedIn: 'root' })

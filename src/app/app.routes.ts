@@ -1,4 +1,4 @@
-import { getFeaturePageRoutes } from './core/services/run-modal-config-registry';
+import { getFeaturePageRoutes } from './core/services/page-registry';
 import { Routes } from '@angular/router';
 import { MainLayout } from './layout/main-layout/main-layout';
 import { DashboardPage } from './features/dashboard/dashboard-page/dashboard-page';

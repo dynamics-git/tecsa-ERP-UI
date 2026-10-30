@@ -18,7 +18,7 @@ export * from './models/field-config.model';
 export * from './models/line-calculation-config.model';
 export * from './models/line-config.model';
 export * from './models/list-filter-config.model';
-export * from './models/list-fact-box-config.model';
+export * from './models/fact-box-config.model';
 export * from './models/page-config.model';
 export * from './models/popup-config.model';
 export * from './models/run-modal-host-data.model';

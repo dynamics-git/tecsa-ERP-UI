@@ -5,7 +5,7 @@ import type { FactBoxContext } from '../../models/fact-box-context.model';
 import { FactBoxToggle } from '../../../shared/ui/fact-box-toggle/fact-box-toggle';
 import { automaticDetailFields, detailValue } from '../../pages/fact-box-display';
 import { SessionService } from '../../../core/services/session.service';
-import type { ListFactBoxConfig } from '../../models/list-fact-box-config.model';
+import type { FactBoxConfig } from '../../models/fact-box-config.model';
 import { LoadingIndicator } from '../../../shared/ui/loading-indicator/loading-indicator';
 import type { CommandConfig } from '../../models/command-config.model';
 import { NgTemplateOutlet } from '@angular/common';
@@ -115,7 +115,7 @@ export class DocumentWindow {
     return this.lineEditor?.validate(row,field,value) ?? Promise.resolve({valid:false,errors:['Line editor is unavailable.']});
   }
   @Input() preferenceKey = '';
-  @Input() factBoxConfig?: ListFactBoxConfig;
+  @Input() factBoxConfig?: FactBoxConfig;
   @Input() factBoxDataSource?: DataSourceConfig;
   private readonly factBoxSource = inject(DataSourceService);
   @Input() factBoxSections?: FactBoxSectionConfig[];

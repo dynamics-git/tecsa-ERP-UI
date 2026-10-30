@@ -4,7 +4,7 @@ import { AttachmentsConfig, DocumentWindowConfig } from '../models/document-wind
 import { ListPageConfig } from '../models/page-config.model';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
-import { RunModalConfigModule, RunModalContext } from './run-modal-config.token';
+import { PageModule, RunModalContext } from './run-modal-config.token';
 
 @Injectable({
   providedIn: 'root',
@@ -13,7 +13,7 @@ export class RunModalConfigAssemblerService {
   private readonly valueMapper = inject(RuntimeValueMapperService);
 
   buildGenericDocumentWindowConfig(params: {
-    module: RunModalConfigModule;
+    module: PageModule;
     pageId: string;
     context: RunModalContext;
   }): DocumentWindowConfig {
@@ -92,7 +92,7 @@ export class RunModalConfigAssemblerService {
     };
   }
 
-  pickDataSource(params: { module: RunModalConfigModule }): DataSourceConfig | undefined {
+  pickDataSource(params: { module: PageModule }): DataSourceConfig | undefined {
     const listConfig = this.pickListPageConfig({ module: params.module });
     const nestedDataSource = this.toRecord(listConfig?.['dataSource']);
     if (typeof nestedDataSource?.['endpoint'] === 'string') {
@@ -113,7 +113,7 @@ export class RunModalConfigAssemblerService {
     return undefined;
   }
 
-  pickLineDataSource(params: { module: RunModalConfigModule }): DataSourceConfig | undefined {
+  pickLineDataSource(params: { module: PageModule }): DataSourceConfig | undefined {
     const lineConfig = this.pickObject({ module: params.module, suffix: 'LineConfig' });
     const nestedDataSource = this.toRecord(lineConfig?.['dataSource']);
     if (typeof nestedDataSource?.['endpoint'] === 'string') {
@@ -134,7 +134,7 @@ export class RunModalConfigAssemblerService {
     return undefined;
   }
 
-  pickListPageConfig(params: { module: RunModalConfigModule }): ListPageConfig | undefined {
+  pickListPageConfig(params: { module: PageModule }): ListPageConfig | undefined {
     const direct = this.pickObject({ module: params.module, suffix: 'ListPageConfig' }) as ListPageConfig | undefined;
     if (direct) {
       return direct;
@@ -162,7 +162,7 @@ export class RunModalConfigAssemblerService {
     return undefined;
   }
 
-  pickDialogTitle(params: { module: RunModalConfigModule }): string {
+  pickDialogTitle(params: { module: PageModule }): string {
     const headerConfig = this.pickObject({ module: params.module, suffix: 'HeaderConfig' });
     const nestedTitle = this.toText(headerConfig?.['dialogTitle']).trim();
     if (nestedTitle.length) {
@@ -178,7 +178,7 @@ export class RunModalConfigAssemblerService {
     return '';
   }
 
-  resolvePageLabel(params: { module: RunModalConfigModule; pageId: string; title: string }): string {
+  resolvePageLabel(params: { module: PageModule; pageId: string; title: string }): string {
     for (const [key, value] of Object.entries(params.module)) {
       if (key.endsWith('PageLabel') && typeof value === 'string' && value.trim()) {
         return value.trim();
@@ -189,7 +189,7 @@ export class RunModalConfigAssemblerService {
     return base;
   }
 
-  pickArray(params: { module: RunModalConfigModule; suffix: string }): unknown[] {
+  pickArray(params: { module: PageModule; suffix: string }): unknown[] {
     for (const [key, value] of Object.entries(params.module)) {
       if (key.endsWith(params.suffix) && Array.isArray(value)) {
         return value;
@@ -208,7 +208,7 @@ export class RunModalConfigAssemblerService {
   }
 
   pickObject(params: {
-    module: RunModalConfigModule;
+    module: PageModule;
     suffix: string;
   }): Record<string, unknown> | undefined {
     for (const [key, value] of Object.entries(params.module)) {
@@ -221,7 +221,7 @@ export class RunModalConfigAssemblerService {
     return undefined;
   }
 
-  resolveEntryHydrationTop(params: { module: RunModalConfigModule; dataSource: DataSourceConfig }): number {
+  resolveEntryHydrationTop(params: { module: PageModule; dataSource: DataSourceConfig }): number {
     const pageConfig = this.pickListPageConfig({ module: params.module });
     const pageType = this.toText(pageConfig?.pageType).trim().toLowerCase();
     if (pageType === 'setup') {
@@ -231,12 +231,12 @@ export class RunModalConfigAssemblerService {
     return params.dataSource.navigation?.top ?? params.dataSource.pageSize ?? 20;
   }
 
-  isWorksheetPage(params: { module: RunModalConfigModule }): boolean {
+  isWorksheetPage(params: { module: PageModule }): boolean {
     const pageConfig = this.pickListPageConfig({ module: params.module });
     return this.toText(pageConfig?.pageType).trim().toLowerCase() === 'worksheet';
   }
 
-  resolvePageType(params: { module: RunModalConfigModule; pageId: string }): string {
+  resolvePageType(params: { module: PageModule; pageId: string }): string {
     const normalizedPageId = params.pageId.trim().toLowerCase();
     if (!normalizedPageId.length) {
       return '';

@@ -2,11 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DocumentRecordService } from '../data/document-record.service';
-import { RunModalConfigModule } from './run-modal-config.token';
+import { PageModule } from './run-modal-config.token';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 
 export type RunModalPayloadBindingContext = {
-  module: RunModalConfigModule;
+  module: PageModule;
 };
 
 @Injectable({
@@ -52,7 +52,7 @@ export class RunModalPayloadBuilderService {
     documentWindowConfig: DocumentWindowConfig;
     dataSource: DataSourceConfig;
     changePayload?: unknown;
-    pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
+    pickObjectFromModule: (module: PageModule, suffix: string) => Record<string, unknown> | undefined;
     readFieldValue: (record: Record<string, unknown>, field: string) => unknown;
     firstPresentValue: (values: unknown[]) => unknown;
   }): Record<string, unknown> {
@@ -96,7 +96,7 @@ export class RunModalPayloadBuilderService {
     row: Record<string, unknown>;
     documentWindowConfig: DocumentWindowConfig;
     dataSource: DataSourceConfig;
-    pickObjectFromModule: (module: RunModalConfigModule, suffix: string) => Record<string, unknown> | undefined;
+    pickObjectFromModule: (module: PageModule, suffix: string) => Record<string, unknown> | undefined;
     firstPresentValue: (values: unknown[]) => unknown;
   }): Record<string, unknown> {
     this.ensureLineParentFields({

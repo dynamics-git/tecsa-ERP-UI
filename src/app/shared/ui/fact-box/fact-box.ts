@@ -6,9 +6,9 @@ import { NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FactBoxSectionConfig } from '../../../platform/models/document-window-config.model';
 import {
-  ListFactBoxConfig,
+  FactBoxConfig,
   FactBoxPanelConfig,
-} from '../../../platform/models/list-fact-box-config.model';
+} from '../../../platform/models/fact-box-config.model';
 import { FactBoxContext } from '../../../platform/models/fact-box-context.model';
 import { FactBoxOverview } from './overview';
 import { Notes } from './notes';
@@ -25,7 +25,7 @@ let nextId = 0;
 })
 export class FactBox {
   @Input() sections: FactBoxSectionConfig[] = [];
-  @Input() config?: ListFactBoxConfig;
+  @Input() config?: FactBoxConfig;
   @Input() context: FactBoxContext = {};
   @Input() label = '';
   @Input() title = '';

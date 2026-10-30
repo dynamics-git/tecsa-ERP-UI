@@ -6,10 +6,10 @@ import {
   RUN_MODAL_CONFIG_RESOLVER,
   RunModalConfigResolver
 } from '../../platform/public-api';
-import { loadRunModalConfigModule } from '../services/run-modal-config-registry';
+import { loadPageModule } from '../services/page-registry';
 
 const runModalConfigResolver: RunModalConfigResolver = async (pageId: string) => {
-  return loadRunModalConfigModule(pageId);
+  return loadPageModule(pageId);
 };
 
 export function providePlatformGovernance(): Provider[] {

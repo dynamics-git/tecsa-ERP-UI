@@ -1,19 +1,19 @@
 import { Type } from '@angular/core';
 import { Routes } from '@angular/router';
-import { PageType, RunModalConfigModule } from '../../platform/public-api';
+import { PageType, PageModule } from '../../platform/public-api';
 import { featurePageModules } from '../../features/feature-pages.generated';
 
 type PageOpenTarget = 'list' | 'entry';
 type PageTypeName = PageType;
 
 type RegisteredPageConfig = {
-  moduleRef: RunModalConfigModule;
+  moduleRef: PageModule;
   pageType?: PageTypeName;
 };
 
 const registeredPages = buildPageRegistry(featurePageModules);
 
-export function buildPageRegistry(modules: RunModalConfigModule[]): Map<string, RegisteredPageConfig> {
+export function buildPageRegistry(modules: PageModule[]): Map<string, RegisteredPageConfig> {
   const registry = new Map<string, RegisteredPageConfig>();
 
   for (const moduleRef of modules) {
@@ -73,12 +73,12 @@ function normalizePageType(value: unknown): PageTypeName | undefined {
   return undefined;
 }
 
-export function resolveRunModalConfigModule(pageId: string): RunModalConfigModule | undefined {
-  return registeredPages.get(normalizePageId(pageId))?.moduleRef as RunModalConfigModule | undefined;
+export function resolvePageModule(pageId: string): PageModule | undefined {
+  return registeredPages.get(normalizePageId(pageId))?.moduleRef as PageModule | undefined;
 }
 
-export async function loadRunModalConfigModule(pageId: string): Promise<RunModalConfigModule | undefined> {
-  return resolveRunModalConfigModule(pageId);
+export async function loadPageModule(pageId: string): Promise<PageModule | undefined> {
+  return resolvePageModule(pageId);
 }
 
 export function resolvePageType(pageId: string): PageTypeName | undefined {
@@ -99,7 +99,7 @@ export function resolveRunModalOpenTarget(pageId: string): PageOpenTarget {
   return 'list';
 }
 
-export function getRegisteredRunModalPageIds(): string[] {
+export function getRegisteredPageIds(): string[] {
   return [...registeredPages.keys()].sort();
 }
 

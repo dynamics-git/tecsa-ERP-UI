@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { MenuItem, MenuSearchItem } from '../models/menu-item.model';
 import { PermissionService } from './permission.service';
-import { isPageIdRegistered } from './run-modal-config-registry';
+import { isPageIdRegistered } from './page-registry';
 import { featurePageModules } from '../../features/feature-pages.generated';
 import { ListPageConfig } from '../../platform/models/page-config.model';
 

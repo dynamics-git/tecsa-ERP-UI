@@ -1,7 +1,7 @@
-import type { ListFactBoxConfig } from '../../../platform/public-api';
+import type { FactBoxConfig } from '../../../platform/public-api';
 
 /** Presentation only. Field precision, captions and lookups remain in the existing page contract. */
-export const itemsFactBoxConfig: ListFactBoxConfig = {
+export const itemsFactBoxConfig: FactBoxConfig = {
   enabled: true,
   label: 'Item information',
   overview: true,

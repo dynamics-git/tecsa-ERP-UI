@@ -65,7 +65,7 @@ type CreateLineOptions = {
   onSettled?: (success: boolean) => void;
 };
 
-export interface DocumentPageCommandEvent {
+export interface PageCommandEvent {
   actionKey: string;
   payload?: unknown;
   context: {
@@ -200,7 +200,7 @@ export class ListPage implements OnInit, OnDestroy {
   @Input() documentOnly = false;
   @Input() initialRecord?: Record<string, unknown>;
   @Output() closeRequested = new EventEmitter<void>();
-  @Output() businessCommand = new EventEmitter<DocumentPageCommandEvent>();
+  @Output() businessCommand = new EventEmitter<PageCommandEvent>();
 
   error?: string;
   hasMore = true;

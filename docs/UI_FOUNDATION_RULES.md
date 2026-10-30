@@ -3,6 +3,21 @@
 Use the existing shared ListPage runtime. Do not create a feature-owned CRUD
 engine, a backend page registry, or another form renderer.
 
+## Shared names
+
+Use RestService for API calls and RunModal for opening a page in a modal.
+page-registry.ts resolves discovered pages by pageId for both routes and RunModal;
+new pages do not need manual registry entries. PageModule describes the discovered
+exports, and PageCommandEvent carries page commands.
+
+Page declarations use ListPageConfig, HeaderConfig, LineConfig and FactBoxConfig.
+The Angular application wires the existing REST adapter with dataRestProvider;
+feature pages do not configure providers or implement ordinary CRUD.
+
+Code identifiers do not use an ERP prefix. Product names, deployment environment
+variables, existing storage namespaces and historical migration references keep
+their existing spelling.
+
 ## One feature-page pattern
 
 All feature pages have the same file responsibilities, including related

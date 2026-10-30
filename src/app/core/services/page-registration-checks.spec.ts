@@ -1,6 +1,6 @@
 import { EntityContractService } from '../../platform/data/entity-contract.service';
 import { describe, expect, it } from 'vitest';
-import { buildPageRegistry, getFeaturePageRoutes, resolveRunModalConfigModule } from './run-modal-config-registry';
+import { buildPageRegistry, getFeaturePageRoutes, resolvePageModule } from './page-registry';
 import { featurePageModules } from '../../features/feature-pages.generated';
 import { HeaderConfig, LineConfig, ListPageConfig } from '../../platform/public-api';
 
@@ -9,7 +9,7 @@ describe('One shared ERP page declaration pattern', () => {
     const routes = getFeaturePageRoutes();
     for (const module of featurePageModules) {
       const page = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig;
-      expect(resolveRunModalConfigModule(page.pageId!), page.pageId).toBe(module);
+      expect(resolvePageModule(page.pageId!), page.pageId).toBe(module);
       if (page.menu?.route) {
         const route = routes.find(route => route.path === page.menu!.route!.replace(/^\//, ''));
         expect(route?.data?.['pageId'], page.pageId).toBe(page.pageId);

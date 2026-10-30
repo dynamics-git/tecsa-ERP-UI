@@ -1,7 +1,7 @@
 .app-run-modal-host {
-  --erp-popup-top-offset: 88px;
+  --popup-top-offset: 88px;
   position: fixed;
-  inset: var(--erp-popup-top-offset) 0 0 0;
+  inset: var(--popup-top-offset) 0 0 0;
   z-index: 900;
   pointer-events: none;
 }
@@ -95,18 +95,18 @@
 }
 
 :host ::ng-deep .popup-shell.full-page app-document-window .entry-pane {
-  top: calc(var(--erp-popup-top-offset) + 18px);
-  max-height: calc(100vh - var(--erp-popup-top-offset) - 36px);
+  top: calc(var(--popup-top-offset) + 18px);
+  max-height: calc(100vh - var(--popup-top-offset) - 36px);
 }
 
 :host ::ng-deep .popup-shell.full-page app-document-window .entry-pane.maximized {
   width: calc(100vw - 20px);
-  max-height: calc(100vh - var(--erp-popup-top-offset) - 20px);
+  max-height: calc(100vh - var(--popup-top-offset) - 20px);
 }
 
 @media (max-width: 620px) {
   .app-run-modal-host {
-    --erp-popup-top-offset: 56px;
+    --popup-top-offset: 56px;
   }
 
   .popup-shell {

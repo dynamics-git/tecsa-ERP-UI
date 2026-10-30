@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { of } from 'rxjs';
 import { SessionService } from '../../../core/services/session.service';
 import { MenuService } from '../../../core/services/menu.service';
-import { resolveRunModalConfigModule, resolvePageType } from '../../../core/services/run-modal-config-registry';
+import { resolvePageModule, resolvePageType } from '../../../core/services/page-registry';
 import { DocumentPageCommandAssemblerService } from '../document-page-command-assembler.service';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { DataSourceService, DATA_REST_SERVICE } from '../../data/data-source.service';
@@ -18,7 +18,7 @@ describe('PR reference page acceptance', () => {
     const session = {SuperAdmin:false,Permissions:[{pageId:'purchase-requisition',ReadPermission:true}]};
     TestBed.configureTestingModule({providers:[provideRouter([]),{provide:SessionService,useValue:session}]});
     expect(resolvePageType('purchase-requisition')).toBe('document');
-    expect(Object.values(resolveRunModalConfigModule('purchase-requisition')!)).toContain(purchaseRequisitionListConfig);
+    expect(Object.values(resolvePageModule('purchase-requisition')!)).toContain(purchaseRequisitionListConfig);
     const menu=TestBed.inject(MenuService);
     expect(menu.getModules().flatMap(module=>module.children ?? [])).toEqual(expect.arrayContaining([
       expect.objectContaining({pageId:'purchase-requisition',label:purchaseRequisitionListConfig.title}),

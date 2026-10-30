@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { ListPage, RunModalPageWindow, DocumentPageCommandEvent } from '../../../platform/public-api';
+import { ListPage, RunModalPageWindow, PageCommandEvent } from '../../../platform/public-api';
 import { purchaseOrderListConfig, purchaseOrderHeaderConfig, purchaseOrderLineConfig } from './purchase-order.config';
 export * from './purchase-order.config';
 
@@ -16,7 +16,7 @@ export class PurchaseOrderPage {
   readonly lineConfig = purchaseOrderLineConfig;
   readonly pageId = purchaseOrderListConfig.pageId!;
 
-handleBusinessCommand(event: DocumentPageCommandEvent): void {
+handleBusinessCommand(event: PageCommandEvent): void {
     // Only add code here for real business processes.
   }
 }

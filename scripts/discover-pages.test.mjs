@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {discoverPages, generatePages} from './discover-pages.mjs';
 
 test('nested page folders are discovered, added and removed without a central registration', () => {
-  const root = mkdtempSync(join(tmpdir(), 'erp-page-discovery-'));
+  const root = mkdtempSync(join(tmpdir(), 'page-discovery-'));
   try {
     const features = join(root, 'src/app/features');
     const folder = join(features, 'extension/orders');

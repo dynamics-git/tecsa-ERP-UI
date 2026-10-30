@@ -19,9 +19,9 @@ export function generatePages(root = projectRoot) {
   const features = join(root, 'src/app/features');
   const pages = discoverPages(features);
   const output = '// Generated from feature folders. Do not edit.\n'
-    + "import type { RunModalConfigModule } from '../platform/public-api';\n"
+    + "import type { PageModule } from '../platform/public-api';\n"
     + pages.map((page, index) => `import * as page${index} from '${page}';`).join('\n')
-    + '\n\nexport const featurePageModules: RunModalConfigModule[] = [\n'
+    + '\n\nexport const featurePageModules: PageModule[] = [\n'
     + pages.map((_, index) => `  page${index},`).join('\n') + '\n];\n';
   const target = join(features, 'feature-pages.generated.ts');
   if (!existsSync(target) || readFileSync(target, 'utf8') !== output) writeFileSync(target, output);
