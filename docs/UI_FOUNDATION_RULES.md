@@ -23,11 +23,29 @@ their existing spelling.
 All feature pages have the same file responsibilities, including related
 worksheets opened only inside a popup:
 
-- Page config: the complete declaration, including pageType, data source, list
-  columns, card/line fields, FactBox, lookups, menu and actions.
+- Page config: header form, list page and optional document lines, in that order.
+  Declare data sources, columns, fields, lookups, menu and actions here.
+- FactBox config: the page's FactBox declaration, imported by its list config.
 - Page TS: the thin Angular component, configuration bindings and genuine
   page-specific business handlers. No ordinary REST/CRUD implementation.
 - Page HTML: pass those declarations to the existing shared ListPage renderer.
+
+Use Users and Purchase Requisition as the reference for every configured page:
+
+- Keep each field and column object expanded, with one property per line.
+- List declarations start with pageId, pageType, title, optional autoSave,
+  dataSource, identity and module/menu; presentation and actions follow, then factBox.
+- Declare record identity once as dataSource.keyField. headerPKProp and lineFKProp
+  describe the business relationship independently of each record's key.
+- Use explicit object entries in listColumns(headerConfig, [...]). Reuse header
+  labels and types; keep overrides only for actual list presentation differences.
+- Use type for ordinary field semantics (code, decimal, date, boolean, etc.) and
+  lookup/dropdown for those editors. Use valueType only when the editor needs
+  different value semantics, such as a lookup whose selected value is a guid.
+- Related worksheets share one local data source between list and line configs.
+  Keep their parent navigation and existing save/operation settings intact.
+- Keep feature TS limited to bindings and existing business-command hooks. Do not
+  add new placeholder handlers or repeat CRUD, validation or query behavior there.
 
 Routing and RunModal instantiate that same feature component. Related worksheet
 components are actively used by the popup host; they are not empty scaffolding.

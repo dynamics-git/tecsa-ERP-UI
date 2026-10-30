@@ -125,16 +125,16 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'status',
           label: 'Status',
           type: 'text',
-          readonly: true,
           defaultValue: 'open',
+          readonly: true,
           factBox: true,
         },
         {
           key: 'requestDate',
           label: 'Request Date',
           type: 'date',
-          required: true,
           defaultValue: () => new Date().toLocaleDateString('en-CA'),
+          required: true,
         },
         {
           key: 'requiredDate',
@@ -259,7 +259,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & {
       },
       {
         field: 'status',
-        label: 'Status',
         type: 'badge',
         filter: {
           type: 'select',
@@ -378,6 +377,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       id: 'itemId',
       label: 'No.',
       type: 'lookup',
+      editableWhen: {
+        field: 'lineType',
+        values: ['item'],
+      },
       lookup: {
         endpoint: '/items',
         filter: 'blocked eq false',
@@ -386,10 +389,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       fill: {
         description: 'description',
       },
-      editableWhen: {
-        field: 'lineType',
-        values: ['item'],
-      },
       displayColumn: 'number',
     },
     {
@@ -397,6 +396,10 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       id: 'glAccountId',
       label: 'No.',
       type: 'lookup',
+      editableWhen: {
+        field: 'lineType',
+        values: ['gl_account'],
+      },
       lookup: {
         endpoint: '/glAccounts',
         filter: "accountType eq 'posting' and blocked eq false",
@@ -404,10 +407,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       },
       fill: {
         description: 'name',
-      },
-      editableWhen: {
-        field: 'lineType',
-        values: ['gl_account'],
       },
       displayColumn: 'number',
     },
