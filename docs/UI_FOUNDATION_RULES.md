@@ -6,6 +6,10 @@ engine, a backend page registry, or another form renderer.
 ## Shared names
 
 Use RestService for API calls and RunModal for opening a page in a modal.
+Reusable DOM interactions belong in shared/directives/. ColumnReorder owns
+header dragging, indicators and edge scrolling; ColumnResize owns pointer and
+keyboard resizing. ListGrid binds these directives and retains column state and
+preference persistence. Do not put new drag/pointer lifecycle handlers in ListGrid.
 page-registry.ts resolves discovered pages by pageId for both routes and RunModal;
 new pages do not need manual registry entries. PageModule describes the discovered
 exports, and PageCommandEvent carries page commands.

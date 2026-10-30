@@ -160,7 +160,8 @@
           }
         </colgroup>
 
-        <thead>
+        <thead [columnReorder]="columnsEnabled" [columnReorderScroll]="gridScroll"
+          [frozenThrough]="frozenThrough" (columnReordered)="reorderColumn($event)">
           <tr>
             <th class="row-action-col"></th>
             <th class="select-col">
@@ -176,6 +177,9 @@
             </th>
             @for (column of columns; track column.field ?? column.id ?? column.label) {
               <th
+                [draggable]="columnsEnabled"
+                [attr.data-column-key]="column.field ?? column.id ?? column.label"
+                [attr.title]="columnsEnabled ? 'Drag to reorder ' + column.label : null"
                 [class.frozen-column]="isFrozen(column)" [style.left.px]="frozenLeft(column)"
                 [class.amount]="column.align === 'end' || column.type === 'currency'"
                 [class.sorted]="getColumnSortDirection(column)"
@@ -197,13 +201,11 @@
                   }
                 </button>
                 @if (config?.dataSurface?.resizable !== false) {
-                  <span class="column-resizer" role="separator" tabindex="0" aria-orientation="vertical"
+                  <span class="column-resizer" [columnResize]="columnWidthNumber(column)"
+                    (columnWidthChange)="setColumnWidth(column, $event)"
+                    (columnResizeEnd)="persistPersonalization()" (columnAutoFit)="autoFitColumn(column)"
                     [attr.aria-label]="'Resize ' + column.label" [attr.title]="'Resize ' + column.label"
-                    [attr.aria-valuenow]="columnWidthNumber(column)" aria-valuemin="72" aria-valuemax="800"
-                    (keydown.arrowleft)="$event.preventDefault(); resizeColumn(column, -16)"
-                    (keydown.arrowright)="$event.preventDefault(); resizeColumn(column, 16)"
-                    (dblclick)="$event.preventDefault(); autoFitColumn(column)"
-                    (pointerdown)="startColumnResize($event, column)"></span>
+                  ></span>
                 }
               </th>
             }
