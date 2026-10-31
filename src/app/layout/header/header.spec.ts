@@ -29,6 +29,14 @@ describe('Header', () => {
     expect(component).toBeTruthy();
   });
 
+  it('opens documentation beside company in a separate tab', () => {
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.app-documentation');
+    expect(link.getAttribute('href')).toBe('/documentation');
+    expect(link.target).toBe('_blank');
+    expect(link.rel).toContain('noopener');
+    expect(link.previousElementSibling?.classList.contains('app-company')).toBe(true);
+  });
+
   it('opens global search with Ctrl K while a document is active', () => {
     const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, cancelable: true });
     document.dispatchEvent(event);

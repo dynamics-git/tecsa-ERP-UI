@@ -19,3 +19,7 @@ Permission administration follows that same structure, not a second UI framework
   completion. Cover business-key filters and selected-row navigation in tests.
 - Leave current changes uncommitted for user review. Other business modules and
   SDK generation remain separate work; do not mass-convert their relationships.
+- Update the relevant `docs/learn` article with every changed API/config/core
+  behavior and add a dated maintenance/what's-new entry for completed work.
+  Keep examples consistent with Users/PR and mark compatibility/future behavior.
+  Do not edit generated documentation JSON; run `npm run docs:check`.

@@ -1,0 +1,64 @@
+<div class="documentation-shell">
+  <a class="learn-skip" href="#learn-article">Skip to article</a>
+  <header class="learn-header">
+    <a class="learn-brand" routerLink="/documentation"><span class="learn-logo">T</span><strong>TecSA <span>Learn</span></strong></a>
+    <span class="learn-header-label">Developer documentation</span>
+    <a class="learn-return" routerLink="/">Open application <i class="ts-icon ts-icon-arrow" aria-hidden="true"></i></a>
+  </header>
+  <nav class="learn-topics" aria-label="Documentation topics">
+    <button class="learn-mobile-toggle" (click)="navigationOpen.set(!navigationOpen())" [attr.aria-expanded]="navigationOpen()">Contents</button>
+    <a routerLink="/documentation/get-started/overview">Get started</a>
+    <a routerLink="/documentation/backend/table-and-api">Backend</a>
+    <a routerLink="/documentation/frontend/page-pattern">Frontend</a>
+    <a routerLink="/documentation/core/fields-and-validation">Shared core</a>
+    <a routerLink="/documentation/modules/permission-administration">Modules</a>
+    <a routerLink="/documentation/reference/page-config">Config reference</a>
+    <a routerLink="/documentation/maintenance/whats-new">What’s new</a>
+  </nav>
+  <div class="learn-scroll">
+    <div class="learn-layout">
+      <aside class="learn-navigation" [class.is-open]="navigationOpen()" aria-label="Article navigation">
+        <label class="learn-search-label" for="learn-search">Find documentation</label>
+        <input id="learn-search" type="search" placeholder="Search titles, config and code…" [value]="query()" (input)="query.set($any($event.target).value)" />
+        @if (query()) {<p class="learn-result-count" role="status">{{ results().length }} matching articles <button (click)="query.set('')">Clear</button></p>}
+        @for (section of sections(); track section.id) {
+          <details [open]="true"><summary>{{ section.title }}</summary>
+            @for (article of section.articles; track article.id) {
+              <a [routerLink]="'/documentation/' + article.id" [class.is-current]="article.id === articleId()" [attr.aria-current]="article.id === articleId() ? 'page' : null">{{ article.title }}</a>
+            }
+          </details>
+        }
+        @if (!loading() && !results().length) {<p>No matching articles. Try a field name, page type or module.</p>}
+        <p class="learn-source-note">Versioned with the application.<br />Edit Markdown; reference types update at build.</p>
+      </aside>
+      <main id="learn-article" class="learn-article" (click)="followArticleLink($event)">
+        @if (loading()) {<p role="status">Loading documentation…</p>}
+        @else if (error()) {<h1>Documentation could not load</h1><p>Check that the documentation assets were generated with the application.</p><button (click)="load()">Retry</button>}
+        @else if (current(); as article) {
+          <div class="learn-breadcrumb"><a routerLink="/documentation">Learn</a><span>/</span><span>{{ article.sectionTitle }}</span></div>
+          <div class="learn-article-actions"><span>{{ article.readingMinutes }} min read</span><button (click)="copyLink()">Copy link</button><button (click)="print()">Print</button></div>
+          <h1>{{ article.title }}</h1>
+          <p class="learn-kicker">TecSA developer guide · Current repository contract</p>
+          <div class="learn-content">
+            @for (block of article.blocks; track $index) {
+              @if (block.kind === 'html') {<div [innerHTML]="block.html"></div>}
+              @else {<div class="learn-code"><div class="learn-code-toolbar"><span>{{ block.language }}</span><button (click)="copy(block.code)">Copy code</button></div><pre><code>{{ block.code }}</code></pre></div>}
+            }
+          </div>
+          <div class="learn-maintenance"><strong>Keep this article current</strong><p>Source: <code>{{ article.source }}</code>. Update it with the implementation; see the documentation maintenance guide.</p></div>
+          <nav class="learn-next" aria-label="Previous and next article">
+            @if (previous(); as item) {<a [routerLink]="'/documentation/' + item.id"><small>Previous</small>{{ item.title }}</a>}
+            @if (next(); as item) {<a [routerLink]="'/documentation/' + item.id"><small>Next</small>{{ item.title }}</a>}
+          </nav>
+        } @else {<h1>Article not found</h1><p>Choose an article from the contents or <a routerLink="/documentation">start with the overview</a>.</p>}
+      </main>
+      <aside class="learn-outline" aria-label="In this article">
+        @if (current(); as article) {<strong>In this article</strong>
+          @for (heading of article.outline; track heading.id) {<button [class.is-subheading]="heading.level > 2" (click)="openHeading(heading.id)">{{ heading.title }}</button>}
+          <div class="learn-outline-note">Build with shared core.<br />Keep business rules in the correct layer.</div>
+        }
+      </aside>
+    </div>
+  </div>
+  <span class="learn-announcement" role="status" aria-live="polite">{{ message() }}</span>
+</div>

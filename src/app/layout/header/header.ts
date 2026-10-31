@@ -1,5 +1,5 @@
 import { Component, ElementRef, HostListener, ViewChild, inject } from '@angular/core';
-import { NavigationStart, Router } from '@angular/router';
+import { NavigationStart, Router, RouterLink } from '@angular/router';
 import { filter, firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MenuItem } from '../../core/models/menu-item.model';
@@ -18,7 +18,7 @@ import { ModuleMenuPanel } from '../module-menu-panel/module-menu-panel';
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [ModuleMenuPanel],
+  imports: [ModuleMenuPanel, RouterLink],
   templateUrl: './header.html',
   styleUrl: './header.scss'
 })

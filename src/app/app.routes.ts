@@ -8,6 +8,8 @@ import { PlatformRedirect } from './features/auth/platform-redirect';
 import { authChildGuard, authGuard, unsavedChangesGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
+  { path: 'documentation', loadComponent: () => import('./documentation/documentation').then(module => module.Documentation) },
+  { path: 'documentation/:section/:article', loadComponent: () => import('./documentation/documentation').then(module => module.Documentation) },
   { path: 'welcome', component: PlatformRedirect },
   { path: 'start', component: PlatformRedirect, data:{registration:true} },
   { path: 'auth/login', component: LoginPage },
