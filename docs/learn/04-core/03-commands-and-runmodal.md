@@ -66,6 +66,22 @@ This is the PR Submit pattern. The backend must expose and authorize that domain
 
 `requireSelection`, `selectionMode`, `order`, `group`, `isPrimary`, `hidden`, `disabled` and `tooltip` describe command behavior. `permissionKey` is an explicit override where the standard command identity cannot be used; do not invent a separate permission alias for every button.
 
+## Shell drawers
+
+### Company selection
+
+The header Company button opens the dedicated `CompanySwitcher` through the existing `DrawerService`, above the current document. It does not use a generic confirmation prompt or require page configuration. This shell component owns company-selection presentation; ordinary ERP pages continue to use their existing configs.
+
+The drawer loads authorized companies through the existing `AuthService.authorizedCompanies()`, searches the returned names/codes locally, marks the current company and separates row selection from the **Switch company** action. Only the company list scrolls; search and footer remain available. Loading, empty/search-empty, load retry and switch errors appear within the drawer. Search receives focus on opening, native radio controls support keyboard selection, and Cancel, Escape or the backdrop dismiss without switching.
+
+Both opening the drawer and confirming a switch use the existing pending-edit guard. Confirmation rechecks because edits may have changed after opening. Switching calls the existing `AuthService.switchCompany()`; authorization and session updates remain there. Duplicate submissions and drawer dismissal are blocked while switching. Failure retains the selection for retry; success reloads the existing workspace base URL so old-company records and caches do not remain active. No new backend endpoint, permission rule or company-management feature is introduced.
+
+Implementation: `src/app/features/auth/company-switcher/`, integrated by the existing header and drawer host. Company creation/administration remains separate future work.
+
+Company selection, Profile and Notifications load their existing standalone components when their drawers open. The host shows the shared loading indicator while loading and an error if a component cannot load. This keeps optional drawer code out of startup without raising the production bundle budget.
+
+The shell profile dropdown remains accessible above RunModal documents, at the existing global-search panel layer. Clicking or tapping back into a document dismisses it before the document action runs; interactions inside the profile menu remain available. Escape closes the shell menus. Do not raise the entire header or document stack to fix one dropdown.
+
 ## Keep registration automatic
 
 The page module exports its config and uses the established feature folder. Shared discovery/registry resolves page IDs. Do not maintain a thousand-entry manual RunModal page list. Navigation identity resolution belongs in core, not copied into each page's TS.

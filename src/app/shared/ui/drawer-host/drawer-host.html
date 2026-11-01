@@ -10,15 +10,38 @@
           <section class="drawer-shell" [class.size-sm]="popup.size === 'sm'" [class.size-md]="!popup.size || popup.size === 'md'" [class.size-lg]="popup.size === 'lg'" [class.size-xl]="popup.size === 'xl' || popup.size === 'full'">
             <header class="drawer-head">
               <strong>{{ popup.title || 'Details' }}</strong>
-              <button type="button" class="drawer-close" (click)="close(popup.id)" aria-label="Close">
+              <button type="button" class="drawer-close" [disabled]="busyCompanies.has(popup.id)" (click)="close(popup.id)" aria-label="Close">
                 <i class="ts-icon ts-icon-close"></i>
               </button>
             </header>
 
-            <div class="drawer-content">
-              @if (isNotificationDrawer(popup)) { <app-notification-inbox (recordOpened)="close(popup.id)"></app-notification-inbox> }
+            <div class="drawer-content" [class.company-switcher-content]="isCompanySwitcher(popup)">
+              @if (isCompanySwitcher(popup)) {
+                @defer (on immediate) {
+                  <app-company-switcher (cancelled)="close(popup.id)" (busyChange)="setCompanyBusy(popup.id, $event)"></app-company-switcher>
+                } @placeholder {
+                  <app-loading-indicator label="Loading companies…" [compact]="true"></app-loading-indicator>
+                } @error {
+                  <p role="alert">Could not load company selection. Close this drawer and try again.</p>
+                }
+              }
+              @if (isNotificationDrawer(popup)) {
+                @defer (on immediate) {
+                  <app-notification-inbox (recordOpened)="close(popup.id)"></app-notification-inbox>
+                } @placeholder {
+                  <app-loading-indicator label="Loading notifications…" [compact]="true"></app-loading-indicator>
+                } @error {
+                  <p role="alert">Could not load notifications. Close this drawer and try again.</p>
+                }
+              }
               @if (isProfileDrawer(popup)) {
-                <app-profile-drawer></app-profile-drawer>
+                @defer (on immediate) {
+                  <app-profile-drawer></app-profile-drawer>
+                } @placeholder {
+                  <app-loading-indicator label="Loading profile…" [compact]="true"></app-loading-indicator>
+                } @error {
+                  <p role="alert">Could not load profile. Close this drawer and try again.</p>
+                }
               }
             </div>
           </section>

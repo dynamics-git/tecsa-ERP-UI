@@ -1,0 +1,25 @@
+:host { display: block; height: 100%; min-height: 0; }
+.company-switcher { height: 100%; display: flex; flex-direction: column; color: var(--ts-text); font-size: var(--ts-font-body); }
+.company-intro { padding: var(--ts-space-4); background: var(--ts-surface-soft); border-bottom: 1px solid var(--ts-border-soft); }
+.company-intro p { margin: 0 0 var(--ts-space-4); color: var(--ts-text-soft); }
+.company-intro > span { display: block; color: var(--ts-muted); font-size: var(--ts-font-label); margin-bottom: var(--ts-space-1); }
+.company-intro strong { font-weight: 600; }
+.company-search { padding: var(--ts-space-4); }
+.company-search label { display: block; color: var(--ts-muted); font-size: var(--ts-font-label); margin-bottom: var(--ts-space-2); }
+.company-search input { width: 100%; }
+.company-list { flex: 1; min-height: 0; overflow: auto; padding: 0 var(--ts-space-4) var(--ts-space-4); }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.company-count { color: var(--ts-muted); font-size: var(--ts-font-caption); padding: 0 0 var(--ts-space-2); }
+.company-option { display: flex; align-items: center; gap: var(--ts-space-3); padding: var(--ts-space-3); margin-bottom: var(--ts-space-2); border: 1px solid var(--ts-border-soft); border-radius: var(--ts-radius-sm); cursor: pointer; }
+.company-option:hover { background: var(--ts-surface-soft); }
+.company-option.selected { background: var(--ts-surface-selected); border-color: var(--ts-brand-900); }
+.company-option:focus-within { outline: 2px solid var(--ts-brand-900); outline-offset: 2px; }
+.company-option input { accent-color: var(--ts-brand-900); flex-shrink: 0; }
+.company-identity { display: grid; gap: var(--ts-space-1); min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.company-identity strong { font-weight: 600; }
+.company-identity > span, .company-current { font-size: var(--ts-font-caption); color: var(--ts-muted); }
+.company-current { flex-shrink: 0; }
+.company-empty { color: var(--ts-muted); line-height: var(--ts-line-body); }
+.company-error { padding: var(--ts-space-3); margin-bottom: var(--ts-space-3); color: var(--ts-text); background: var(--ts-surface-soft); border: 1px solid var(--ts-border); border-radius: var(--ts-radius-sm); }
+.company-footer { padding: var(--ts-space-4); border-top: 1px solid var(--ts-border-soft); display: grid; gap: var(--ts-space-3); }
+.company-actions { display: flex; justify-content: flex-end; gap: var(--ts-space-2); flex-wrap: wrap; }

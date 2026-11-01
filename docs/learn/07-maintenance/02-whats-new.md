@@ -2,6 +2,16 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 1 November 2026: company switcher drawer
+
+Replaced the header's generic company prompt with a dedicated searchable Company Switcher inside the existing drawer host. Preserved authorized-company loading, pending-edit guards, session switching and workspace refresh. Added current/selected indicators, fixed search/footer, loading/error/retry states and in-flight dismissal protection. See [commands and RunModal](/documentation/core/commands-and-runmodal).
+
+## 1 November 2026: list toolbar dismissal
+
+Corrected shared View/Export menus and Columns/Save view panels to dismiss on an outside click or tap while retaining inside interactions. Escape also closes native toolbar menus. Existing filter-side-panel behavior is preserved. See [lists and personalization](/documentation/core/lists-and-personalization).
+
+Aligned the shell profile dropdown with the existing global-search overlay layer so RunModal does not cover it. Added pointer-based outside dismissal while retaining click/keyboard behavior. See [commands and RunModal](/documentation/core/commands-and-runmodal).
+
 ## 1 November 2026: document text hierarchy
 
 Kept the line grid aligned with the document body after reviewing an inset scrollbar treatment. The added gap created an unnecessary strip and was removed; independent document/grid scrolling remains unchanged.

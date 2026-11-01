@@ -64,7 +64,7 @@
               <i class="ts-icon ts-icon-filter" aria-hidden="true"></i> Filters @if (appliedFilters.length) { <span>{{ appliedFilters.length }}</span> }
             </button>
           }
-          @if (columnsEnabled) { <button type="button" [attr.aria-expanded]="showColumns" (click)="showColumns = !showColumns"><i class="ts-icon ts-icon-columns" aria-hidden="true"></i> Columns</button> }
+          @if (columnsEnabled) { <button type="button" data-list-tool="columns" [attr.aria-expanded]="showColumns" (click)="showColumns = !showColumns"><i class="ts-icon ts-icon-columns" aria-hidden="true"></i> Columns</button> }
           @if (views.length || savedViews.length || config?.tools?.density !== false || config?.tools?.grouping !== false) {
             <details class="list-export-menu list-view-menu">
               <summary><i class="ts-icon ts-icon-sliders" aria-hidden="true"></i> View</summary>
@@ -91,7 +91,7 @@
               </div>
             </details>
           }
-          @if (savedViewsEnabled) { <button type="button" [attr.aria-expanded]="showSaveView" (click)="showSaveView = !showSaveView"><i class="ts-icon ts-icon-bookmark" aria-hidden="true"></i> Save view</button> }
+          @if (savedViewsEnabled) { <button type="button" data-list-tool="save-view" [attr.aria-expanded]="showSaveView" (click)="showSaveView = !showSaveView"><i class="ts-icon ts-icon-bookmark" aria-hidden="true"></i> Save view</button> }
           @if (config?.tools?.export !== false) {
             <details class="list-export-menu">
               <summary class="export-trigger" aria-label="Export" title="Export"><i class="ts-icon ts-icon-download" aria-hidden="true"></i></summary>

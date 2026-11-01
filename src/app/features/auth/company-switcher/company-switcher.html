@@ -1,0 +1,41 @@
+<section class="company-switcher" aria-label="Company selection" [attr.aria-busy]="loading() || switching()">
+  <div class="company-intro">
+    <p>Choose the company you want to work in.</p>
+    <span>Current company</span><strong>{{ currentCompanyName }}</strong>
+  </div>
+  <div class="company-search">
+    <label for="company-switch-search">Search companies</label>
+    <input #companySearch id="company-switch-search" class="ts-control" type="search" placeholder="Search by name or code"
+      [value]="query()" (input)="query.set($any($event.target).value)" [disabled]="switching()" />
+  </div>
+  <div class="company-list">
+    @if (loading()) {
+      <app-loading-indicator label="Loading companies…" [compact]="true"></app-loading-indicator>
+    } @else {
+      @if (error()) {
+        <div class="company-error" role="alert">{{ error() }}</div>
+        @if (!companies().length) { <button type="button" class="ts-btn ts-btn-secondary" (click)="loadCompanies()">Try again</button> }
+      }
+      <fieldset [disabled]="switching()">
+        <legend class="company-count">{{ filteredCompanies().length }} companies</legend>
+        @for (company of filteredCompanies(); track company.systemId) {
+          <label class="company-option" [class.selected]="selectedId() === company.systemId">
+            <input type="radio" name="working-company" [value]="company.systemId"
+              [checked]="selectedId() === company.systemId" (change)="selectCompany(company.systemId)" />
+            <span class="company-identity"><strong>{{ company.name }}</strong>@if (company.code) { <span>{{ company.code }}</span> }</span>
+            @if (company.systemId === currentCompanyId) { <span class="company-current">Current</span> }
+          </label>
+        } @empty {
+          @if (!error()) { <p class="company-empty">{{ query().trim() ? 'No companies match your search.' : 'No companies are available for your account.' }}</p> }
+        }
+      </fieldset>
+    }
+  </div>
+  <footer class="company-footer">
+    @if (switching()) { <app-loading-indicator label="Changing company…" [compact]="true"></app-loading-indicator> }
+    <div class="company-actions">
+      <button type="button" class="ts-btn ts-btn-secondary" [disabled]="switching()" (click)="cancelled.emit()">Cancel</button>
+      <button type="button" class="ts-btn ts-btn-primary" [disabled]="!canSwitch()" (click)="switchCompany()">Switch company</button>
+    </div>
+  </footer>
+</section>

@@ -1,6 +1,6 @@
 import { Component, ElementRef, HostListener, ViewChild, inject } from '@angular/core';
 import { NavigationStart, Router, RouterLink } from '@angular/router';
-import { filter, firstValueFrom } from 'rxjs';
+import { filter } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MenuItem } from '../../core/models/menu-item.model';
 import { MenuSearchItem } from '../../core/models/menu-item.model';
@@ -10,9 +10,6 @@ import { shouldOpenFromMenuAsRunModal } from '../../core/services/page-registry'
 import { SessionService } from '../../core/services/session.service';
 import { DrawerService } from '../../platform/public-api';
 import { UnsavedChangesService } from '../../platform/public-api';
-import { ConfirmationService } from '../../shared/ui/confirmation.service';
-import { AuthService } from '../../core/services/auth.service';
-import { WorkspaceContext } from '../../core/services/workspace-context';
 import { ModuleMenuPanel } from '../module-menu-panel/module-menu-panel';
 
 @Component({
@@ -23,10 +20,7 @@ import { ModuleMenuPanel } from '../module-menu-panel/module-menu-panel';
   styleUrl: './header.scss'
 })
 export class Header {
-  private readonly auth = inject(AuthService);
-  private readonly confirmation = inject(ConfirmationService);
   private readonly unsaved = inject(UnsavedChangesService);
-  private readonly workspace = inject(WorkspaceContext);
   @ViewChild('globalSearchInput') globalSearchInput?: ElementRef<HTMLInputElement>;
 
   readonly isLive = Boolean(environment.isLive || environment.production);
@@ -122,14 +116,15 @@ export class Header {
   }
 
   @HostListener('document:click', ['$event'])
-  closeModulePanelOnOutsideClick(event: MouseEvent): void {
+  @HostListener('document:pointerdown', ['$event'])
+  closeModulePanelOnOutsideClick(event: Event): void {
     if (!this.activeModule && !this.isGlobalSearchOpen && !this.isUserMenuOpen) {
       return;
     }
 
     const target = event.target;
 
-    if (!(target instanceof HTMLElement)) {
+    if (!(target instanceof Element)) {
       return;
     }
 
@@ -213,19 +208,8 @@ export class Header {
 
   async changeCompany(): Promise<void> {
     if (!await this.unsaved.canLeave()) return;
-    try {
-      const companies = await firstValueFrom(this.auth.authorizedCompanies());
-      const selection = await this.confirmation.prompt('Change Company', [{key: 'companyId', label: 'Company',
-        type: 'select', required: true, defaultValue: this.sessionService.Company,
-        options: companies.map(company => ({value: company.systemId, label: company.name}))}]);
-      const companyId = selection?.['companyId'];
-      if (typeof companyId !== 'string' || companyId === this.sessionService.Company) return;
-      await firstValueFrom(this.auth.switchCompany(companyId));
-      // Start a fresh view so no records, popups or read caches cross company contexts.
-      window.location.assign(this.workspace.baseHref);
-    } catch (error) {
-      await this.confirmation.confirm({title: 'Company change failed', message: error instanceof Error ? error.message : 'Could not change company.'});
-    }
+    this.closeUserMenu();
+    this.drawerService.open({id: 'company-switcher', title: 'Change company', viewId: 'company-switcher', size: 'md', allowNested: true});
   }
 
   openGlobalSearch(): void {

@@ -68,6 +68,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   private readonly listExport = inject(ListExportService);
   exportBusy = false;
   private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   @ViewChild('gridScroll') private readonly gridScroll?: ElementRef<HTMLElement>;
 
   @Input() config?: ListPageConfig;
@@ -367,9 +368,26 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
     } finally { this.exportBusy = false; this.changeDetector.markForCheck(); }
   }
 
+  @HostListener('document:pointerdown', ['$event'])
+  dismissOutsideListTools(event: PointerEvent): void {
+    if (!(event.target instanceof Node)) return;
+    const target = event.target;
+    const inside = (selector: string): boolean =>
+      Array.from(this.host.nativeElement.querySelectorAll(selector)).some(element => element.contains(target));
+    if (!inside('[data-list-tool="columns"], .list-column-panel')) this.showColumns = false;
+    if (!inside('[data-list-tool="save-view"], .list-save-view')) this.showSaveView = false;
+    this.closeToolbarMenus(target);
+  }
+
+  private closeToolbarMenus(insideTarget?: Node): void {
+    this.host.nativeElement.querySelectorAll<HTMLDetailsElement>('.dataset-tools details[open]').forEach(menu => {
+      if (!insideTarget || !menu.contains(insideTarget)) menu.open = false;
+    });
+  }
+
   @HostListener('keydown', ['$event'])
   handleListKey(event: KeyboardEvent): void {
-    if (event.key === 'Escape') { this.showColumns = false; this.showSaveView = false; this.filterPanel?.close(); return; }
+    if (event.key === 'Escape') { this.showColumns = false; this.showSaveView = false; this.closeToolbarMenus(); this.filterPanel?.close(); return; }
     if (event.altKey && event.key.toLowerCase() === 'f' && this.advancedFilterEnabled) { event.preventDefault(); this.filterPanel?.toggle(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && this.searchEnabled) { event.preventDefault(); this.searchInput?.nativeElement.focus(); }
   }

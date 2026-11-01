@@ -37,6 +37,8 @@ Loading should track outstanding reads. Keep layout stable and show errors accur
 
 ## Reuse instead of enlarging the grid
 
+View and Export menus, Columns and Save view close when the user clicks or taps outside their own panel and trigger. Interactions inside remain available, and Escape dismisses these tools. Outside dismissal does not cancel the clicked action or discard saved personalization. Filters remain a separate persistent side panel with their existing close control.
+
 Put independent grid interactions in the shared directives folder. Keep business filters and fields in config. An ordinary module should not add pointer handling or a second table template to the list component.
 
 ## Tokens and readability
