@@ -2,6 +2,18 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 2 November 2026: schema-driven queries checkpoint 3/7
+
+Readable physical fields now use shared schema-driven filter/sort defaults;
+reserved, hidden, virtual and generated fields remain protected. Removed repeated
+query-field arrays while preserving legacy exclusions and search sets. Query
+profiles bind their exact source and reject ambiguity. Corrected the three PO
+comment-source callers and domain date-filter binding validation. Focused tests
+exercise a disposable SDK table and restricted/scoped queries in the dedicated
+test database. No Angular component/config changes or whole-module acceptance.
+See [queries and concurrency](/documentation/backend/queries-and-concurrency).
+Checkpoint 4 requires independent review.
+
 ## 2 November 2026: field permission enforcement checkpoint 2/7
 
 Record resources now enforce their own exact source, including nested collections.

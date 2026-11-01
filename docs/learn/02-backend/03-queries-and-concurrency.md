@@ -49,6 +49,37 @@ A timeout does not prove the write failed before reaching the server. Do not bli
 
 ## Restricted fields in queries
 
+### Schema defaults and explicit exceptions (checkpoint 3/7)
+
+An ordinary readable physical field from an explicitly published API becomes a
+filter/sort candidate automatically. Add the PostgreSQL column; do not repeat its
+type/column mapping in a PHP query.fields list. Core excludes private, reserved,
+virtual and generated fields from unrestricted defaults. Existing source exposure
+policies remain the authority; Core cannot infer that an arbitrary new column is
+private merely from its name.
+
+Search is separate: Core defaults to conventional code/number/name/description
+fields rather than searching every new text column. Keep an explicit search set
+when the API needs legacy or domain-specific search behavior. Existing cursor
+keys, paging limits, indexes, aliases and company/parent scopes are preserved.
+
+Existing query.fields is a deliberate fixed allowlist when needed. queryExclude
+and queryInclude remain optional overrides. Checkpoint 3 removed 63 repeated
+allowed-field arrays: 22 were completely redundant and 41 were replaced with
+negative exclusions preserving their old query surface. The business rationale
+for those legacy exclusions remains unverified; do not copy them to a new table.
+
+Queries bind the actual route ApiSource. Different views of one table keep their
+own query and field policies. Unbound legacy profile calls reject ambiguity, and
+a source/profile mismatch fails instead of selecting the first registration.
+An alias keeps its canonical target's field identity and SQL type; private aliases
+cannot reopen hidden columns. This uses the existing Registry and ListQuery.
+
+Focused dedicated-PostgreSQL tests cover SDK publication, adding/querying a new
+column, protected fields, company/parent collections, cursors and restricted aliases.
+They do not establish whole-module or production-load acceptance. No Angular
+components or page configs were changed for this backend checkpoint.
+
 Core authorizes filter identifiers, sort fields and cursors against their exact
 published source and canonical field identity. API aliases retain that identity;
 text inside a filter value is not a field name. An unreadable field cannot be
