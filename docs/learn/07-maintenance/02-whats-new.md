@@ -2,6 +2,19 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 2 November 2026: field permission enforcement checkpoint 2/7
+
+Record resources now enforce their own exact source, including nested collections.
+Write input sources are separate from command result sources; command aliases and
+nested edits bind actual fields. Notes/Attachments retain independent DTO contracts.
+Search permits readable fields without being blocked by unrelated hidden fields;
+filter/sort aliases preserve canonical authorization. Unprovable projections and
+report lineage fail closed with documented limits. No UI feature configs changed.
+Database-free boundary checks passed; full module/live persistence acceptance was
+not run. See [business exceptions](/documentation/backend/business-rules-and-exceptions)
+and [queries](/documentation/backend/queries-and-concurrency). Independent review
+is required before checkpoint 3.
+
 ## 1 November 2026: API source binding checkpoint 1/7
 
 Custom record routes now bind their exact source, including posted headers,

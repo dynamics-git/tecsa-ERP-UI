@@ -47,6 +47,25 @@ When another writer changes a record first, a precondition conflict must be show
 
 A timeout does not prove the write failed before reaching the server. Do not blindly repeat POST or a posting action. Check the record or use the operation's supported reconciliation/idempotency contract. Keep the error visible and preserve the user's draft where possible.
 
+## Restricted fields in queries
+
+Core authorizes filter identifiers, sort fields and cursors against their exact
+published source and canonical field identity. API aliases retain that identity;
+text inside a filter value is not a field name. An unreadable field cannot be
+filtered or sorted. Search uses only readable declared search fields, so hiding
+an unrelated field does not disable legitimate search. If all configured search
+fields are hidden, search returns 403.
+
+Existing domain search passes through the same authorization boundary before its
+service runs. Domain date/filter aliases declare their field using the existing
+ApiSource `http.filters` options. Unknown custom aliases and opaque SQL ordering
+fail closed under restrictions; Core does not guess their dependency by spelling.
+An unreadable historical default basic order is removed. These checks complement
+record-output masking and do not grant record or company access.
+
+Checkpoint 2 has focused database-free verification only; it does not establish
+full runtime compatibility for every module.
+
 ## Scope remains mandatory
 
 The URL company and workspace are authorized contexts. `companyColumn: null` declares shared storage; it does not bypass company membership or administrative permissions. Never accept a client-supplied company ID as authority to access another company's data.

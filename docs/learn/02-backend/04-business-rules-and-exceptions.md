@@ -46,6 +46,33 @@ This is a focused illustration of shared storage and a disabled delete operation
 
 ## Sensitive fields
 
+### Exact field authority (checkpoint 2/7)
+
+Each returned record uses its own published ApiSource. Nested lines and activities
+use their child sources, including resource collections; a header field policy
+does not describe its children. A command returning a posted record has a separate
+input contract: its DTO is not authorized as editable posted-invoice fields.
+Ordinary EntityInput checks supplied canonical fields. Existing command preparation
+binds nested/aliased edits to their actual source fields, including supplied nulls.
+Keep operation permissions and business validation as well as these field checks.
+
+Notes/Attachments retain their owner-access and collaboration DTO contracts. Their
+text, mention list and upload fields are not owner-record columns. User choices for
+mentions/notifications separately respect readable User fields.
+
+There are explicit limits. Undeclared calculated projections under source read
+restrictions are omitted and named in `meta.fieldPolicyOmissions`. Typed child
+resources keep their own policy. For independently configurable derived output,
+declare a read-only virtual field through the existing ApiSource contract; do not
+invent a second catalogue or infer permissions from JSON names. Reports without
+field-level lineage reject restricted-source access with 403 rather than leaking
+aggregate information. Existing command-only flags/selectors retain their operation
+permissions and service validation, not an unrelated response field policy.
+
+This checkpoint has database-free boundary checks, not full module/runtime
+acceptance. No UI page configuration changes are needed. Checkpoint 3 remains
+subject to independent review.
+
 Passwords require write-only handling in the source contract and hashing in the
 User model. The existing Users API supports password creation and changes;
 UserService applies credential rules while shared Core supplies persistence,
