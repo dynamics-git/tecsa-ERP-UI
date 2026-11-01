@@ -2,6 +2,17 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 2 November 2026: shared Core sorting correction
+
+UI sorting is optional. Core now orders ordinary lists by creation descending and
+authoritative history sequences by entryNo descending, both with systemId DESC
+ties. Authorized UI sort overrides this; no per-source orderBy declaration is
+needed. Descending cursors seek with `<` and reject changed context; old ascending
+tokens restart. Service processing orders, query exposure/scopes and financial
+algorithms remain unchanged. Existing PR UI sort overrides remain explicit.
+This is a focused backend correction, not whole-ERP acceptance. See
+[query contract and cursor limits](/documentation/backend/queries-and-concurrency).
+
 ## 2 November 2026: strict UI-selected query correction 3B
 
 Removed backend-selected ordinary search defaults. Quick/Advanced Search uses

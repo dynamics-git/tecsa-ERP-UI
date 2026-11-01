@@ -16,10 +16,27 @@ The example is shown unescaped for readability; the HTTP client encodes query pa
 dataSource: {
   endpoint: '/samples',
   keyField: 'systemId',
-  defaultSort: 'code asc',
   pageSize: 25,
 }
 ```
+
+Sorting configuration is optional. Without UI sort, ordinary lists use
+`system_created_at DESC, system_id DESC`. Ledger/history sources with an
+authoritative entryNo sequence use `entry_no DESC, system_id DESC`, resolved by
+Core from the existing cursor contract or read-only scoped unique key. Merely
+naming a column entryNo does not make a writable table a history source.
+
+Set `defaultSort: 'code asc'` only when the page intentionally overrides that
+order. Authorized UI sort wins; Core appends systemId DESC for stable ties unless
+systemId was explicitly sorted. ApiSource needs no query.orderBy declaration.
+Existing PR number DESC and lineNo ASC UI overrides remain unchanged.
+
+History cursors use descending sequence/UUID and a parameterized tuple `<`
+continuation. Tokens bind source, scoped query, user, path, database and page size.
+Old ascending tokens must restart at cursor=start. Cursor plus arbitrary UI sort
+remains a validation error; use offset paging for a custom order. An unreadable
+automatic sort field returns 403, rather than silently selecting another field;
+an authorized explicit sort on other fields remains usable.
 
 The UI page size becomes the requested top/count. Backend validation and defensive limits protect the API independently; do not hardcode a new per-table limit merely to match one page. Cursor paging is an explicit capability and must be supported on both sides before selecting it.
 
@@ -112,10 +129,9 @@ filtered or sorted. An unrelated restricted field does not disable authorized
 predicates. Querying an unreadable selected field is rejected before record SQL.
 
 Domain date/filter aliases declare their field using the existing
-ApiSource `http.filters` options. Unknown custom aliases and opaque SQL ordering
-fail closed under restrictions; Core does not guess their dependency by spelling.
-An unreadable historical default basic order is removed. These checks complement
-record-output masking and do not grant record or company access.
+ApiSource `http.filters` options. Unknown custom aliases fail closed under
+restrictions. These checks complement record-output masking and do not grant
+record or company access.
 
 Checkpoint 2 has focused database-free verification only; it does not establish
 full runtime compatibility for every module.
