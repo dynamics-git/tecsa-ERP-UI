@@ -2,6 +2,23 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 1 November 2026: backend structural cleanup implementation
+
+Schema-backed models and shared resource/input helpers remove repeated physical
+field declarations. The implementation removes all 54 original custom Request
+classes and 45 response-only Resource wrappers. Existing domain services retain
+operation-specific checks; shared Core owns physical validation and mapping.
+Corrected remaining journal/document input selections and model assignments so
+schema-mapped values survive ordinary saves; calculated values retain precedence.
+Date/time output uses the shared UTC JSON formatter; timestamp representation
+compatibility has not yet been exercised. Existing Users and global Companies CRUD use the shared
+runtime; services retain credential/visibility rules. Public hook signatures,
+domain commands and posted-history protections remain. This does not add Company
+copy/delete, resize columns or migrate UI pages. Runtime tests are explicitly
+deferred; implementation is not regression acceptance. See
+[table/API authoring](/documentation/backend/table-and-api) and
+[business exceptions](/documentation/backend/business-rules-and-exceptions).
+
 ## 1 November 2026: company switcher drawer
 
 Replaced the header's generic company prompt with a dedicated searchable Company Switcher inside the existing drawer host. Preserved authorized-company loading, pending-edit guards, session switching and workspace refresh. Added current/selected indicators, fixed search/footer, loading/error/retry states and in-flight dismissal protection. See [commands and RunModal](/documentation/core/commands-and-runmodal).

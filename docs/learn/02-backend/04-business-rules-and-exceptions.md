@@ -25,7 +25,11 @@ This is a focused illustration of shared storage and a disabled delete operation
 
 ## Sensitive fields
 
-Passwords require write-only/create-only handling in the source contract and hashing in the appropriate user business logic. Hiding a password in a form or FactBox does not stop an API response leaking it. Server field policies must prevent that exposure.
+Passwords require write-only handling in the source contract and hashing in the
+User model. The existing Users API supports password creation and changes;
+UserService applies credential rules while shared Core supplies persistence,
+uniqueness and concurrency. Hiding a password in a form or FactBox does not stop
+an API response leaking it. Server field policies must prevent that exposure.
 
 ## Field validation hooks
 
@@ -50,7 +54,26 @@ Do not use a UI loop of PATCH requests as the only implementation of an invarian
 
 ## Entity behaviors
 
+Ordinary table CRUD does not require a custom FormRequest, Resource or CRUD
+service. Core reads physical field rules and maps public names to storage. The
+current cleanup removes the custom Request layer; existing domain services keep
+only operation-specific input checks and preparation. Those methods accept plain
+data and create/update context. Moving a repeated schema rule into a service is
+not an acceptable replacement for shared schema handling.
+
+Response-only Resource wrappers use EntityResource directly. A distinct Resource
+is justified for derived values or relationship output. Physical date/time output
+uses the shared UTC JSON formatter; representation compatibility still needs
+runtime verification in this cleanup.
+
 The shared `EntityBehavior` contract offers `scope`, `beforeWrite`, `determine`, `validate` and `afterWrite` stages. A behavior can apply a domain rule without replacing generic controller CRUD. Use the actual interface signatures from the backend when implementing one; lifecycle callbacks are not interchangeable with UI save callbacks.
+
+Existing hook signatures remain compatible. A concrete behavior for an
+authenticatable Eloquent model may accept `Model` instead of `BaseModel`; a global
+behavior may accept `?Company`. These are wider PHP parameter types. Empty inherited
+base hooks are skipped by Core. Company-owned entities and company URLs still
+require verified company context. The current implementation changes have not yet
+been behaviorally verified; tests were deferred by the user.
 
 ## Posted and system-owned records
 

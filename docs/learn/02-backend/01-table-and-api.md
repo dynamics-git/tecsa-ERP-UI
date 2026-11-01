@@ -60,6 +60,22 @@ class Sample extends BaseModel
 
 The naming convention resolves the `samples` table. Use an explicit table override only for a real naming exception. An ordinary schema-backed model does not repeat every database column in handwritten `fillable`, casts or a second entity field list.
 
+`HasEntityDefinition` now obtains storage fields, defaults and physical casts from
+the existing schema resolver. Public API write/exposure flags remain separate from
+trusted service assignments. An internal model can use the same trait without an
+API source; an internal model must not gain a public API merely to read its schema.
+Keep deliberate behavior casts such as password hashing and encryption.
+
+The same ordinary CRUD runtime supports the existing authenticatable User and
+explicitly global Companies API. A company-scoped URL still requires verified
+company access. No new Company copy/delete feature is included in this cleanup.
+
+This is the ordinary API authoring path. Document adapters retain schema-mapped
+values alongside their business initialization. Explicit command inputs, such as
+source lines to invoice or quantities to post, still belong to the service;
+adding a column does not invent new posting behavior. Behavioral verification of
+the current cleanup is deferred.
+
 ## 3. API controller
 
 ```php
