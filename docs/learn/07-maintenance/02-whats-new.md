@@ -2,14 +2,15 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
-## 2 November 2026: UI-selected query correction 3B
+## 2 November 2026: strict UI-selected query correction 3B
 
 Removed backend-selected ordinary search defaults. Quick/Advanced Search uses
 existing field predicates selected by UI config, with server type/permission/scope
-validation. Seventeen domain-service ILIKE implementations now delegate to the same
-ListQuery compatibility path. One hundred existing bare-text contracts remain
-explicitly legacy to preserve callers and metadata-dependent UI fallbacks; they
-are not required for new modules. The 41 historical exclusions remain unverified
+validation. Removed all 100 text-search field arrays, aliases, metadata, restoration
+branches and 17 service search arguments/delegations; 17 controller callers are
+updated. Bare text-search parameters return 422. This replaces the earlier rejected
+compatibility implementation. UI metadata consumers and external text-search/service
+callers require coordinated migration to explicit filters. The 41 exclusions remain unverified
 compatibility restrictions, not assumed security requirements. No Angular code
 changes, new engine, production tables or financial algorithms. See
 [query contract and limitations](/documentation/backend/queries-and-concurrency).

@@ -74,14 +74,19 @@ Another page for that API can choose other authorized fields. The `$filter`
 equivalent is `contains(name,'ABC') or contains(email,'ABC')`. Backend validates
 physical type, exposure and effective rights; UI field selection grants no access.
 
-Existing `search`/`$search` callers retain 100 documented `query.legacySearch`
-contracts. Older `query.search` is a deprecated SDK declaration alias. These are
-compatibility, not new-page requirements. Seventeen service search blocks now
-delegate to ListQuery's single compatibility implementation. New sources without
-a legacy contract must send filters; bare text-search returns 422 instead of
-guessing fields. Frontend ListPage/EntityContractService metadata fallbacks still
-consume legacy search metadata; migrating these callers is separate Angular work.
-No Angular code changed in this checkpoint.
+Bare `search`/`$search` now return 422, including empty values. All backend search
+field arrays, their aliases, service delegations and implicit defaults are removed.
+ApiSource does not accept search-field configuration. Auth metadata no longer
+selects search fields. Existing clients must send explicit `filter`/`$filter`.
+
+Frontend ListPage must separate queryable-field capability handling from UI-owned
+search flags; its fallback currently expects metadata that no longer exists.
+EntityContractService must use configured lookup fields/display fields instead of
+inferring search fields from backend metadata. ListFilterStateService and lookup
+query construction already build explicit predicates and should remain the execution
+path. This is required coordinated UI migration; no Angular code is changed here.
+External service callers must also remove the obsolete search argument from the
+17 changed query methods; business filters retain their names and relative order.
 
 Existing query.fields is a deliberate fixed allowlist when needed. queryExclude
 and queryInclude remain optional overrides. Checkpoint 3 removed 63 repeated
@@ -103,12 +108,10 @@ components or page configs were changed for this backend checkpoint.
 Core authorizes filter identifiers, sort fields and cursors against their exact
 published source and canonical field identity. API aliases retain that identity;
 text inside a filter value is not a field name. An unreadable field cannot be
-filtered or sorted. Legacy text-only search uses readable compatibility fields, so hiding
-an unrelated field does not disable legitimate search. If all configured search
-fields are hidden, search returns 403.
+filtered or sorted. An unrelated restricted field does not disable authorized
+predicates. Querying an unreadable selected field is rejected before record SQL.
 
-Existing domain search passes through the same authorization boundary before its
-service runs. Domain date/filter aliases declare their field using the existing
+Domain date/filter aliases declare their field using the existing
 ApiSource `http.filters` options. Unknown custom aliases and opaque SQL ordering
 fail closed under restrictions; Core does not guess their dependency by spelling.
 An unreadable historical default basic order is removed. These checks complement
