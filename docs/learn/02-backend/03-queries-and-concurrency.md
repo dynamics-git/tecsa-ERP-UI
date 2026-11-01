@@ -58,10 +58,30 @@ virtual and generated fields from unrestricted defaults. Existing source exposur
 policies remain the authority; Core cannot infer that an arbitrary new column is
 private merely from its name.
 
-Search is separate: Core defaults to conventional code/number/name/description
-fields rather than searching every new text column. Keep an explicit search set
-when the API needs legacy or domain-specific search behavior. Existing cursor
-keys, paging limits, indexes, aliases and company/parent scopes are preserved.
+Checkpoint 3B removes the backend-selected search default. UI config selects the
+fields and sends existing filter predicates. Quick Search sends an OR group;
+Advanced Search combines AND/OR, typed comparisons and dates. No PHP search-field
+declaration is needed, and Core does not search all text columns. Cursor keys,
+limits, indexes, aliases and company/parent scopes remain.
+
+A page using Customers can send this URL-encoded `filter` JSON with `sort=name`:
+
+```json
+{"or":[{"field":"name","op":"contains","value":"ABC"},{"field":"email","op":"contains","value":"ABC"}]}
+```
+
+Another page for that API can choose other authorized fields. The `$filter`
+equivalent is `contains(name,'ABC') or contains(email,'ABC')`. Backend validates
+physical type, exposure and effective rights; UI field selection grants no access.
+
+Existing `search`/`$search` callers retain 100 documented `query.legacySearch`
+contracts. Older `query.search` is a deprecated SDK declaration alias. These are
+compatibility, not new-page requirements. Seventeen service search blocks now
+delegate to ListQuery's single compatibility implementation. New sources without
+a legacy contract must send filters; bare text-search returns 422 instead of
+guessing fields. Frontend ListPage/EntityContractService metadata fallbacks still
+consume legacy search metadata; migrating these callers is separate Angular work.
+No Angular code changed in this checkpoint.
 
 Existing query.fields is a deliberate fixed allowlist when needed. queryExclude
 and queryInclude remain optional overrides. Checkpoint 3 removed 63 repeated
@@ -83,7 +103,7 @@ components or page configs were changed for this backend checkpoint.
 Core authorizes filter identifiers, sort fields and cursors against their exact
 published source and canonical field identity. API aliases retain that identity;
 text inside a filter value is not a field name. An unreadable field cannot be
-filtered or sorted. Search uses only readable declared search fields, so hiding
+filtered or sorted. Legacy text-only search uses readable compatibility fields, so hiding
 an unrelated field does not disable legitimate search. If all configured search
 fields are hidden, search returns 403.
 
