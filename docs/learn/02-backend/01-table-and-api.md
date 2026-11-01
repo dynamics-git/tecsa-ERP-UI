@@ -144,3 +144,23 @@ changed by client payloads. Ordinary pages need no custom request/resource/CRUD
 service. Document services retain their real aggregate initialization, numbering,
 workflow and posting responsibilities. This checkpoint does not rewrite those
 services or certify every unfinished business module.
+
+## Stage 5: domain adapters use the same field contract
+
+A domain service can add business requirements, but ordinary create/update field
+ownership belongs to its ApiSource. For example, a document number can be accepted
+at creation and locked on update. A service-derived status or snapshot can be
+non-writable. These are explicit API exceptions; ordinary new columns need no
+per-service list. Do not repeat database types, lengths or precision in the service.
+
+The existing flow remains Controller serviceInput -> domain prepare method ->
+EntityInput validatePayload -> storagePayload -> business processing -> model save.
+The business-rule array is not an ordinary field allowlist. New published columns
+receive schema validation and storage mapping even when absent from that array.
+
+Posting/counting/receiving DTOs remain distinct from ordinary table writes.
+Readonly posted results do not make legitimate posting inputs unwritable. Their
+existing field-authorization bindings stay; nested decimal limits now use the
+actual schema field through EntityInput decimalPattern. Business sign, required
+inputs, array limits and canonical number formatting remain deliberate rules.
+No posting/costing/calculation algorithm, route or UI page configuration changes.

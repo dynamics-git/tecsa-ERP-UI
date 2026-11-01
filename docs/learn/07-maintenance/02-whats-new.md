@@ -2,6 +2,17 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 2 November 2026: domain input/write-policy checkpoint 5/7
+
+Audited 51 input adapters. Existing ordinary field prohibitions now live in
+ApiSource create/update policy; duplicate service lists are removed. Physical
+nested decimal precision uses PostgreSQL metadata through the existing helper.
+Business validation, command DTOs, field authorization, numbering and financial
+algorithms remain. New ordinary published fields keep the shared mapping path.
+See [table/API contract](/documentation/backend/table-and-api) and
+[business exceptions](/documentation/backend/business-rules-and-exceptions).
+Focused verification and baseline limitations are recorded in the backend Stage 5
+report. This does not complete the remaining architecture checkpoints.
 ## 2 November 2026: shared write lifecycle checkpoint 4/7
 
 Corrected shared parent/owned-child resolution to use actual PostgreSQL FK pairs,
