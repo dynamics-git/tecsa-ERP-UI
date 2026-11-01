@@ -4,6 +4,27 @@ Use the shared lifecycle for business rules. Add source options or model behavio
 
 ## Source options
 
+API source identity is explicit. Shared generated routes supply their own
+`apiSource` defaults. A custom record/view route must bind the exact published
+source it returns, including separate header, line and assignment sources:
+
+```php
+Route::get('postedPurchaseInvoices/{systemId}/lines', [PostedPurchaseInvoiceController::class, 'lines'])
+    ->defaults('apiSource', 'postedPurchaseInvoiceLines');
+```
+
+This illustrates binding only; retain the existing company/workspace group,
+parameter constraints and permission middleware. Core rejects missing source
+bindings on published controllers instead of choosing a controller match.
+Physical model validation reads the table schema independently of API views;
+public input policies use their explicitly resolved source. One table may have
+multiple views with different filtering, exposure and permissions.
+
+Session/catalogue/aggregate DTOs that have no single record source use an explicit
+null binding with a nonempty `apiSourceException` description. This is a reviewed
+route contract, not a way to suppress an ambiguous record binding. Nested field
+permissions remain a separate architecture checkpoint.
+
 `ApiSource` supports explicit exceptions such as operations, field policies, unique validation, relationships, behaviors, numbering, query inclusion/exclusion and concurrency. Their purpose is to describe a real contract difference, not repeat every schema field.
 
 ```php

@@ -2,6 +2,17 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 1 November 2026: API source binding checkpoint 1/7
+
+Custom record routes now bind their exact source, including posted headers,
+lines, assignments and ledger views. Generated routes retain their existing
+bindings. Missing/unknown source bindings fail closed; non-record exceptions are
+explicitly documented. Customer and vendor ledger-application responses use their
+independent route sources. Model field validation uses PostgreSQL metadata rather
+than the first matching API view. This checkpoint does not complete nested field
+permissions, business-key parent support or the full partner SDK. See
+[business exceptions](/documentation/backend/business-rules-and-exceptions).
+
 ## 1 November 2026: backend structural cleanup implementation
 
 Schema-backed models and shared resource/input helpers remove repeated physical
