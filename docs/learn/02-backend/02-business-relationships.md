@@ -65,3 +65,23 @@ See [commands and RunModal](/documentation/core/commands-and-runmodal) for the e
 ## GUID usage
 
 System record IDs remain valid for API addressing, audit references and company context. They are not mandatory business relationship fields. Use the relationship designed for the domain and enforce it with the correct FK; do not mechanically replace every relationship with a GUID or every GUID with a code.
+
+## Nested APIs and physical keys: Stage 4
+
+A nested URL locates its header by systemId. The stored header-line relationship
+comes from the declared PostgreSQL FK, which can point to business fields. These
+are separate responsibilities. For an existing parent declaration, Core resolves
+all FK pairs selected by its child column and parent table, including company and
+document type. No second field map is needed in PHP. Missing or ambiguous nested-parent FKs fail
+explicitly; Core never substitutes systemId for an unrelated business column.
+
+Flat record aliases use that same parent resolution for read, update and delete.
+Owned-child delete restrictions/cascades match the actual FK values and company
+scope, and child model guards still execute within the transaction. Parent field
+filtering uses the physical type, so a document number is text rather than UUID.
+
+PR's existing flat number/type API flow and service remain unchanged. Explicit UI
+headerPKProp, lineFKProp and parentFieldMap still select the page relationship;
+they do not redefine the database FK or grant cross-company record access.
+
+An explicit logical UUID owned-child guard without a direct FK remains an owner-record identity policy, with company scope. Core does not invent a business-key FK for it; Item's Warehouse Bin Entry guard is the existing case. Business-key ownership requires an actual unambiguous FK.

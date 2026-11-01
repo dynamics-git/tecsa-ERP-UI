@@ -122,3 +122,25 @@ Database `starting_date` is exposed as `startingDate`, `is_active` as `isActive`
 Shared source metadata powers filtering, sorting, pagination and ordinary write validation. Shared record routes support Notes and Attachments for the published source. Authorization and company/workspace context still apply; table creation alone does not grant every user access.
 
 Continue with [API queries and writes](/documentation/backend/queries-and-concurrency), then [create its page](/documentation/frontend/page-pattern).
+
+## Stage 4: shared write enforcement
+
+Ordinary CRUD and SDK-published tables use the same EntityController,
+EntityRuntime and EntityInput. PostgreSQL owns physical types, sizes, defaults,
+nullability and constraints. The API source owns exposure/write policy; domain
+services own exceptional business behavior. A domain input validator may narrow
+validation, but cannot reopen a field whose source declares create/update false.
+Explicit null on a prohibited/system field is rejected rather than silently omitted.
+
+The write lifecycle is: authorize -> transaction and scoped locks -> normalize
+supplied fields -> typed merged candidate -> existing business preparation and
+determination -> physical/unique/reference and domain validation -> model save ->
+afterWrite -> refresh. Audit and row-version handling remain shared. afterWrite
+is inside the transaction; a failure rolls back the record changes.
+
+PATCH omission preserves the previous value; explicit null is valid for nullable
+writable columns. Trusted parent scope participates in validation and cannot be
+changed by client payloads. Ordinary pages need no custom request/resource/CRUD
+service. Document services retain their real aggregate initialization, numbering,
+workflow and posting responsibilities. This checkpoint does not rewrite those
+services or certify every unfinished business module.

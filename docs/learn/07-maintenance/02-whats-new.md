@@ -2,6 +2,17 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
+## 2 November 2026: shared write lifecycle checkpoint 4/7
+
+Corrected shared parent/owned-child resolution to use actual PostgreSQL FK pairs,
+including composite business keys. Flat aliases now resolve parent scope for
+writes as well as reads. Trusted scope participates in candidate validation;
+domain validators cannot reopen source-prohibited fields. Record UUID identity,
+existing routes, page configs, domain services and financial processing remain.
+See [table/API write flow](/documentation/backend/table-and-api) and
+[business relationships](/documentation/backend/business-relationships).
+Acceptance evidence and remaining baseline test callers are recorded in the
+backend Stage 4 report; this is not whole-ERP module acceptance.
 ## 2 November 2026: shared Core sorting correction
 
 UI sorting is optional. Core now orders ordinary lists by creation descending and
