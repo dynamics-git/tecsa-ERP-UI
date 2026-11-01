@@ -41,4 +41,8 @@ Put independent grid interactions in the shared directives folder. Keep business
 
 ## Tokens and readability
 
+List pages use a 20px semibold page title and quiet 12px context text. Column headings use 13px medium text; row values use 14px regular text. Primary record links use the shared brand foreground and semibold weight, with the existing underline/focus treatment. Neutral status badges and list tools stay less prominent than record identity. Active tools receive the shared selected surface and brand foreground. The main document title uses the same page-title role as list titles, so the FactBox title does not dominate the record being edited.
+
 Use shared semantic color tokens for primary text, secondary labels, commands and disabled states. Do not lighten an entire modal to indicate one disabled field. Keep disabled state, readonly state and normal secondary text visually distinct. Avoid page-specific color patches that make only one module readable.
+
+The shared typography uses 14px body/record text, 13px labels and 12px captions. Captions are for supporting metadata, not ordinary column or field labels. Primary record titles remain primary text; labels use a quieter slate token while values retain primary text. Ordinary form and grid values use regular weight; section titles, record identities and grand totals provide emphasis. FactBox uses a subtle shared surface for its header, a 20px record title and distinct section headings. These are shared styles, not per-page config overrides.

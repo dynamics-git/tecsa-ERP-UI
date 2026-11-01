@@ -33,7 +33,7 @@
     background: var(--ts-surface-soft);
     color: var(--ts-muted);
     font-size: var(--ts-font-label);
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: 0;
     text-transform: none;
     border-bottom-color: var(--ts-border);
@@ -77,7 +77,7 @@
   td {
     color: var(--ts-text);
     font-size: var(--ts-font-body);
-    font-weight: 500;
+    font-weight: 400;
     background: var(--ts-surface);
   }
 
@@ -100,7 +100,7 @@
     color: inherit;
     font: inherit;
     font-size: var(--ts-font-body);
-    font-weight: 500;
+    font-weight: 400;
     box-sizing: border-box;
 
     &:focus {

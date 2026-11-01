@@ -43,3 +43,9 @@ Check that the API source is published, the endpoint matches its source, company
 ## Permissions
 
 Overview visibility, upload/delete commands and shared record endpoints must honor the current permission context. A custom panel must not bypass the same checks. A company switch must not retain a previous company's selected record or files as if they belonged to the new context.
+
+## Text hierarchy
+
+Use the shared text roles consistently: record titles and section headings are primary and semibold; labels are slate at 13px; values are primary at 14px and regular weight. Metric values use 20px semibold text. Inactive tabs and supporting descriptions use secondary text, while the selected tab uses the existing brand token.
+
+Do not make every value or label bold. Ordinary totals remain regular; the grand total receives emphasis. Readonly values keep normal readable contrast. These roles belong in shared tokens and styles, not individual module config.
