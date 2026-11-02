@@ -20,6 +20,11 @@ Failed cutover rolls back transactionally. After success, rollback means restori
 the verified database/files backup and matching code; do not merge schemas blindly.
 Keep writers stopped through acceptance so rollback cannot lose newer writes.
 
+The configured development database completed this cutover on 2 November 2026.
+TECSA is its only Company, with 152 independent business tables. The shared schema
+retains directory/security infrastructure; the empty canonical template is a table
+definition source, not another Company or a second copy of Company data.
+
 Two journeys use the existing foundation:
 
 - Header **Company** opens the searchable **Change company** drawer, showing
