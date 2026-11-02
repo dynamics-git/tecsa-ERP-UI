@@ -1,5 +1,16 @@
 # Create a table and its API
 
+## Company storage
+
+One migration/model/ApiSource definition describes a logical business table.
+After backend storage cutover, Core provisions separate physical tables for every
+Company inside its workspace database. Use existing CompanyData classification;
+do not create per-Company controllers, model classes, field lists or UI configs.
+The Company directory/security/session infrastructure remains shared. API URLs,
+SystemId and business relationships are unchanged. New schema migrations run
+through Laravel's coordinated Company storage path; custom data transformations
+must use explicit Company context. See [Companies](/documentation/modules/companies).
+
 For an ordinary table without custom business rules, create three backend files: Migration, Model and API Controller. Shared core supplies the CRUD runtime; the migration supplies the real database contract.
 
 ## 1. Migration
@@ -39,7 +50,7 @@ return new class extends Migration {
 
 `SystemFields::columns` provides `system_id`, created/modified timestamps and actors, and the row version. Do not add a second ordinary `id` merely to identify the same record. Audit values are maintained by the shared lifecycle, not trusted from the request.
 
-Use lengths, nullability, defaults, decimal scale and constraints that reflect the domain. If a business key is company-specific, its unique constraint must include company scope. Add a corresponding FK when a child depends on it.
+Use lengths, nullability, defaults, decimal scale and constraints that reflect the domain. Existing composite business keys remain valid. In physical Company tables, a unique key is already local to that Company; do not invent another record identity. Add the real corresponding FK when a child depends on a business key.
 
 ## 2. Model
 
@@ -49,7 +60,9 @@ Use lengths, nullability, defaults, decimal scale and constraints that reflect t
 namespace App\Models;
 
 use App\Models\Concerns\HasEntityDefinition;
+use App\Support\CompanyData;
 
+#[CompanyData('master')]
 class Sample extends BaseModel
 {
     use HasEntityDefinition;
@@ -58,7 +71,7 @@ class Sample extends BaseModel
 }
 ```
 
-The naming convention resolves the `samples` table. Use an explicit table override only for a real naming exception. An ordinary schema-backed model does not repeat every database column in handwritten `fillable`, casts or a second entity field list.
+The naming convention resolves the `samples` table. CompanyData classifies the table once for physical ownership and setup/master/full-copy scope; it is not a field list. Use an explicit table override only for a real naming exception. An ordinary schema-backed model does not repeat every database column in handwritten `fillable`, casts or a second entity field list.
 
 `HasEntityDefinition` now obtains storage fields, defaults and physical casts from
 the existing schema resolver. Public API write/exposure flags remain separate from
@@ -68,13 +81,13 @@ Keep deliberate behavior casts such as password hashing and encryption.
 
 The same ordinary CRUD runtime supports the existing authenticatable User and
 explicitly global Companies API. A company-scoped URL still requires verified
-company access. No new Company copy/delete feature is included in this cleanup.
+company access. Company provisioning/copy/delete use the storage contract described above.
 
 This is the ordinary API authoring path. Document adapters retain schema-mapped
 values alongside their business initialization. Explicit command inputs, such as
 source lines to invoice or quantities to post, still belong to the service;
 adding a column does not invent new posting behavior. Behavioral verification of
-the current cleanup is deferred.
+each storage or business change must be verified against its actual supported contract.
 
 ## 3. API controller
 
