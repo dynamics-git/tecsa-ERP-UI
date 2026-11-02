@@ -1,5 +1,13 @@
 # What's new in developer documentation
 
+## 2 November 2026: Company-specific physical storage
+
+The backend branch introduces physical Company schemas within existing workspace
+databases, transactional provisioning, scoped HTTP/console/queue execution and
+schema-based copy/delete. UI/API contracts remain unchanged. Rollout is a controlled
+database cutover with verified backups and acceptance, not a frontend configuration
+change. See [Companies](/documentation/modules/companies) for migration/rollback.
+
 ## 2 November 2026: shared record acceptance checkpoint 6/7
 
 Corrected shared field-write authorization to accept an already-resolved private
