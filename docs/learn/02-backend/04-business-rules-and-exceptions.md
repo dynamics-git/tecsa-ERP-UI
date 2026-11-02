@@ -131,17 +131,19 @@ Disable unsupported operations on the API and reflect their capabilities in the 
 
 The backend also contains an integration provider example for package-based table publication. That is an advanced integration surface, not another registration required for ordinary controllers. The future SDK generator must emit the same supported contracts rather than creating a parallel CRUD architecture.
 
-## Stage 5: keep input DTOs separate from record write policy
+## Stage 5: command shape versus business behavior
 
-Ordinary domain inputs obey the same ApiSource create/update flags as Core CRUD.
-Do not copy readonly physical-field lists into prepare methods. Keep real business
-validation there: required command inputs, eligible masters, positive quantities,
-workflow state and calculations. Supported business account/document-type sets
-remain business rules even where they currently match a storage CHECK enum.
+Ordinary schema-column acceptance does not require a manual write-policy list.
+The earlier policy-relocation implementation was reverted. Do not move old service
+restrictions wholesale into controllers. Their business necessity requires evidence.
 
-A posting command can return an immutable posted source while accepting quantities
-and source-line IDs in its own DTO. Reuse that source's schema shape for precision,
-not its readonly-record CRUD flags as a command input allowlist. Existing command
-aliases and per-field authorization remain explicit; do not guess bindings from
-identical JSON names. Numbering aliases and structured dimensions still belong to
-their business adapter rather than becoming invented database fields.
+For a proven command-to-physical-field binding, use existing EntityRegistry field
+metadata and EntityInput rulesForFields/decimalPattern instead of copied lengths
+or numeric precision. Keep required inputs, signs, canonical format, collection
+limits, eligibility and existing field authorization. Posted sources provide
+physical shape without granting their immutable record CRUD operations.
+
+The targeted corrections change input preparation only. Financial posting,
+numbering, rounding, allocations and workflows are unchanged. Other physical
+validation copies outside the verified command scope remain separate review work;
+this is not whole-ERP acceptance or a new extension framework.

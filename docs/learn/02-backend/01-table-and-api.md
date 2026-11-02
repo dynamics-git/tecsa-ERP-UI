@@ -145,22 +145,20 @@ service. Document services retain their real aggregate initialization, numbering
 workflow and posting responsibilities. This checkpoint does not rewrite those
 services or certify every unfinished business module.
 
-## Stage 5: domain adapters use the same field contract
+## Stage 5: schema-column acceptance
 
-A domain service can add business requirements, but ordinary create/update field
-ownership belongs to its ApiSource. For example, a document number can be accepted
-at creation and locked on update. A service-derived status or snapshot can be
-non-writable. These are explicit API exceptions; ordinary new columns need no
-per-service list. Do not repeat database types, lengths or precision in the service.
+The earlier Stage 5 bulk field-policy relocation was reverted. Do not use it as
+a template for new APIs. An ordinary supported column added to a published table
+needs no per-field controller, ApiSource, service or model declaration.
 
-The existing flow remains Controller serviceInput -> domain prepare method ->
-EntityInput validatePayload -> storagePayload -> business processing -> model save.
-The business-rule array is not an ordinary field allowlist. New published columns
-receive schema validation and storage mapping even when absent from that array.
+Acceptance fixtures prove this on an SDK table and existing PR header/line tables:
+metadata, HTTP create/update/read, filter/sort, validation, defaults/nulls and
+persistence use the new column automatically. Existing UUID record identity and
+business document relationships remain unchanged. Source configuration snapshots
+stay identical before/after adding the test columns.
 
-Posting/counting/receiving DTOs remain distinct from ordinary table writes.
-Readonly posted results do not make legitimate posting inputs unwritable. Their
-existing field-authorization bindings stay; nested decimal limits now use the
-actual schema field through EntityInput decimalPattern. Business sign, required
-inputs, array limits and canonical number formatting remain deliberate rules.
-No posting/costing/calculation algorithm, route or UI page configuration changes.
+Existing shared Core supplies this behavior; it was not replaced. Targeted command
+input corrections reuse existing schema-derived patterns/rules for proven field
+bindings. No field-policy lists, new metadata endpoint, CRUD engine or UI config
+change is introduced. Full field shape is checked through existing Core metadata;
+HTTP auth/context query metadata discovers the new field names.

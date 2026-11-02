@@ -2,17 +2,22 @@
 
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
-## 2 November 2026: domain input/write-policy checkpoint 5/7
+## 2 November 2026: Stage 5 schema-column acceptance
 
-Audited 51 input adapters. Existing ordinary field prohibitions now live in
-ApiSource create/update policy; duplicate service lists are removed. Physical
-nested decimal precision uses PostgreSQL metadata through the existing helper.
-Business validation, command DTOs, field authorization, numbering and financial
-algorithms remain. New ordinary published fields keep the shared mapping path.
+Baseline b53ec7df reverts the rejected bulk field-policy relocation. Disposable
+PostgreSQL tests first prove automatic SDK and existing PR header/line column
+handling through metadata, HTTP CRUD/query, validation and persistence. Existing
+Core and field declarations are unchanged. Targeted command physical constraints
+then reuse existing schema rules while business/financial behavior remains.
 See [table/API contract](/documentation/backend/table-and-api) and
 [business exceptions](/documentation/backend/business-rules-and-exceptions).
-Focused verification and baseline limitations are recorded in the backend Stage 5
-report. This does not complete the remaining architecture checkpoints.
+The original Stage 5 alignment entry below is historical and reverted.
+
+## 2 November 2026: reverted domain input/write-policy checkpoint 5/7
+
+Implementation 96e9c2f3 moved ordinary field prohibitions into ApiSource. It was
+rejected and reverted by b53ec7df. Its former completion claims do not describe the
+current backend and must not be followed as an SDK authoring pattern.
 ## 2 November 2026: shared write lifecycle checkpoint 4/7
 
 Corrected shared parent/owned-child resolution to use actual PostgreSQL FK pairs,
