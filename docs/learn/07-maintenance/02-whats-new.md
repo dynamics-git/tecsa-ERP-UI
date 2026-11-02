@@ -1,5 +1,21 @@
 # What's new in developer documentation
 
+## 2 November 2026: response-driven ERP request lifetime
+
+Removed default 8/15-second request limits and isolated hardcoded hydration/filter/
+metadata limits. Existing timeout overrides remain optional. Pending saves retain
+their real state instead of becoming unknown because a timer elapsed; no write
+retry was introduced. Company Copy uses the shared prompt/progress/Core worksheet
+workflow and selected source identity. Import/token lint and compilation are
+checked separately from regression suites; no additional test suite was run for
+this user-requested review. See [commands and RunModal](/documentation/core/commands-and-runmodal).
+
+Import/token lint and the development build passed. Production compilation reached
+the initial-bundle guard but exceeds its unchanged 1.2 MB ceiling by 6.63 kB; this
+is an unresolved bundle-size blocker, not a TypeScript error or a passed release
+build. No budget was raised to conceal it. The configured PostgreSQL statement,
+lock and idle-transaction timeouts were checked and all are disabled (`0`).
+
 ## 2 November 2026: Company-specific physical storage
 
 The backend branch introduces physical Company schemas within existing workspace
@@ -7,6 +23,56 @@ databases, transactional provisioning, scoped HTTP/console/queue execution and
 schema-based copy/delete. UI/API contracts remain unchanged. Rollout is a controlled
 database cutover with verified backups and acceptance, not a frontend configuration
 change. See [Companies](/documentation/modules/companies) for migration/rollback.
+
+## 2 November 2026: missing attachment files during company copy
+
+Full company copy skips attachments whose source file is already missing. The API
+returns warnings and the completion dialog reports the skipped count. Valid files
+and records still copy; no broken destination attachment is created. Source cleanup
+is separate. Other storage failures still roll back the operation.
+See [Companies](/documentation/modules/companies).
+
+## 2 November 2026: full copy with historical collaboration owners
+
+Reproduced a full-copy 409 caused by existing Notes whose parent had already been
+physically deleted. Full copy now preserves those Notes/files and historical owner
+IDs without recreating parent records. Live-owner mappings, other-company isolation,
+independent files and rollback on storage-copy failures remain enforced. Missing
+files now follow the warning behavior above. Source data is not
+deleted or repaired automatically. The copy prompt explicitly names its source.
+See [Companies](/documentation/modules/companies).
+
+## 2 November 2026: restored-session access and disabled commands
+
+Authenticated route entry now initializes the existing permission refresh service.
+Previously a restored session could keep older operation flags until a lazy
+consumer such as the company switcher instantiated AuthService. No new refresh
+engine, per-page request or SUPER bypass was added. Shared shell/document/line
+toolbar commands now dim visibly when disabled and use a not-allowed cursor.
+Focused checks cover restored-session refresh, allowed and denied server flags,
+and an open worksheet receiving updated access. See
+[command access and layout](/documentation/core/commands-and-runmodal).
+
+## 2 November 2026: shared command prompt and progress presentation
+
+Compact shared prompts stack their fields instead of inheriting three document
+columns. Dialog spacing, typography and surfaces reuse existing tokens. Copy
+company uses a short description and readable choices, without an explanatory
+callout. Its shared spinner starts only after submission and cannot be dismissed
+while pending. Existing CRUD/delete loading remains unchanged. See
+[command dialogs](/documentation/core/commands-and-runmodal).
+
+## 2 November 2026: Companies toolbar correction
+
+Removed the duplicate, unhandled New company command and custom Delete company
+handler. Companies uses Core New/Delete, including shared delete confirmation and
+loading state. Copy is its only custom business command. Removed the extra page
+loader/workspace component and bespoke stylesheet; the Companies HTML binds
+ListPage directly, following PR, with shared feedback dialogs and loader.
+Corrected DataSourceService resource normalization: a global Companies record URL
+must not be stripped as a company-scoped resource prefix. That error could report
+an already-committed write as failed during cache invalidation.
+See [Companies](/documentation/modules/companies).
 
 ## 2 November 2026: shared record acceptance checkpoint 6/7
 

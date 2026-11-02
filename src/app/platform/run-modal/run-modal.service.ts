@@ -1,14 +1,13 @@
 import { DocumentConfigDataService } from '../data/document-config-data.service';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom, Subject } from 'rxjs';
-import { timeout } from 'rxjs/operators';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
 import { PopupMode, PopupSize } from '../models/popup-config.model';
 import { RunModalHostData } from '../models/run-modal-host-data.model';
 import { DataSourceService, DataPage } from '../data/data-source.service';
 import { ApiErrorService } from '../data/api-error.service';
-import { RUNTIME_TIMEOUT_POLICY } from '../data/runtime-timeout-policy.token';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../data/runtime-timeout-policy.token';
 import { ListFilterStateService } from '../pages/list-filter-state.service';
 import { PageModule, RunModalContext } from './run-modal-config.token';
 import { RunModalConfigAssemblerService } from './run-modal-config-assembler.service';
@@ -53,7 +52,7 @@ export class RunModalService {
   private readonly entryRevisions = new Map<string, { source: DataSourceConfig; revision: number; before: Record<string, unknown> }>();
   readonly entriesChanged$ = new Subject<SavedEntryChange>();
   private windows: import('../models/popup-config.model').PopupConfig[] = [];
-  private readonly deferredSaves = new Map<string, {record: Record<string, unknown>; owner: BackgroundSaveOwner; hidden: boolean; timer: ReturnType<typeof setTimeout>; valid(): boolean}>();
+  private readonly deferredSaves = new Map<string, {record: Record<string, unknown>; owner: BackgroundSaveOwner; hidden: boolean; valid(): boolean}>();
   private readonly notices = signal<SaveNotice[]>([]);
   backgroundFor(pageId: string): SaveNotice[] { return this.notices().filter(item => item.pageId === pageId && item.valid()); }
   isRecordBackground(record: Record<string,unknown> | undefined): boolean { return [...this.deferredSaves.values()].some(save=>save.record===record && save.hidden); }
@@ -68,11 +67,7 @@ export class RunModalService {
     const valid = this.data.captureWriteScope();
     const initial = this.entryRevisions.get(window.id);
     if (!initial) return false;
-    const timer = setTimeout(() => {
-      if (!valid()) { this.entryPages.delete(window.id); this.entryRevisions.delete(window.id); this.parents.delete(window.id); this.releaseDeferred(window.id); this.dismissSaveNotice(window.id); this.stack.close(window.id); return; }
-      if (this.deferredSaves.get(window.id)?.hidden && owner.state().pending) this.notice(window.id,{state:'unknown',message:'Save confirmation is taking longer than expected. Check the server status before retrying.'});
-    }, this.policy.requestTimeoutMs);
-    this.deferredSaves.set(window.id,{record,owner,hidden:false,timer,valid});
+    this.deferredSaves.set(window.id,{record,owner,hidden:false,valid});
     const label = String(owner.state().record[initial.source.headerPKProp ?? 'number'] ?? owner.state().record['code'] ?? window.title ?? initial.before[initial.source.keyField ?? 'systemId'] ?? 'Record');
     this.notices.update(items => [...items.filter(item => item.id !== window.id),{id:window.id,pageId:this.entryPages.get(window.id)!,label,state:'saving',message:'Saving changes…',valid}]);
     return true;
@@ -94,7 +89,6 @@ export class RunModalService {
         if (!save.hidden) { save.owner.resumed(); continue; }
         const state = save.owner.state();
         if (state.pending) continue;
-        clearTimeout(save.timer);
         if (state.dirty) {
           this.notice(id,{state:state.uncertain?'unknown':'error',message:state.uncertain?'Save outcome is unknown. Check the server status before retrying.':state.message || 'Changes could not be saved.'});
         } else {
@@ -108,7 +102,7 @@ export class RunModalService {
   }
   resumeSave(id: string): void {
     const save=this.deferredSaves.get(id);if(!save || !save.valid())return;
-    clearTimeout(save.timer);save.hidden=false;save.owner.resumed();this.dismissSaveNotice(id);
+    save.hidden=false;save.owner.resumed();this.dismissSaveNotice(id);
     this.stack.update(id,window=>({...window,data:{...(window.data as RunModalHostData),backgroundSave:false}}));
   }
   async verifySave(id: string): Promise<void> {
@@ -118,7 +112,7 @@ export class RunModalService {
     catch { if(save.valid())this.notice(id,{message:'Server status could not be checked. Your edits are retained; no save was retried.'}); }
     finally { this.notice(id,{checking:false}); }
   }
-  private releaseDeferred(id: string): void { const save=this.deferredSaves.get(id);if(save)clearTimeout(save.timer);this.deferredSaves.delete(id); }
+  private releaseDeferred(id: string): void { this.deferredSaves.delete(id); }
 
   constructor() {
     this.stack.stack$.subscribe(stack => {
@@ -155,7 +149,7 @@ export class RunModalService {
           !config.dataSource.singleton && record[config.dataSource.keyField ?? 'systemId'] == null && config.dataSource.headerPKProp) {
         try {
           const source = this.contextualSource({...config.dataSource, lineFKProp: config.dataSource.headerPKProp}, {headerData: record});
-          const page = await firstValueFrom(this.data.loadList(source, {top: 2}).pipe(timeout<unknown>(this.policy.requestTimeoutMs))) as DataPage;
+          const page = await firstValueFrom(this.data.loadList(source, {top: 2}).pipe(optionalRequestTimeout<unknown>(this.policy.requestTimeoutMs))) as DataPage;
           if (page.value.length !== 1) { this.failure = 'related-record-missing'; return false; }
           record = page.value[0];
         } catch {
@@ -244,7 +238,7 @@ export class RunModalService {
     try {
       const source = { ...binding.source, defaultFilter: this.filters.buildFilter(id) };
       const size = source.pageSize ?? 20;
-      const page = await firstValueFrom(this.data.loadList(source, { top: size, skip: reset ? 0 : binding.rows.length, cursor: reset ? undefined : binding.cursor, useCache: true, maxAgeMs: 30000, forceRefresh }).pipe(timeout<unknown>(this.policy.hydrationTimeoutMs))) as DataPage;
+      const page = await firstValueFrom(this.data.loadList(source, { top: size, skip: reset ? 0 : binding.rows.length, cursor: reset ? undefined : binding.cursor, useCache: true, maxAgeMs: 30000, forceRefresh }).pipe(optionalRequestTimeout<unknown>(this.policy.hydrationTimeoutMs))) as DataPage;
       if (generation !== binding.generation || !this.lists.has(id)) return;
       binding.rows = reset ? page.value : [...binding.rows, ...page.value];
       binding.cursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;

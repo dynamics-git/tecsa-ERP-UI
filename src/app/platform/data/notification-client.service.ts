@@ -1,10 +1,10 @@
 import { inject, Injectable, InjectionToken } from '@angular/core';
-import { firstValueFrom, timeout } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { RestService } from '../../core/services/rest.service';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
 import { RunModalService } from '../run-modal/run-modal.service';
-import { RUNTIME_TIMEOUT_POLICY } from './runtime-timeout-policy.token';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from './runtime-timeout-policy.token';
 export interface InboxEntry {
   systemId: string;
   systemRowVersion: number;
@@ -52,7 +52,7 @@ export class NotificationClient {
   }
   private async read<T>(request: import('rxjs').Observable<unknown>): Promise<T> {
     const scope = this.scope();
-    const response = await firstValueFrom(request.pipe(timeout(this.policy.requestTimeoutMs)));
+    const response = await firstValueFrom(request.pipe(optionalRequestTimeout(this.policy.requestTimeoutMs)));
     if (scope !== this.scope()) throw new Error('Your company or session changed.');
     return response as T;
   }

@@ -167,6 +167,7 @@ export class DynamicForm {
   }
   ngOnDestroy(): void { this.destroyed=true; this.validationRuns.clear(); this.lookupSearch?.unsubscribe(); this.lookups.forEach(subscription => subscription.unsubscribe()); }
   @Input() sections: FormSectionConfig[] = [];
+  @Input() layout: 'default' | 'stacked' = 'default';
   @Input() dependencySections?: FormSectionConfig[];
   @Input() data: Record<string, unknown> = {};
   @Output() draftChanged = new EventEmitter<{fieldKey:string;invalid:boolean}>();

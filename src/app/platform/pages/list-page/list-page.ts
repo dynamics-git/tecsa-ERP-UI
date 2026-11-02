@@ -9,7 +9,7 @@ import { resolvePageIdentity, recordIdentityText } from '../../data/record-ident
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
 import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
-import { catchError, map, timeout } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
 import { AttachmentsConfig, DocumentWindowConfig, HeaderConfig, LineTotalsConfig, DocumentStatusMessage } from '../../models/document-window-config.model';
@@ -37,7 +37,7 @@ import { ListFilterStateService } from '../list-filter-state.service';
 import { MasterDataService } from '../../data/master-data.service';
 import { PageCommandService } from '../page-command.service';
 import { RunModalStackService } from '../../run-modal/run-modal-stack.service';
-import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../../data/runtime-timeout-policy.token';
 import {
   DocumentPageDataSourceResolverService,
   DocumentPageLineValueType,
@@ -154,7 +154,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.startPopupLoading('Loading records...');
       const existing = reset ? [] : (this.activeDocumentWindowConfig?.lineRows ?? []).filter(row => this.hasValue(this.resolvePersistedRecordId(row, this.worksheetSource)));
       const size = this.worksheetSource.pageSize ?? 25;
-      const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
+      const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
       const records = await this.documentHydration.resolveLineLookups(page.value, this.lineConfig.columns, this.initialRecord ?? {}, () => true, () => this.startPopupLoading('Loading selected values...'));
       this.nextCursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
       this.hasMore = this.worksheetSource.paging === 'cursor' ? !!this.nextCursor : typeof page.meta['total'] === 'number' ? existing.length + records.length < page.meta['total'] : records.length === size;
@@ -744,7 +744,7 @@ export class ListPage implements OnInit, OnDestroy {
     if (initialLoad && this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
     let setupRecordLoaded = false;
     this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource, { useCache: true, maxAgeMs: 30000, onRequest: () => this.startPopupLoading('Loading setup...') }).pipe(
-      timeout(this.timeoutPolicy.hydrationTimeoutMs),
+      optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs),
       switchMap(record => {
         setupRecordLoaded = true;
         return from(this.documentHydration.resolveHeaderLookups(this.isRecord(record) ? record : {}, this.headerConfig.sections.flatMap(section => section.fields), () => this.startPopupLoading('Loading selected values...')));
@@ -785,7 +785,7 @@ export class ListPage implements OnInit, OnDestroy {
           const header=this.activeDocumentWindowConfig?.headerData ?? {};
           const id=this.resolvePersistedRecordId(header,this.listConfig.dataSource);
           if(!this.hasValue(id) && !this.listConfig.dataSource.singleton)return 'The new record has no confirmed identifier yet. Your edits are retained; do not submit it again.';
-          const result=await firstValueFrom(this.dataSource.loadById(this.listConfig.dataSource,id,{forceRefresh:true}).pipe(timeout(this.timeoutPolicy.hydrationTimeoutMs)));
+          const result=await firstValueFrom(this.dataSource.loadById(this.listConfig.dataSource,id,{forceRefresh:true}).pipe(optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs)));
           const current=this.resolveHeaderRecordResponse(result,{});
           const edits=this.unsavedFields.get(header);
           const matches=!!edits?.size && [...edits.keys()].every(field=>JSON.stringify(current[field])===JSON.stringify(header[field]));
@@ -1209,7 +1209,7 @@ export class ListPage implements OnInit, OnDestroy {
         resolved.dataSource,
         header,
         {
-          timeoutMs: 10000,
+          timeoutMs: this.timeoutPolicy.hydrationTimeoutMs,
           fallbackHeaderPKProp: this.listConfig.dataSource.headerPKProp,
           defaultTop: backgroundTop,
           allowWithoutParentKey: pageType === 'worksheet',
@@ -1910,7 +1910,7 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
-    const payload = this.documentConfigData.buildLineUpdatePayload(row, this.isWorksheetPage ? this.lineConfig.dataSource.updateFields ?? uniqueFields : uniqueFields, this.lineConfig);
+    const payload = this.documentConfigData.buildLineUpdatePayload(row, uniqueFields, this.lineConfig);
     if (this.isWorksheetPage) { this.worksheetPending++; this.lineCreateInProgress.add(row); }
     this.setEntryStatus({
       tone: 'info',
@@ -2466,8 +2466,11 @@ export class ListPage implements OnInit, OnDestroy {
         (!this.activeLineRow || this.activeLineRow['__entryPlaceholder'] === true || this.selectedLineIndexes.length > 1)) {
       this.setEntryStatus({tone: 'error', title: 'Select a saved row', message: 'Select one saved line before opening its related record.'}); return true;
     }
-    if (this.isWorksheetPage && button?.requireSelection && (!this.activeLineRow || !this.hasValue(this.resolvePersistedRecordId(this.activeLineRow, this.listConfig.dataSource)) || this.dirtyWorksheet)) {
-      this.setEntryStatus({tone: 'error', title: 'Select a saved row', message: 'Complete your changes and select a saved record first.'}); return true;
+    if (this.isWorksheetPage && button?.requireSelection && (!this.activeLineRow || !this.hasValue(this.resolvePersistedRecordId(this.activeLineRow, this.listConfig.dataSource)))) {
+      this.setEntryStatus({tone: 'info', title: 'Select a record', message: 'Select an existing record first.'}); return true;
+    }
+    if (this.isWorksheetPage && button?.requireSelection && this.dirtyWorksheet) {
+      this.setEntryStatus({tone: 'info', title: 'Finish saving', message: 'Wait for your changes to finish saving, then try again.'}); return true;
     }
     const pageId = this.toText(button?.runModalPageId).trim();
     if (!pageId.length) {
@@ -2534,8 +2537,10 @@ export class ListPage implements OnInit, OnDestroy {
       payload,
       context: {
         pageId: this.pageId,
-        selectedRow: this.selectedRow,
-        checkedRowKeys: [...this.checkedRowKeys],
+        selectedRow: this.isWorksheetPage ? this.activeLineRow : this.selectedRow,
+        checkedRowKeys: this.isWorksheetPage
+          ? this.selectedLineIndexes.map(index => this.activeDocumentWindowConfig?.lineRows?.[index]).filter(row => !!row).map(row => this.getRowKey(row))
+          : [...this.checkedRowKeys],
         headerData: this.activeDocumentWindowConfig?.headerData,
         lineRows: this.activeDocumentWindowConfig?.lineRows,
       },

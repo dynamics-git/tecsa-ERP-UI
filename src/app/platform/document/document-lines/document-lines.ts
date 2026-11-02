@@ -1,7 +1,7 @@
 import { MINIMUM_LINE_GRID_ROWS } from '../../models/line-config.model';
 import { CommandConfig } from '../../models/command-config.model';
 import { moveQuickEntry } from '../../../shared/ui/quick-entry';
-import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../../data/runtime-timeout-policy.token';
 import { readTabularText, writeTabularText } from '../../data/tabular-text';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { ListPersonalizationService } from '../../pages/list-personalization.service';
@@ -26,7 +26,7 @@ import {
 import { FieldChangeSource } from '../../models/field-config.model';
 import { LineColumnConfig } from '../../models/line-config.model';
 import { DataSourceService } from '../../data/data-source.service';
-import { Subscription, timer, switchMap, from, firstValueFrom, timeout } from 'rxjs';
+import { Subscription, timer, switchMap, from, firstValueFrom } from 'rxjs';
 
 type LineOption = { label: string; value: unknown; record?: Record<string, unknown> };
 
@@ -497,7 +497,7 @@ export class DocumentLines {
     const field=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)?(lookup.valueField ?? 'systemId'):lookup.displayField;
     if(!/^[A-Za-z_]\w*$/.test(field))throw new Error('Unsupported lookup field.');
     const exact=field+" eq '"+raw.replace(/'/g,"''")+"'";
-    const response=await firstValueFrom(this.source.loadList({endpoint:query.endpoint!,defaultFilter:[query.filter,exact].filter(Boolean).map(filter=>'('+filter+')').join(' and ')},{top:2,count:false,useCache:true,maxAgeMs:30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as {value:Record<string,unknown>[]};
+    const response=await firstValueFrom(this.source.loadList({endpoint:query.endpoint!,defaultFilter:[query.filter,exact].filter(Boolean).map(filter=>'('+filter+')').join(' and ')},{top:2,count:false,useCache:true,maxAgeMs:30000}).pipe(optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as {value:Record<string,unknown>[]};
     if(response.value.length!==1 || String(response.value[0][field]).toLowerCase()!==raw.toLowerCase())throw new Error('Lookup is missing or ambiguous.');
     return response.value[0];
   }

@@ -1,0 +1,10 @@
+<app-list-page
+  [listConfig]="listConfig"
+  [headerConfig]="headerConfig"
+  [lineConfig]="lineConfig"
+  [attr.inert]="busy() ? '' : null"
+  [documentOnly]="!!runModal"
+  [initialRecord]="runModal?.record"
+  (closeRequested)="requestClose()"
+  (businessCommand)="handleBusinessCommand($event)"
+></app-list-page>

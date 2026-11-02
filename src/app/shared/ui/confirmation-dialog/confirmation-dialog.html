@@ -1,19 +1,28 @@
 @if (config; as dialog) {
   <section
+    #dialogElement
     class="ts-confirmation-modal"
     role="dialog"
     aria-modal="true"
     [attr.aria-label]="dialog.title"
     tabindex="0"
-    (keydown.escape)="cancel()"
+    (keydown.escape)="$event.stopPropagation(); cancel()"
     (keydown.enter)="$any($event.target).tagName !== 'TEXTAREA' && confirm()">
     <h3 class="ts-confirmation-modal__title">{{ dialog.title }}</h3>
-    <p class="ts-confirmation-modal__message">{{ dialog.message }}</p>
+    @if (dialog.kind === 'progress') {
+      <div class="ts-confirmation-modal__progress">
+        <app-loading-indicator [label]="dialog.message"></app-loading-indicator>
+        <p class="ts-confirmation-modal__message">Keep this window open until the operation finishes.</p>
+      </div>
+    } @else if (dialog.message) {
+      <p class="ts-confirmation-modal__message">{{ dialog.message }}</p>
+    }
     @if (dialog.sections && dialog.values) {
-      <app-dynamic-form [sections]="dialog.sections" [data]="dialog.values"></app-dynamic-form>
+      <app-dynamic-form layout="stacked" [sections]="dialog.sections" [data]="dialog.values"></app-dynamic-form>
     }
     @if (validationError) { <p role="alert">{{ validationError }}</p> }
 
+    @if (dialog.kind !== 'progress') {
     <footer class="ts-confirmation-modal__actions">
       <button
         #confirmButton
@@ -32,5 +41,6 @@
         </button>
       }
     </footer>
+    }
   </section>
 }

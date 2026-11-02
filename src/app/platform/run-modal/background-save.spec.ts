@@ -82,9 +82,10 @@ describe('Shared save status with isolated API fixtures',()=>{
   expect(policy.canSynchronizeListRecord([before],before,{systemId:'one',systemRowVersion:2},source)).toBe(false);
   expect(policy.canSynchronizeListRecord([],before,saved,source)).toBe(false);
  });
- it('replaces indefinite progress with an unknown status and checks the server without resubmitting',async()=>{
+ it('keeps a pending save in progress past a configured read deadline and checks the server without resubmitting',async()=>{
   const {f,modal,pending,patch,get}=await create(40);
-  await vi.waitFor(()=>expect(modal.backgroundFor('items')[0]?.state).toBe('unknown'));
+  await new Promise(resolve=>setTimeout(resolve,60));
+  expect(modal.backgroundFor('items')[0]?.state).toBe('saving');
   const notice=modal.backgroundFor('items')[0];await modal.verifySave(notice.id);
   expect(get).toHaveBeenCalledTimes(1);expect(patch).toHaveBeenCalledTimes(1);
   expect(modal.backgroundFor('items')[0].message).toContain('not confirmed');

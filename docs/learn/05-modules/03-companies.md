@@ -25,6 +25,25 @@ TECSA is its only Company, with 152 independent business tables. The shared sche
 retains directory/security infrastructure; the empty canonical template is a table
 definition source, not another Company or a second copy of Company data.
 
+## Copy execution and loading limits
+
+Copy uses `DataSourceService.execute` against the selected Company's `/copy`
+command. The shared REST POST has no client timeout or automatic retry; progress
+remains open until success or failure, and pending operation guards block closing.
+Ordinary page reads also wait for their actual response by default. The previous
+8/15-second policy and isolated 5/10/15-second cutoffs have been removed. A host
+can explicitly supply an optional timeout policy; ordinary page configs require
+none. Background saves remain pending until their real result, and a timer cannot
+turn an in-flight write into an unknown outcome or cause an automatic retry.
+
+In the current development topology Angular calls local Laravel, while Laravel
+connects to hosted PostgreSQL. Read-only server measurements on 2 November 2026
+returned Payment Terms in 2.18 seconds (68 queries, 2.04 seconds in SQL) and auth
+context in 5.14 seconds (72 queries, 4.85 seconds in SQL). These are individual
+observations, not load benchmarks or browser end-to-end measurements. The local
+development server can queue simultaneous reads; colocating API/database and
+profiling query round trips addresses latency without hiding it by raising limits.
+
 Two journeys use the existing foundation:
 
 - Header **Company** opens the searchable **Change company** drawer, showing

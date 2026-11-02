@@ -3,7 +3,8 @@ import type { ListAppliedFilter } from '../../models/list-personalization-config
 import type { FilterOperator } from '../../models/list-filter-config.model';
 import { ListPersonalizationService } from '../list-personalization.service';
 import { ChangeDetectorRef, Component, EventEmitter, HostBinding, Input, OnDestroy, OnInit, Output, inject } from '@angular/core';
-import { Subscription, finalize, timeout } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../../data/runtime-timeout-policy.token';
 import { DataSourceService } from '../../data/data-source.service';
 import { ActionDispatcherService } from '../../../shared/ui/action-dispatcher.service';
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
@@ -37,6 +38,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
   validationMessage = '';
   private appliedFilters: ListAppliedFilter[] = [];
   private readonly personalization = inject(ListPersonalizationService);
+  private readonly timeoutPolicy = inject(RUNTIME_TIMEOUT_POLICY);
   private readonly changeDetector = inject(ChangeDetectorRef);
   @Input() columns: Array<{ id?: string; label?: string; field?: string; type?: string; hidden?: boolean; filterable?: boolean; filter?: Omit<ListFilterFieldConfig, 'field' | 'label'> }> = [];
   @Input() filterOptions: ListFilterFieldConfig[] = [];
@@ -410,7 +412,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     const scope = this.buildFilterLoadScope(config.field);
     this.loading.begin(scope, `Loading ${config.label} options...`);
     this.subscriptions.add(this.dataSource.loadList({ endpoint: config.apiUrl, pageSize: 50 }).pipe(
-      timeout(15000),
+      optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs),
       finalize(() => {
         this.dropdownLoading[row.id] = false; this.loading.end(scope);
         if (!this.destroyed) this.changeDetector.markForCheck();

@@ -1,3 +1,5 @@
+@use '../../shared/ui/command-state' as command-state;
+
 .ts-commandbar {
   min-height: var(--ts-command-h);
   padding: 0 var(--ts-space-4);
@@ -36,6 +38,8 @@
   transition:
     background 120ms ease,
     color 120ms ease;
+
+  @include command-state.disabled;
 }
 
 .ts-command:hover,

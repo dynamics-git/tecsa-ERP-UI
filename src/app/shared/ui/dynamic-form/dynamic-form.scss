@@ -74,6 +74,13 @@
   }
 }
 
+// Compact shared dialogs need readable full-width controls, independent of viewport.
+.header-form.stacked {
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--ts-space-4) 0 0;
+  .wide { grid-column: auto; }
+}
+
 
 app-lookup-select { margin-top: var(--ts-space-1); }
 

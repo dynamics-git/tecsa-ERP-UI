@@ -1,4 +1,4 @@
-<div class="header-form" (keydown)="moveQuickEntry($event)">
+<div class="header-form" [class.stacked]="layout === 'stacked'" (keydown)="moveQuickEntry($event)">
   @for (section of visibleSections; track section.id) {
     @for (field of section.fields; track field.key) {
       @if (!isHidden(field)) {

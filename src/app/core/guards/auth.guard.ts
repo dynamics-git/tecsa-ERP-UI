@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivateChildFn, CanActivateFn, Router, RouterStateSnapshot } from '@angular/router';
 import { PermissionService } from '../services/permission.service';
 import { SessionService } from '../services/session.service';
+import { AuthService } from '../services/auth.service';
 
 const canActivate = (route: ActivatedRouteSnapshot, _state: RouterStateSnapshot) => {
   const sessionService = inject(SessionService);
@@ -10,6 +11,9 @@ const canActivate = (route: ActivatedRouteSnapshot, _state: RouterStateSnapshot)
   const router = inject(Router);
 
   if (sessionService.isSessionValid()) {
+    // Start the existing access-refresh lifecycle for restored sessions too.
+    // Root services are lazy; no login page/drawer may have requested AuthService.
+    inject(AuthService);
     const pageId = route.data?.['pageId'];
     if (typeof pageId === 'string' && pageId.trim().length && !permissionService.canView(pageId)) {
       return router.createUrlTree(['/']);
