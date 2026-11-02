@@ -44,6 +44,33 @@ Check that the API source is published, the endpoint matches its source, company
 
 Overview visibility, upload/delete commands and shared record endpoints must honor the current permission context. A custom panel must not bypass the same checks. A company switch must not retain a previous company's selected record or files as if they belonged to the new context.
 
+## Backend record-feature contract (Stage 6)
+
+For a persisted record URL, shared Core supplies:
+
+| Request | Behavior |
+| --- | --- |
+| `GET /notes`, `POST /notes` | List notes or create with a body; creation returns 201 and an ETag. |
+| `PATCH /notes/{noteId}` | Change body with the current `If-Match`; returns 204. |
+| `DELETE /notes/{noteId}` | Delete with the current `If-Match`; returns 204. |
+| `GET /attachments`, `POST /attachments` | List files or upload multipart `file`. |
+| `GET /attachments/{fileId}/content` | Authenticated private download. |
+| `DELETE /attachments/{fileId}` | Delete with the current `If-Match`; returns 204. |
+
+Missing collaboration write versions return 428; stale versions return 412.
+Refresh the list for the latest version before retrying. Files do not support
+editing. Server audit identities cannot be chosen by the page.
+
+The actor needs owner-record access and the separate Notes/Attachments operation.
+Global User records still have company-separated Notes/Files. Workspace tokens
+and record features remain workspace-isolated. A flat PR line URL and its correct
+nested URL identify the same owner; another header does not.
+
+Stage 6 verifies backend APIs for PR header/line, Users and a disposable SDK source,
+including real loopback HTTP and two disposable workspace databases. No page-local
+save endpoint or extra collaboration registration is required. This is backend
+acceptance, not browser or whole-ERP acceptance.
+
 ## Text hierarchy
 
 Use the shared text roles consistently: record titles and section headings are primary and semibold; labels are slate at 13px; values are primary at 14px and regular weight. Metric values use 20px semibold text. Inactive tabs and supporting descriptions use secondary text, while the selected tab uses the existing brand token.

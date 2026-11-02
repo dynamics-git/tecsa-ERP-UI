@@ -1,5 +1,15 @@
 # What's new in developer documentation
 
+## 2 November 2026: shared record acceptance checkpoint 6/7
+
+Corrected shared field-write authorization to accept an already-resolved private
+collaboration definition, avoiding public-registry 404s without publishing private
+tables or bypassing rights. PR header/line, Users, SDK and nested-history checks
+cover Notes/Files, audit, stale writes, permissions and company isolation. Separate
+loopback HTTP checks use two disposable workspaces with matching UUIDs. No Angular
+source or feature config changed. See
+[record-feature contracts](/documentation/core/factbox-notes-and-files).
+
 Use this page to record reviewed development changes and link readers to the matching guide. Do not treat a roadmap item as a completed feature.
 
 ## 2 November 2026: Stage 5 schema-column acceptance
