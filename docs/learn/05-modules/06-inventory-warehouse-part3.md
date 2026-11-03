@@ -2,6 +2,24 @@
 
 This guide is for **TecSA ERP developers and implementation consultants**. It records the backend Part 3 work in `schema/bc-aligned-inventory-warehouse-part3-20261103`. **Physical schema code has been committed but migrations, runtime API tests, and warehouse posting acceptance are not yet completed.** The UI `main` documentation page is not evidence that the backend changes are deployed.
 
+## Phase A extension: Item Tracking Code, Variants, Serial and Lot Masters
+
+The integrated Phase A backend branch (`schema/bc-aligned-finance-part4-20261103`) now contains migrations `000306` and `000307`, sourced from **Microsoft Base Application 26.1 symbols**, not TecSA's custom BC API extensions.
+
+| Physical table | BC source | Record purpose |
+| --- | --- | --- |
+| `item_tracking_codes` | 6502 | Serial, lot and package tracking policies for Purchase, Sales, Transfer and Warehouse |
+| `item_variants` | 5401 | Company- and Item-scoped variant codes and block flags |
+| `serial_number_informations` | 6504 | Per-Item/Variant serial identification and blocking |
+| `lot_number_informations` | 6505 | Per-Item/Variant lot identity, quality and certificate reference |
+| `item_tracking_setups` | 6565 | Required serial/lot/package tracking setup |
+
+`items` additionally gains `item_tracking_code_id` + `item_tracking_code` with a Company-scoped composite FK. `inventory_reservation_entries` and `inventory_tracking_specifications` gain *optional* variant/serial/lot information IDs with Company+Item-scoped relationships. Presence of a lot or serial number **does not require** a separate info card for every tracking policy.
+
+The physical inventory totals and expired quantities are **not** stored on Serial/Lot Information; in BC they are FlowFields derived from ledger data. The five schema API sources are currently **read-only** pending item tracking validation and posting integration. They must not be used to bypass the existing Item Ledger or reservation rules.
+
+**Out of scope:** Manufacturing, Production Orders, Resource Capacity, Jobs/Projects. Tracking a manufacturing date on an inventory lot does not mean Production/MRP is enabled.
+
 ## What is in Part 3
 
 | Physical table | Purpose | API source |
