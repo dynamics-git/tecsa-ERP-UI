@@ -24,6 +24,12 @@ The physical inventory totals and expired quantities are **not** stored on Seria
 
 Migration `000308` adds `warehouse_classes`, based on BC Table 7304 (Warehouse Class), with Company-scoped SystemId and business code. Warehouse Zones and Bins gain optional `warehouse_class_id` / `warehouse_class_code` links that must refer to the same Company and master record. `warehouseClasses` is a read-only physical schema API. Classification does not create stock entries or capacity/manufacturing tables.
 
+## Phase A warehouse put-away document and registered history
+
+Migration `000309` adds `warehouse_putaways`, `warehouse_putaway_lines`, `registered_warehouse_putaways` and `registered_warehouse_putaway_lines`. These use BC Base Application 26.1 Warehouse Activity Header/Line (5766/5767) and Registered Warehouse Activity Header/Line (5772/5773) as field and relationship references, adapted to TecSA's separate Put-away tables and existing Pick/Location/Bin movement architecture.
+
+The draft Put-away header and lines preserve posted warehouse receipt source references, location, Item, Zone/Bin, take/place action type, quantity and tracking fields. Registered history is immutable and optionally links to the existing Warehouse Bin Movement Register. These are **document/history tables, not duplicate stock ledger balances**. All four schema APIs are read-only until Warehouse Registration and its quantity rules are implemented.
+
 ## What is in Part 3
 
 | Physical table | Purpose | API source |
