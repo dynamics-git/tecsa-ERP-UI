@@ -306,7 +306,7 @@ nav {
 }
 
 .attachments-heading { margin: var(--ts-8) 0 0; padding-bottom: var(--ts-space-3); border-bottom: 1px solid var(--ts-border-soft); font-size: var(--ts-font-caption); font-weight: 600; }
-.file-name { color: var(--ts-text-soft); font-weight: 600; }
+.file-name { color: var(--ts-text); font-weight: 600; }
 .file > i { display: grid; place-items: center; width: var(--ts-control-h); height: var(--ts-table-head-h); border: 1px solid var(--ts-border-soft); border-radius: var(--ts-radius-sm); background: var(--ts-surface-soft); }
 
 .note-editor {
@@ -330,8 +330,8 @@ nav {
 
 
 .note .note-meta strong { font-size: var(--ts-font-body); color: var(--ts-text); }
-.note .note-actions button { font-weight: 400; color: var(--ts-text-soft); }
-.composer { font-weight: 500; }
+.note .note-actions button { font-weight: 500; color: var(--ts-text-soft); }
+.composer { font-weight: 600; color: var(--ts-text); }
 .composer textarea { font-weight: 400; }
 .composer textarea::placeholder { color: var(--ts-muted); opacity: 1; }
 .composer-actions .save-note:not(:disabled) { background: var(--ts-brand-800); border-color: var(--ts-brand-800); color: var(--ts-text-inverse); font-weight: 600; }
