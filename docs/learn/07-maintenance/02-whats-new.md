@@ -1,5 +1,13 @@
 # What's new in developer documentation
 
+## 3 November 2026: Part 3 Inventory & Warehouse schema/API reference
+
+Added a [developer and consultant guide](/documentation/modules/inventory-warehouse-part3) for Warehouse Receipt/Shipment, Bin Content, Inventory Reservation Entry, and Tracking Specification tables. The backend work remains **unmigrated/unverified**; no new warehouse posting flow or completed reservation/tracking behavior is claimed. Existing bin/pick history and item/value ledgers remain authoritative.
+
+## 3 November 2026: Part 2 Sales schema/API reference
+
+Added the [Sales Part 2 guide](/documentation/modules/sales-part2-database) describing new draft Sales documents, item-charge tables, extended posted document fields, and API-source declarations. This is a schema inventory, not accepted Sales posting integration.
+
 ## 2 November 2026: response-driven ERP request lifetime
 
 Removed default 8/15-second request limits and isolated hardcoded hydration/filter/
