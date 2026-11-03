@@ -35,6 +35,16 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 
 **No second quantity ledger:** Bin Content defines fixed/default/dedicated/block settings and item/bin assignment; on-hand, reserved and available stock must come from authoritative inventory/bin entries and domain calculations.
 
+## Location integrity and tracking history — 3 November update
+
+**Developer contract:** Warehouse Receipt/Shipment Header and Line `zone_id` / `bin_id` foreign keys are location-scoped, not merely company-scoped. These database relationships must prevent a document for Location A from referencing a Bin or Zone belonging to Location B. Angular lookups should apply the same Location filter for usability; the database FK is the final authority.
+
+**Existing posted/immutable warehouse records extended:** Migration `000305` adds nullable `variant_code`, `lot_no`, `serial_no`, `package_no`, and source-document information where appropriate to `warehouse_bin_entries`, `warehouse_pick_activity_entries`, `warehouse_pick_reservations`, and `warehouse_pick_shipment_allocations`. The code preserves existing record keys, quantities, posted allocation values, costing methods and immutable-entry behavior.
+
+**Consultant interpretation:** A historical movement with an empty lot/serial field is *not proof* that the item was never tracked. Older transactions may predate these fields; the posting service is not yet wired to populate them. Do not use these columns for traceability reports until posting coverage, validation and historical-data policy are accepted.
+
+**Verification:** Part 3 now includes a location-scoped FK checkpoint in `WarehousePart3SchemaCheckpointTest`. Its code is committed, but it has not been run on PostgreSQL in this work. Do not migrate or certify traceability from this documentation alone.
+
 ## Technical keys and parent–line relationship
 
 | Header | Lines | Child FK |
