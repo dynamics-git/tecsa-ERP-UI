@@ -13,6 +13,10 @@ This guide is for **TecSA ERP developers and implementation consultants**. It re
 | `warehouse_bin_contents` | Bin/item/variant setup; no separate stock quantity balance | `warehouseBinContents` |
 | `inventory_reservation_entries` | Source-document reservation records | `inventoryReservationEntries` (read-only) |
 | `inventory_tracking_specifications` | Lot, serial and package traceability | `inventoryTrackingSpecifications` (read-only) |
+| `posted_warehouse_receipts` | Posted warehouse receipt header (history) | `postedWarehouseReceipts` (read-only) |
+| `posted_warehouse_receipt_lines` | Posted warehouse receipt lines | `postedWarehouseReceiptLines` (read-only) |
+| `posted_warehouse_shipments` | Posted warehouse shipment header (history) | `postedWarehouseShipments` (read-only) |
+| `posted_warehouse_shipment_lines` | Posted warehouse shipment lines | `postedWarehouseShipmentLines` (read-only) |
 
 Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000301` creates bin content configuration; `000302` adds Warehouse Receipt/Shipment No. Series fields to `inventory_setup`; `000303` creates Inventory Reservation Entries and Tracking Specifications. The last two schemas are **not yet integrated** with reservation or posting services.
 
@@ -27,6 +31,8 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 | Inventory costing | `item_ledger_entries`, `value_entries`, `item_ledger_applications`, `item_cost_applications` | Costing, application and quantity history |
 | Warehouse operations | Transfer, item-journal, cost-adjustment and posted pick activity tables | Existing posting services and historical consistency |
 
+**Posted warehouse history versus posted trade history:** `posted_warehouse_receipts` and `posted_warehouse_shipments` represent warehouse handling documents; `posted_purchase_receipts` and `posted_sales_shipments` represent accounting/trade posting histories. These must not be conflated.
+
 **No second quantity ledger:** Bin Content defines fixed/default/dedicated/block settings and item/bin assignment; on-hand, reserved and available stock must come from authoritative inventory/bin entries and domain calculations.
 
 ## Technical keys and parent–line relationship
@@ -36,7 +42,7 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 | `warehouse_receipts` | `warehouse_receipt_lines` | `warehouse_receipt_id` |
 | `warehouse_shipments` | `warehouse_shipment_lines` | `warehouse_shipment_id` |
 
-`system_id` is the technical row key. `company_id` scopes records. `number` and `line_no` are business identifiers. Generic ApiSource uses PostgreSQL field metadata and existing Core CRUD/permissions, not a second field-definition registry. Physical APIs alone do **not** implement Register, Post Receipt, Post Shipment, Create Pick, Apply Reservation or Assign Tracking actions.
+`system_id` is the technical row key. `company_id` scopes records. `number` and `line_no` are business identifiers. Generic ApiSource uses PostgreSQL field metadata and existing Core CRUD/permissions, not a second field-definition registry. Physical APIs alone do **not** implement Register, Post Receipt, Post Shipment, Create Pick, Apply Reservation or Assign Tracking actions. Four posted warehouse history APIs are read-only; the new posted history tables are not yet populated by posting services.
 
 ## Developer checklist: page and endpoint implementation
 
@@ -62,12 +68,13 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 | Checkpoint | Status |
 | --- | --- |
 | GitHub backend physical schema committed | Yes — Part 3 development branch |
-| Generic ApiSource declarations committed | Yes — 7 sources |
+| Generic ApiSource declarations committed | Yes — 11 sources |
 | Existing Core, bin ledgers and posting services preserved | No deliberate rewrite in Part 3 |
 | Database migration executed | **Not yet** |
 | Test suite / runtime API verified | **Not yet** |
 | Reservation & tracking posting integration | **Not yet** |
 | Warehouse Receipt/Shipment end-to-end workflow | **Not yet** |
+| Posted warehouse history written through posting services | **Not yet** |
 | Backend `main` merged | **No** |
 
 See [Purchasing Part 1](/documentation/modules/purchasing-pr28-database), [Sales Part 2](/documentation/modules/sales-part2-database), [Table and API](/documentation/backend/table-and-api), and [Header and lines](/documentation/frontend/header-and-lines).
