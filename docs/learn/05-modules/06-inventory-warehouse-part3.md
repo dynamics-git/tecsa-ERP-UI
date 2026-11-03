@@ -1,5 +1,9 @@
 # Inventory & Warehouse Part 3 — database and API guide
 
+## Phase A physical FK integrity correction
+
+Warehouse Receipt/Shipment Lines now have an **unconditional Company + Header SystemId parent FK** as well as the optional Header Location-scoped FK. This matters because PostgreSQL skips a composite FK whenever a nullable referencing column is NULL. A Zone or Bin cannot be supplied without a Location. Registered/Posted Warehouse history keeps source draft Line SystemIds as indexed immutable **snapshots**, not restrictive draft FKs that prevent removing completed handling documents. Posting source validation and journal registration remain outside Phase A. All these changes reside on the integrated backend development branch until migrations and acceptance.
+
 This guide is for **TecSA ERP developers and implementation consultants**. It records the backend Part 3 work in `schema/bc-aligned-inventory-warehouse-part3-20261103`. **Physical schema code has been committed but migrations, runtime API tests, and warehouse posting acceptance are not yet completed.** The UI `main` documentation page is not evidence that the backend changes are deployed.
 
 ## Phase A extension: Item Tracking Code, Variants, Serial and Lot Masters
