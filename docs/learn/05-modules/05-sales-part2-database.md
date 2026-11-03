@@ -2,6 +2,14 @@
 
 **Status:** Backend migrations committed on `schema/bc-aligned-sales-part2-20261103`. PostgreSQL migration, runtime API verification, and backend merge are **not completed**. This is a schema reference, not a declaration that Sales UI pages are implemented.
 
+## Current ERP scope — no Manufacturing / Jobs / Resource Capacity
+
+**Current sequence:** Part 1 Purchasing → Part 2 Sales → Part 3 Inventory & Warehouse → Part 4 Finance / G/L. Complete these physical schemas and relationships first; conduct integrated PostgreSQL migration and API acceptance afterwards.
+
+**Explicitly deferred:** Manufacturing, Production Orders, Capacity Planning, Resource Capacity and Job/Project modules. BC contains Resource (156), Resource Group (152) and capacity-related FlowFields, but they are not required in the currently approved TecSA database rollout. The previously proposed Resource/Resource Group migration `000213` was removed from the backend development branch, without migration or main merge.
+
+For developers: maintain the existing Sales Line Item/G/L Account type restrictions. Do not generate Resource/Job records merely because the standard BC Sales Line enum lists additional types. For consultants: optional BC capabilities are not enabled in TecSA until the corresponding module is explicitly scheduled.
+
 ## Sales Order BC Table 36/37 acceptance correction
 
 **Do not treat this page as an accepted BC-aligned Sales Order module.** The latest source review compared Microsoft BC Sales Header (Table 36) and Sales Line (Table 37) with TecSA's actual migration and `SalesOrderService`:
