@@ -1,5 +1,9 @@
 # What's new in developer documentation
 
+## 3 November 2026: Finance and General Ledger Part 4 checkpoint
+
+Published the [Finance Part 4 developer/consultant guide](/documentation/modules/finance-part4), identifying existing General Ledger, VAT, Receivables, Payables and Bank Reconciliation tables, plus a bank history extension migration. The backend is **not migrated or accepted**. No duplicate accounting ledger or posting engine was added.
+
 ## 3 November 2026: Part 3 Inventory & Warehouse schema/API reference
 
 Added a [developer and consultant guide](/documentation/modules/inventory-warehouse-part3) for Warehouse Receipt/Shipment, Bin Content, Inventory Reservation Entry, and Tracking Specification tables. The backend work remains **unmigrated/unverified**; no new warehouse posting flow or completed reservation/tracking behavior is claimed. Existing bin/pick history and item/value ledgers remain authoritative.
