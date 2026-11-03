@@ -37,6 +37,8 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 
 ## Location integrity and tracking history — 3 November update
 
+**Header–Line location correction:** The line's `(company_id, warehouse_receipt_id, location_id)` or `(company_id, warehouse_shipment_id, location_id)` now references the corresponding Header's `(company_id, system_id, location_id)`. Line Zone references also use `(company_id, location_id, zone_id)`. This prevents a non-null line Location from disagreeing with its Header and prevents selecting a Zone from another Location. A NULL Location on an unfinished draft is not a substitute for business validation at registration/posting.
+
 **Developer contract:** Warehouse Receipt/Shipment Header and Line `zone_id` / `bin_id` foreign keys are location-scoped, not merely company-scoped. These database relationships must prevent a document for Location A from referencing a Bin or Zone belonging to Location B. Angular lookups should apply the same Location filter for usability; the database FK is the final authority.
 
 **Existing posted/immutable warehouse records extended:** Migration `000305` adds nullable `variant_code`, `lot_no`, `serial_no`, `package_no`, and source-document information where appropriate to `warehouse_bin_entries`, `warehouse_pick_activity_entries`, `warehouse_pick_reservations`, and `warehouse_pick_shipment_allocations`. The code preserves existing record keys, quantities, posted allocation values, costing methods and immutable-entry behavior.
