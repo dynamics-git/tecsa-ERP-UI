@@ -2,6 +2,20 @@
 
 **Status:** Backend migrations committed on `schema/bc-aligned-sales-part2-20261103`. PostgreSQL migration, runtime API verification, and backend merge are **not completed**. This is a schema reference, not a declaration that Sales UI pages are implemented.
 
+## Sales Order BC Table 36/37 acceptance correction
+
+**Do not treat this page as an accepted BC-aligned Sales Order module.** The latest source review compared Microsoft BC Sales Header (Table 36) and Sales Line (Table 37) with TecSA's actual migration and `SalesOrderService`:
+
+- The physical Sales Order Header/Line tables exist, but new sell-to/bill-to/ship-to, pricing, dates and shipment fields are not all populated or enforced by the domain service.
+- The SQL constraint and current order service use `line_amount = quantity × unit_price`. BC line discounts, invoice discounts and VAT amounts are **not yet implemented** by merely adding nullable fields. The API now rejects unsupported Sales Order discount and posting-owned quantity input instead of silently accepting it.
+- BC supports more Sales Line types than TecSA currently validates; existing code allows `item` and `gl_account` only.
+- Shipped/outstanding quantity is presently derived from posted shipment lines by the service. Added physical quantities should not be assumed authoritative until posting-state ownership is verified.
+- Full Sales Order → Shipment → Invoice → Credit Memo and Return compatibility is still **pending**. Neither API acceptance nor full BC parity has passed.
+
+**Developer guidance:** Do not expose those new fields as editable page-config inputs or promise accounting behavior until backend operations, validation, financial posting and PostgreSQL regression tests are accepted. **Consultant guidance:** Do not certify discounts, multiple line types, complete shipping statuses or reporting from unpopulated physical fields.
+
+[Source-level Sales Order acceptance audit](https://github.com/dynamics-git/tecsa-erp-26.0/blob/schema/bc-aligned-finance-part4-20261103/docs/database/BC_SALES_ORDER_36_37_ACCEPTANCE_AUDIT.md).
+
 ## New tables (17)
 
 | Area | Physical table | Purpose |
