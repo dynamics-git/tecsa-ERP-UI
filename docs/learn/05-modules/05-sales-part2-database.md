@@ -1,5 +1,9 @@
 # Sales Part 2 — tables and API publication
 
+## Phase A Microsoft Base Application symbols — scoped physical extensions
+
+Actual BC 26.1 Base Application symbols, **not custom BCProcure360 API pages**, were used for Tables 36, 37, 222, 10, 13, 291, 5790, 318–321, 560–561, 19 and 287. Additive integrated-branch migrations `000214`–`000219` create shipping masters and tax/VAT clause masters, expand six draft Sales Header/Line pairs, preserve Posted/Archive shipping and tax snapshots, and link customers/ship-to addresses, shipping agents/services and Sales Orders to purchase sources with Company-scoped foreign keys. `000224` adds Customer Invoice Discount tiers separately from line discounts. Sales reference ApiSources use dedicated permission resources; Customer Bank Account metadata has all ordinary API operations disabled. **No pricing calculations, posting, tests, or live migration were performed.** Deferred: Jobs/Projects, Manufacturing and Resource Capacity. [Source inventory](https://github.com/dynamics-git/E-invoice-custom-v24-poc/blob/audit/bc-baseapp-symbols-20261103/docs/bc-base-symbol-audit/extract-summary.json).
+
 **Status:** Backend migrations committed on `schema/bc-aligned-sales-part2-20261103`. PostgreSQL migration, runtime API verification, and backend merge are **not completed**. This is a schema reference, not a declaration that Sales UI pages are implemented.
 
 ## Current ERP scope — no Manufacturing / Jobs / Resource Capacity
