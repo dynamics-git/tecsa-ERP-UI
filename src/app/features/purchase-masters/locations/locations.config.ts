@@ -113,7 +113,6 @@ export const locationsListConfig: ListPageConfig & {
   pageId: 'locations',
   pageType: 'card',
   title: 'Locations',
-  autoSave: true,
   dataSource: {
     endpoint: '/locations',
     keyField: 'systemId',

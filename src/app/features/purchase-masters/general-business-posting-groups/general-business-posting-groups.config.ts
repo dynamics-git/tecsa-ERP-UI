@@ -71,7 +71,6 @@ export const generalBusinessPostingGroupsListConfig: ListPageConfig & {
   pageId: 'general-business-posting-groups',
   pageType: 'card',
   title: 'General Business Posting Groups',
-  autoSave: true,
   dataSource: {
     endpoint: '/generalBusinessPostingGroups',
     keyField: 'systemId',

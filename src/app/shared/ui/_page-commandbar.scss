@@ -1,3 +1,5 @@
+@use './command-state' as command-state;
+
 :host {
   display: block;
 }
@@ -35,7 +37,7 @@ button {
 .work-title {
   color: var(--ts-text);
   font-size: var(--ts-font-page-title);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   white-space: nowrap;
 }
@@ -48,7 +50,7 @@ button {
   min-width: 0;
   color: var(--ts-muted);
   font-size: var(--ts-font-caption);
-  font-weight: 600;
+  font-weight: 400;
   line-height: var(--ts-line-body);
   white-space: nowrap;
 
@@ -193,7 +195,7 @@ button {
   .command-tools { justify-content: flex-end; }
 }
 
-button:disabled { color: var(--ts-muted); opacity: 0.6; cursor: default; }
+button { @include command-state.disabled; }
 
 // Page commands follow the title; optional tools retain the right edge.
 .app-commandbar {
@@ -227,7 +229,8 @@ button:disabled { color: var(--ts-muted); opacity: 0.6; cursor: default; }
   &:focus-visible { outline: 2px solid var(--ts-border-focus); outline-offset: 2px; }
   &.cmd-primary { color: var(--ts-brand-900); }
   &.cmd-danger { color: var(--ts-danger); }
-  &:disabled { color: var(--ts-muted); border-bottom-color: transparent; cursor: default; }
+  @include command-state.disabled;
+  &:disabled { border-bottom-color: transparent; }
 }
 
 .command-tools { margin-inline-start: auto; }

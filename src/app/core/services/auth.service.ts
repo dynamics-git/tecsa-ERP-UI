@@ -1,12 +1,14 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
+import { Injectable, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { catchError, map, Observable, of, switchMap, tap, throwError, fromEvent, throttleTime, finalize } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { featurePageModules } from '../../features/feature-pages.generated';
 import type { DataSourceConfig, ListPageConfig, LineConfig } from '../../platform/public-api';
 import { ApiAuthService } from './api-auth.service';
 import { RestService } from './rest.service';
 import { SessionContext, SessionService } from './session.service';
+import type { PagePermissionRule } from './page-access.service';
 
 export type LoginRequest = {
   companyId?: string;
@@ -35,12 +37,80 @@ type BackendLoginResponse = Record<string, unknown>;
 })
 export class AuthService {
   private pendingLogin?: { token: string; user: Record<string, unknown>; companies: AuthorizedCompany[] };
+  private refreshGeneration = 0;
+  private readonly destroyRef = inject(DestroyRef);
   constructor(
     private readonly apiAuth: ApiAuthService,
     private readonly restService: RestService,
     private readonly sessionService: SessionService,
     private readonly http: HttpClient,
-  ) {}
+  ) {
+    let refreshing = false;
+    let refreshAfterChange = false;
+    const refresh = (changed = false) => {
+      if (!this.sessionService.isSessionValid()) return;
+      // Focus must not queue repeated context requests behind a slow local PHP worker.
+      // A permission edit during the current request still requires one fresh follow-up.
+      if (refreshing) { refreshAfterChange ||= changed; return; }
+      refreshing = true;
+      const company = this.sessionService.Company;
+      this.refreshPermissions().pipe(finalize(() => {
+        refreshing = false;
+        if (refreshAfterChange && !this.destroyRef.destroyed) {
+          refreshAfterChange = false;
+          refresh(true);
+        }
+      })).subscribe({error: error => {
+        if (this.sessionService.Company === company && [401, 403].includes(error?.status)) this.sessionService.logout('permission-access-removed');
+      }});
+    };
+    this.sessionService.permissionRefreshRequested$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => refresh(true));
+    if (typeof window !== 'undefined') fromEvent(window, 'focus').pipe(throttleTime(1000), takeUntilDestroyed(this.destroyRef)).subscribe(() => refresh());
+    if (this.sessionService.isSessionValid()) queueMicrotask(() => { if (!this.destroyRef.destroyed) refresh(); });
+  }
+
+  refreshPermissions(): Observable<void> {
+    const companyId = this.sessionService.Company;
+    const generation = ++this.refreshGeneration;
+    return this.getPermissionEngine(companyId).pipe(map(response => {
+      // Ignore a response belonging to a company the user has already left.
+      if (this.sessionService.Company !== companyId || generation !== this.refreshGeneration) return;
+      const data = this.toRecord(this.readValue(this.toRecord(response) ?? {}, 'data'));
+      if (!data || this.toRecord(data['company'])?.['systemId'] !== companyId) throw new Error('Could not refresh company permissions.');
+      this.sessionService.applySessionContext({
+        permissions: this.mapEnginePagesToPermissions(data),
+        pagePermissions: this.readPagePermissions(data),
+        superAdmin: this.readBoolean(data, 'isSuperAdmin'),
+        companySuper: this.readBoolean(data, 'isCompanySuper'),
+      });
+    }));
+  }
+
+  authorizedCompanies(): Observable<AuthorizedCompany[]> {
+    return this.http.get(this.buildAuthUrl('/auth/companies'), {headers: this.createBearerHeaders()}).pipe(
+      map(response => this.extractAuthorizedCompanies(this.toRecord(response)?.['data'])),
+    );
+  }
+
+  switchCompany(companyId: string): Observable<SessionContext> {
+    return this.authorizedCompanies().pipe(switchMap(companies => {
+      const company = companies.find(item => item.systemId === companyId);
+      if (!company) throw new Error('Choose an authorized company.');
+      return this.getPermissionEngine(companyId).pipe(map(response => {
+        const engine = this.toRecord(this.toRecord(response)?.['data']);
+        if (!engine || this.toRecord(engine['company'])?.['systemId'] !== companyId) throw new Error('Could not verify the selected company.');
+        const user = this.toRecord(this.sessionService.User) ?? {};
+        const context = this.mapEngineToSessionContext(user, {email: this.sessionService.Email, password: '',
+          companyId, companyName: company.name}, engine);
+        this.sessionService.applySessionContext(context);
+        return context;
+      }));
+    }));
+  }
+
+  private readPagePermissions(engine: Record<string, unknown>): PagePermissionRule[] {
+    return Array.isArray(engine['pagePermissions']) ? engine['pagePermissions'] as PagePermissionRule[] : [];
+  }
 
   authenticate(): Observable<string> {
     if (this.sessionService.AccessToken) {
@@ -294,6 +364,8 @@ export class AuthService {
 
     return this.createSessionContext(user, request, {
       superAdmin: isSuperAdmin,
+      companySuper: this.readBoolean(engine, 'isCompanySuper'),
+      pagePermissions: this.readPagePermissions(engine),
       permissions,
       accessCenters,
       showAllAccessCenters: this.readBoolean(engine, 'showAllAccessCenters') || isSuperAdmin,
@@ -415,6 +487,14 @@ export class AuthService {
         });
       });
     });
+
+    for (const module of featurePageModules) {
+      const config = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig | undefined;
+      if (!config?.permissionPageId || config.permissionPageId === config.pageId) continue;
+      if (permissions.some(permission => this.toRecord(permission)?.['pageId'] === config.pageId)) continue;
+      const inherited = permissions.filter(permission => this.toRecord(permission)?.['pageId'] === config.permissionPageId);
+      for (const permission of inherited) permissions.push({...this.toRecord(permission), pageId: config.pageId, PageId: config.pageId});
+    }
 
     return permissions;
   }

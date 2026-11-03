@@ -1,6 +1,6 @@
 import type { FormSectionConfig } from './field-config.model';
 
-export type ConfirmationDialogKind = 'confirm' | 'alert';
+export type ConfirmationDialogKind = 'confirm' | 'alert' | 'progress';
 
 export interface ConfirmationDialogConfig {
   title: string;

@@ -1,0 +1,14 @@
+// Shared toolbar state for shell, document and line commands.
+@mixin disabled {
+  &:disabled {
+    color: var(--ts-muted);
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+
+    &:hover {
+      color: var(--ts-muted);
+      background: transparent;
+    }
+  }
+}

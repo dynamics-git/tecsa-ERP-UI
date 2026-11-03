@@ -16,7 +16,7 @@ beforeEach(()=>{
  TestBed.configureTestingModule({providers:[{provide:DATA_REST_SERVICE,useValue:{get:()=>of({data:[]}),post,patch,delete:remove}},
  {provide:SessionService,useValue:{Company:'company',UserId:'user',AccessToken:'token',Permissions:[],SuperAdmin:true}},
  {provide:WorkspaceContext,useValue:{slug:'workspace'}},{provide:ErrorHandler,useValue:{handleError:report}}]});
- data=TestBed.inject(DataSourceService);source=data.relation(purchaseRequisitionLineConfig.dataSource,{systemId:'header'});
+ data=TestBed.inject(DataSourceService);source=data.relation(purchaseRequisitionLineConfig.dataSource,{systemId:'header',number:'PRTEST',documentType:'Requisition'});
 });
 afterEach(()=>TestBed.resetTestingModule());
 describe('PR reference for shared optional write hooks',()=>{

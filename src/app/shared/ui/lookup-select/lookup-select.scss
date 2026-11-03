@@ -34,7 +34,7 @@ input {
   color: inherit;
   font: inherit;
   font-size: var(--ts-text-13);
-  font-weight: 650;
+  font-weight: 500;
   &:focus { outline: none; box-shadow: none; }
 }
 .lookup-popup {
@@ -46,7 +46,7 @@ input {
   background: var(--ts-surface);
   color: var(--ts-text);
   font-size: var(--ts-text-13);
-  font-weight: 650;
+  font-weight: 400;
   [role="listbox"] { display: flex; flex-direction: column; max-height: 220px; min-height: 0; overflow: auto; }
   button {
     border: 0; background: transparent; color: inherit; text-align: left;

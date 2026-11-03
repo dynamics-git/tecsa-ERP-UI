@@ -6,6 +6,7 @@ import type { FactBoxContext } from '../../models/fact-box-context.model';
 import { resolvePageIdentity } from '../../data/record-identity';
 import { automaticDetailFields, detailValue } from '../fact-box-display';
 import { SessionService } from '../../../core/services/session.service';
+import { PageAccessService } from '../../../core/services/page-access.service';
 import { formatRecordValue } from '../record-value-formatter';
 import { Component, EventEmitter, Input, Output, OnChanges, inject } from '@angular/core';
 import { FieldFactBoxConfig } from '../../models/field-config.model';
@@ -31,6 +32,7 @@ export class ListFactBox implements OnChanges {
   recordWasSelected = false;
   ngOnChanges(): void { if (this.hasRecord) this.recordWasSelected = true; }
   private readonly session = inject(SessionService);
+  private readonly access = inject(PageAccessService);
   private readonly factBox = viewChild(FactBox);
   canLeave(): Promise<boolean> { return this.factBox()?.canLeave() ?? Promise.resolve(true); }
   private readonly source = inject(DataSourceService);
@@ -48,7 +50,7 @@ export class ListFactBox implements OnChanges {
   get displaySections(): FactBoxSectionConfig[] {
     const sections = this.sections.map((section, index) => ({
       ...section, id: this.config?.factBox?.sections?.[index]?.id ?? 'section-' + index,
-      rows: section.fields.filter(field => this.hasFieldValue(field)).map(field => ({label: field.label, value: this.getFieldValue(field), tooltip: this.getFieldTooltip(field), badge: field.type === 'badge'})),
+      rows: section.fields.filter(field => this.access.field(this.config?.pageId ?? '', 'header', field.field ?? '').visible && this.hasFieldValue(field)).map(field => ({label: field.label, value: this.getFieldValue(field), tooltip: this.getFieldTooltip(field), badge: field.type === 'badge'})),
     }));
     if (this.hasSummary || this.hasStatus) sections.unshift({id: 'summary', title: 'Overview', rows: [
       ...(this.hasSummary ? [{label: this.summaryLabel, value: this.summaryValue}] : []),
@@ -93,7 +95,7 @@ export class ListFactBox implements OnChanges {
       (titleField ? this.read(this.selectedRow, titleField) : undefined) ??
         this.readFirst(this.selectedRow, fallbackFields) ??
         factBox?.title ??
-        (resolvePageIdentity(this.selectedRow, this.config).primary || undefined) ??
+        (resolvePageIdentity(this.access.displayRecord(this.config?.pageId ?? '', 'header', this.selectedRow), this.config).primary || undefined) ??
         this.config?.title ??
         '',
     );
@@ -118,7 +120,7 @@ export class ListFactBox implements OnChanges {
       return rowSubtitle;
     }
 
-    const identitySubtitle = resolvePageIdentity(this.selectedRow, this.config).secondary;
+    const identitySubtitle = resolvePageIdentity(this.access.displayRecord(this.config?.pageId ?? '', 'header', this.selectedRow), this.config).secondary;
     if (identitySubtitle) return identitySubtitle;
     const module = this.toText(this.config?.module).trim();
     if (module.length) {
@@ -341,6 +343,7 @@ export class ListFactBox implements OnChanges {
   }
 
   private read(target: unknown, path: string): unknown {
+    if (!this.access.field(this.config?.pageId ?? '', 'header', path).visible) return undefined;
     if (!target || !path) {
       return undefined;
     }

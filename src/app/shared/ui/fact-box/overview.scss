@@ -12,7 +12,8 @@
 
   h4 {
     margin: 0 0 var(--ts-space-3);
-    font-size: var(--ts-font-body);
+    color: var(--ts-text);
+    font-size: var(--ts-font-section);
     font-weight: 600;
     line-height: 1.4;
   }
@@ -41,8 +42,9 @@ dl {
 
   dt {
     min-width: 0;
-    color: var(--ts-text-soft);
-    font-size: var(--ts-font-caption);
+    color: var(--ts-muted);
+    font-size: var(--ts-font-label);
+    font-weight: 400;
     line-height: 1.4;
     overflow-wrap: anywhere;
   }
@@ -52,6 +54,7 @@ dl {
     margin: 0;
     color: var(--ts-text);
     font-size: var(--ts-font-body);
+    font-weight: 400;
     line-height: 1.4;
     overflow-wrap: anywhere;
     font-variant-numeric: tabular-nums;
@@ -77,7 +80,7 @@ dl {
   }
 
   dd {
-    font-size: var(--ts-font-section);
+    font-size: var(--ts-text-20);
     font-weight: 600;
   }
 }
@@ -129,7 +132,3 @@ summary:focus-visible {
 }
 
 details[open] summary::after { content: "−"; }
-
-dl dt { font-weight: 400; color: var(--ts-muted); }
-dl dd { font-weight: 400; }
-.metrics dd { font-weight: 600; }

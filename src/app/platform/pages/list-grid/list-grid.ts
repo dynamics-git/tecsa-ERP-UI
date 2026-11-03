@@ -27,6 +27,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { SessionService } from '../../../core/services/session.service';
+import { PageAccessService } from '../../../core/services/page-access.service';
 import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
 import { CommandConfig, StandardCommandConfig, resolveCommandPermissionKey } from '../../models/command-config.model';
 import { ListPageColumnConfig, ListPageConfig } from '../../models/page-config.model';
@@ -61,11 +62,13 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   readonly saves = inject(RunModalService);
   private readonly factBoxHost = inject(FactBoxHostService);
   private readonly sessionService = inject(SessionService);
+  private readonly pageAccess = inject(PageAccessService);
   private readonly commandPermissions = inject(DocumentPageCommandPermissionService);
   private readonly standardActions = inject(StandardListActionsService);
   private readonly listExport = inject(ListExportService);
   exportBusy = false;
   private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   @ViewChild('gridScroll') private readonly gridScroll?: ElementRef<HTMLElement>;
 
   @Input() config?: ListPageConfig;
@@ -148,7 +151,8 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   private preferenceScope = '';
 
   get configurableColumns(): DisplayColumn[] {
-    const columns = (this.config?.dataSurface?.columns ?? []).filter(column => column.hidden !== true);
+    const columns = (this.config?.dataSurface?.columns ?? []).filter(column => column.hidden !== true &&
+      this.pageAccess.field(this.config?.pageId ?? '', 'header', column.field ?? column.id ?? '').visible);
     const positions = new Map(this.columnOrder.map((key, index) => [key, index]));
     return [...columns].sort((a, b) => (positions.get(this.getColumnKey(a)) ?? 999) - (positions.get(this.getColumnKey(b)) ?? 999));
   }
@@ -364,9 +368,26 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
     } finally { this.exportBusy = false; this.changeDetector.markForCheck(); }
   }
 
+  @HostListener('document:pointerdown', ['$event'])
+  dismissOutsideListTools(event: PointerEvent): void {
+    if (!(event.target instanceof Node)) return;
+    const target = event.target;
+    const inside = (selector: string): boolean =>
+      Array.from(this.host.nativeElement.querySelectorAll(selector)).some(element => element.contains(target));
+    if (!inside('[data-list-tool="columns"], .list-column-panel')) this.showColumns = false;
+    if (!inside('[data-list-tool="save-view"], .list-save-view')) this.showSaveView = false;
+    this.closeToolbarMenus(target);
+  }
+
+  private closeToolbarMenus(insideTarget?: Node): void {
+    this.host.nativeElement.querySelectorAll<HTMLDetailsElement>('.dataset-tools details[open]').forEach(menu => {
+      if (!insideTarget || !menu.contains(insideTarget)) menu.open = false;
+    });
+  }
+
   @HostListener('keydown', ['$event'])
   handleListKey(event: KeyboardEvent): void {
-    if (event.key === 'Escape') { this.showColumns = false; this.showSaveView = false; this.filterPanel?.close(); return; }
+    if (event.key === 'Escape') { this.showColumns = false; this.showSaveView = false; this.closeToolbarMenus(); this.filterPanel?.close(); return; }
     if (event.altKey && event.key.toLowerCase() === 'f' && this.advancedFilterEnabled) { event.preventDefault(); this.filterPanel?.toggle(); return; }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && this.searchEnabled) { event.preventDefault(); this.searchInput?.nativeElement.focus(); }
   }
@@ -480,6 +501,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
     const pagePermissions = this.resolvePagePermissionFlags();
     return (this.config?.commands ?? [])
       .map((command) => {
+        command = this.commandPermissions.apply(command, this.config?.pageId ?? '', this.config?.dataSource, 'list');
         if (command.hidden === true) {
           return command;
         }
@@ -993,6 +1015,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
 
   getCellValue(row: unknown, column: DisplayColumn): string {
     const key = column.field ?? column.id ?? '';
+    if (!this.pageAccess.field(this.config?.pageId ?? '', 'header', key).visible) return '';
     const caption = this.read(row, '__display_' + key);
     if (typeof caption === 'string') return caption;
     const value = this.read(row, key);
@@ -1006,6 +1029,7 @@ export class ListGrid implements AfterViewChecked, OnChanges, OnDestroy {
   }
 
   getSubtitle(row: unknown, column: DisplayColumn): string {
+    if (!this.pageAccess.field(this.config?.pageId ?? '', 'header', column.subtitleField ?? '').visible) return '';
     const value = this.read(row, column.subtitleField ?? '');
     return value === undefined || value === null ? '' : String(value);
   }

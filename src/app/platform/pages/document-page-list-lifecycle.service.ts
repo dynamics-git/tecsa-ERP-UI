@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { timeout } from 'rxjs/operators';
+import { optionalRequestTimeout } from '../data/runtime-timeout-policy.token';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
 
@@ -9,7 +9,7 @@ export interface DocumentPageListLifecycleContext {
   listLoadingScope: string;
   listFilterScope: string;
   listTitle: unknown;
-  hydrationTimeoutMs: number;
+  hydrationTimeoutMs?: number;
 
   rows: unknown[];
   hasMore: boolean;
@@ -106,7 +106,7 @@ export class DocumentPageListLifecycleService {
 
     ctx.listLoadSubscription = ctx
       .loadList(effectiveListDataSource, loadOptions)
-      .pipe(timeout(ctx.hydrationTimeoutMs))
+      .pipe(optionalRequestTimeout(ctx.hydrationTimeoutMs))
       .subscribe({
         next: (response) => {
           const records = ctx.toRecords(response);

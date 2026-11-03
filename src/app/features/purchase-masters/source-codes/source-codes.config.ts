@@ -62,7 +62,6 @@ export const sourceCodesListConfig: ListPageConfig & {
   pageId: 'source-codes',
   pageType: 'card',
   title: 'Source Codes',
-  autoSave: true,
   dataSource: {
     endpoint: '/sourceCodes',
     keyField: 'systemId',

@@ -1,3 +1,6 @@
+/** Shared grid baseline for visual rows and editable entry space. */
+export const MINIMUM_LINE_GRID_ROWS = 8;
+
 import type { CommandConfig } from './command-config.model';
 import { DataSurfaceColumnConfig } from './data-surface-config.model';
 import type { DataSourceConfig } from './data-source-config.model';

@@ -113,7 +113,6 @@ export const warehouseBinsListConfig: ListPageConfig & {
   pageId: 'warehouse-bins',
   pageType: 'card',
   title: 'Warehouse Bins',
-  autoSave: true,
   dataSource: {
     endpoint: '/warehouseBins',
     keyField: 'systemId',

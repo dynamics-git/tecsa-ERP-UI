@@ -51,7 +51,6 @@ export const reasonCodesListConfig: ListPageConfig & {
   pageId: 'reason-codes',
   pageType: 'card',
   title: 'Reason Codes',
-  autoSave: true,
   dataSource: {
     endpoint: '/reasonCodes',
     keyField: 'systemId',

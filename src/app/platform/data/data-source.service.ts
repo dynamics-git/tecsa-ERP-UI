@@ -2,7 +2,7 @@ import { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
 import { lookupQuery } from './lookup-dependencies';
 import { Inject, Injectable, InjectionToken, Optional, ErrorHandler } from '@angular/core';
 import { Observable, Subject, defer, firstValueFrom, from, of } from 'rxjs';
-import { finalize, map, shareReplay, catchError, timeout } from 'rxjs/operators';
+import { finalize, map, shareReplay, catchError } from 'rxjs/operators';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
 import { DataSourceConfig, DataWriteContext } from '../models/data-source-config.model';
@@ -59,7 +59,9 @@ export class DataSourceService {
   }
   private readonly resourceRevisions = new Map<string, number>();
   private resourcePath(endpoint: string): string {
-    const path = endpoint.split('?')[0].replace(/^\/companies\/[^/]+/, '');
+    // Strip company scope only when another resource follows it. A global
+    // /companies/{systemId} record belongs to the /companies resource itself.
+    const path = endpoint.split('?')[0].replace(/^\/companies\/[^/]+(?=\/)/, '');
     // Collaboration changes do not modify the parent master or its lookup captions.
     const collaboration = path.match(/^(.+\/(?:notes|attachments))(?:\/[^/]+)?$/);
     return collaboration?.[1] ?? '/' + path.split('/').filter(Boolean)[0].split('(')[0];
@@ -101,7 +103,7 @@ export class DataSourceService {
     this.metadataLoadedAt = 0;
     const context = this.context();
     const generation = this.readGeneration;
-    const request = defer(() => this.client.get(this.endpoint({endpoint:'/apiCapabilities'}))).pipe(timeout(5000), map(response => {
+    const request = defer(() => this.client.get(this.endpoint({endpoint:'/apiCapabilities'}))).pipe(map(response => {
       if (context !== this.context() || generation !== this.readGeneration) return false;
       const accepted = this.contracts.acceptMetadata(response);
       if (accepted) this.metadataLoadedAt = Date.now();
@@ -289,7 +291,20 @@ export class DataSourceService {
   }
   relation(config: DataSourceConfig, header: Record<string, unknown>): DataSourceConfig {
     const navigation = config.navigation;
-    if (!navigation) return config;
+    if (!navigation) {
+      if (!config.lineFKProp) return config;
+      const bindings = {[config.lineFKProp]: config.contextHeaderPKProp ?? config.headerPKProp ?? config.lineFKProp, ...config.parentFieldMap};
+      const values: Record<string, unknown> = {...config.parentFixedFields};
+      for (const [field, headerField] of Object.entries(bindings)) {
+        if (!this.present(header[headerField])) throw new Error('The related record context is missing.');
+        values[field] = header[headerField];
+      }
+      const predicate = Object.entries(values).map(([field, value]) => {
+        const literal = typeof value === 'number' || typeof value === 'boolean' ? String(value) : `'${String(value).replace(/'/g, "''")}'`;
+        return `${field} eq ${literal}`;
+      }).join(' and ');
+      return {...config, defaultFilter: config.defaultFilter ? `(${config.defaultFilter}) and (${predicate})` : predicate};
+    }
     const id = navigation.parentIdFields?.map(field => header[field]).find(value => this.present(value));
     if (!this.present(id)) throw new Error('Save the header before editing lines.');
     return { ...config, navigation: undefined, endpoint: `${this.recordEndpoint({ endpoint: navigation.parentEndpoint, addressStyle: config.addressStyle }, id)}/${navigation.childCollection}` };

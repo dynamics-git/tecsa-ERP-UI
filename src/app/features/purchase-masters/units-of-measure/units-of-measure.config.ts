@@ -59,7 +59,6 @@ export const unitsOfMeasureListConfig: ListPageConfig & {
   pageId: 'units-of-measure',
   pageType: 'card',
   title: 'Units of Measure',
-  autoSave: true,
   dataSource: {
     endpoint: '/unitsOfMeasure',
     keyField: 'systemId',

@@ -265,7 +265,6 @@ export const generalPostingSetupListConfig: ListPageConfig & {
   pageId: 'general-posting-setup',
   pageType: 'card',
   title: 'General Posting Setup',
-  autoSave: true,
   dataSource: {
     endpoint: '/generalPostingSetup',
     keyField: 'systemId',

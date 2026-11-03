@@ -81,6 +81,13 @@ describe('Shared data lifecycle with controlled synthetic API responses',()=>{
   const contracts=TestBed.inject(EntityContractService);
   expect(contracts.sanitizePayload({...config,updateFields:[]},'update',{code:'WRONG',__options_code:[]})).toEqual({});
  });
+ it('binds business and composite relationships without substituting the record identity',()=>{
+  const related={endpoint:'/lines',keyField:'systemId',headerPKProp:'number',lineFKProp:'documentNumber',parentFieldMap:{documentType:'documentType'},defaultFilter:'isActive eq true'};
+  expect(source.relation(related,{systemId:'unrelated-guid',number:"PO'17",documentType:'Order'}).defaultFilter)
+   .toBe("(isActive eq true) and (documentNumber eq 'PO''17' and documentType eq 'Order')");
+  expect(()=>source.relation(related,{systemId:'unrelated-guid',number:'PO17'})).toThrow('related record context is missing');
+  expect(()=>source.relation(related,{systemId:'unrelated-guid',documentType:'Order'})).toThrow('related record context is missing');
+ });
  it('preserves unrelated master caches across note writes and invalidates only a changed master family',async()=>{
   post.mockReturnValue(of({data:{systemId:'2',systemRowVersion:1}}));
   const lookup={endpoint:'/unitsOfMeasure'};

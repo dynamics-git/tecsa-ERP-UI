@@ -125,7 +125,6 @@ export const sourceCodeSetupListConfig: ListPageConfig & {
   pageId: 'source-code-setup',
   pageType: 'setup',
   title: 'Source Code Setup',
-  autoSave: true,
   dataSource: {
     endpoint: '/sourceCodeSetup',
     keyField: 'systemId',

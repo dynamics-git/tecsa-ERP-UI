@@ -174,9 +174,6 @@
   border-radius: 0;
   overflow: hidden;
   box-shadow: none;
-}
-
-.workspace-grid {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -204,7 +201,7 @@
   th {
     height: var(--ts-table-head-h);
     font-size: var(--ts-font-label);
-    font-weight: 600;
+    font-weight: 500;
     text-transform: none;
     position: relative;
     padding: 0 8px;
@@ -402,8 +399,8 @@
 
 .cell-title {
   color: var(--ts-text);
-  font-size: var(--ts-font-label);
-  font-weight: 700;
+  font-size: var(--ts-font-body);
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -414,8 +411,9 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--ts-brand-950);
+  color: var(--ts-brand-900);
   font: inherit;
+  font-weight: 600;
   text-align: left;
   cursor: pointer;
   overflow: hidden;
@@ -437,7 +435,7 @@
   margin-top: 1px;
   color: var(--ts-muted);
   font-size: var(--ts-font-caption);
-  font-weight: 500;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -466,7 +464,7 @@
   align-items: center;
 
   font-size: var(--ts-font-caption);
-  font-weight: 700;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -577,24 +575,24 @@ button:disabled:not(.th-sort) { opacity: 0.45; }
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: var(--ts-text);
+    color: var(--ts-text-soft);
     font-size: var(--ts-font-body);
-    font-weight: 500;
+    font-weight: 400;
     line-height: var(--ts-line-body);
     white-space: nowrap;
-    .ts-icon { font-size: var(--ts-text-15); color: var(--ts-text-soft); }
+    .ts-icon { font-size: var(--ts-text-15); color: var(--ts-muted); }
     &:hover:not(:disabled) { background: var(--ts-surface-hover); }
     &:focus-visible { outline: 2px solid var(--ts-border-focus); outline-offset: 2px; }
   }
   > button.active, > details[open] > summary {
     background: var(--ts-surface-selected);
-    color: var(--ts-text);
+    color: var(--ts-brand-900);
+    font-weight: 500;
   }
   > button:disabled { color: var(--ts-muted); cursor: default; }
 }
 .dataset-search input { font-size: var(--ts-font-body); font-weight: 400; }
-.app-grid td { font-size: var(--ts-font-body); font-weight: 400; }
-.app-grid .cell-link { font-weight: 600; }
+.app-grid td { font-weight: 400; }
 
 :host-context(.popup-shell) app-command-bar { margin-inline: calc(-1 * var(--ts-space-2)); }
 .dataset-tools > details > summary.export-trigger { width: var(--ts-control-h); padding: 0; }

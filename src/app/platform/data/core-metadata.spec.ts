@@ -63,6 +63,7 @@ describe('Authenticated shared Core metadata contract', () => {
     AccessToken: string;
     Permissions: unknown[];
     SuperAdmin: boolean;
+    permissionsLoaded$: Subject<boolean>;
   };
   let workspace: { slug: string };
   let get: ReturnType<typeof vi.fn>,
@@ -77,6 +78,7 @@ describe('Authenticated shared Core metadata contract', () => {
       AccessToken: 'token',
       Permissions: [],
       SuperAdmin: false,
+      permissionsLoaded$: new Subject<boolean>(),
     };
     workspace = { slug: 'workspace-a' };
     get = vi.fn(() => of(metadata()));

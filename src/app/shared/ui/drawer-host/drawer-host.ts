@@ -4,6 +4,8 @@ import { Component, inject } from '@angular/core';
 import { PopupConfig } from '../../../platform/models/popup-config.model';
 import { RunModalStackService } from '../../../platform/run-modal/run-modal-stack.service';
 import { ProfileDrawer } from '../../../features/auth/profile/profile-drawer';
+import { CompanySwitcher } from '../../../features/auth/company-switcher/company-switcher';
+import { LoadingIndicator } from '../loading-indicator/loading-indicator';
 
 type DrawerPopupData = {
   drawerViewId?: string;
@@ -13,7 +15,7 @@ type DrawerPopupData = {
 @Component({
   selector: 'app-drawer-host',
   standalone: true,
-  imports: [AsyncPipe, ProfileDrawer, NotificationInbox],
+  imports: [AsyncPipe, ProfileDrawer, NotificationInbox, CompanySwitcher, LoadingIndicator],
   templateUrl: './drawer-host.html',
   styleUrl: './drawer-host.scss'
 })
@@ -21,6 +23,12 @@ export class DrawerHost {
   private readonly popupStack = inject(RunModalStackService);
 
   readonly stack$ = this.popupStack.stack$;
+  readonly busyCompanies = new Set<string>();
+
+  isCompanySwitcher(popup: PopupConfig): boolean { return this.drawerViewId(popup) === 'company-switcher'; }
+  setCompanyBusy(id: string, busy: boolean): void {
+    if (busy) this.busyCompanies.add(id); else this.busyCompanies.delete(id);
+  }
 
   getDrawers(popups: PopupConfig[]): PopupConfig[] {
     return popups.filter((popup) => popup.mode === 'drawer');
@@ -33,6 +41,7 @@ export class DrawerHost {
   }
 
   close(popupId?: string): void {
+    if (popupId && this.busyCompanies.has(popupId)) return;
     this.popupStack.close(popupId);
   }
 

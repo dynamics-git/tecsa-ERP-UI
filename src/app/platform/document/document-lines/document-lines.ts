@@ -1,6 +1,7 @@
+import { MINIMUM_LINE_GRID_ROWS } from '../../models/line-config.model';
 import { CommandConfig } from '../../models/command-config.model';
 import { moveQuickEntry } from '../../../shared/ui/quick-entry';
-import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../../data/runtime-timeout-policy.token';
 import { readTabularText, writeTabularText } from '../../data/tabular-text';
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { ListPersonalizationService } from '../../pages/list-personalization.service';
@@ -25,7 +26,7 @@ import {
 import { FieldChangeSource } from '../../models/field-config.model';
 import { LineColumnConfig } from '../../models/line-config.model';
 import { DataSourceService } from '../../data/data-source.service';
-import { Subscription, timer, switchMap, from, firstValueFrom, timeout } from 'rxjs';
+import { Subscription, timer, switchMap, from, firstValueFrom } from 'rxjs';
 
 type LineOption = { label: string; value: unknown; record?: Record<string, unknown> };
 
@@ -37,6 +38,9 @@ type LineOption = { label: string; value: unknown; record?: Record<string, unkno
   styleUrl: './document-lines.scss',
 })
 export class DocumentLines {
+  // Presentation only: never inserted into rows, selection, totals or save payloads.
+  readonly emptyGridRows = Array.from({length: MINIMUM_LINE_GRID_ROWS}, (_, index) => index);
+
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
   private readonly hydration = inject(DocumentHydrationOrchestratorService);
   private readonly timeoutPolicy = inject(RUNTIME_TIMEOUT_POLICY);
@@ -493,7 +497,7 @@ export class DocumentLines {
     const field=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)?(lookup.valueField ?? 'systemId'):lookup.displayField;
     if(!/^[A-Za-z_]\w*$/.test(field))throw new Error('Unsupported lookup field.');
     const exact=field+" eq '"+raw.replace(/'/g,"''")+"'";
-    const response=await firstValueFrom(this.source.loadList({endpoint:query.endpoint!,defaultFilter:[query.filter,exact].filter(Boolean).map(filter=>'('+filter+')').join(' and ')},{top:2,count:false,useCache:true,maxAgeMs:30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as {value:Record<string,unknown>[]};
+    const response=await firstValueFrom(this.source.loadList({endpoint:query.endpoint!,defaultFilter:[query.filter,exact].filter(Boolean).map(filter=>'('+filter+')').join(' and ')},{top:2,count:false,useCache:true,maxAgeMs:30000}).pipe(optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as {value:Record<string,unknown>[]};
     if(response.value.length!==1 || String(response.value[0][field]).toLowerCase()!==raw.toLowerCase())throw new Error('Lookup is missing or ambiguous.');
     return response.value[0];
   }
@@ -584,6 +588,11 @@ export class DocumentLines {
 
   isActiveRow(rowIndex: number): boolean {
     return this.activeRowIndex === rowIndex;
+  }
+
+  /** Fixed data widths leave surplus space after the data, never inside row controls. */
+  get fixedColumnLayout(): boolean {
+    return this.showSelection && this.visibleColumns.length > 0 && this.visibleColumns.every(column => !!this.getColumnWidthStyle(column));
   }
 
   getColumnWidthStyle(column: LineColumnConfig): string | null {

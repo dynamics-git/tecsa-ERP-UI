@@ -1,8 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { timeout } from 'rxjs/operators';
 import { DataSourceConfig } from '../models/data-source-config.model';
-import { RUNTIME_TIMEOUT_POLICY } from '../data/runtime-timeout-policy.token';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../data/runtime-timeout-policy.token';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 import { DocumentHydrationOrchestratorService } from '../data/document-hydration-orchestrator.service';
 import { DocumentRecordService } from '../data/document-record.service';
@@ -157,7 +156,7 @@ export class RunModalHydrationResolverService {
     options: { top: number } = { top: dataSource.pageSize ?? 20 },
   ): Promise<Record<string, unknown>[]> {
     const response = await firstValueFrom(
-      this.dataSource.loadList(dataSource, options).pipe(timeout(this.timeoutPolicy.requestTimeoutMs)),
+      this.dataSource.loadList(dataSource, options).pipe(optionalRequestTimeout(this.timeoutPolicy.requestTimeoutMs)),
     );
     return this.toRecordList(response);
   }
@@ -247,7 +246,7 @@ export class RunModalHydrationResolverService {
       const response = await firstValueFrom(
         this.dataSource
           .loadList(params.dataSource, { top: listTop })
-          .pipe(timeout(this.timeoutPolicy.hydrationTimeoutMs)),
+          .pipe(optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs)),
       );
       const records = this.documentHydration.extractRecords(response);
       if (!records.length) {

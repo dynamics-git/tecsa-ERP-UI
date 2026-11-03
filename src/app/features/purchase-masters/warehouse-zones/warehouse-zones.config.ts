@@ -73,7 +73,6 @@ export const warehouseZonesListConfig: ListPageConfig & {
   pageId: 'warehouse-zones',
   pageType: 'card',
   title: 'Warehouse Zones',
-  autoSave: true,
   dataSource: {
     endpoint: '/warehouseZones',
     keyField: 'systemId',

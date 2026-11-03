@@ -6,6 +6,7 @@ export * from './dynamic-form/dynamic-form';
 export * from './action-dispatcher.service';
 export * from './confirmation.service';
 export * from './drawer.service';
+export * from './loading-indicator/loading-indicator';
 
 export * from './fact-box/overview';
 export * from './fact-box/notes';

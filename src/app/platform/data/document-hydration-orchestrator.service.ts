@@ -1,9 +1,10 @@
 import { lookupQuery } from './lookup-dependencies';
 import { FieldConfig } from '../models/field-config.model';
 import { LineColumnConfig } from '../models/line-config.model';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, of } from 'rxjs';
-import { catchError, timeout } from 'rxjs/operators';
+import { catchError } from 'rxjs/operators';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from './runtime-timeout-policy.token';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DataSourceService } from './data-source.service';
 import { DocumentResponseNormalizerService } from './document-response-normalizer.service';
@@ -22,6 +23,7 @@ type LineLoadOptions = {
   providedIn: 'root',
 })
 export class DocumentHydrationOrchestratorService {
+  private readonly timeoutPolicy = inject(RUNTIME_TIMEOUT_POLICY);
   constructor(
     private readonly dataSource: DataSourceService,
     private readonly normalizer: DocumentResponseNormalizerService,
@@ -134,7 +136,7 @@ export class DocumentHydrationOrchestratorService {
                 { top: chunk.length, useCache: true, maxAgeMs: 30000, count: false, onRequest },
               )
               .pipe(
-                timeout<unknown>(10000),
+                optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs),
                 catchError(error => of({ value: [], restricted: error?.status === 403, failed: true })),
               ),
           )) as { value: Record<string, unknown>[]; restricted?: boolean; failed?: boolean };
@@ -185,13 +187,13 @@ export class DocumentHydrationOrchestratorService {
     dataSourceConfig: DataSourceConfig,
     id: unknown,
     fallback: Record<string, unknown>,
-    timeoutMs: number,
+    timeoutMs: number | undefined,
     onRequest?: () => void,
   ): Promise<Record<string, unknown>> {
     const response = await firstValueFrom(
       this.dataSource
         .loadById(dataSourceConfig, id, { useCache: true, maxAgeMs: 30000, onRequest })
-        .pipe(timeout(timeoutMs)),
+        .pipe(optionalRequestTimeout(timeoutMs)),
     );
 
     return this.normalizer.normalizeSingleRecordResponse(response, fallback);
@@ -245,7 +247,7 @@ export class DocumentHydrationOrchestratorService {
     headerData: Record<string, unknown>,
     options: LineLoadOptions = {},
   ): Promise<Record<string, unknown>[]> {
-    const timeoutMs = options.timeoutMs ?? 10000;
+    const timeoutMs = options.timeoutMs ?? this.timeoutPolicy.hydrationTimeoutMs;
     const defaultTop = options.defaultTop ?? 200;
 
     if (!this.toText(lineDataSource.endpoint).trim().length) {
@@ -329,7 +331,7 @@ export class DocumentHydrationOrchestratorService {
 
   private async loadBoundedRows(
     config: DataSourceConfig,
-    timeoutMs: number,
+    timeoutMs: number | undefined,
     onRequest?: () => void,
     maxAgeMs = 30000,
   ): Promise<Record<string, unknown>[]> {
@@ -339,7 +341,7 @@ export class DocumentHydrationOrchestratorService {
       const response = (await firstValueFrom(
         this.dataSource
           .loadList(config, { top, skip: rows.length, useCache: true, maxAgeMs, onRequest })
-          .pipe(timeout<unknown>(timeoutMs)),
+          .pipe(optionalRequestTimeout<unknown>(timeoutMs)),
       )) as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
       // A stale total must not make us reread an empty page without advancing.
       if (response.value.length === 0) return rows;

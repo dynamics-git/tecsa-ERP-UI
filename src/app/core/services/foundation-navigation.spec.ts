@@ -27,8 +27,10 @@ describe('F1 navigation registrations', () => {
       'locations',
       'no-series',
       'notification-rules',
+      'page-configuration',
       'payment-methods',
       'payment-terms',
+      'permission-sets',
       'purchase-order',
       'purchase-requisition',
       'purchases-payables-setup',
@@ -56,6 +58,8 @@ describe('F1 navigation registrations', () => {
         'default-dimension-priorities',
         'gl-account-default-dimensions',
         'dimension-value-combinations',
+        'page-permissions',
+        'user-company-access',
       ].sort(),
     );
     const shell = routes.find((route) => route.path === '')!;

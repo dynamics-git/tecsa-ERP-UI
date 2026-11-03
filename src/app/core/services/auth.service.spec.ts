@@ -3,7 +3,7 @@ import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@a
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
 import { PermissionService } from './permission.service';
@@ -67,6 +67,66 @@ describe('TecSA Laravel company-aware login', () => {
   afterEach(() => {
     http.verify();
     localStorage.clear();
+  });
+
+  it('does not overlap background context reads and refreshes once more after a permission edit', () => {
+    session.applySessionContext({user, company: companyA.systemId, accessToken: 'token'});
+    vi.spyOn(session, 'isSessionValid').mockReturnValue(true);
+    session.permissionRefreshRequested$.next();
+    const first = http.expectOne(contextUrl(companyA.systemId));
+    window.dispatchEvent(new Event('focus'));
+    session.permissionRefreshRequested$.next();
+    session.permissionRefreshRequested$.next();
+    http.expectNone(contextUrl(companyA.systemId));
+    first.flush(context(companyA, false, true));
+    http.expectOne(contextUrl(companyA.systemId)).flush(context(companyA, false, true));
+    http.expectNone(contextUrl(companyA.systemId));
+  });
+
+  it('exposes a config catalogue through its declared permission owner for non-super users', async () => {
+    session.applySessionContext({user, company: companyA.systemId, accessToken: 'token'});
+    const operation = firstValueFrom(auth.refreshPermissions());
+    http.expectOne(contextUrl(companyA.systemId)).flush({data: {company: companyA, isSuperAdmin: false,
+      pages: [{apiPath: '/permissionSets', canRead: true, canCreate: false, canUpdate: false, canDelete: false}]}});
+    await operation;
+    expect(permissions.canView('page-configuration')).toBe(true);
+    expect(session.Permissions.some(value => (value as Record<string, unknown>)['pageId'] === 'page-configuration')).toBe(true);
+  });
+
+  it('switches only to a verified company and replaces its complete permission context', async () => {
+    session.applySessionContext({user, company: companyA.systemId, accessToken: 'token',
+      pagePermissions: [{pageId: 'users', targetType: 'page', surface: 'header', targetKey: '*',
+        canRead: true, canCreate: true, canModify: true, canDelete: true, canExecute: true}]});
+    const operation = firstValueFrom(auth.switchCompany(companyB.systemId));
+    http.expectOne(`${apiBase}/auth/companies`).flush({data: [companyA, companyB]});
+    expect(session.Company).toBe(companyA.systemId);
+    http.expectOne(contextUrl(companyB.systemId)).flush({data: {company: companyB, isSuperAdmin: false,
+      isCompanySuper: false, pages: [], pagePermissions: []}});
+    await operation;
+    expect(session.Company).toBe(companyB.systemId);
+    expect(session.PagePermissions).toEqual([]);
+    expect(session.Permissions).toEqual([]);
+  });
+
+  it('rejects a company outside the server membership list without changing the current context', async () => {
+    session.applySessionContext({user, company: companyA.systemId, accessToken: 'token'});
+    const operation = firstValueFrom(auth.switchCompany(companyB.systemId));
+    http.expectOne(`${apiBase}/auth/companies`).flush({data: [companyA]});
+    await expect(operation).rejects.toThrow('Choose an authorized company.');
+    http.expectNone(contextUrl(companyB.systemId));
+    expect(session.Company).toBe(companyA.systemId);
+  });
+
+  it('refreshes UI rules together with verified data grants', async () => {
+    session.applySessionContext({user, company: companyA.systemId, accessToken: 'token'});
+    const operation = firstValueFrom(auth.refreshPermissions());
+    const denied = {pageId: 'users', targetType: 'page', surface: 'header', targetKey: '*',
+      canRead: false, canCreate: false, canModify: false, canDelete: false, canExecute: false};
+    http.expectOne(contextUrl(companyA.systemId)).flush({data: {company: companyA,
+      pages: [{pageId: 'users', apiPath: '/users', pageCode: 'users', canRead: true}], pagePermissions: [denied]}});
+    await operation;
+    expect(session.PagePermissions).toEqual([denied]);
+    expect(permissions.canView('users')).toBe(false);
   });
 
   it('uses Laravel login, verifies default company and receives backend permissions before entering ERP', async () => {

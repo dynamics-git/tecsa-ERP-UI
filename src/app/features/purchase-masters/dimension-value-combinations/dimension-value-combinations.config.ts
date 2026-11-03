@@ -30,7 +30,6 @@ export const dimensionValueCombinationsListConfig: ListPageConfig & {
   pageId: 'dimension-value-combinations',
   pageType: 'worksheet',
   title: 'Dimension Value Combinations',
-  autoSave: true,
   dataSource: dimensionValueCombinationsDataSource,
   identity: {
     primaryField: '__display_dimension1Id',

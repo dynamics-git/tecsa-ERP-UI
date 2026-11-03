@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
 import { SessionService } from './session.service';
+import { PageAccessService } from './page-access.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PermissionService {
-  constructor(private readonly sessionService: SessionService) {}
+  constructor(private readonly sessionService: SessionService, private readonly pageAccess: PageAccessService = new PageAccessService(sessionService)) {}
 
   isSuperAdmin(): boolean {
     return this.sessionService.SuperAdmin;
@@ -44,6 +45,7 @@ export class PermissionService {
     if (!pageId) {
       return true;
     }
+    if (!this.pageAccess.page(pageId, 'Read')) return false;
 
     if (this.isSuperAdmin()) {
       return true;

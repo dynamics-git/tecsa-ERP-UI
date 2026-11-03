@@ -244,7 +244,6 @@ export const itemsListConfig: ListPageConfig & {
   pageId: 'items',
   pageType: 'card',
   title: 'Items',
-  autoSave: true,
   dataSource: {
     endpoint: '/items',
     keyField: 'systemId',

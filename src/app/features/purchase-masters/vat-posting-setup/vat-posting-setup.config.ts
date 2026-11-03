@@ -231,7 +231,6 @@ export const vatPostingSetupListConfig: ListPageConfig & {
   pageId: 'vat-posting-setup',
   pageType: 'card',
   title: 'VAT Posting Setup',
-  autoSave: true,
   dataSource: {
     endpoint: '/vatPostingSetup',
     keyField: 'systemId',

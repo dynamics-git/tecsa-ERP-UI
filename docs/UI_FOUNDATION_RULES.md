@@ -1,5 +1,22 @@
 # UI foundation conventions
 
+## Record identity and business relationships
+
+PR and permission pages use the same pattern. `keyField: 'systemId'` identifies
+each record for CRUD. Business relationships use `headerPKProp`, `lineFKProp`
+and `parentFieldMap`; these are not derived from `keyField`.
+
+Users assignments filter `userName` from the User header. Permission resource
+and page-rule rows filter `permissionSetCode` from header `code`. Company Access
+filters membership `userName`, with `companyCode` identifying its company.
+RunModal maps the selected business field (e.g. assignment `permissionSetCode`
+to Permission Set `code`). A related card resolves a unique API match before
+opening; missing or ambiguous matches fail. Its API response supplies record
+identity for later edit/delete. Do not remap the assignment's own record ID.
+
+Permission resource rows use ordinary CRUD and default field autosave, exactly
+like PR lines. No separate Update Permissions/whole-collection save path.
+
 Use the existing shared ListPage runtime. Do not create a feature-owned CRUD
 engine, a backend page registry, or another form renderer.
 
@@ -64,6 +81,42 @@ server's query capabilities; do not repeat per-field sort/filter/search flags.
 Writable fields derive from editable card/line fields. readonlyAfterCreate
 excludes a field from updates. Backend permissions and validation remain
 authoritative.
+
+## Config defaults and lookup bindings
+
+Ordinary pages omit `autoSave`: the existing core autosaves when no Save/Apply
+command requests manual mode. Declare `autoSave: false` only for an intentional
+manual-save workflow. Do not copy core defaults into every page declaration.
+
+Record identity and lookup selection are separate bindings:
+
+```ts
+dataSource: {
+  endpoint: '/users',
+  keyField: 'systemId',
+}
+
+// A field stores the selected master value; this can be a GUID or a business code.
+lookup: {
+  endpoint: '/permissionSets',
+  valueField: 'systemId',
+  displayField: 'code',
+}
+```
+
+For both header fields and line columns, declare lookup endpoint, selected-value
+field and display field inside `lookup` only. Do not repeat them as outer
+`api`, `valueField`, `labelField`, `bindValue` or `bindLabel` properties.
+`displayFormat` is the existing optional explicit caption format; preserve it
+when a business caption combines multiple source fields. `options` is for a
+fixed choice list. `type` chooses the editor; `valueType` is only needed when its
+stored-value semantics differ (for example lookup + guid).
+
+PR and all ordinary configs follow this pattern. Purchase Order still contains
+read-only old-app reference bindings and unsupported fallback endpoints; replacing
+those bindings requires the deferred Purchase Order API/business migration. They
+are not a template for new feature pages. Do not invent a replacement source or
+make backend routes to satisfy a UI convention.
 
 ## Page types and related navigation
 

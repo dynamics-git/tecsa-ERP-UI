@@ -21,6 +21,19 @@ function editor(columns:LineColumnConfig[]=[quantity], loadList=vi.fn(),inScope=
   instance.columns=columns;return instance;
 }
 describe('Shared power-user line behavior',()=>{
+  it('keeps explicit data widths separate from surplus row-control space without changing automatic document columns', () => {
+    const grid = editor([{id:'resource',label:'Resource',width:'260px'}, {id:'canRead',label:'Read',width:'100px'}]);
+    grid.showSelection = true;
+    expect(grid.fixedColumnLayout).toBe(true);
+    grid.showSelection = false;
+    expect(grid.fixedColumnLayout).toBe(false);
+    grid.showSelection = true;
+    expect(grid.getColumnWidthStyle(grid.columns[0])).toBe('260px');
+    grid.columns = [{id:'lineNo',label:'Line No.'}, {id:'description',label:'Description'}];
+    expect(grid.fixedColumnLayout).toBe(false);
+    expect(grid.getColumnWidthStyle(grid.columns[0])).toBeNull();
+  });
+
   it('reads quoted Excel text, preserves decimals and rejects malformed or unbounded input',()=>{
     expect(readTabularText('"A\tB"\t12345678901234.123456\r\n"line\ntext"\t"a""b"\r\n')).toEqual([['A\tB','12345678901234.123456'],['line\ntext','a"b']]);
     expect(()=>readTabularText('a\tb\nc')).toThrow(/rectangular/);

@@ -1,14 +1,20 @@
 import { InjectionToken } from '@angular/core';
+import { MonoTypeOperatorFunction, timeout } from 'rxjs';
 
 export interface RuntimeTimeoutPolicy {
-  requestTimeoutMs: number;
-  hydrationTimeoutMs: number;
+  /** Explicit host override only. Omitted means wait for the actual response. */
+  requestTimeoutMs?: number;
+  hydrationTimeoutMs?: number;
 }
 
-export const DEFAULT_RUNTIME_TIMEOUT_POLICY: RuntimeTimeoutPolicy = {
-  requestTimeoutMs: 15000,
-  hydrationTimeoutMs: 8000,
-};
+export const DEFAULT_RUNTIME_TIMEOUT_POLICY: RuntimeTimeoutPolicy = {};
+
+/** No invented deadline for ERP work. Preserve deliberately supplied overrides. */
+export function optionalRequestTimeout<T>(milliseconds?: number): MonoTypeOperatorFunction<T> {
+  return milliseconds !== undefined && Number.isFinite(milliseconds) && milliseconds > 0
+    ? timeout<T>(milliseconds)
+    : source => source;
+}
 
 export const RUNTIME_TIMEOUT_POLICY = new InjectionToken<RuntimeTimeoutPolicy>(
   'RUNTIME_TIMEOUT_POLICY',

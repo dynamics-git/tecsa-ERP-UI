@@ -1,5 +1,5 @@
-import { Component, ElementRef, HostListener, ViewChild } from '@angular/core';
-import { NavigationStart, Router } from '@angular/router';
+import { Component, ElementRef, HostListener, ViewChild, inject } from '@angular/core';
+import { NavigationStart, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MenuItem } from '../../core/models/menu-item.model';
@@ -9,16 +9,18 @@ import { MenuService } from '../../core/services/menu.service';
 import { shouldOpenFromMenuAsRunModal } from '../../core/services/page-registry';
 import { SessionService } from '../../core/services/session.service';
 import { DrawerService } from '../../platform/public-api';
+import { UnsavedChangesService } from '../../platform/public-api';
 import { ModuleMenuPanel } from '../module-menu-panel/module-menu-panel';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [ModuleMenuPanel],
+  imports: [ModuleMenuPanel, RouterLink],
   templateUrl: './header.html',
   styleUrl: './header.scss'
 })
 export class Header {
+  private readonly unsaved = inject(UnsavedChangesService);
   @ViewChild('globalSearchInput') globalSearchInput?: ElementRef<HTMLInputElement>;
 
   readonly isLive = Boolean(environment.isLive || environment.production);
@@ -114,14 +116,15 @@ export class Header {
   }
 
   @HostListener('document:click', ['$event'])
-  closeModulePanelOnOutsideClick(event: MouseEvent): void {
+  @HostListener('document:pointerdown', ['$event'])
+  closeModulePanelOnOutsideClick(event: Event): void {
     if (!this.activeModule && !this.isGlobalSearchOpen && !this.isUserMenuOpen) {
       return;
     }
 
     const target = event.target;
 
-    if (!(target instanceof HTMLElement)) {
+    if (!(target instanceof Element)) {
       return;
     }
 
@@ -203,7 +206,10 @@ export class Header {
     }
   }
 
-  changeCompany(): void {
+  async changeCompany(): Promise<void> {
+    if (!await this.unsaved.canLeave()) return;
+    this.closeUserMenu();
+    this.drawerService.open({id: 'company-switcher', title: 'Change company', viewId: 'company-switcher', size: 'md', allowNested: true});
   }
 
   openGlobalSearch(): void {

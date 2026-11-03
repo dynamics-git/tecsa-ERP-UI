@@ -158,7 +158,6 @@ export const glAccountsListConfig: ListPageConfig & {
   pageId: 'gl-accounts',
   pageType: 'card',
   title: 'G/L Accounts',
-  autoSave: true,
   dataSource: {
     endpoint: '/glAccounts',
     keyField: 'systemId',

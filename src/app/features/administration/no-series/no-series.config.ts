@@ -71,7 +71,6 @@ export const noSeriesListConfig: ListPageConfig & {
   pageId: 'no-series',
   pageType: 'document',
   title: 'No. Series',
-  autoSave: true,
   dataSource: {
     endpoint: '/numberSeries',
     keyField: 'systemId',

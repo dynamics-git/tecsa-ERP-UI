@@ -118,7 +118,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
             endpoint: '/numberSeries',
             displayField: 'code',
           },
-          labelField: 'code',
           displayFormat: '[code] — [description]',
         },
         {
@@ -164,7 +163,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
             endpoint: '/locations',
             displayField: 'code',
           },
-          labelField: 'code',
         },
       ],
     },

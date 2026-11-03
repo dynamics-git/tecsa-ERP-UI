@@ -47,7 +47,6 @@ export const vendorDefaultDimensionsListConfig: ListPageConfig & {
   pageId: 'vendor-default-dimensions',
   pageType: 'worksheet',
   title: 'Vendor Dimensions',
-  autoSave: true,
   dataSource: vendorDefaultDimensionsDataSource,
   identity: {
     primaryField: 'number',

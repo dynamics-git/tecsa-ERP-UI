@@ -47,7 +47,6 @@ export const glAccountDefaultDimensionsListConfig: ListPageConfig & {
   pageId: 'gl-account-default-dimensions',
   pageType: 'worksheet',
   title: 'G/L Account Dimensions',
-  autoSave: true,
   dataSource: glAccountDefaultDimensionsDataSource,
   identity: {
     primaryField: 'number',

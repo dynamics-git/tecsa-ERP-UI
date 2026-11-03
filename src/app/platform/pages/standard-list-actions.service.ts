@@ -27,6 +27,7 @@ export class StandardListActionsService {
         ...override,
         label: override.label ?? labels[key],
         actionKey: key,
+        surface: 'list',
         disabled: unsupported || override.disabled === true,
         tooltip: unsupported ? `${labels[key]} is not supported for this page.` : override.tooltip,
       };
@@ -39,7 +40,7 @@ export class StandardListActionsService {
         label: command.label,
         icon: override.icon ?? icons[key],
         order: override.order ?? ({new: 10, delete: 20, refresh: 30}[key]),
-        visible: override.visible !== false,
+        visible: override.visible !== false && permission.hidden !== true,
         disabled: permission.disabled === true,
         tooltip: permission.tooltip,
       };

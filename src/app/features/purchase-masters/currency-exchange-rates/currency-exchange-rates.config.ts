@@ -30,7 +30,6 @@ export const currencyExchangeRatesListConfig: ListPageConfig & {
   pageId: 'currency-exchange-rates',
   pageType: 'worksheet',
   title: 'Currency Exchange Rates',
-  autoSave: true,
   dataSource: currencyExchangeRatesDataSource,
   identity: {
     primaryField: 'code',

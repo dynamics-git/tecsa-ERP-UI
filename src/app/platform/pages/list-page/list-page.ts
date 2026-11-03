@@ -9,11 +9,11 @@ import { resolvePageIdentity, recordIdentityText } from '../../data/record-ident
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
 import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
-import { catchError, map, timeout } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
 import { AttachmentsConfig, DocumentWindowConfig, HeaderConfig, LineTotalsConfig, DocumentStatusMessage } from '../../models/document-window-config.model';
-import { LineColumnConfig, LineConfig } from '../../models/line-config.model';
+import { MINIMUM_LINE_GRID_ROWS, LineColumnConfig, LineConfig } from '../../models/line-config.model';
 import { CommandConfig } from '../../models/command-config.model';
 import { ListCommandSelectionMode, ListPageConfig } from '../../models/page-config.model';
 import { DataSourceConfig } from '../../models/data-source-config.model';
@@ -37,7 +37,7 @@ import { ListFilterStateService } from '../list-filter-state.service';
 import { MasterDataService } from '../../data/master-data.service';
 import { PageCommandService } from '../page-command.service';
 import { RunModalStackService } from '../../run-modal/run-modal-stack.service';
-import { RUNTIME_TIMEOUT_POLICY } from '../../data/runtime-timeout-policy.token';
+import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../../data/runtime-timeout-policy.token';
 import {
   DocumentPageDataSourceResolverService,
   DocumentPageLineValueType,
@@ -50,6 +50,7 @@ import { RuntimeValueMapperService } from '../../data/runtime-value-mapper.servi
 import { RunModalLoadingService } from '../../run-modal/run-modal-loading.service';
 import { RunModalService, SavedEntryChange } from '../../run-modal/run-modal.service';
 import { DocumentPageCommandPermissionService } from '../document-page-command-permission.service';
+import { PageAccessService } from '../../../core/services/page-access.service';
 import { DocumentWindow } from '../../document/document-window/document-window';
 
 type RequiredListConfig = ListPageConfig & { dataSource: DataSourceConfig };
@@ -125,6 +126,7 @@ export class ListPage implements OnInit, OnDestroy {
   get hasUnsavedChanges(): boolean { return this.dirty || this.dirtyWorksheet || this.invalidHeaderDrafts.size > 0 || this.hasInvalidLineDrafts; }
   get hasPendingWrites(): boolean { return this.deleting || this.savingEntry || this.autosavePending > 0 || this.worksheetPending > 0 || this.lineBatchPending; }
   private readonly commandPermission = inject(DocumentPageCommandPermissionService);
+  private readonly pageAccess = inject(PageAccessService);
   private readonly worksheetChangedRows = new Set<Record<string, unknown>>();
   private worksheetPending = 0;
   private worksheetSource?: DataSourceConfig;
@@ -152,7 +154,7 @@ export class ListPage implements OnInit, OnDestroy {
       this.startPopupLoading('Loading records...');
       const existing = reset ? [] : (this.activeDocumentWindowConfig?.lineRows ?? []).filter(row => this.hasValue(this.resolvePersistedRecordId(row, this.worksheetSource)));
       const size = this.worksheetSource.pageSize ?? 25;
-      const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(timeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
+      const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
       const records = await this.documentHydration.resolveLineLookups(page.value, this.lineConfig.columns, this.initialRecord ?? {}, () => true, () => this.startPopupLoading('Loading selected values...'));
       this.nextCursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
       this.hasMore = this.worksheetSource.paging === 'cursor' ? !!this.nextCursor : typeof page.meta['total'] === 'number' ? existing.length + records.length < page.meta['total'] : records.length === size;
@@ -302,6 +304,14 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.subscriptions.add(this.sessionService.permissionsLoaded$.subscribe(loaded => {
+      if (!loaded || !this.activeDocumentWindowConfig) return;
+      queueMicrotask(() => {
+        if (this.destroyed) return;
+        this.refreshEntryPolicy();
+        this.changeDetector.markForCheck();
+      });
+    }));
     this.subscriptions.add(this.dataSource.mutations.subscribe(change => {
       const entry = this.activeDocumentWindowConfig;
       if (!entry?.headerData || !this.lineConfig) return;
@@ -734,7 +744,7 @@ export class ListPage implements OnInit, OnDestroy {
     if (initialLoad && this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
     let setupRecordLoaded = false;
     this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource, { useCache: true, maxAgeMs: 30000, onRequest: () => this.startPopupLoading('Loading setup...') }).pipe(
-      timeout(this.timeoutPolicy.hydrationTimeoutMs),
+      optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs),
       switchMap(record => {
         setupRecordLoaded = true;
         return from(this.documentHydration.resolveHeaderLookups(this.isRecord(record) ? record : {}, this.headerConfig.sections.flatMap(section => section.fields), () => this.startPopupLoading('Loading selected values...')));
@@ -775,7 +785,7 @@ export class ListPage implements OnInit, OnDestroy {
           const header=this.activeDocumentWindowConfig?.headerData ?? {};
           const id=this.resolvePersistedRecordId(header,this.listConfig.dataSource);
           if(!this.hasValue(id) && !this.listConfig.dataSource.singleton)return 'The new record has no confirmed identifier yet. Your edits are retained; do not submit it again.';
-          const result=await firstValueFrom(this.dataSource.loadById(this.listConfig.dataSource,id,{forceRefresh:true}).pipe(timeout(this.timeoutPolicy.hydrationTimeoutMs)));
+          const result=await firstValueFrom(this.dataSource.loadById(this.listConfig.dataSource,id,{forceRefresh:true}).pipe(optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs)));
           const current=this.resolveHeaderRecordResponse(result,{});
           const edits=this.unsavedFields.get(header);
           const matches=!!edits?.size && [...edits.keys()].every(field=>JSON.stringify(current[field])===JSON.stringify(header[field]));
@@ -896,7 +906,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private get headerFieldConfigMap() {
-    return this.documentState.buildFieldConfigMap(this.headerConfig.sections);
+    return this.documentState.buildFieldConfigMap(this.activeDocumentWindowConfig?.headerSections ?? this.headerConfig.sections);
   }
 
   private get defaultAttachments(): AttachmentsConfig {
@@ -1199,7 +1209,7 @@ export class ListPage implements OnInit, OnDestroy {
         resolved.dataSource,
         header,
         {
-          timeoutMs: 10000,
+          timeoutMs: this.timeoutPolicy.hydrationTimeoutMs,
           fallbackHeaderPKProp: this.listConfig.dataSource.headerPKProp,
           defaultTop: backgroundTop,
           allowWithoutParentKey: pageType === 'worksheet',
@@ -1303,12 +1313,16 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private refreshEntryPolicy(): void {
+    if (this.activeDocumentWindowConfig?.headerData) this.activeDocumentWindowConfig.title = this.getDocumentTitle(this.activeDocumentWindowConfig.headerData);
     if (this.isWorksheetPage) {
       const entry = this.activeDocumentWindowConfig;
       if (!entry) return;
       entry.headerSections = [];
       const editable = this.canModifyLines() || this.canModifyLines('create');
-      entry.lineColumns = this.lineConfig?.columns.map(column => ({ ...column, readonly: column.readonly || !editable })) ?? [];
+      entry.lineColumns = this.lineConfig?.columns
+        .filter(column => this.pageAccess.field(this.pageId, 'line', column.field ?? column.id).visible)
+        .map(column => ({ ...column, readonly: column.readonly || !editable || this.lineConfig?.editable === false ||
+          !this.pageAccess.field(this.pageId, 'line', column.field ?? column.id).editable })) ?? [];
       entry.headerToolbarButtons = this.resolvePopupHeaderToolbarButtons();
       entry.lineToolbarButtons = [];
       return;
@@ -1318,9 +1332,13 @@ export class ListPage implements OnInit, OnDestroy {
     const persisted = this.hasPersistedIdentity(entry.headerData);
     const supported = persisted || this.listConfig.dataSource.singleton ? this.listConfig.dataSource.supportsUpdate !== false : this.listConfig.dataSource.supportsCreate !== false;
     const editable = supported && this.canModifyPage() && this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {});
-    entry.headerSections = this.headerConfig.sections.map(section => ({ ...section, fields: section.fields.map(field => ({ ...field, readonly: field.readonly || !editable || (!!field.readonlyAfterCreate && this.hasPersistedIdentity(entry.headerData)) })) }));
+    entry.headerSections = this.headerConfig.sections.map(section => ({ ...section, fields: section.fields
+      .filter(field => this.pageAccess.field(this.pageId, 'header', field.key).visible)
+      .map(field => ({ ...field, readonly: field.readonly || !editable || !this.pageAccess.field(this.pageId, 'header', field.key).editable || (!!field.readonlyAfterCreate && this.hasPersistedIdentity(entry.headerData)) })) }));
     const lineEditable = this.canModifyLines() && this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {});
-    entry.lineColumns = this.lineConfig?.columns.map(column => ({ ...column, readonly: column.readonly || !lineEditable })) ?? [];
+    entry.lineColumns = this.lineConfig?.columns
+      .filter(column => this.pageAccess.field(this.pageId, 'line', column.field ?? column.id).visible)
+      .map(column => ({ ...column, readonly: column.readonly || !lineEditable || !this.pageAccess.field(this.pageId, 'line', column.field ?? column.id).editable })) ?? [];
     entry.headerToolbarButtons = this.resolvePopupHeaderToolbarButtons().map(button => ({ ...button,
       hidden: button.hidden || (this.listConfig.dataSource.singleton && (
         (this.normalizeCommandAction(button.actionKey) === 'new' && this.listConfig.dataSource.supportsCreate === false) ||
@@ -1331,7 +1349,10 @@ export class ListPage implements OnInit, OnDestroy {
         (!!button.apiAction?.states && !button.apiAction.states.values.includes(entry.headerData?.[button.apiAction.states.field])),
     }));
     entry.lineToolbarButtons = this.resolvePopupLineToolbarButtons().map(button => ({ ...button,
-      disabled: button.disabled || (this.normalizeCommandAction(button.actionKey) === 'line-copy-rows' ? false : this.normalizeCommandAction(button.actionKey) === 'line-delete'
+      disabled: button.disabled ||
+        (!!button.requireSelection && button.runModalRecord?.source === 'activeLine' &&
+          (!this.activeLineRow || this.activeLineRow['__entryPlaceholder'] === true || this.selectedLineIndexes.length > 1)) ||
+        (button.runModalPageId || ['line-copy-rows', 'line-refresh'].includes(this.normalizeCommandAction(button.actionKey)) ? false : this.normalizeCommandAction(button.actionKey) === 'line-delete'
         ? !this.dataSource.canWrite(this.listConfig.dataSource, entry.headerData ?? {}) : !lineEditable),
     }));
   }
@@ -1410,6 +1431,8 @@ export class ListPage implements OnInit, OnDestroy {
       return [];
     }
 
+    if (!lines.length && !this.dataSource.canWrite(this.listConfig.dataSource, headerData)) return [];
+
     const rows = this.documentConfigData.buildLineRows(
       this.lineConfig,
       headerData,
@@ -1417,9 +1440,10 @@ export class ListPage implements OnInit, OnDestroy {
       this.getLineMasterRegistry(),
       this.optionFieldMap,
     );
-    if (this.lineConfig.dataSource.supportsCreate !== false && this.lineConfig.editable !== false && this.canModifyLines('create')) {
+    if (this.lineConfig.dataSource.supportsCreate !== false && this.lineConfig.editable !== false && this.canModifyLines('create') &&
+      this.dataSource.canWrite(this.listConfig.dataSource, headerData)) {
       for (const row of rows) if (!this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig.dataSource)) && this.isLineRowMeaningfullyEmpty(row)) row['__entryPlaceholder'] = true;
-      while (rows.length < 8 || !rows.some(row => row['__entryPlaceholder'])) {
+      while (rows.length < MINIMUM_LINE_GRID_ROWS || !rows.some(row => row['__entryPlaceholder'])) {
         const row = this.documentConfigData.createEmptyLineRow(this.lineConfig, headerData, this.getLineMasterRegistry(), this.optionFieldMap);
         row['__entryPlaceholder'] = true; rows.push(row);
       }
@@ -1644,6 +1668,8 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
+    const previousRow = this.activeLineRow;
+    const previousSelection = this.selectedLineIndexes;
     const activeRow = payload['activeRow'];
     if (this.isRecord(activeRow)) {
       this.activeLineRow = activeRow;
@@ -1654,6 +1680,16 @@ export class ListPage implements OnInit, OnDestroy {
       payload,
       selectedIndexes: this.selectedLineIndexes,
     }).selectedIndexes;
+    const selectionChanged = previousRow !== this.activeLineRow ||
+      previousSelection.length !== this.selectedLineIndexes.length ||
+      previousSelection.some((index, position) => index !== this.selectedLineIndexes[position]);
+    if (selectionChanged && this.lineConfig?.toolbarButtons?.some(button => button.runModalRecord?.source === 'activeLine')) {
+      queueMicrotask(() => {
+        if (this.destroyed) return;
+        this.refreshEntryPolicy();
+        this.changeDetector.markForCheck();
+      });
+    }
   }
 
   private handleHeaderChanged(payload: unknown): void {
@@ -1663,6 +1699,10 @@ export class ListPage implements OnInit, OnDestroy {
     }
 
     const fieldKey = this.toText(payload['fieldKey']);
+    if (!this.pageAccess.field(this.pageId, 'header', fieldKey).editable) {
+      this.setEntryStatus({tone: 'error', title: 'Permission denied', message: 'You cannot change this field.'});
+      return;
+    }
     const fieldConfig = this.headerFieldConfigMap[fieldKey];
     const validation = this.fieldValidation.validateField(fieldConfig, payload['value'], this.activeDocumentWindowConfig.headerData);
     if (!validation.valid) {
@@ -1793,6 +1833,10 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private saveLineFields(row: Record<string, unknown>, fields: string[], options: CreateLineOptions = {}): void {
+    if (fields.some(field => !this.pageAccess.field(this.pageId, 'line', field).editable)) {
+      this.setEntryStatus({tone: 'error', title: 'Permission denied', message: 'You cannot change these line fields.'});
+      options.onSettled?.(false); return;
+    }
     if (!this.lineConfig || !this.activeDocumentWindowConfig?.headerData) {
       options.onSettled?.(false); return;
     }
@@ -1866,7 +1910,7 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
-    const payload = this.documentConfigData.buildLineUpdatePayload(row, this.isWorksheetPage ? this.lineConfig.dataSource.updateFields ?? uniqueFields : uniqueFields, this.lineConfig);
+    const payload = this.documentConfigData.buildLineUpdatePayload(row, uniqueFields, this.lineConfig);
     if (this.isWorksheetPage) { this.worksheetPending++; this.lineCreateInProgress.add(row); }
     this.setEntryStatus({
       tone: 'info',
@@ -2418,8 +2462,15 @@ export class ListPage implements OnInit, OnDestroy {
 
   private tryOpenEntryRunModal(command: string, payload: unknown, listRecord?: Record<string, unknown>): boolean {
     const button = this.findEntryCommandButton(command);
-    if (this.isWorksheetPage && button?.requireSelection && (!this.activeLineRow || !this.hasValue(this.resolvePersistedRecordId(this.activeLineRow, this.listConfig.dataSource)) || this.dirtyWorksheet)) {
-      this.setEntryStatus({tone: 'error', title: 'Select a saved row', message: 'Complete your changes and select a saved record first.'}); return true;
+    if (button?.requireSelection && button.runModalRecord?.source === 'activeLine' &&
+        (!this.activeLineRow || this.activeLineRow['__entryPlaceholder'] === true || this.selectedLineIndexes.length > 1)) {
+      this.setEntryStatus({tone: 'error', title: 'Select a saved row', message: 'Select one saved line before opening its related record.'}); return true;
+    }
+    if (this.isWorksheetPage && button?.requireSelection && (!this.activeLineRow || !this.hasValue(this.resolvePersistedRecordId(this.activeLineRow, this.listConfig.dataSource)))) {
+      this.setEntryStatus({tone: 'info', title: 'Select a record', message: 'Select an existing record first.'}); return true;
+    }
+    if (this.isWorksheetPage && button?.requireSelection && this.dirtyWorksheet) {
+      this.setEntryStatus({tone: 'info', title: 'Finish saving', message: 'Wait for your changes to finish saving, then try again.'}); return true;
     }
     const pageId = this.toText(button?.runModalPageId).trim();
     if (!pageId.length) {
@@ -2486,8 +2537,10 @@ export class ListPage implements OnInit, OnDestroy {
       payload,
       context: {
         pageId: this.pageId,
-        selectedRow: this.selectedRow,
-        checkedRowKeys: [...this.checkedRowKeys],
+        selectedRow: this.isWorksheetPage ? this.activeLineRow : this.selectedRow,
+        checkedRowKeys: this.isWorksheetPage
+          ? this.selectedLineIndexes.map(index => this.activeDocumentWindowConfig?.lineRows?.[index]).filter(row => !!row).map(row => this.getRowKey(row))
+          : [...this.checkedRowKeys],
         headerData: this.activeDocumentWindowConfig?.headerData,
         lineRows: this.activeDocumentWindowConfig?.lineRows,
       },
@@ -3027,7 +3080,7 @@ export class ListPage implements OnInit, OnDestroy {
 
   private getDocumentTitle(row: unknown): string {
     if (this.isWorksheetPage || this.listConfig.dataSource.singleton) return this.documentLabel;
-    const identity = resolvePageIdentity(row, this.listConfig);
+    const identity = resolvePageIdentity(this.pageAccess.displayRecord(this.pageId, 'header', row), this.listConfig);
     if (identity.primary) return recordIdentityText(identity);
     const record = this.isRecord(row) ? row : {};
     return this.hasPersistedIdentity(record) ? this.documentLabel : 'New ' + this.documentLabel;
@@ -3123,13 +3176,14 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.lineConfig.dataSource.supportsCreate === false || this.lineConfig.editable === false || !this.canModifyLines('create')) {
+    if (this.lineConfig.dataSource.supportsCreate === false || this.lineConfig.editable === false || !this.canModifyLines('create') ||
+      !this.dataSource.canWrite(this.listConfig.dataSource, this.activeDocumentWindowConfig.headerData ?? {})) {
       return;
     }
 
     const lineRows = this.activeDocumentWindowConfig.lineRows ?? [];
     const emptyRows = lineRows.filter((row) => !this.hasValue(this.resolvePersistedRecordId(row, this.lineConfig?.dataSource)) && this.isLineRowMeaningfullyEmpty(row));
-    const missing = Math.max(0, minEmptyRows - emptyRows.length, 8 - lineRows.length);
+    const missing = Math.max(0, minEmptyRows - emptyRows.length, MINIMUM_LINE_GRID_ROWS - lineRows.length);
     if (missing <= 0) {
       return;
     }

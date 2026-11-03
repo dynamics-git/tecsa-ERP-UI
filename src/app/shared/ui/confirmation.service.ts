@@ -132,11 +132,17 @@ export class ConfirmationService {
     }).then(() => undefined);
   }
 
-  async prompt(title: string, fields: FieldConfig[]): Promise<Record<string, unknown> | null> {
+  async prompt(title: string, fields: FieldConfig[], options: {message?: string; confirmLabel?: string} = {}): Promise<Record<string, unknown> | null> {
     const values = Object.fromEntries(fields.map(field => [field.key, field.defaultValue ?? '']));
-    const confirmed = await this.openDialog({ title, message: '', kind: 'confirm', confirmLabel: 'Continue', cancelLabel: 'Cancel',
+    const confirmed = await this.openDialog({ title, message: options.message ?? '', kind: 'confirm', confirmLabel: options.confirmLabel ?? 'Continue', cancelLabel: 'Cancel',
       sections: [{ id: 'command-input', fields }], values });
     return confirmed ? values : null;
+  }
+
+  /** Blocking feedback for a submitted operation. The caller must finish it in finally. */
+  progress(title: string, message: string): () => void {
+    const dialog = this.createDialog({title, message, kind: 'progress', confirmLabel: ''});
+    return () => this.resolveDialog(dialog.id, true);
   }
 
   resolveDialog(popupId: string, value: boolean): void {
@@ -155,8 +161,12 @@ export class ConfirmationService {
   }
 
   private openDialog(config: ConfirmationDialogConfig): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-      const popupId = `confirmation-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    return this.createDialog(config).result;
+  }
+
+  private createDialog(config: ConfirmationDialogConfig): {id: string; result: Promise<boolean>} {
+    const popupId = `confirmation-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const result = new Promise<boolean>((resolve) => {
       this.pending.set(popupId, { resolve });
 
       this.popupStack.open({
@@ -171,5 +181,6 @@ export class ConfirmationService {
         }
       });
     });
+    return {id: popupId, result};
   }
 }
