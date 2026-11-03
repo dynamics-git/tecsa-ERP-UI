@@ -66,6 +66,14 @@ Migration references: `2026_11_03_000200`, `000203`, and `000206`.
 
 New Sales source controller declares **17 ApiSource endpoints**, not 17 working UI pages. Six are draft header/lines, three status-history read-only APIs and eight item-charge APIs (posted history sources are read-only). Check API discovery and permissions after migrations.
 
+## Sales Order physical field catalog — for developers
+
+A source-extracted inventory of the actual `sales_orders` and `sales_order_lines` physical columns has been committed separately. It distinguishes original migration fields from additive fields. This is useful for page configuration and DB review but does **not** certify that every BC Table 36/37 field and behavior is operational.
+
+[Exact Sales Order Header/Line field catalog](https://github.com/dynamics-git/tecsa-erp-26.0/blob/schema/bc-aligned-finance-part4-20261103/docs/database/SALES_ORDER_PHYSICAL_FIELD_INVENTORY.md).
+
+The integrated backend branch now has 19 Sales supplemental ApiSource declarations including read-only archives. For consultants, the new archive and pricing schema is not yet an accepted business workflow.
+
 ## Header–Line relationships
 
 | Header | Lines | Parent foreign key |
