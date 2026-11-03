@@ -74,6 +74,23 @@ A source-extracted inventory of the actual `sales_orders` and `sales_order_lines
 
 The integrated backend branch now has 19 Sales supplemental ApiSource declarations including read-only archives. For consultants, the new archive and pricing schema is not yet an accepted business workflow.
 
+## BC Sales pricing tables — physical database extension
+
+Microsoft's official Price List Header (Table 7000), Price List Line (Table 7001), Customer Price Group (Table 6) and Customer Discount Group (Table 340) are now used as the reference for four new Sales physical tables in the integrated backend development chain:
+
+| TecSA table | Relation / role |
+| --- | --- |
+| `sales_price_list_headers` | Price list header, status, currency, source and validity period |
+| `sales_price_list_lines` | Child prices and line discounts, linked to header by Company + SystemId |
+| `customer_price_groups` | Shared pricing group master for customers |
+| `customer_discount_groups` | Shared customer discount group master |
+
+`customers` gains the two corresponding nullable, Company-scoped group foreign keys. Migrations: `000210` and `000211`. These are **physical database additions, not completed pricing functionality**. Four API source declarations exist but are read-only until group assignment, active pricing, discount selection, and posting rules are implemented.
+
+**For developers:** Reuse the generic API and Company-aware Header–Line model; do not expose Price List activation or customer price calculation as a CRUD side-effect. **For consultants:** Sales Line types in BC include blank, G/L Account, Item, Resource, Fixed Asset, Charge (Item), and Allocation Account, but current TecSA SalesOrderService supports only Item and G/L Account. Do not assume the remaining types work.
+
+[Full BC Sales pricing mapping and database acceptance notes](https://github.com/dynamics-git/tecsa-erp-26.0/blob/schema/bc-aligned-finance-part4-20261103/docs/database/BC_SALES_PRICING_TABLES_7000_7001_6_340.md).
+
 ## Header–Line relationships
 
 | Header | Lines | Parent foreign key |
