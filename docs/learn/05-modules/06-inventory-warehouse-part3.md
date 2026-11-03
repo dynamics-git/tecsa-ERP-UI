@@ -35,6 +35,8 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 
 **Posted warehouse history versus posted trade history:** `posted_warehouse_receipts` and `posted_warehouse_shipments` represent warehouse handling documents; `posted_purchase_receipts` and `posted_sales_shipments` represent accounting/trade posting histories. These must not be conflated.
 
+**Bin Content business identity:** the unique key includes Company, Location, Bin, Item, Variant **and Unit of Measure Code**. UOM Code uses an empty-string default rather than nullable identity to avoid ambiguous duplicate records. This is master configuration, not an on-hand stock balance.
+
 **No second quantity ledger:** Bin Content defines fixed/default/dedicated/block settings and item/bin assignment; on-hand, reserved and available stock must come from authoritative inventory/bin entries and domain calculations.
 
 ## Location integrity and tracking history — 3 November update
