@@ -91,6 +91,19 @@ Microsoft's official Price List Header (Table 7000), Price List Line (Table 7001
 
 [Full BC Sales pricing mapping and database acceptance notes](https://github.com/dynamics-git/tecsa-erp-26.0/blob/schema/bc-aligned-finance-part4-20261103/docs/database/BC_SALES_PRICING_TABLES_7000_7001_6_340.md).
 
+## BC Item Discount Groups and Sales Line Discount
+
+Additional official BC structures reviewed and added to the backend integrated branch:
+
+| Physical table | BC origin | Relationship |
+| --- | --- | --- |
+| `item_discount_groups` | Item Discount Group, Table 341 | `items.item_discount_group_id` with Company-scoped FK |
+| `sales_line_discounts` | Sales Line Discount, Table 7004 | Sales/customer group, item/group, UOM, variant, currency, minimum quantity and effective dates |
+
+Migration `000212` introduces these records. The `itemDiscountGroups` and `salesLineDiscounts` ApiSources are **read-only** until price selection, group applicability, overlapping agreement handling, and line-discount posting logic are implemented.
+
+BC's modern Price List Header/Line (7000/7001) is the primary direction for new pricing; the Sales Line Discount Table 7004 is included as a separately identified BC concept, **not** as a duplicate active pricing engine. Developers must choose one authoritative calculation route before enabling writes. Consultants must not assume the new discount groups are being applied to customer orders merely because the database tables exist.
+
 ## Header–Line relationships
 
 | Header | Lines | Parent foreign key |
