@@ -54,7 +54,7 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 | `warehouse_receipts` | `warehouse_receipt_lines` | `warehouse_receipt_id` |
 | `warehouse_shipments` | `warehouse_shipment_lines` | `warehouse_shipment_id` |
 
-`system_id` is the technical row key. `company_id` scopes records. `number` and `line_no` are business identifiers. Generic ApiSource uses PostgreSQL field metadata and existing Core CRUD/permissions, not a second field-definition registry. Physical APIs alone do **not** implement Register, Post Receipt, Post Shipment, Create Pick, Apply Reservation or Assign Tracking actions. Four posted warehouse history APIs are read-only; the new posted history tables are not yet populated by posting services.
+`system_id` is the technical row key. `company_id` scopes records. `number` and `line_no` are business identifiers. Generic ApiSource uses PostgreSQL field metadata and existing Core CRUD/permissions, not a second field-definition registry. The draft warehouse API also blocks generic writes to `status`, status-change audit fields and handled quantities; these are reserved for future domain commands rather than arbitrary field PATCH requests. Physical APIs alone do **not** implement Register, Post Receipt, Post Shipment, Create Pick, Apply Reservation or Assign Tracking actions. Four posted warehouse history APIs are read-only; the new posted history tables are not yet populated by posting services.
 
 ## Developer checklist: page and endpoint implementation
 
