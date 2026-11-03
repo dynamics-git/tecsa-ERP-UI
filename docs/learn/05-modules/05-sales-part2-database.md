@@ -16,6 +16,14 @@
 
 [Source-level Sales Order acceptance audit](https://github.com/dynamics-git/tecsa-erp-26.0/blob/schema/bc-aligned-finance-part4-20261103/docs/database/BC_SALES_ORDER_36_37_ACCEPTANCE_AUDIT.md).
 
+## Additional Sales table-first database corrections
+
+**BC Sales Header/Line archive coverage:** The backend integrated development branch now adds `sales_document_archives` (versioned Header) and `sales_document_archive_lines` (versioned Lines) through migration `000208`. These tables use Company-scoped technical keys, archive version and document occurrence, and full JSONB source-record snapshots so that fields are not silently omitted from archived versions. The two new ApiSource declarations are **read-only**. No archive command is implemented yet.
+
+**Sales Order line discount storage:** Migration `000209` removes the old constraint that always forced `line_amount = quantity × unit_price`. It replaces that rule with constraints limiting discount percentage and discount amount to valid ranges. This makes the physical schema less incompatible with BC discounts, but **does not make discount calculation or posting operational**. Existing SalesOrderService still rejects unimplemented discount inputs.
+
+**Consultant note:** A new archive table does not mean automatic archiving is live; a discounted line can be represented by the database but cannot yet be entered and posted through the current Sales Order business service. These changes are committed to the development chain, not migrated or accepted in a PostgreSQL runtime.
+
 ## New tables (17)
 
 | Area | Physical table | Purpose |
