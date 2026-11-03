@@ -20,6 +20,10 @@ The physical inventory totals and expired quantities are **not** stored on Seria
 
 **Out of scope:** Manufacturing, Production Orders, Resource Capacity, Jobs/Projects. Tracking a manufacturing date on an inventory lot does not mean Production/MRP is enabled.
 
+## Phase A warehouse class master
+
+Migration `000308` adds `warehouse_classes`, based on BC Table 7304 (Warehouse Class), with Company-scoped SystemId and business code. Warehouse Zones and Bins gain optional `warehouse_class_id` / `warehouse_class_code` links that must refer to the same Company and master record. `warehouseClasses` is a read-only physical schema API. Classification does not create stock entries or capacity/manufacturing tables.
+
 ## What is in Part 3
 
 | Physical table | Purpose | API source |
