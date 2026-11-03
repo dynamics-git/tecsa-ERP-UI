@@ -31,6 +31,8 @@ Migration files: `2026_11_03_000300` creates receipt/shipment header/lines; `000
 | Inventory costing | `item_ledger_entries`, `value_entries`, `item_ledger_applications`, `item_cost_applications` | Costing, application and quantity history |
 | Warehouse operations | Transfer, item-journal, cost-adjustment and posted pick activity tables | Existing posting services and historical consistency |
 
+**Posted history source integrity:** Posted Warehouse Receipt Lines and Posted Warehouse Shipment Lines now have `company_id`-scoped source-line foreign keys (`pwr_line_source_fk` and `pws_line_source_fk`). Consultants should treat this as a database integrity rule only: posting/registration services still need quantity and source validation, and have not yet been accepted.
+
 **Posted warehouse history versus posted trade history:** `posted_warehouse_receipts` and `posted_warehouse_shipments` represent warehouse handling documents; `posted_purchase_receipts` and `posted_sales_shipments` represent accounting/trade posting histories. These must not be conflated.
 
 **No second quantity ledger:** Bin Content defines fixed/default/dedicated/block settings and item/bin assignment; on-hand, reserved and available stock must come from authoritative inventory/bin entries and domain calculations.
