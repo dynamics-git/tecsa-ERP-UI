@@ -1,5 +1,9 @@
 # Finance & General Ledger Part 4 — developer and consultant guide
 
+## Phase A counterparty banking and invoice discount physical masters
+
+The integrated branch adds `customer_bank_accounts` (BC 287) and `vendor_bank_accounts` (BC 288) as separate customer/vendor-owned tables, **not duplicates of TecSA's `bank_accounts` cash ledger**. Company + Customer/Vendor/SystemId and business Code keys protect ownership. Currency references are Company-scoped. No generic read/create/update/delete API is enabled for counterparty banking while secure domain policies are pending. Invoice discount tiers (`customer_invoice_discounts` BC 19, `vendor_invoice_discounts` BC 24) use Company + discount Code + Currency + Minimum Amount as business identity and are read-only metadata sources. No banking posting, remittance, pricing calculation or runtime migration was performed.
+
 **Status:** This article documents the initial Finance Part 4 backend schema changes, **not a completed rollout**. Backend branch: `schema/bc-aligned-finance-part4-20261103`. PostgreSQL migrations and runtime acceptance **have not been run**. Neither backend `main` nor Company data has been migrated by this work.
 
 ## Phase A extension: Check Ledger and Bank Account Ledger
