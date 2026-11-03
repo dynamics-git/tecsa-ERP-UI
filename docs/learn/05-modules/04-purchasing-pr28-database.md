@@ -1,5 +1,9 @@
 # Purchasing Part 1 — PR #28 physical database tables
 
+## Phase A integrated cross-module additions (symbol-backed)
+
+On the integrated backend schema branch `schema/bc-aligned-finance-part4-20261103`, Microsoft Base Application 26.1 Purchase Header (38), Purchase Line (39), Order Address (224), Vendor Bank Account (288) and Vendor Invoice Disc. (24) have been reviewed as **physical database references**, not production business processes. The later additive migrations `000220`, `000222`, `000223` and `000224` link Purchasing to the shared Purchaser, Shipment Method, Tax Area/Group, Vendor Order Address and invoice-discount tier masters, while preserving posted Purchase source snapshots. Vendor banking is in migration `000221`, with generic API operations disabled for sensitive account details. These migrations are on the **integrated branch**, not necessarily the original Part 1 PR branch; neither tested nor migrated. Projects, Manufacturing and Resource Capacity remain deferred.
+
 This page is the UI-facing table inventory for [backend PR #28](https://github.com/dynamics-git/tecsa-erp-26.0/pull/28) (source commit `ea0b56e`). **Migration code is committed but PostgreSQL execution and API discovery are not yet verified.** No UI module implementation is implied.
 
 TecSA uses separate document header/line tables and `system_id` as row identity. Fields and table publishing come from backend migrations and ApiSource; UI config supplies page presentation, lookups, actions and required-field UX. Do not infer that a table automatically creates a page.
