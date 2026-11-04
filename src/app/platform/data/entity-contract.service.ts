@@ -4,6 +4,7 @@ import { Injectable } from '@angular/core';
 import { ENTITY_CONTRACT_PROFILES } from './entity-contract-profiles';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { ContractOperation, EntityContractProfile } from '../models/entity-contract.model';
+import type { ObjectIdentity } from '../models/object-definition.model';
 
 export interface CoreField {
   type: string;
@@ -21,6 +22,8 @@ export interface CoreField {
   values?: string[];
 }
 export interface CoreEntity {
+  /** Optional stable Table Object metadata, independent of record/key fields. */
+  object?: ObjectIdentity<'table'>;
   kind: 'generic' | 'domain';
   path: string;
   singleton?: boolean;

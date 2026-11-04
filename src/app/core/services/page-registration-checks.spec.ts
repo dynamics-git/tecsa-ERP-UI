@@ -69,8 +69,14 @@ describe('One shared ERP page declaration pattern', () => {
         expect(header.sections, page.pageId).toEqual([]);
         expect(lines, page.pageId).toHaveLength(1);
         expect((lines[0][1] as LineConfig).columns.length, page.pageId).toBeGreaterThan(0);
-        expect(!!page.dataSource?.navigation || !!(page.dataSource?.headerPKProp && page.dataSource?.lineFKProp), page.pageId).toBe(true);
-        expect(page.menu, page.pageId).toBeUndefined();
+        const source = page.dataSource!;
+        if (source.navigation || source.headerPKProp || source.lineFKProp) {
+          expect(!!source.navigation || !!(source.headerPKProp && source.lineFKProp), page.pageId).toBe(true);
+          expect(page.menu, page.pageId).toBeUndefined();
+        } else {
+          // Standalone worksheets (e.g. Companies) edit their own collection.
+          expect((lines[0][1] as LineConfig).dataSource.endpoint, page.pageId).toBe(source.endpoint);
+        }
       } else if (page.pageType === 'setup') {
         expect(page.dataSource?.singleton, page.pageId).toBe(true);
         expect(header.sections.length, page.pageId).toBeGreaterThan(0);

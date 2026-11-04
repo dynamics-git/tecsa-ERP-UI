@@ -1,5 +1,14 @@
 # UI architecture rules
 
+## Phase 2: Object Architecture
+
+Object metadata and PR integration are authorized on the existing
+`codex/tecsa-object-architecture` branch. Commit/push the focused implementation
+and documentation there. Preserve Config + TypeScript + Shared Components;
+extend the existing page registry only for optional identity/lookup, never add
+another renderer, CRUD layer, field registry or permission engine. This
+supersedes historical commit deferrals below for this requested foundation.
+
 Use Purchase Requisition as the reference for ordinary page/config structure.
 Permission administration follows that same structure, not a second UI framework.
 

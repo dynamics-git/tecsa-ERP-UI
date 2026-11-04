@@ -1,5 +1,24 @@
 # What's new in developer documentation
 
+## 5 November 2026: Phase 2 object foundation and PR integration
+
+Added optional stable Page Object identity to existing Config-based pages and
+the existing page registry. PR resolves by Object ID to its current component;
+its document-number/type Header–Line binding is unchanged. Backend Table,
+Codeunit, Query, Report dataset, Enum and Permission identities reuse existing
+Core. See [object architecture](/documentation/backend/object-architecture).
+The page-registration test now recognizes existing standalone worksheets such
+as Companies, alongside related worksheets. No renderer, design-token or
+installed schema change is involved.
+
+## 5 November 2026: Company login and archive JSON discovery
+
+Corrected backend schema discovery for existing PostgreSQL JSON/JSONB archive
+fields, which previously caused Company session context to fail after successful
+authentication. Shared casts preserve structured JSON values; scalar query
+filter/sort contracts remain separate. No new schema, API source or UI editor
+was added. Login and Company context were verified through the development API.
+
 ## 3 November 2026: Finance and General Ledger Part 4 checkpoint
 
 Published the [Finance Part 4 developer/consultant guide](/documentation/modules/finance-part4), identifying existing General Ledger, VAT, Receivables, Payables and Bank Reconciliation tables, plus a bank history extension migration. The backend is **not migrated or accepted**. No duplicate accounting ledger or posting engine was added.

@@ -1,4 +1,5 @@
 import type { RecordIdentityConfig } from './record-identity.model';
+import type { PageObjectDefinition } from './object-definition.model';
 import type { ListPersonalizationConfig } from './list-personalization-config.model';
 import { CommandConfig, StandardCommandConfig } from './command-config.model';
 import { DataSourceConfig } from './data-source-config.model';
@@ -47,6 +48,8 @@ export interface ListCommandSelectionPolicyConfig {
 }
 
 export interface BasePageConfig extends Record<string, unknown> {
+  /** Optional stable metadata. pageId and existing pageType still control the UI. */
+  object?: PageObjectDefinition;
   pageId?: string;
   /** Entry surface: card/document pages browse a list before opening a record; setup/worksheet open directly. */
   pageType?: PageType;

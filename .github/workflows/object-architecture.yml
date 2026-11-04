@@ -1,0 +1,34 @@
+name: Object Architecture UI focused acceptance
+on:
+  push:
+    branches: ['codex/tecsa-object-architecture']
+    paths:
+      - '.github/workflows/object-architecture.yml'
+      - 'src/app/platform/models/object-definition.model.ts'
+      - 'src/app/platform/models/page-config.model.ts'
+      - 'src/app/platform/data/entity-contract.service.ts'
+      - 'src/app/platform/public-api.ts'
+      - 'src/app/core/services/page-registry.ts'
+      - 'src/app/core/services/object-architecture.spec.ts'
+      - 'src/app/core/services/page-registration-checks.spec.ts'
+      - 'src/app/features/purchasing/purchase-requisition/**'
+      - 'docs/learn/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focused:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - run: npm run docs:check
+      - name: Existing page registry and PR Object integration only
+        run: npm run ng -- test --watch=false --include='src/app/core/services/object-architecture.spec.ts' --include='src/app/core/services/page-registration-checks.spec.ts'

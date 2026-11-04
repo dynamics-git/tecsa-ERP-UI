@@ -212,6 +212,11 @@ export const purchaseRequisitionListConfig: ListPageConfig & {
   dataSource: DataSourceConfig;
 } = {
   pageId: 'purchase-requisition',
+  object: {
+    objectType: 'page', objectId: 10000, objectName: 'Purchase Requisition',
+    sourceTable: {objectType: 'table', objectId: 10000, objectName: 'Purchase Requisition'},
+    codeunit: {objectType: 'codeunit', objectId: 10000, objectName: 'Purchase Requisition Management'},
+  },
   pageType: 'document',
   title: 'Purchase Requisition',
   dataSource: {

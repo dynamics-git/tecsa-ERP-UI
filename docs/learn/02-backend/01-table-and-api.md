@@ -2,6 +2,12 @@
 
 ## Company storage
 
+Native PostgreSQL `json`/`jsonb` fields use the backend's shared structured JSON
+type and casts. Existing archive payloads can be discovered without breaking
+Company login. JSON fields retain source read/write permissions and are excluded
+from ordinary scalar filtering and sorting; no page-specific field list or
+frontend JSON editor is introduced by this correction.
+
 One migration/model/ApiSource definition describes a logical business table.
 After backend storage cutover, Core provisions separate physical tables for every
 Company inside its workspace database. Use existing CompanyData classification;

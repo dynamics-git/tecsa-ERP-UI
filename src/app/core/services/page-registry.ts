@@ -2,6 +2,7 @@ import { Type } from '@angular/core';
 import { Routes } from '@angular/router';
 import { PageType, PageModule } from '../../platform/public-api';
 import { featurePageModules } from '../../features/feature-pages.generated';
+import { PageObjectDefinition, pageObjectDefinition } from '../../platform/models/object-definition.model';
 
 type PageOpenTarget = 'list' | 'entry';
 type PageTypeName = PageType;
@@ -9,12 +10,15 @@ type PageTypeName = PageType;
 type RegisteredPageConfig = {
   moduleRef: PageModule;
   pageType?: PageTypeName;
+  object?: PageObjectDefinition;
 };
 
 const registeredPages = buildPageRegistry(featurePageModules);
 
 export function buildPageRegistry(modules: PageModule[]): Map<string, RegisteredPageConfig> {
   const registry = new Map<string, RegisteredPageConfig>();
+  const objectIds = new Set<number>();
+  const objectNames = new Set<string>();
 
   for (const moduleRef of modules) {
     let declaredPages = 0;
@@ -32,7 +36,14 @@ export function buildPageRegistry(modules: PageModule[]): Map<string, Registered
       if (!pageType) throw new Error(`Invalid pageType for ${pageId}`);
       if (++declaredPages > 1) throw new Error('Each config module must declare exactly one page');
       if (registry.has(pageId)) throw new Error(`Duplicate pageId: ${pageId}`);
-      registry.set(pageId, { moduleRef, pageType });
+      const object = exportedValue['object'] === undefined ? undefined : pageObjectDefinition(exportedValue['object']);
+      if (object) {
+        const name = object.objectName.toLowerCase();
+        if (objectIds.has(object.objectId) || objectNames.has(name)) throw new Error(`Duplicate Page Object: ${object.objectId}`);
+        objectIds.add(object.objectId);
+        objectNames.add(name);
+      }
+      registry.set(pageId, { moduleRef, pageType, object });
     }
     if (!declaredPages) throw new Error('Each config module must declare exactly one page');
   }
@@ -75,6 +86,14 @@ function normalizePageType(value: unknown): PageTypeName | undefined {
 
 export function resolvePageModule(pageId: string): PageModule | undefined {
   return registeredPages.get(normalizePageId(pageId))?.moduleRef as PageModule | undefined;
+}
+
+/** Resolves through the same registry as menus, routes and RunModal. */
+export function resolvePageObject(objectId: number): {pageId: string; moduleRef: PageModule; object: PageObjectDefinition} | undefined {
+  for (const [pageId, entry] of registeredPages) {
+    if (entry.object?.objectId === objectId) return {pageId, moduleRef: entry.moduleRef, object: entry.object};
+  }
+  return undefined;
 }
 
 export async function loadPageModule(pageId: string): Promise<PageModule | undefined> {
