@@ -152,6 +152,29 @@ describe('Authenticated shared Core metadata contract', () => {
     }).validation).toMatchObject({ min: 10, max: 90 });
   });
 
+  it('loads only a requested published source and retains it per Company', async () => {
+    const first = data.loadSourceContract(source);
+    const second = data.loadSourceContract(source);
+    expect(await firstValueFrom(first)).toBe(true);
+    expect(await firstValueFrom(second)).toBe(true);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls[0][0]).toBe('/fieldContracts?path=%2Ffixtures');
+    expect(data.resolveFieldContract(source, {key: 'code', label: 'Code'}).validation?.maxLength).toBe(20);
+
+    session.Company = 'B';
+    const pending = new Subject<unknown>();
+    get.mockReturnValue(pending);
+    const stale = firstValueFrom(data.loadSourceContract(source));
+    session.Company = 'C';
+    pending.next(metadata());
+    pending.complete();
+    expect(await stale).toBe(false);
+    expect(data.resolveSourceContract(source)).toEqual(source);
+    get.mockReturnValue(of(metadata()));
+    expect(await firstValueFrom(data.loadSourceContract(source))).toBe(true);
+    expect(get).toHaveBeenCalledTimes(3);
+  });
+
   it('keeps update-only fields out of new-record editing without blocking ordinary creation', async () => {
     const contract = metadata();
     contract.data.entities['fixtures'].fields['later'] = {
@@ -398,7 +421,7 @@ describe('Authenticated shared Core metadata contract', () => {
       expect(get).toHaveBeenCalledTimes(2);
       expect(data.resolveSourceContract(source)).toEqual(source);
     });
-  it('opens an ordinary configured page and autosaves first input without capability discovery', async () => {
+  it('loads a thin table-backed Page contract and autosaves first input', async () => {
     session.SuperAdmin = true;
     const fixture = TestBed.createComponent(ListPage);
     fixture.componentRef.setInput('listConfig', { ...paymentTermsListConfig, dataSource: source });
@@ -422,7 +445,8 @@ describe('Authenticated shared Core metadata contract', () => {
     fixture.detectChanges();
     const page = fixture.componentInstance;
     expect(post).not.toHaveBeenCalled();
-    expect(page.headerConfig.sections[0].fields[0].readonlyAfterCreate).toBeUndefined();
+    expect(page.headerConfig.sections[0].fields[0].readonlyAfterCreate).toBe(true);
+    expect(get.mock.calls.some(([url]) => String(url).includes('/fieldContracts?path='))).toBe(true);
     expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
     page.handleInlineAction({
       actionKey: 'header:changed',
