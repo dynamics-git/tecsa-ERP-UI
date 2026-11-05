@@ -72,6 +72,8 @@ export class EntityContractService {
   }
 
   private metadata?: CoreMetadata;
+  /** Route aliases discovered for the same source must coexist in one session. */
+  private readonly sourcePaths = new Map<string, Set<string>>();
   /** Published source identity for config-derived field protection; no endpoint naming guesses. */
   sourceName(source: DataSourceConfig): string | undefined {
     const entity = this.entity(source);
@@ -80,6 +82,7 @@ export class EntityContractService {
 
   clearMetadata(): void {
     this.metadata = undefined;
+    this.sourcePaths.clear();
   }
   acceptMetadata(response: unknown): boolean {
     const data = this.isRecord(response) ? response['data'] : undefined;
@@ -134,9 +137,10 @@ export class EntityContractService {
     const previous = this.metadata;
     if (!this.acceptMetadata(response)) return false;
     const incoming = this.metadata!;
-    const entities = Object.values(incoming.entities);
-    if (entities.length !== 1 || incoming.endpoints.length !== 0 ||
-        !this.matchesPath('/' + entities[0].path.split('/').filter(Boolean).join('/'), requestedPath)) {
+    const entries = Object.entries(incoming.entities);
+    const entity = entries[0]?.[1];
+    if (entries.length !== 1 || incoming.endpoints.length !== 0 ||
+        !entity || !this.matchesPath('/' + entity.path.split('/').filter(Boolean).join('/'), requestedPath)) {
       this.metadata = previous;
       return false;
     }
@@ -146,6 +150,10 @@ export class EntityContractService {
       endpoints: previous?.endpoints ?? [],
       queryProfiles: {...previous?.queryProfiles, ...incoming.queryProfiles},
     };
+    const name = entries[0][0];
+    const paths = this.sourcePaths.get(name) ?? new Set<string>();
+    paths.add(requestedPath);
+    this.sourcePaths.set(name, paths);
     return true;
   }
 
@@ -170,11 +178,10 @@ export class EntityContractService {
   private entity(source: DataSourceConfig): CoreEntity | undefined {
     if (source.addressStyle === 'odata') return undefined;
     // Nested relationships remain explicit; never identify all child APIs as "lines".
-    return Object.values(this.metadata?.entities ?? {}).find(
-      (entity) =>
-        entity.kind === 'generic' &&
-        this.matchesPath('/' + entity.path.replace(/^\//, ''), this.path(source)),
-    );
+    return Object.entries(this.metadata?.entities ?? {}).find(([name, entity]) =>
+      entity.kind === 'generic' &&
+      [entity.path, ...(this.sourcePaths.get(name) ?? [])].some(path =>
+        this.matchesPath('/' + path.replace(/^\//, ''), this.path(source))))?.[1];
   }
   private matchesPath(template: string, path: string): boolean {
     const parts = template.split('/'),
