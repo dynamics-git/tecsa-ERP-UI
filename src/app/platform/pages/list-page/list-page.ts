@@ -696,7 +696,10 @@ export class ListPage implements OnInit, OnDestroy {
     // An unchanged row already belongs to this open page's trusted read snapshot.
     // Closing its card does not discard that snapshot merely because a short HTTP TTL elapsed.
     const cached = this.dataSource.getCachedRecord(this.listConfig.dataSource, recordId, Infinity);
-    const hasHeaderFields = cached && this.headerConfig.sections.flatMap(section => section.fields).every(field => Object.prototype.hasOwnProperty.call(cached, field.key));
+    // Secret inputs are intentionally never returned by a read API. Their
+    // absence must not invalidate an otherwise complete, unchanged list record.
+    const hasHeaderFields = cached && this.headerConfig.sections.flatMap(section => section.fields)
+      .filter(field => field.type !== 'password').every(field => Object.prototype.hasOwnProperty.call(cached, field.key));
     const sameSnapshot = cached && hasHeaderFields && row['systemRowVersion'] !== undefined
       && String(cached['systemRowVersion']) === String(row['systemRowVersion']);
     const header: Observable<Record<string, unknown>> = sameSnapshot
@@ -1168,6 +1171,8 @@ export class ListPage implements OnInit, OnDestroy {
     }
 
     const initialTop = this.resolveInitialLineFetchTop(resolved.dataSource);
+    // DocumentLines hydrates selected captions in the background, with edit/context
+    // guards. Publish actual rows without waiting for those master lookups.
     return from(this.documentHydration.loadLineRowsForHeader(
       this.lineConfig.dataSource,
       header,
@@ -1179,7 +1184,7 @@ export class ListPage implements OnInit, OnDestroy {
         onRequest: () => this.startCardLineLoading(),
         reuseSnapshot: header['__fromReadSnapshot'] === true,
       },
-    )).pipe(switchMap(rows => from(this.documentHydration.resolveLineLookups(rows, this.lineConfig!.columns, header, () => true, () => this.startCardLineLoading()))));
+    ));
   }
 
   private expandLineRowsInBackground(
