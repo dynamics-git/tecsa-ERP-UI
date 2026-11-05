@@ -390,12 +390,14 @@ export class ListPage implements OnInit, OnDestroy {
     this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
     const permission = this.sessionService.Permissions.find(value => this.isRecord(value) && (value['pageId'] === this.permissionPageId || value['PageId'] === this.permissionPageId));
     const query = this.isRecord(permission) && this.isRecord(permission['query']) ? permission['query'] : undefined;
-    if (query && Array.isArray(query['fields']) && Array.isArray(query['search']) && this.listConfig.dataSurface) {
+    // Search-field selection belongs to the Page. Older server search lists
+    // were removed; a granted queryable field list can still constrain sorting
+    // and filtering without turning every field into a text-search target.
+    if (query && Array.isArray(query['fields']) && this.listConfig.dataSurface) {
       const fields = new Set(query['fields']);
-      const search = new Set(query['search']);
       this.listConfig = {...this.listConfig, dataSurface: {...this.listConfig.dataSurface, columns: this.listConfig.dataSurface.columns.map(column => {
         const key = column.field ?? column.id;
-        return {...column, sortable: column.sortable ?? fields.has(key), filterable: column.filterable ?? fields.has(key), searchable: column.searchable ?? search.has(key)};
+        return {...column, sortable: column.sortable ?? fields.has(key), filterable: column.filterable ?? fields.has(key)};
       })}};
     }
     if (this.lineConfig) this.lineConfig = lineConfigDefaults(this.lineConfig);
