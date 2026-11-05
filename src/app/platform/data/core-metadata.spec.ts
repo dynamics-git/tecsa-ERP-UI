@@ -175,6 +175,46 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(get).toHaveBeenCalledTimes(3);
   });
 
+  it('derives line create prerequisites after resolving Table field metadata', async () => {
+    session.SuperAdmin = true;
+    const child = metadata();
+    child.data.entities = {
+      fixtureLines: {
+        ...child.data.entities['fixtures'],
+        path: 'fixtures/{parentId}/lines',
+        endpoint: 'lines',
+        fields: {
+          quantity: {type: 'integer', read: true, create: true, update: true, required: true},
+        },
+      },
+    };
+    get.mockImplementation((url?: string) => of(
+      String(url).includes('fieldContracts?path=%2Ffixtures%2F') ? child : metadata(),
+    ));
+    vi.spyOn(data, 'loadList').mockReturnValue(of({value: [], meta: {total: 0}}));
+    const fixture = TestBed.createComponent(ListPage);
+    fixture.componentRef.setInput('listConfig', {
+      pageId: 'fixture-document', pageType: 'document', title: 'Fixtures',
+      dataSource: source, dataSurface: {columns: [{field: 'code', label: 'Code'}]},
+    });
+    fixture.componentRef.setInput('headerConfig', {
+      sections: [{id: 'general', fields: [{key: 'code', label: 'Code'}]}],
+    });
+    fixture.componentRef.setInput('lineConfig', {
+      placement: {mode: 'end'}, toolbarButtons: [],
+      dataSource: {
+        endpoint: '/lines',
+        navigation: {parentEndpoint: '/fixtures', parentIdFields: ['systemId'], childCollection: 'lines'},
+      },
+      columns: [{id: 'quantity', label: 'Quantity'}],
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.lineConfig?.columns[0].required).toBe(true);
+    expect(fixture.componentInstance.lineConfig?.dataSource.requiredCreateFields).toEqual(['quantity']);
+    fixture.destroy();
+  });
+
   it('keeps update-only fields out of new-record editing without blocking ordinary creation', async () => {
     const contract = metadata();
     contract.data.entities['fixtures'].fields['later'] = {
