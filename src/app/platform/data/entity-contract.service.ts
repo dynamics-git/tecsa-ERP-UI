@@ -1,5 +1,5 @@
 import { FieldConfig } from '../models/field-config.model';
-import { FieldValueType } from '../models/field-value';
+import { compareDecimalValues, FieldValueType } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { ENTITY_CONTRACT_PROFILES } from './entity-contract-profiles';
 import { DataSourceConfig } from '../models/data-source-config.model';
@@ -284,11 +284,26 @@ export class EntityContractService {
       date: 'date',
       datetime: 'datetime',
     };
-    const validation = Object.fromEntries(
-      ['maxLength', 'min', 'max', 'precision', 'scale']
-        .filter((key) => key in metadata)
-        .map((key) => [key, metadata[key as keyof CoreField]]),
-    );
+    // A Page may narrow a physical limit, but cannot weaken PostgreSQL's
+    // length, precision, scale, or numeric bounds.
+    const validation = {...field.validation};
+    for (const key of ['maxLength', 'precision', 'scale'] as const) {
+      const physical = metadata[key];
+      if (physical !== undefined) {
+        validation[key] = validation[key] === undefined ? physical : Math.min(physical, validation[key]);
+      }
+    }
+    for (const key of ['min', 'max'] as const) {
+      const physical = metadata[key];
+      if (physical === undefined) continue;
+      const requested = validation[key];
+      const comparison = requested === undefined ? undefined : compareDecimalValues(String(requested), String(physical));
+      validation[key] = comparison === undefined
+        ? physical
+        : key === 'min'
+          ? comparison > 0 ? requested : physical
+          : comparison < 0 ? requested : physical;
+    }
     return {
       ...field,
       type: field.type ?? (metadata.type === 'enum' && !field.lookup ? 'select' : undefined),
@@ -311,7 +326,7 @@ export class EntityContractService {
             : metadata.nullable
               ? null
               : undefined,
-      validation: { ...validation, ...field.validation },
+      validation,
     };
   }
 
