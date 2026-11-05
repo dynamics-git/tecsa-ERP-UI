@@ -179,6 +179,17 @@ export class DynamicForm {
     return this.sections.filter((section) => section.fields.some((field) => !this.isHidden(field)));
   }
 
+  onFieldLabelClick(event: MouseEvent): void {
+    const label = event.currentTarget;
+    if (!(label instanceof HTMLLabelElement)) return;
+    const control = label.control;
+    // The label fills a whole grid field. Its caption/padding must not toggle
+    // a boolean and trigger autosave; direct and keyboard checkbox clicks stay native.
+    if (control instanceof HTMLInputElement && control.type === 'checkbox' && event.target !== control) {
+      event.preventDefault();
+    }
+  }
+
   inputType(field: FieldConfig): string { return fieldInputType(field.valueType ?? field.type); }
 
   isRequired(field: FieldConfig): boolean { return fieldIsRequired(field, this.data); }

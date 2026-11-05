@@ -1,5 +1,14 @@
 # What's new in developer documentation
 
+## 5 November 2026: checkbox activation safety
+
+Fixed shared header/form labels toggling booleans when their caption or empty
+field area was clicked, which could autosave an unintended change. Only direct
+checkbox activation edits the value; native keyboard behavior is retained.
+Added rendered component regression coverage for header, line and worksheet
+click boundaries, disabled/readonly values and ordinary text labels. See
+[the field contract](/documentation/core/field-contract-details).
+
 ## 5 November 2026: individual API source controllers restored
 
 Each table now has its own thin controller with ApiSource and inherited Core

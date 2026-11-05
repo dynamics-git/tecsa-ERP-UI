@@ -21,6 +21,14 @@ the references for new pages.
 
 ## Header
 
+Boolean fields change through the checkbox itself or native keyboard activation.
+Header labels occupy a whole grid field, so clicking their caption, required
+marker or surrounding padding must not toggle the checkbox or emit an autosave
+change. The shared form keeps the native label association and protects that
+activation boundary; ordinary text-field labels retain their native behavior.
+Line/worksheet cell and row clicks select/focus rows without editing boolean
+data. Disabled and readonly checkbox values remain protected.
+
 ```ts
 { key: 'code', label: 'Code', type: 'code', required: true,
   validation: { maxLength: 20 } }

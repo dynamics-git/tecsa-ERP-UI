@@ -2,7 +2,7 @@
   @for (section of visibleSections; track section.id) {
     @for (field of section.fields; track field.key) {
       @if (!isHidden(field)) {
-        <label [attr.data-quick-entry]="field.quickEntry !== false && !isFieldDisabled(field)" [class.wide]="isWide(field)" [class.boolean-field]="(field.type === 'boolean' || field.valueType === 'boolean')">
+        <label [attr.data-quick-entry]="field.quickEntry !== false && !isFieldDisabled(field)" [class.wide]="isWide(field)" [class.boolean-field]="(field.type === 'boolean' || field.valueType === 'boolean')" (click)="onFieldLabelClick($event)">
           {{ field.label }} @if (isRequired(field)) { <span aria-hidden="true">*</span> }
 
           @if (field.lookup) {
