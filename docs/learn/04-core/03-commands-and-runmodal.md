@@ -2,6 +2,15 @@
 
 Standard commands come from shared core. Declare custom business actions or navigation through CommandConfig, with stable keys and existing icons.
 
+## Shared presentation tokens
+
+Menu height, padding, icon/chevron size, command height/gap/weight and shared
+form padding/radius/checkbox size live in `assets/styles/tokens/_components.scss`.
+Font weights live in `_typography.scss`. Adjust these shared roles instead of
+adding per-page styling. The token extraction preserves the existing values;
+parent-menu leading icons are 18px, with 13px dropdown chevrons. Palette and menu
+label weight are unchanged.
+
 ## Open the selected assignment's permission set
 
 ```typescript

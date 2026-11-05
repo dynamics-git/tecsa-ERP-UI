@@ -4,9 +4,27 @@
   --ts-table-head-h: 40px;
   --ts-table-row-h: 46px;
 
+  /* Shared presentation values; keep page configs free of visual overrides. */
+  --ts-nav-h: 40px;
+  --ts-nav-padding-inline: 18px;
+  --ts-nav-item-padding-inline: var(--ts-space-3);
+  --ts-nav-item-gap: 7px;
+  --ts-nav-icon-size: var(--ts-text-18);
+  --ts-nav-chevron-size: var(--ts-text-13);
+  --ts-command-button-h: 30px;
+  --ts-command-gap: 6px;
+  --ts-command-padding-inline: 10px;
+  --ts-command-weight: var(--ts-weight-semibold);
+  --ts-field-padding-inline: 9px;
+  --ts-field-radius: 6px;
+  --ts-field-label-gap: 7px;
+  --ts-checkbox-size: 16px;
+  --ts-focus-width: 2px;
+  --ts-focus-offset: 3px;
+
   --ts-focus-ring: 0 0 0 3px rgba(61, 102, 150, 0.18);
   --ts-row-hover-bg: var(--ts-surface-soft);
   --ts-row-selected-bg: var(--ts-surface-selected);
-  --ts-row-selected-accent: #3d6696;
+  --ts-row-selected-accent: var(--ts-brand-800);
   --ts-control-hover-bg: var(--ts-surface-hover);
 }

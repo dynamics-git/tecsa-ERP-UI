@@ -47,6 +47,8 @@ export interface ListCommandSelectionPolicyConfig {
 }
 
 export interface BasePageConfig extends Record<string, unknown> {
+  /** Optional stable metadata. pageId and existing pageType still control the UI. */
+  objectId?: number;
   pageId?: string;
   /** Entry surface: card/document pages browse a list before opening a record; setup/worksheet open directly. */
   pageType?: PageType;

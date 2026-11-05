@@ -26,11 +26,11 @@
 
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--ts-command-gap);
 
   color: var(--ts-text-soft);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--ts-text-13);
+  font-weight: var(--ts-command-weight);
 
   white-space: nowrap;
   cursor: pointer;
@@ -54,7 +54,7 @@
   background: var(--ts-brand-800);
   color: var(--ts-text-inverse);
 
-  font-weight: 700;
+  font-weight: var(--ts-weight-bold);
 
   box-shadow: var(--ts-shadow-sm);
 }
@@ -95,7 +95,7 @@
 
   color: var(--ts-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--ts-weight-semibold);
 
   cursor: pointer;
 }
@@ -112,5 +112,5 @@
 .ts-command-meta {
   color: var(--ts-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--ts-weight-semibold);
 }

@@ -212,6 +212,7 @@ export const purchaseRequisitionListConfig: ListPageConfig & {
   dataSource: DataSourceConfig;
 } = {
   pageId: 'purchase-requisition',
+  objectId: 10000,
   pageType: 'document',
   title: 'Purchase Requisition',
   dataSource: {

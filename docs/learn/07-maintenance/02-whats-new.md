@@ -1,5 +1,68 @@
 # What's new in developer documentation
 
+## 5 November 2026: scoped presentation token cleanup
+
+Moved repeated parent-menu, shared command and shared form presentation values
+into component/typography tokens without changing the palette or existing
+spacing/weights. Increased only parent-menu leading icons from 13px to 18px;
+dropdown chevrons remain 13px. Focus/info/selection colors now reference the
+existing identical brand token. No page config, API or editing behavior changed.
+
+## 5 November 2026: checkbox activation safety
+
+Fixed shared header/form labels toggling booleans when their caption or empty
+field area was clicked, which could autosave an unintended change. Only direct
+checkbox activation edits the value; native keyboard behavior is retained.
+Added rendered component regression coverage for header, line and worksheet
+click boundaries, disabled/readonly values and ordinary text labels. See
+[the field contract](/documentation/core/field-contract-details).
+
+## 5 November 2026: individual API source controllers restored
+
+Each table now has its own thin controller with ApiSource and inherited Core
+CRUD. Removed the consolidated table controller and its publisher. Existing API
+contracts/routes are preserved; no schema, posting/costing or UI runtime change
+was needed. Follow Individual Migration -> Model -> Individual Controller +
+ApiSource -> Shared EntityController for future table work.
+
+## 5 November 2026: readable tables and normal CRUD correction
+
+Documented individually readable backend table migrations, shared draft Purchase
+and Sales Header–Line APIs, and PR's single typed number reference. Native binary,
+time and own-object record-reference types reuse existing schema-backed Core.
+Existing page configurations and workflow buttons are not yet proof of the
+corrected API contract; normal page alignment precedes later business logic.
+No page renderer, shared component, menu or design token changed in this update.
+
+## 5 November 2026: local Object Explorer and simpler page identity
+
+Laravel generates private searchable offline HTML from ObjectRegistry/ApiSource
+and actual Angular source, with VS Code/GitHub links and related files. Existing
+pages without numeric IDs remain visible. Config now uses only optional
+`objectId`; PR's duplicated object name/type/table/codeunit declarations were
+removed. Cross-repository source/ID checks do not change pageId, title, routes,
+permissions or Header–Line behavior. See
+[Object Architecture](/documentation/backend/object-architecture).
+
+## 5 November 2026: Phase 2 object foundation and PR integration
+
+Added optional stable Page Object identity to existing Config-based pages and
+the existing page registry. PR resolves by Object ID to its current component;
+its document-number/type Header–Line binding is unchanged. Backend Table,
+Codeunit, Query, Report dataset, Enum and Permission identities reuse existing
+Core. See [object architecture](/documentation/backend/object-architecture).
+The page-registration test now recognizes existing standalone worksheets such
+as Companies, alongside related worksheets. No renderer, design-token or
+installed schema change is involved.
+
+## 5 November 2026: Company login and archive JSON discovery
+
+Corrected backend schema discovery for existing PostgreSQL JSON/JSONB archive
+fields, which previously caused Company session context to fail after successful
+authentication. Shared casts preserve structured JSON values; scalar query
+filter/sort contracts remain separate. No new schema, API source or UI editor
+was added. Login and Company context were verified through the development API.
+
 ## 3 November 2026: Finance and General Ledger Part 4 checkpoint
 
 Published the [Finance Part 4 developer/consultant guide](/documentation/modules/finance-part4), identifying existing General Ledger, VAT, Receivables, Payables and Bank Reconciliation tables, plus a bank history extension migration. The backend is **not migrated or accepted**. No duplicate accounting ledger or posting engine was added.

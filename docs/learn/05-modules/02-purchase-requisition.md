@@ -1,5 +1,16 @@
 # Purchase Requisition development map
 
+## Current backend correction — 5 November 2026
+
+Normal CRUD is now the active backend contract. Header identity is still
+`systemId`; lines bind `documentType` and `documentNumber` to the header and get
+`lineNo` in 10000 steps. Line `lineType` + `number` selects Item, G/L Account,
+Item Charge or Fixed Asset through Company-aware reference validation. Previous
+parallel item/account UUID fields are retired. Existing Config + TypeScript +
+Shared Components will be aligned in the page phase; the older workflow and
+calculation descriptions below are historical, not current acceptance evidence.
+Submit/Approve/Reject and posting/costing commands are frozen in this phase.
+
 PR is the document-page reference: browse list, header form, related line grid, domain commands and FactBox. Its business workflow remains separate from generic CRUD.
 
 ## Page structure

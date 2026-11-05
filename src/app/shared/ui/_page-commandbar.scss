@@ -37,7 +37,7 @@ button {
 .work-title {
   color: var(--ts-text);
   font-size: var(--ts-font-page-title);
-  font-weight: 600;
+  font-weight: var(--ts-weight-semibold);
   line-height: 1.25;
   white-space: nowrap;
 }
@@ -50,7 +50,7 @@ button {
   min-width: 0;
   color: var(--ts-muted);
   font-size: var(--ts-font-caption);
-  font-weight: 400;
+  font-weight: var(--ts-weight-regular);
   line-height: var(--ts-line-body);
   white-space: nowrap;
 
@@ -88,14 +88,14 @@ button {
 .cmd,
 .tool {
   height: var(--ts-control-h);
-  padding: 0 10px;
+  padding: 0 var(--ts-command-padding-inline);
   border-radius: var(--ts-radius-sm);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--ts-command-gap);
   color: var(--ts-text-soft);
   font-size: var(--ts-font-body);
-  font-weight: 600;
+  font-weight: var(--ts-command-weight);
   white-space: nowrap;
 
   &:hover {
@@ -117,7 +117,7 @@ button {
   padding: 0 13px;
   background: var(--ts-brand-900);
   color: var(--ts-text-inverse);
-  font-weight: 700;
+  font-weight: var(--ts-weight-bold);
 
   &:hover {
     background: var(--ts-brand-950);
@@ -137,7 +137,7 @@ button {
 }
 
 .view-switch {
-  height: 30px;
+  height: var(--ts-command-button-h);
   padding: 2px;
   border: 1px solid var(--ts-border);
   border-radius: 7px;
@@ -147,12 +147,12 @@ button {
   gap: 2px;
 
   button {
-    height: 24px;
-    padding: 0 10px;
-    border-radius: 5px;
+    height: var(--ts-6);
+    padding: 0 var(--ts-command-padding-inline);
+    border-radius: var(--ts-radius-sm);
     color: var(--ts-muted);
     font-size: var(--ts-font-caption);
-    font-weight: 600;
+    font-weight: var(--ts-weight-semibold);
 
     &.active {
       background: var(--ts-brand-900);
@@ -220,7 +220,7 @@ button { @include command-state.disabled; }
   border-radius: 0;
   background: transparent;
   color: var(--ts-text-soft);
-  font-weight: 600;
+  font-weight: var(--ts-command-weight);
   &:hover:not(:disabled) {
     color: var(--ts-brand-900);
     border-bottom-color: var(--ts-brand-900);
