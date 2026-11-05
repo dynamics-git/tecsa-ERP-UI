@@ -1,7 +1,7 @@
 import { getFeaturePageRoutes } from './core/services/page-registry';
 import { Routes } from '@angular/router';
 import { MainLayout } from './layout/main-layout/main-layout';
-import { DashboardPage } from './features/dashboard/dashboard-page/dashboard-page';
+
 import { PurchaseOrderPage } from './features/purchasing/purchase-order/purchase-order';
 import { LoginPage } from './features/auth/login/login';
 import { PlatformRedirect } from './features/auth/platform-redirect';
@@ -19,7 +19,7 @@ export const routes: Routes = [
     canActivate: [authGuard],
     canActivateChild: [authChildGuard, unsavedChangesGuard],
     children: [
-      { path: '', component: DashboardPage },
+      { path: '', loadComponent: () => import('./features/dashboard/dashboard-page/dashboard-page').then(m => m.DashboardPage) },
       ...getFeaturePageRoutes(),
       { path: 'purchase-order', component: PurchaseOrderPage, data: { pageId: 'purchase-order' } },
       { path: 'item-default-dimensions', redirectTo: 'items', pathMatch: 'full' },

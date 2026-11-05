@@ -1,12 +1,18 @@
 name: Object Architecture UI focused acceptance
 on:
   push:
-    branches: ['codex/tecsa-object-architecture']
+    branches: ['codex/tecsa-object-architecture', 'fix/object-crud-ui-core-contract-20261106']
     paths:
       - '.github/workflows/object-architecture.yml'
       - 'src/app/platform/models/object-definition.model.ts'
       - 'src/app/platform/models/page-config.model.ts'
       - 'src/app/platform/data/entity-contract.service.ts'
+      - 'src/app/platform/data/data-source.service.ts'
+      - 'src/app/platform/data/core-metadata.spec.ts'
+      - 'src/app/platform/pages/list-page/list-page.ts'
+      - 'src/app/core/services/foundation-navigation.spec.ts'
+      - 'src/app/app.routes.ts'
+      - 'src/app/features/purchase-masters/items/items.spec.ts'
       - 'src/app/platform/public-api.ts'
       - 'src/app/core/services/page-registry.ts'
       - 'src/app/core/services/object-architecture.spec.ts'
@@ -35,3 +41,18 @@ jobs:
         run: node --test scripts/export-page-objects.test.mjs
       - name: Existing page registry and PR Object integration only
         run: npm run ng -- test --watch=false --include='src/app/core/services/object-architecture.spec.ts' --include='src/app/core/services/page-registration-checks.spec.ts'
+      - name: CRUD/UI schema field and autosave regressions
+        run: npm run ng -- test --watch=false --include='src/app/platform/data/core-metadata.spec.ts' --include='src/app/platform/pages/document-page/autosave-regression.spec.ts'
+      - name: Full Angular regression suite on isolated review branch only
+        if: github.ref == 'refs/heads/fix/object-crud-ui-core-contract-20261106'
+        run: npm test -- --watch=false
+      - name: Production bundle with unchanged size budget
+        if: github.ref == 'refs/heads/fix/object-crud-ui-core-contract-20261106'
+        run: npm run build
+      - name: Compare baseline Object bundle if current build exceeds budget
+        if: failure() && github.ref == 'refs/heads/fix/object-crud-ui-core-contract-20261106'
+        run: |
+          git fetch --depth=1 origin codex/tecsa-object-architecture
+          git worktree add --detach /tmp/tecsa-object-baseline FETCH_HEAD
+          ln -s "$PWD/node_modules" /tmp/tecsa-object-baseline/node_modules
+          (cd /tmp/tecsa-object-baseline && npm run build)

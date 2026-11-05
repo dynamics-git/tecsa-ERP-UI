@@ -125,6 +125,109 @@ describe('Authenticated shared Core metadata contract', () => {
       true,
     );
   });
+  it('does not let a Page widen PostgreSQL length, decimal shape or numeric bounds', async () => {
+    const contract = metadata();
+    contract.data.entities['fixtures'].fields['quantity'] = {
+      type: 'integer', read: true, create: true, update: true, min: 1, max: 100,
+    };
+    get.mockReturnValue(of(contract));
+    await firstValueFrom(data.loadCoreMetadata());
+    expect(data.resolveFieldContract(source, {
+      key: 'code', label: 'Code', validation: { maxLength: 40 },
+    }).validation?.maxLength).toBe(20);
+    expect(data.resolveFieldContract(source, {
+      key: 'code', label: 'Code', validation: { maxLength: 8 },
+    }).validation?.maxLength).toBe(8);
+    expect(data.resolveFieldContract(source, {
+      key: 'amount', label: 'Amount', validation: { precision: 30, scale: 8 },
+    }).validation).toMatchObject({ precision: 20, scale: 6 });
+    expect(data.resolveFieldContract(source, {
+      key: 'amount', label: 'Amount', validation: { precision: 10, scale: 3 },
+    }).validation).toMatchObject({ precision: 10, scale: 3 });
+    expect(data.resolveFieldContract(source, {
+      key: 'quantity', label: 'Quantity', validation: { min: -10, max: 999 },
+    }).validation).toMatchObject({ min: 1, max: 100 });
+    expect(data.resolveFieldContract(source, {
+      key: 'quantity', label: 'Quantity', validation: { min: 10, max: 90 },
+    }).validation).toMatchObject({ min: 10, max: 90 });
+  });
+
+  it('loads only a requested published source and retains it per Company', async () => {
+    const first = data.loadSourceContract(source);
+    const second = data.loadSourceContract(source);
+    expect(await firstValueFrom(first)).toBe(true);
+    expect(await firstValueFrom(second)).toBe(true);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls[0][0]).toBe('/fieldContracts?path=%2Ffixtures');
+    expect(data.resolveFieldContract(source, {key: 'code', label: 'Code'}).validation?.maxLength).toBe(20);
+
+    session.Company = 'B';
+    const pending = new Subject<unknown>();
+    get.mockReturnValue(pending);
+    const stale = firstValueFrom(data.loadSourceContract(source));
+    session.Company = 'C';
+    pending.next(metadata());
+    pending.complete();
+    expect(await stale).toBe(false);
+    expect(data.resolveSourceContract(source)).toEqual(source);
+    get.mockReturnValue(of(metadata()));
+    expect(await firstValueFrom(data.loadSourceContract(source))).toBe(true);
+    expect(get).toHaveBeenCalledTimes(3);
+  });
+
+  it('retains Table contract lookup across multiple authorized route aliases', async () => {
+    expect(await firstValueFrom(data.loadSourceContract(source))).toBe(true);
+    const alias = {endpoint: '/fixtureAlias'};
+    const second = metadata();
+    second.data.entities['fixtures'].path = 'fixtureAlias';
+    get.mockReturnValue(of(second));
+    expect(await firstValueFrom(data.loadSourceContract(alias))).toBe(true);
+    expect(contracts.sourceName(source)).toBe('fixtures');
+    expect(contracts.sourceName(alias)).toBe('fixtures');
+    expect(data.resolveFieldContract(source, {key:'code',label:'Code'}).validation?.maxLength).toBe(20);
+    expect(data.resolveFieldContract(alias, {key:'code',label:'Code'}).validation?.maxLength).toBe(20);
+  });
+
+  it('derives line create prerequisites after resolving Table field metadata', async () => {
+    session.SuperAdmin = true;
+    const child = metadata();
+    child.data.entities = {
+      fixtureLines: {
+        ...child.data.entities['fixtures'],
+        path: 'fixtures/{parentId}/lines',
+        endpoint: 'lines',
+        fields: {
+          quantity: {type: 'integer', read: true, create: true, update: true, required: true},
+        },
+      },
+    };
+    get.mockImplementation((url?: string) => of(
+      String(url).includes('fieldContracts?path=%2Ffixtures%2F') ? child : metadata(),
+    ));
+    vi.spyOn(data, 'loadList').mockReturnValue(of({value: [], meta: {total: 0}}));
+    const fixture = TestBed.createComponent(ListPage);
+    fixture.componentRef.setInput('listConfig', {
+      pageId: 'fixture-document', pageType: 'document', title: 'Fixtures',
+      dataSource: source, dataSurface: {columns: [{field: 'code', label: 'Code'}]},
+    });
+    fixture.componentRef.setInput('headerConfig', {
+      sections: [{id: 'general', fields: [{key: 'code', label: 'Code'}]}],
+    });
+    fixture.componentRef.setInput('lineConfig', {
+      placement: {mode: 'end'}, toolbarButtons: [],
+      dataSource: {
+        endpoint: '/lines',
+        navigation: {parentEndpoint: '/fixtures', parentIdFields: ['systemId'], childCollection: 'lines'},
+      },
+      columns: [{id: 'quantity', label: 'Quantity'}],
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.lineConfig?.columns[0].required).toBe(true);
+    expect(fixture.componentInstance.lineConfig?.dataSource.requiredCreateFields).toEqual(['quantity']);
+    fixture.destroy();
+  });
+
   it('keeps update-only fields out of new-record editing without blocking ordinary creation', async () => {
     const contract = metadata();
     contract.data.entities['fixtures'].fields['later'] = {
@@ -371,7 +474,7 @@ describe('Authenticated shared Core metadata contract', () => {
       expect(get).toHaveBeenCalledTimes(2);
       expect(data.resolveSourceContract(source)).toEqual(source);
     });
-  it('opens an ordinary configured page and autosaves first input without capability discovery', async () => {
+  it('loads a thin table-backed Page contract and autosaves first input', async () => {
     session.SuperAdmin = true;
     const fixture = TestBed.createComponent(ListPage);
     fixture.componentRef.setInput('listConfig', { ...paymentTermsListConfig, dataSource: source });
@@ -395,7 +498,8 @@ describe('Authenticated shared Core metadata contract', () => {
     fixture.detectChanges();
     const page = fixture.componentInstance;
     expect(post).not.toHaveBeenCalled();
-    expect(page.headerConfig.sections[0].fields[0].readonlyAfterCreate).toBeUndefined();
+    expect(page.headerConfig.sections[0].fields[0].readonlyAfterCreate).toBe(true);
+    expect(get.mock.calls.some(([url]) => String(url).includes('/fieldContracts?path='))).toBe(true);
     expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
     page.handleInlineAction({
       actionKey: 'header:changed',

@@ -1,5 +1,5 @@
 import { FieldConfig } from '../models/field-config.model';
-import { FieldValueType } from '../models/field-value';
+import { compareDecimalValues, FieldValueType } from '../models/field-value';
 import { Injectable } from '@angular/core';
 import { ENTITY_CONTRACT_PROFILES } from './entity-contract-profiles';
 import { DataSourceConfig } from '../models/data-source-config.model';
@@ -72,6 +72,8 @@ export class EntityContractService {
   }
 
   private metadata?: CoreMetadata;
+  /** Route aliases discovered for the same source must coexist in one session. */
+  private readonly sourcePaths = new Map<string, Set<string>>();
   /** Published source identity for config-derived field protection; no endpoint naming guesses. */
   sourceName(source: DataSourceConfig): string | undefined {
     const entity = this.entity(source);
@@ -80,6 +82,7 @@ export class EntityContractService {
 
   clearMetadata(): void {
     this.metadata = undefined;
+    this.sourcePaths.clear();
   }
   acceptMetadata(response: unknown): boolean {
     const data = this.isRecord(response) ? response['data'] : undefined;
@@ -129,6 +132,33 @@ export class EntityContractService {
     this.metadata = data as unknown as CoreMetadata;
     return true;
   }
+  /** Merge exactly one authenticated source without replacing another loaded Page. */
+  acceptSourceMetadata(response: unknown, requestedPath: string): boolean {
+    const previous = this.metadata;
+    if (!this.acceptMetadata(response)) return false;
+    const incoming = this.metadata!;
+    const entries = Object.entries(incoming.entities);
+    const entity = entries[0]?.[1];
+    if (entries.length !== 1 || incoming.endpoints.length !== 0 ||
+        !entity || !this.matchesPath('/' + entity.path.split('/').filter(Boolean).join('/'), requestedPath)) {
+      this.metadata = previous;
+      return false;
+    }
+    this.metadata = {
+      ...incoming,
+      entities: {...previous?.entities, ...incoming.entities},
+      endpoints: previous?.endpoints ?? [],
+      queryProfiles: {...previous?.queryProfiles, ...incoming.queryProfiles},
+    };
+    const name = entries[0][0];
+    const paths = this.sourcePaths.get(name) ?? new Set<string>();
+    paths.add(requestedPath);
+    this.sourcePaths.set(name, paths);
+    return true;
+  }
+
+  sourcePath(source: DataSourceConfig): string { return this.path(source); }
+
   private path(source: DataSourceConfig): string {
     if (source.navigation)
       return (
@@ -148,11 +178,10 @@ export class EntityContractService {
   private entity(source: DataSourceConfig): CoreEntity | undefined {
     if (source.addressStyle === 'odata') return undefined;
     // Nested relationships remain explicit; never identify all child APIs as "lines".
-    return Object.values(this.metadata?.entities ?? {}).find(
-      (entity) =>
-        entity.kind === 'generic' &&
-        this.matchesPath('/' + entity.path.replace(/^\//, ''), this.path(source)),
-    );
+    return Object.entries(this.metadata?.entities ?? {}).find(([name, entity]) =>
+      entity.kind === 'generic' &&
+      [entity.path, ...(this.sourcePaths.get(name) ?? [])].some(path =>
+        this.matchesPath('/' + path.replace(/^\//, ''), this.path(source))))?.[1];
   }
   private matchesPath(template: string, path: string): boolean {
     const parts = template.split('/'),
@@ -284,11 +313,26 @@ export class EntityContractService {
       date: 'date',
       datetime: 'datetime',
     };
-    const validation = Object.fromEntries(
-      ['maxLength', 'min', 'max', 'precision', 'scale']
-        .filter((key) => key in metadata)
-        .map((key) => [key, metadata[key as keyof CoreField]]),
-    );
+    // A Page may narrow a physical limit, but cannot weaken PostgreSQL's
+    // length, precision, scale, or numeric bounds.
+    const validation = {...field.validation};
+    for (const key of ['maxLength', 'precision', 'scale'] as const) {
+      const physical = metadata[key];
+      if (physical !== undefined) {
+        validation[key] = validation[key] === undefined ? physical : Math.min(physical, validation[key]);
+      }
+    }
+    for (const key of ['min', 'max'] as const) {
+      const physical = metadata[key];
+      if (physical === undefined) continue;
+      const requested = validation[key];
+      const comparison = requested === undefined ? undefined : compareDecimalValues(String(requested), String(physical));
+      validation[key] = comparison === undefined
+        ? physical
+        : key === 'min'
+          ? comparison > 0 ? requested : physical
+          : comparison < 0 ? requested : physical;
+    }
     return {
       ...field,
       type: field.type ?? (metadata.type === 'enum' && !field.lookup ? 'select' : undefined),
@@ -311,7 +355,7 @@ export class EntityContractService {
             : metadata.nullable
               ? null
               : undefined,
-      validation: { ...validation, ...field.validation },
+      validation,
     };
   }
 

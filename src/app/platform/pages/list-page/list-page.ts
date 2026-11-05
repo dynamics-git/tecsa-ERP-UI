@@ -8,7 +8,7 @@ import { fieldIsRequired } from '../../models/field-state';
 import { resolvePageIdentity, recordIdentityText } from '../../data/record-identity';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
-import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
+import { Observable, Subscription, from, of, firstValueFrom, defer, forkJoin } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
@@ -332,8 +332,29 @@ export class ListPage implements OnInit, OnDestroy {
       throw new Error('ListPage requires listConfig or setupConfig with dataSource.');
     }
 
-    // Pages initialize from their declared configuration and the existing login context.
-    this.initializePage();
+    // Thin BC-style Pages omit physical field types; resolve those from the
+    // published source before constructing editors or create prerequisites.
+    // Existing explicit configs remain usable when discovery is unavailable.
+    const needsFieldContract = this.headerConfig.sections.some(section =>
+      section.fields.some(field => field.type === undefined && field.valueType === undefined)
+    ) || !!this.lineConfig?.columns.some(column =>
+      column.type === undefined && column.valueType === undefined
+    );
+    if (!needsFieldContract) {
+      this.initializePage();
+      return;
+    }
+    const sources = [this.listConfig.dataSource, ...(this.lineConfig ? [this.lineConfig.dataSource] : [])];
+    this.subscriptions.add(forkJoin(sources.map(source =>
+      this.dataSource.loadSourceContract(source).pipe(
+        optionalRequestTimeout<boolean>(this.timeoutPolicy.requestTimeoutMs),
+        catchError(() => of(false)),
+      )
+    )).subscribe(() => {
+      if (this.destroyed) return;
+      this.initializePage();
+      this.changeDetector.markForCheck();
+    }));
   }
 
   private initializePage(): void {
@@ -342,25 +363,47 @@ export class ListPage implements OnInit, OnDestroy {
       fields: section.fields.map(field => this.dataSource.resolveFieldContract(source, field))}))};
     this.listConfig = {...this.listConfig, dataSource: this.dataSource.resolveSourceContract(source)};
     if (this.lineConfig) {
-      this.lineConfig = lineConfigDefaults(this.lineConfig);
-      const lineSource = this.lineConfig.dataSource;
-      this.lineConfig = {...this.lineConfig, dataSource: this.dataSource.resolveSourceContract(lineSource),
-        columns: this.lineConfig.columns.map(column => {
-          const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
-          return {...column, lookup: field.lookup, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
-            readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required, validation: field.validation};
-        })};
+      // First combine declared line/column options; then resolve API field rules.
+      // Only after resolution derive the create/modify and required-field lists.
+      // Otherwise the early requiredCreateFields: [] remains stale forever.
+      const declared = this.lineConfig;
+      const prepared = lineConfigDefaults(declared);
+      const lineSource = prepared.dataSource;
+      const columns = prepared.columns.map(column => {
+        const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
+        return {...column, lookup: field.lookup, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
+          readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required,
+          requiredWhen: field.requiredWhen, validation: field.validation};
+      });
+      this.lineConfig = lineConfigDefaults({
+        ...declared,
+        columns,
+        dataSource: {
+          ...this.dataSource.resolveSourceContract(lineSource),
+          // Keep deliberate page prerequisites; otherwise derive them from the
+          // final resolved columns, never the intermediate declaration.
+          requiredCreateFields: declared.dataSource.requiredCreateFields,
+        },
+      });
     }
     this.pageId = this.listConfig.pageId ?? this.pageId;
     this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
     const permission = this.sessionService.Permissions.find(value => this.isRecord(value) && (value['pageId'] === this.permissionPageId || value['PageId'] === this.permissionPageId));
     const query = this.isRecord(permission) && this.isRecord(permission['query']) ? permission['query'] : undefined;
-    if (query && Array.isArray(query['fields']) && Array.isArray(query['search']) && this.listConfig.dataSurface) {
+    // Search-field selection belongs to the Page. Older server search lists
+    // were removed; a granted queryable field list can still constrain sorting
+    // and filtering without turning every field into a text-search target.
+    if (query && Array.isArray(query['fields']) && this.listConfig.dataSurface) {
       const fields = new Set(query['fields']);
-      const search = new Set(query['search']);
+      // Retain the pre-existing client contract if a legacy permission snapshot
+      // supplies it; new backend sessions no longer choose quick-search fields.
+      const search = Array.isArray(query['search']) ? new Set(query['search']) : undefined;
       this.listConfig = {...this.listConfig, dataSurface: {...this.listConfig.dataSurface, columns: this.listConfig.dataSurface.columns.map(column => {
         const key = column.field ?? column.id;
-        return {...column, sortable: column.sortable ?? fields.has(key), filterable: column.filterable ?? fields.has(key), searchable: column.searchable ?? search.has(key)};
+        return {...column,
+          sortable: column.sortable ?? fields.has(key),
+          filterable: column.filterable ?? fields.has(key),
+          searchable: column.searchable ?? (search ? search.has(key) : undefined)};
       })}};
     }
     if (this.lineConfig) this.lineConfig = lineConfigDefaults(this.lineConfig);
