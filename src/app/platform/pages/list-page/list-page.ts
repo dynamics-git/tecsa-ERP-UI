@@ -395,9 +395,15 @@ export class ListPage implements OnInit, OnDestroy {
     // and filtering without turning every field into a text-search target.
     if (query && Array.isArray(query['fields']) && this.listConfig.dataSurface) {
       const fields = new Set(query['fields']);
+      // Retain the pre-existing client contract if a legacy permission snapshot
+      // supplies it; new backend sessions no longer choose quick-search fields.
+      const search = Array.isArray(query['search']) ? new Set(query['search']) : undefined;
       this.listConfig = {...this.listConfig, dataSurface: {...this.listConfig.dataSurface, columns: this.listConfig.dataSurface.columns.map(column => {
         const key = column.field ?? column.id;
-        return {...column, sortable: column.sortable ?? fields.has(key), filterable: column.filterable ?? fields.has(key)};
+        return {...column,
+          sortable: column.sortable ?? fields.has(key),
+          filterable: column.filterable ?? fields.has(key),
+          searchable: column.searchable ?? (search ? search.has(key) : undefined)};
       })}};
     }
     if (this.lineConfig) this.lineConfig = lineConfigDefaults(this.lineConfig);
