@@ -1,5 +1,13 @@
 # What's new in developer documentation
 
+## 5 November 2026: individual API source controllers restored
+
+Each table now has its own thin controller with ApiSource and inherited Core
+CRUD. Removed the consolidated table controller and its publisher. Existing API
+contracts/routes are preserved; no schema, posting/costing or UI runtime change
+was needed. Follow Individual Migration -> Model -> Individual Controller +
+ApiSource -> Shared EntityController for future table work.
+
 ## 5 November 2026: readable tables and normal CRUD correction
 
 Documented individually readable backend table migrations, shared draft Purchase

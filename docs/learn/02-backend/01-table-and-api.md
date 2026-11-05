@@ -2,6 +2,12 @@
 
 ## Current table-first phase — 5 November 2026
 
+Required structure: **Individual Migration -> Model -> Individual Controller +
+ApiSource -> existing Shared EntityController/Core CRUD**. Each table publishes
+through its own thin named controller. The temporary consolidated table
+controller and bulk publisher have been removed; API paths, policies, permission
+rules and physical schema are unchanged by this organization correction.
+
 The backend now uses individual readable creation migrations rather than a SQL
 baseline loader. Normal CRUD still uses existing ApiSource + EntityController;
 page Config/TypeScript/shared components are unchanged. Source fields and keys
