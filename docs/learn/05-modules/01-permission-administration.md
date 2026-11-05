@@ -29,7 +29,16 @@ The shared modal journey should preserve the originating user's state when retur
 
 ## Login and company changes
 
-An active user needs permitted company membership. Applicable active set assignments are resolved for the chosen company, including all-company assignments. The context supplies effective permissions to UI core; switching company must refresh/re-resolve them.
+An active user needs permitted company membership. Applicable active set assignments are resolved for the chosen company, including all-company assignments. Login supplies effective permissions to UI core; switching company refreshes/re-resolves them in its existing selection flow.
+
+UI permissions arrive in `auth/login` as `data.session` and are reused by ordinary
+pages. The separate `auth/context` endpoint is removed. Company selection/switching
+uses the existing `auth/companies?companyId=...` response's `meta.session`.
+App startup, window focus, navigation and saving permission rows do not trigger
+additional session reads. Permission edits are reflected in the UI after Company
+reselection or login; backend CRUD checks remain authoritative on every request. Session
+discovery does not load the fields or relationships of every published table.
+Object IDs identify developer metadata; Users and ordinary CRUD do not require one.
 
 Permission grants across applicable sets are combined by the existing resolver. Do not invent a new explicit-deny precedence scheme in a page config. System-owned set restrictions are domain rules independent of whether the current account is called admin.
 

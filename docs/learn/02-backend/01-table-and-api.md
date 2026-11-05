@@ -209,5 +209,6 @@ stay identical before/after adding the test columns.
 Existing shared Core supplies this behavior; it was not replaced. Targeted command
 input corrections reuse existing schema-derived patterns/rules for proven field
 bindings. No field-policy lists, new metadata endpoint, CRUD engine or UI config
-change is introduced. Full field shape is checked through existing Core metadata;
-HTTP auth/context query metadata discovers the new field names.
+change is introduced. CRUD resolves field shape from PostgreSQL for its own
+source. Login/Company selection carries access capabilities, not an all-table
+query-field catalogue; the separate auth/context endpoint has been removed.

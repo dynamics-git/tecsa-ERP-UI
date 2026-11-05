@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { By } from '@angular/platform-browser';
-import { of, Subject } from 'rxjs';
+import { firstValueFrom, of, Subject } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { providePlatformGovernance } from '../../../core/providers/platform-governance.provider';
 import { SessionService } from '../../../core/services/session.service';
@@ -15,9 +15,10 @@ import {
   purchaseRequisitionLineConfig,
   purchaseRequisitionListConfig,
 } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
-import { DATA_REST_SERVICE } from '../../data/data-source.service';
+import { DATA_REST_SERVICE, DataSourceService } from '../../data/data-source.service';
 import { DocumentLines } from '../../document/document-lines/document-lines';
 import { ListPage } from '../list-page/list-page';
+import { usersHeaderConfig, usersLineConfig, usersListConfig } from '../../../features/administration/users/users.config';
 
 describe('Document line layout while the initial request is pending', () => {
   afterEach(() => TestBed.resetTestingModule());
@@ -48,6 +49,50 @@ describe('Document line layout while the initial request is pending', () => {
       },
     },
   ];
+
+  it('shows editable Users permission lines while selected captions remain pending', async () => {
+    const captions = new Subject<unknown>();
+    const record = {systemId: 'user-1', systemRowVersion: 1, userName: 'ayan', name: 'Ayan Rahman', email: 'ayan@tecsa.com.my', isActive: true, lastLoginAt: null};
+    const assignment = {systemId: 'assignment-1', systemRowVersion: 1, userName: 'ayan', permissionSetCode: 'REQ-ENTRY', companyCode: 'TECSA', isActive: true};
+    const get = vi.fn((endpoint: string) => endpoint.startsWith('/userPermissionSets')
+      ? of({data: [assignment], meta: {total: 1}})
+      : endpoint.startsWith('/permissionSets') || endpoint.startsWith('/permissionCompanies')
+        ? captions : endpoint.startsWith('/users?') ? of({data: [record], meta: {total: 1, recordShape: 'complete'}}) : of({data: record}));
+    const patch = vi.fn();
+    TestBed.configureTestingModule({imports: [ListPage], providers: [provideRouter([]), ...providePlatformGovernance(),
+      {provide: DATA_REST_SERVICE, useValue: {get, patch}}]});
+    TestBed.inject(SessionService).SuperAdmin = true;
+    await firstValueFrom(TestBed.inject(DataSourceService).loadList(usersListConfig.dataSource, {useCache: true}));
+    const fixture = TestBed.createComponent(ListPage);
+    fixture.componentRef.setInput('documentOnly', true);
+    fixture.componentRef.setInput('initialRecord', record);
+    fixture.componentRef.setInput('listConfig', usersListConfig);
+    fixture.componentRef.setInput('headerConfig', usersHeaderConfig);
+    fixture.componentRef.setInput('lineConfig', usersLineConfig);
+    fixture.detectChanges();
+    const page = fixture.componentInstance;
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(page.inlineDocumentWindowConfig?.lineRows?.some(row => row['systemId'] === assignment.systemId)).toBe(true);
+      expect(page.popupLoading).toBe(false);
+      expect(captions.observers.length).toBeGreaterThan(0);
+    });
+    const editor = fixture.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
+    expect(captions.observers.length).toBeGreaterThan(0);
+    expect(editor.disabled).toBe(false);
+    expect(get.mock.calls.some(([endpoint]) => endpoint === '/users/user-1')).toBe(false);
+    const row = page.inlineDocumentWindowConfig!.lineRows!.find(row => row['systemId'] === assignment.systemId)!;
+    expect(row['permissionSetCode']).toBe('REQ-ENTRY');
+    expect(editor.lookupDisplay(usersLineConfig.columns[0], row)).toBe('REQ-ENTRY');
+    expect(fixture.nativeElement.textContent).not.toContain('Loading lines...');
+    expect(patch).not.toHaveBeenCalled();
+    captions.next({data: [{code: 'REQ-ENTRY', name: 'Requisition Entry'}, {code: 'TECSA', name: 'TecSA'}], meta: {total: 2}});
+    captions.complete();
+    await vi.waitFor(() => {fixture.detectChanges(); expect(editor.lookupDisplay(usersLineConfig.columns[1], row)).toBe('Requisition Entry');});
+    expect(row['permissionSetCode']).toBe('REQ-ENTRY');
+    expect(patch).not.toHaveBeenCalled();
+    fixture.destroy();
+  });
 
   for (const page of pages) {
     it.each([false, true])(

@@ -57,7 +57,6 @@ export class SessionService {
   private readonly accessTokenKey = this.workspace.storageKey('access-token');
 
   readonly permissionsLoaded$ = new BehaviorSubject<boolean>(false);
-  readonly permissionRefreshRequested$ = new Subject<void>();
   readonly accessCenterChanged$ = new Subject<unknown>();
   readonly userProfileChanged$ = new Subject<unknown>();
 
