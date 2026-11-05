@@ -1,5 +1,14 @@
 # What's new in developer documentation
 
+## 5 November 2026: readable tables and normal CRUD correction
+
+Documented individually readable backend table migrations, shared draft Purchase
+and Sales Header–Line APIs, and PR's single typed number reference. Native binary,
+time and own-object record-reference types reuse existing schema-backed Core.
+Existing page configurations and workflow buttons are not yet proof of the
+corrected API contract; normal page alignment precedes later business logic.
+No page renderer, shared component, menu or design token changed in this update.
+
 ## 5 November 2026: local Object Explorer and simpler page identity
 
 Laravel generates private searchable offline HTML from ObjectRegistry/ApiSource

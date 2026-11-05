@@ -18,7 +18,7 @@ the current Company context. Table objects do not introduce another field list
 or publish APIs. Existing `EntityRegistry`, `ApiSource`, generic CRUD, business
 services and `PermissionService` remain authoritative.
 
-Core IDs use 1–49999; future extension IDs start at 50000. Identities and names
+TecSA core IDs use 1–9999999; future extension IDs start at 10000000. Identities and names
 are unique per type. Registration is trusted code, not an install/permission
 operation. No SDK installer, range allocator or new security engine is supplied.
 

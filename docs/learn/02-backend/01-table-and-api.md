@@ -1,5 +1,29 @@
 # Create a table and its API
 
+## Current table-first phase — 5 November 2026
+
+The backend now uses individual readable creation migrations rather than a SQL
+baseline loader. Normal CRUD still uses existing ApiSource + EntityController;
+page Config/TypeScript/shared components are unchanged. Source fields and keys
+come from PostgreSQL, not a duplicated API field list. Company storage and UUID
+`systemId` remain. Conditional references are declarative column metadata checked
+by the existing generic runtime; structural Header–Line relations also have
+Company-aware SQL constraints. Table Object IDs are TecSA-owned metadata.
+
+Draft purchasing uses `purchaseHeaders`/`purchaseLines`; draft sales uses
+`salesHeaders`/`salesLines`. Document type and number identify the business
+document inside each Company. Posted documents and entries remain separate.
+Normal PR uses `purchaseRequisitions`/`purchaseRequisitionLines`, with
+`lineType` + `number` for Item/G/L/Item Charge/Fixed Asset, and business Header–Line
+binding through `documentType` + `documentNumber`. Existing page configurations
+that use retired field/API names still require alignment in the next page phase.
+Do not infer that old posting/approval buttons are available: those backend
+commands are frozen while ordinary tables and pages are established.
+
+Binary fields use base64 at the API, native time remains time, and structured
+record references use JSON with TecSA `tableObjectId` + UUID `systemId`. This is
+physical type support, not a new page renderer or a generic pricing/item system.
+
 ## Company storage
 
 Native PostgreSQL `json`/`jsonb` fields use the backend's shared structured JSON
