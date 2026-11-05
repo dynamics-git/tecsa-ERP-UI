@@ -2,9 +2,9 @@ name: Verify Angular UI
 
 on:
   pull_request:
-    branches: [main, 'codex/tecsa-object-architecture']
+    branches: [main]
   push:
-    branches: [main, 'fix/object-crud-ui-core-contract-20261106']
+    branches: [main]
   workflow_dispatch:
 
 permissions:
