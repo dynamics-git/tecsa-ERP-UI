@@ -6,9 +6,9 @@ body {
   background: var(--ts-bg);
   color: var(--ts-text);
   font-family: var(--ts-font);
-  font-size: var(--ts-text-14);
-  font-weight: 500;
-  line-height: 1.45;
+  font-size: var(--ts-font-body);
+  font-weight: var(--ts-weight-body);
+  line-height: var(--ts-line-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

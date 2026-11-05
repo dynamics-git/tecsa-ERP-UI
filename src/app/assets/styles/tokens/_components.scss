@@ -1,8 +1,13 @@
 :root {
   --line-grid-height: 240px;
-  --ts-control-h: 34px;
-  --ts-table-head-h: 40px;
-  --ts-table-row-h: 46px;
+  --ts-control-h: 30px;
+  --ts-table-head-h: 34px;
+  --ts-table-row-h: 36px;
+  --ts-table-row-compact-h: 32px;
+  --ts-table-row-spacious-h: 44px;
+  --ts-page-command-h: 48px;
+  --ts-section-h: 34px;
+  --ts-document-command-h: 36px;
 
   /* Shared presentation values; keep page configs free of visual overrides. */
   --ts-nav-h: 40px;
@@ -14,11 +19,13 @@
   --ts-command-button-h: 30px;
   --ts-command-gap: 6px;
   --ts-command-padding-inline: 10px;
-  --ts-command-weight: var(--ts-weight-semibold);
+  --ts-command-weight: var(--ts-weight-regular);
   --ts-field-padding-inline: 9px;
-  --ts-field-radius: 6px;
+  --ts-field-radius: 3px;
   --ts-field-label-gap: 7px;
-  --ts-checkbox-size: 16px;
+  // An inset surface cover neutralizes browser autofill tint without a border.
+  --ts-field-autofill-cover: 1000px;
+  --ts-checkbox-size: 18px;
   --ts-focus-width: 2px;
   --ts-focus-offset: 3px;
 

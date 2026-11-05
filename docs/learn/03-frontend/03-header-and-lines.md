@@ -10,6 +10,19 @@ placement: {mode: 'after-section', afterSectionId: 'general'},
 
 The named section must exist in HeaderConfig. Use `mode: 'end'` when the line area belongs after all header sections. Do not add spacer fields or page CSS to position a line grid.
 
+## Initial line area and resizing
+
+Cards and documents open with space for six rows even when empty or holding one
+record. Longer data grows the initial area to eight rows; automatic height is
+capped at 40% of viewport height to leave room for the header and totals. The
+shared `LINE_GRID_LAYOUT` policy owns these defaults and manual resize bounds.
+Resizing remains local to the open window; Home or double-clicking the handle
+restores the responsive default. It is not saved across popup instances.
+
+Existing header-to-lines spacing, calculations/totals and following sections
+retain their layout. Worksheets retain their available-height grid; lists and
+pages without Lines keep their existing layout. No per-page configuration is required.
+
 ## Users example
 
 ```typescript

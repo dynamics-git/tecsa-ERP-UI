@@ -17,7 +17,7 @@ import { FactBox } from '../../../shared/ui/fact-box/fact-box';
 import { ViewChild } from '@angular/core';
 import { DocumentLines } from '../document-lines/document-lines';
 import { FieldConfig, FieldFactBoxConfig } from '../../models/field-config.model';
-import { LineColumnConfig } from '../../models/line-config.model';
+import { LINE_GRID_LAYOUT, LineColumnConfig } from '../../models/line-config.model';
 import { AttachmentsConfig, CommandBarConfig, FooterRowConfig, FooterSectionConfig, LineCommandPolicyConfig, LinePlacementConfig, DocumentDetailType, HeaderSectionConfig, LineTotalsConfig, DocumentStatusMessage, FactBoxSectionConfig } from '../../models/document-window-config.model';
 import { ApiErrorService } from '../../data/api-error.service';
 
@@ -47,12 +47,20 @@ export class DocumentWindow {
   canLeaveFactBox(): Promise<boolean> { return this.factBox()?.canLeave() ?? Promise.resolve(true); }
   async requestClose(): Promise<void> { if (await this.canLeaveFactBox()) this.closed.emit(); }
   private preferredLineGridHeight?: number;
-  readonly minLineGridHeight = 96;
-  readonly maxLineGridHeight = 640;
+  private viewportHeight = globalThis.innerHeight || LINE_GRID_LAYOUT.fallbackViewportHeight;
+  readonly minLineGridHeight = LINE_GRID_LAYOUT.minimumHeight;
+  readonly maxLineGridHeight = LINE_GRID_LAYOUT.maximumHeight;
   get lineGridHeight(): number {
-    // Size to entered rows, not the empty entry placeholders. Long documents scroll inside the grid.
-    const automatic = 36 + Math.max(2, Math.min(this.enteredLineCount, 12)) * 33 + 16;
+    // Start with a usable work area even for an empty/single-line card. Small
+    // viewports reserve room for header/totals; manual sizing remains independent.
+    const visibleRows = Math.max(LINE_GRID_LAYOUT.minimumVisibleRows, Math.min(this.enteredLineCount, LINE_GRID_LAYOUT.maximumVisibleRows));
+    const naturalHeight = LINE_GRID_LAYOUT.headerHeight + visibleRows * LINE_GRID_LAYOUT.rowHeight + LINE_GRID_LAYOUT.scrollbarAllowance;
+    const automatic = Math.min(naturalHeight, Math.floor(this.viewportHeight * LINE_GRID_LAYOUT.viewportShare));
     return Math.max(this.minLineGridHeight, Math.min(this.maxLineGridHeight, this.preferredLineGridHeight ?? automatic));
+  }
+  @HostListener('window:resize')
+  onViewportResize(): void {
+    this.viewportHeight = globalThis.innerHeight || LINE_GRID_LAYOUT.fallbackViewportHeight;
   }
   set lineGridHeight(value: number) {
     if (Number.isFinite(value)) this.preferredLineGridHeight = Math.max(this.minLineGridHeight, Math.min(this.maxLineGridHeight, value));
@@ -75,7 +83,7 @@ export class DocumentWindow {
     if (event.key === 'Home') { event.preventDefault(); this.resetLineGridHeight(); return; }
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
     event.preventDefault();
-    this.lineGridHeight = this.lineGridHeight + (event.key === 'ArrowDown' ? 32 : -32);
+    this.lineGridHeight = this.lineGridHeight + (event.key === 'ArrowDown' ? LINE_GRID_LAYOUT.keyboardStep : -LINE_GRID_LAYOUT.keyboardStep);
   }
 
   private static readonly GLOBAL_LINE_PRIMARY_COMMANDS = new Set(['cmd:line-new', 'line-new', 'cmd:line-delete', 'line-delete']);

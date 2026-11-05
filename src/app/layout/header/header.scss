@@ -270,7 +270,7 @@ button {
 .app-search-result-label {
   color: var(--ts-text);
   font-size: var(--ts-text-13);
-  font-weight: 700;
+  font-weight: var(--ts-weight-medium);
 }
 
 .app-search-result-meta,
@@ -413,7 +413,7 @@ button {
   gap: 8px;
   color: var(--ts-text-soft);
   font-size: var(--ts-text-13);
-  font-weight: 650;
+  font-weight: var(--ts-command-weight);
 
   i:last-child {
     margin-left: auto;
@@ -504,5 +504,5 @@ button {
   padding: 8px;
   border-radius: 5px;
   &:hover { background: var(--ts-surface-hover); }
-  &:focus-visible { outline: 2px solid var(--ts-accent-600); }
+  &:focus-visible { outline: 2px solid var(--ts-border-focus); }
 }

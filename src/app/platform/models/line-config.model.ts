@@ -1,6 +1,20 @@
 /** Shared grid baseline for visual rows and editable entry space. */
 export const MINIMUM_LINE_GRID_ROWS = 8;
 
+/** Shared initial viewport sizing; manual resizing retains its wider bounds. */
+export const LINE_GRID_LAYOUT = {
+  minimumHeight: 96,
+  maximumHeight: 640,
+  minimumVisibleRows: 6,
+  maximumVisibleRows: 8,
+  headerHeight: 36,
+  rowHeight: 33,
+  scrollbarAllowance: 16,
+  viewportShare: 0.4,
+  fallbackViewportHeight: 768,
+  keyboardStep: 32,
+} as const;
+
 import type { CommandConfig } from './command-config.model';
 import { DataSurfaceColumnConfig } from './data-surface-config.model';
 import type { DataSourceConfig } from './data-source-config.model';

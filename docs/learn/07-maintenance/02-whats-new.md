@@ -1,5 +1,39 @@
 # What's new in developer documentation
 
+## 6 November 2026: compact shared ERP typography
+
+Applied shared 13px data/label/command roles with dark neutral foregrounds,
+16px semibold section headings and a 24px regular record title. TecSA navy
+continues to identify brand, links, selection and focus. Controls now use a
+30px height, one-pixel focus edge and 3px radius; list density and shared command
+bars follow central component tokens. Header/Lines/totals ordering and section
+spacing are preserved. Fixed stacked list search growing vertically and replaced
+seven undefined dashboard token names with existing semantic tokens.
+See [shared ERP presentation hierarchy](/documentation/core/commands-and-runmodal).
+
+## 5 November 2026: shared checkbox alignment
+
+Line/worksheet boolean cells and their captions are centered. Native grid
+checkboxes, row-selection controls and form booleans use the shared 18px checkbox
+token. Form booleans sit at the vertical center of adjacent input-height slots.
+List selection visuals use the same token. Caption/padding clicks, disabled
+states, keyboard activation and boolean data semantics are unchanged.
+
+## 5 November 2026: consistent field focus
+
+Text, date/time, select, textarea and form lookup inputs now use the shared
+one-pixel TecSA focus border rather than a native black outline or outer glow.
+Autofill retains the normal field surface and text colors. Field height, layout,
+checkbox focus and borderless line-cell editors keep their existing treatment.
+
+## 5 November 2026: usable default line area
+
+Cards/documents now open their Lines area with six visible-row slots rather than
+shrinking to two for sparse data. Long initial data is capped at eight slots and
+automatic sizing adapts to short screens. Existing section spacing is preserved.
+Manual resizing/reset remain; worksheet, list and form-only layouts are preserved.
+See [line area sizing](/documentation/frontend/header-and-lines).
+
 ## 5 November 2026: scoped presentation token cleanup
 
 Moved repeated parent-menu, shared command and shared form presentation values

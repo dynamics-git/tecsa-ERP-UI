@@ -2,14 +2,42 @@
 
 Standard commands come from shared core. Declare custom business actions or navigation through CommandConfig, with stable keys and existing icons.
 
+## Shared ERP presentation hierarchy
+
+Typography and density are owned by shared tokens, not individual page configs.
+The 6 November 2026 visual pass keeps TecSA navy for brand, links, selection and
+focus while using neutral foregrounds for readable ERP text:
+
+| Role | Shared presentation |
+| --- | --- |
+| Ordinary data | 13px / 400, primary dark text |
+| Labels and column captions | 13px / 400, dark neutral label color |
+| Commands and list tools | 13px / 400, dark neutral command color |
+| General / Lines / FactBox sections | 16px / 600, primary dark text |
+| Record title | 24px / 400, primary dark text |
+| Secondary metadata | 12px, muted text |
+
+Disabled commands retain their shared disabled state. Required labels stay
+readable; readonly fields keep their existing semantics. Native checkboxes share
+an 18px size and boolean grid cells/captions are centered. Header/form checkboxes
+use navy and align within the adjacent input-height slot.
+
+Shared controls are 30px high with a one-pixel border and 3px radius. Document
+command and section bars are 36px and 34px; list rows use 36px normal, 32px compact
+or 44px spacious density. Line editing keeps its existing 32px row height.
+Header, Lines, totals and subsequent sections keep their existing order and
+spacing; no separating gap is added before Lines. Short/narrow lists keep the
+search control at field height when their toolbar stacks.
+
 ## Shared presentation tokens
 
 Menu height, padding, icon/chevron size, command height/gap/weight and shared
-form padding/radius/checkbox size live in `assets/styles/tokens/_components.scss`.
-Font weights live in `_typography.scss`. Adjust these shared roles instead of
-adding per-page styling. The token extraction preserves the existing values;
-parent-menu leading icons are 18px, with 13px dropdown chevrons. Palette and menu
-label weight are unchanged.
+form padding/radius/checkbox size live in
+`assets/styles/tokens/_components.scss`. Font roles live in `_typography.scss`;
+foreground and state colors live in `_colors.scss`. Parent-menu leading icons
+remain 18px with 13px dropdown chevrons and bold menu labels. Use these shared
+roles instead of page-specific visual overrides. Dashboard styles reference the
+same defined semantic tokens rather than unresolved custom-property names.
 
 ## Open the selected assignment's permission set
 

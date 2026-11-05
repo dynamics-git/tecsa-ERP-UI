@@ -70,3 +70,16 @@ Before changing visual files:
 4. Build after changes.
 5. If visual structure changes, document why in this file.
 
+
+## 6 November 2026: authorized whole-ERP refinement
+
+The user authorized a compact, sharper shared ERP presentation inspired by
+Business Central readability while retaining TecSA navy identity. This refines
+the earlier visual checkpoint: shared body/label/command text is 13px, controls
+30px, sections 16px semibold and record titles 24px regular. Navy remains the
+brand/action color; readable neutral text carries ordinary data and captions.
+Use typography/component/color tokens across lists, forms, documents, worksheets,
+FactBoxes and dashboard surfaces. No page-specific renderer or business change.
+Keep Header, Lines, calculations and following sections in their existing flow;
+do not add a gap or separate Header from Lines. Shared checkbox/focus fixes and
+the resizable default Lines area remain in place.

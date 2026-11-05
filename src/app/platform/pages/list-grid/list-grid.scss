@@ -200,13 +200,13 @@
 
   th {
     height: var(--ts-table-head-h);
-    font-size: var(--ts-font-label);
-    font-weight: 500;
+    font-size: var(--ts-font-grid-header);
+    font-weight: var(--ts-weight-label);
     text-transform: none;
     position: relative;
     padding: 0 8px;
     border-bottom: 1px solid var(--ts-border);
-    color: var(--ts-text-soft);
+    color: var(--ts-label-text);
     letter-spacing: 0;
     text-align: left;
     overflow: hidden;
@@ -264,7 +264,7 @@
   }
 
   td {
-    height: 44px;
+    height: var(--ts-table-row-h);
     padding: 0 8px;
     border-bottom: 1px solid var(--ts-border-soft);
     color: var(--ts-text);
@@ -274,8 +274,8 @@
     white-space: nowrap;
   }
 
-  &.density-compact td { height: 36px; }
-  &.density-spacious td { height: 52px; }
+  &.density-compact td { height: var(--ts-table-row-compact-h); }
+  &.density-spacious td { height: var(--ts-table-row-spacious-h); }
 
   th:nth-child(-n + 2),
   td:nth-child(-n + 2) {
@@ -367,8 +367,8 @@
 }
 
 .grid-check {
-  width: 16px;
-  height: 16px;
+  width: var(--ts-checkbox-size);
+  height: var(--ts-checkbox-size);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -381,8 +381,8 @@
   }
 
   span {
-    width: 15px;
-    height: 15px;
+    width: var(--ts-checkbox-size);
+    height: var(--ts-checkbox-size);
     border: 1px solid var(--ts-border-strong);
     border-radius: 4px;
     background: var(--ts-surface);
@@ -575,9 +575,9 @@ button:disabled:not(.th-sort) { opacity: 0.45; }
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: var(--ts-text-soft);
+    color: var(--ts-command-text);
     font-size: var(--ts-font-body);
-    font-weight: 400;
+    font-weight: var(--ts-command-weight);
     line-height: var(--ts-line-body);
     white-space: nowrap;
     .ts-icon { font-size: var(--ts-text-15); color: var(--ts-muted); }
@@ -593,6 +593,14 @@ button:disabled:not(.th-sort) { opacity: 0.45; }
 }
 .dataset-search input { font-size: var(--ts-font-body); font-weight: 400; }
 .app-grid td { font-weight: 400; }
+
+// A width-oriented flex-basis must not become the search height when stacked.
+@media (max-width: 1180px) {
+  .dataset-search {
+    flex: 0 0 var(--ts-control-h);
+    max-width: none;
+  }
+}
 
 :host-context(.popup-shell) app-command-bar { margin-inline: calc(-1 * var(--ts-space-2)); }
 .dataset-tools > details > summary.export-trigger { width: var(--ts-control-h); padding: 0; }

@@ -152,6 +152,39 @@ describe('Shared document height and totals rendering', () => {
     expect(window.lineGridHeight).toBe(automatic);
     fixture.destroy();
   });
+
+  it('opens empty and single-line cards with room to work and caps long documents', () => {
+    vi.stubGlobal('innerHeight', 1080);
+    const fixture = create(0);
+    try {
+      const height = fixture.componentInstance.lineGridHeight;
+      expect(height).toBeGreaterThanOrEqual(250);
+      fixture.componentRef.setInput('lineRows', [{quantity: '1'}]);
+      fixture.detectChanges();
+      expect(fixture.componentInstance.lineGridHeight).toBe(height);
+      fixture.componentRef.setInput('lineRows', Array.from({length: 100}, () => ({quantity: '1'})));
+      fixture.detectChanges();
+      expect(fixture.componentInstance.lineGridHeight).toBeLessThanOrEqual(316);
+    } finally { fixture.destroy(); vi.unstubAllGlobals(); }
+  });
+
+  it('adapts automatic size on short screens while keeping an explicit resize', () => {
+    vi.stubGlobal('innerHeight', 1080);
+    const fixture = create(1);
+    try {
+      vi.stubGlobal('innerHeight', 480);
+      globalThis.dispatchEvent(new Event('resize'));
+      fixture.detectChanges();
+      expect(fixture.componentInstance.lineGridHeight).toBeLessThanOrEqual(192);
+      fixture.componentInstance.lineGridHeight = 300;
+      vi.stubGlobal('innerHeight', 600);
+      globalThis.dispatchEvent(new Event('resize'));
+      fixture.detectChanges();
+      expect(fixture.componentInstance.lineGridHeight).toBe(300);
+      fixture.componentInstance.resetLineGridHeight();
+      expect(fixture.componentInstance.lineGridHeight).toBeLessThanOrEqual(240);
+    } finally { fixture.destroy(); vi.unstubAllGlobals(); }
+  });
 });
 
 describe('PR uses supported header and line capabilities', () => {

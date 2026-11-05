@@ -26,11 +26,14 @@
 
   /* Foreground hierarchy: record values/titles, labels/actions, metadata, hints/icons.
      All four remain readable on the shared white, soft and selected surfaces. */
-  --ts-text: #20262e;
-  --ts-text-soft: #465468;
-  --ts-muted: #5a687a;
-  --ts-muted-light: #5f6c7d;
+  --ts-text: #292d32;
+  --ts-text-soft: #444444;
+  --ts-muted: #626b76;
+  --ts-muted-light: #6b7480;
   --ts-text-inverse: #ffffff;
+  /* Active controls must read as clearly as data, not as muted metadata. */
+  --ts-command-text: var(--ts-text-soft);
+  --ts-label-text: var(--ts-text-soft);
 
   /* semantic states */
   --ts-success: #107c10;

@@ -1,5 +1,6 @@
 :root {
   --ts-font: "Segoe UI", "Segoe UI Web", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+  --ts-font-display: var(--ts-font);
 
   --ts-text-11: 11px;
   --ts-text-12: 12px;
@@ -9,14 +10,22 @@
   --ts-text-18: 18px;
   --ts-text-20: 20px;
   --ts-text-22: 22px;
-  --ts-font-body: var(--ts-text-14);
+  --ts-font-body: var(--ts-text-13);
   --ts-font-label: var(--ts-text-13);
   --ts-font-caption: var(--ts-text-12);
   --ts-font-section: 16px;
   --ts-font-page-title: var(--ts-text-20);
+  --ts-font-record-title: 24px;
+  --ts-font-panel-title: var(--ts-text-18);
+  --ts-font-grid-header: var(--ts-text-13);
   --ts-line-body: 1.4;
   --ts-weight-regular: 400;
   --ts-weight-medium: 500;
   --ts-weight-semibold: 600;
   --ts-weight-bold: 700;
+  --ts-weight-display: var(--ts-weight-regular);
+  --ts-weight-body: var(--ts-weight-regular);
+  --ts-weight-label: var(--ts-weight-regular);
+  --ts-weight-title: var(--ts-weight-medium);
+  --ts-weight-section: var(--ts-weight-semibold);
 }

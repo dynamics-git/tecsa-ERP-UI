@@ -14,6 +14,7 @@
         @for (column of visibleColumns; track column.id) {
           <th
             #headerCell
+            [class.boolean-cell]="(column.valueType ?? column.type) === 'boolean'"
             [class.amount]="column.align === 'end' || column.type === 'currency'"
             [class.line-icon-col]="column.cellType === 'icon'"
             [style.width]="getColumnWidthStyle(column)">
@@ -67,6 +68,7 @@
               [attr.data-quick-entry]="column.quickEntry !== false && !isReadonly(column, row) && column.cellType !== 'icon'"
               (keydown)="handleCellKeydown($event, column, row, rowIndex)"
               (focusin)="focusCell(column, rowIndex)" (paste)="handlePaste($event, column, rowIndex)"
+              [class.boolean-cell]="(column.valueType ?? column.type) === 'boolean'"
               [class.amount]="column.align === 'end' || column.type === 'currency'"
               [class.line-icon-col]="column.cellType === 'icon'"
               [style.width]="getColumnWidthStyle(column)">
