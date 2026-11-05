@@ -129,6 +129,28 @@ export class EntityContractService {
     this.metadata = data as unknown as CoreMetadata;
     return true;
   }
+  /** Merge exactly one authenticated source without replacing another loaded Page. */
+  acceptSourceMetadata(response: unknown, requestedPath: string): boolean {
+    const previous = this.metadata;
+    if (!this.acceptMetadata(response)) return false;
+    const incoming = this.metadata!;
+    const entities = Object.values(incoming.entities);
+    if (entities.length !== 1 || incoming.endpoints.length !== 0 ||
+        !this.matchesPath('/' + entities[0].path.replace(/^\\//, ''), requestedPath)) {
+      this.metadata = previous;
+      return false;
+    }
+    this.metadata = {
+      ...incoming,
+      entities: {...previous?.entities, ...incoming.entities},
+      endpoints: previous?.endpoints ?? [],
+      queryProfiles: {...previous?.queryProfiles, ...incoming.queryProfiles},
+    };
+    return true;
+  }
+
+  sourcePath(source: DataSourceConfig): string { return this.path(source); }
+
   private path(source: DataSourceConfig): string {
     if (source.navigation)
       return (
