@@ -116,7 +116,9 @@ export class DataSourceService {
       finalize(() => {
         if (this.sourceContractRequests.get(cacheKey) === request) this.sourceContractRequests.delete(cacheKey);
       }),
-      shareReplay({bufferSize: 1, refCount: true}),
+      // A late second subscriber must reuse the first HTTP result, not issue
+      // another request when the first editor has already unsubscribed.
+      shareReplay({bufferSize: 1, refCount: false}),
     );
     this.sourceContractRequests.set(cacheKey, request);
     return request;
