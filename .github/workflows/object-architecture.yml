@@ -40,3 +40,8 @@ jobs:
         run: npm run ng -- test --watch=false --include='src/app/core/services/object-architecture.spec.ts' --include='src/app/core/services/page-registration-checks.spec.ts'
       - name: CRUD/UI schema field and autosave regressions
         run: npm run ng -- test --watch=false --include='src/app/platform/data/core-metadata.spec.ts' --include='src/app/platform/pages/document-page/autosave-regression.spec.ts'
+      - name: Full UI regression on isolated review branch only
+        if: github.ref == 'refs/heads/fix/object-crud-ui-core-contract-20261106'
+        run: |
+          npm run build
+          npm test -- --watch=false
