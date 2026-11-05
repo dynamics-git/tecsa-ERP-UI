@@ -13,6 +13,7 @@ on:
       - 'src/app/core/services/page-registration-checks.spec.ts'
       - 'src/app/features/purchasing/purchase-requisition/**'
       - 'docs/learn/**'
+      - 'scripts/*object*.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,5 +31,7 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit -p tsconfig.app.json
       - run: npm run docs:check
+      - name: Angular source discovery without executing page configs
+        run: node --test scripts/export-page-objects.test.mjs
       - name: Existing page registry and PR Object integration only
         run: npm run ng -- test --watch=false --include='src/app/core/services/object-architecture.spec.ts' --include='src/app/core/services/page-registration-checks.spec.ts'

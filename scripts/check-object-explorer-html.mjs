@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {JSDOM, VirtualConsole} from 'jsdom';
+
+// Offline software test of the generated, trusted HTML. No browser or network resource loading.
+const path = process.argv[2];
+if (!path) throw new Error('Pass the generated local Object Explorer HTML file.');
+const errors = [];
+const console = new VirtualConsole(); console.on('jsdomError', error => errors.push(error.message));
+const dom = new JSDOM(readFileSync(path,'utf8'), {runScripts:'dangerously', virtualConsole:console});
+const {document, Event} = dom.window;
+const data = JSON.parse(document.getElementById('catalog').textContent);
+const rows = () => [...document.querySelectorAll('.object-row')];
+assert.equal(rows().length, data.objects.length);
+const search = document.getElementById('search');
+search.value='Purchase Requisition'; search.dispatchEvent(new Event('input'));
+assert.ok(rows().length >= 7);
+document.querySelector('[data-type="table"]').click();
+assert.equal(rows().length,2);
+for(const row of rows()) assert.match(row.querySelector('.name').href,/^vscode:\/\/file\/.+PurchaseRequisition(?:Line)?\.php:\d+$/);
+document.querySelector('[data-type="page"]').click(); assert.equal(rows().length,1);
+rows()[0].querySelector('.details-button').click();
+assert.ok(document.getElementById('detail').textContent.includes('Angular TypeScript'));
+assert.ok(document.getElementById('detail').textContent.includes('API Controller'));
+assert.ok(document.getElementById('detail').textContent.includes('Table / Model'));
+assert.ok(document.getElementById('detail').textContent.includes('Business Service / Codeunit'));
+search.value=''; search.dispatchEvent(new Event('input'));
+assert.equal(rows().length,data.objects.filter(item=>item.objectType==='page').length);
+assert.ok(rows().some(row=>row.textContent.includes('No numeric ID')));
+search.value='does-not-exist-xyz'; search.dispatchEvent(new Event('input'));
+assert.equal(rows().length,0); assert.ok(document.querySelector('.empty'));
+assert.deepEqual(errors,[]);
+process.stdout.write(`Object Explorer DOM checks passed: ${data.objects.length} entries, search, type filters, related files and source URI targets.\n`);
+dom.window.close();

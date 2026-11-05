@@ -24,21 +24,46 @@ operation. No SDK installer, range allocator or new security engine is supplied.
 
 ## Page Objects keep Config + TypeScript + shared components
 
-Optional `object` metadata belongs to the existing `ListPageConfig`:
+Only optional `objectId` is added to the existing `ListPageConfig`:
 
 ```ts
-object: {
-  objectType: 'page', objectId: 10000, objectName: 'Purchase Requisition',
-  sourceTable: {objectType: 'table', objectId: 10000, objectName: 'Purchase Requisition'},
-  codeunit: {objectType: 'codeunit', objectId: 10000, objectName: 'Purchase Requisition Management'},
-}
+pageId: 'purchase-requisition',
+pageType: 'document',
+title: 'Purchase Requisition',
+objectId: 10000,
 ```
 
 This is the actual PR example. The page's `pageId: 'purchase-requisition'`,
 `pageType: 'document'`, menu, HeaderConfig, LineConfig, FactBox and thin
 `PurchaseRequisitionPage` component remain unchanged. `page-registry.ts` validates
-optional identities and `resolvePageObject(10000)` finds the same discovered
+optional IDs and `resolvePageObject(10000)` finds the same discovered
 module as routes and RunModal. It is not another page catalog/renderer.
+
+Do not repeat objectType, objectName, sourceTable or codeunit in Config. The
+backend ObjectRegistry/ApiSource and actual constructor/source relationships
+provide these links in the local developer Explorer. Angular does not load a
+second object/file registry or change runtime API/permission contracts.
+
+## Open the local Developer Object Explorer
+
+In the Laravel repository, run:
+
+```powershell
+php artisan objects:explore --ui="C:\Git-Project\tecsa-ERP-UI" --open
+```
+
+The local/testing-only command generates private offline HTML at
+`storage/app/developer/object-explorer/index.html`. Search/filter all seven object
+types and existing pages without numeric IDs. Click a name for VS Code: Page
+opens Config, Table its model and Codeunit the business service. Related buttons
+show real Config, TypeScript, template, ApiSource controller, models and services,
+with GitHub fallback links. It adds no web endpoint or database connection.
+
+The source exporter reuses feature-folder discovery and TypeScript syntax
+inspection without executing configs. `objects:explore --ui=... --check` checks
+numeric IDs, page modes and root ApiSource bindings across both repositories.
+Mismatched, missing or duplicate assigned IDs stop generation. Existing legacy
+endpoints without matching backend sources appear as notes, not guessed links.
 
 List, Card, Document and Worksheet retain their shared runtime behavior; Setup
 continues to work. Existing pages without object metadata remain supported.

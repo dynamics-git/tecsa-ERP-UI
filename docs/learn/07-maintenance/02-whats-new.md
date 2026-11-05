@@ -1,5 +1,15 @@
 # What's new in developer documentation
 
+## 5 November 2026: local Object Explorer and simpler page identity
+
+Laravel generates private searchable offline HTML from ObjectRegistry/ApiSource
+and actual Angular source, with VS Code/GitHub links and related files. Existing
+pages without numeric IDs remain visible. Config now uses only optional
+`objectId`; PR's duplicated object name/type/table/codeunit declarations were
+removed. Cross-repository source/ID checks do not change pageId, title, routes,
+permissions or Header–Line behavior. See
+[Object Architecture](/documentation/backend/object-architecture).
+
 ## 5 November 2026: Phase 2 object foundation and PR integration
 
 Added optional stable Page Object identity to existing Config-based pages and
