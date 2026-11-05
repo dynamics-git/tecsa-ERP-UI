@@ -125,6 +125,33 @@ describe('Authenticated shared Core metadata contract', () => {
       true,
     );
   });
+  it('does not let a Page widen PostgreSQL length, decimal shape or numeric bounds', async () => {
+    const contract = metadata();
+    contract.data.entities['fixtures'].fields['quantity'] = {
+      type: 'integer', read: true, create: true, update: true, min: 1, max: 100,
+    };
+    get.mockReturnValue(of(contract));
+    await firstValueFrom(data.loadCoreMetadata());
+    expect(data.resolveFieldContract(source, {
+      key: 'code', label: 'Code', validation: { maxLength: 40 },
+    }).validation?.maxLength).toBe(20);
+    expect(data.resolveFieldContract(source, {
+      key: 'code', label: 'Code', validation: { maxLength: 8 },
+    }).validation?.maxLength).toBe(8);
+    expect(data.resolveFieldContract(source, {
+      key: 'amount', label: 'Amount', validation: { precision: 30, scale: 8 },
+    }).validation).toMatchObject({ precision: 20, scale: 6 });
+    expect(data.resolveFieldContract(source, {
+      key: 'amount', label: 'Amount', validation: { precision: 10, scale: 3 },
+    }).validation).toMatchObject({ precision: 10, scale: 3 });
+    expect(data.resolveFieldContract(source, {
+      key: 'quantity', label: 'Quantity', validation: { min: -10, max: 999 },
+    }).validation).toMatchObject({ min: 1, max: 100 });
+    expect(data.resolveFieldContract(source, {
+      key: 'quantity', label: 'Quantity', validation: { min: 10, max: 90 },
+    }).validation).toMatchObject({ min: 10, max: 90 });
+  });
+
   it('keeps update-only fields out of new-record editing without blocking ordinary creation', async () => {
     const contract = metadata();
     contract.data.entities['fixtures'].fields['later'] = {
