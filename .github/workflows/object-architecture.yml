@@ -11,6 +11,7 @@ on:
       - 'src/app/platform/data/core-metadata.spec.ts'
       - 'src/app/platform/pages/list-page/list-page.ts'
       - 'src/app/core/services/foundation-navigation.spec.ts'
+      - 'src/app/app.routes.ts'
       - 'src/app/features/purchase-masters/items/items.spec.ts'
       - 'src/app/platform/public-api.ts'
       - 'src/app/core/services/page-registry.ts'
