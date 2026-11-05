@@ -136,7 +136,7 @@ export class EntityContractService {
     const incoming = this.metadata!;
     const entities = Object.values(incoming.entities);
     if (entities.length !== 1 || incoming.endpoints.length !== 0 ||
-        !this.matchesPath('/' + entities[0].path.replace(/^\\//, ''), requestedPath)) {
+        !this.matchesPath('/' + entities[0].path.split('/').filter(Boolean).join('/'), requestedPath)) {
       this.metadata = previous;
       return false;
     }
