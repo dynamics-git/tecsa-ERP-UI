@@ -8,7 +8,7 @@ import { fieldIsRequired } from '../../models/field-state';
 import { resolvePageIdentity, recordIdentityText } from '../../data/record-identity';
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
-import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
+import { Observable, Subscription, from, of, firstValueFrom, defer, forkJoin } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
@@ -332,8 +332,29 @@ export class ListPage implements OnInit, OnDestroy {
       throw new Error('ListPage requires listConfig or setupConfig with dataSource.');
     }
 
-    // Pages initialize from their declared configuration and the existing login context.
-    this.initializePage();
+    // Thin BC-style Pages omit physical field types; resolve those from the
+    // published source before constructing editors or create prerequisites.
+    // Existing explicit configs remain usable when discovery is unavailable.
+    const needsFieldContract = this.headerConfig.sections.some(section =>
+      section.fields.some(field => field.type === undefined && field.valueType === undefined)
+    ) || !!this.lineConfig?.columns.some(column =>
+      column.type === undefined && column.valueType === undefined
+    );
+    if (!needsFieldContract) {
+      this.initializePage();
+      return;
+    }
+    const sources = [this.listConfig.dataSource, ...(this.lineConfig ? [this.lineConfig.dataSource] : [])];
+    this.subscriptions.add(forkJoin(sources.map(source =>
+      this.dataSource.loadSourceContract(source).pipe(
+        optionalRequestTimeout<boolean>(this.timeoutPolicy.requestTimeoutMs),
+        catchError(() => of(false)),
+      )
+    )).subscribe(() => {
+      if (this.destroyed) return;
+      this.initializePage();
+      this.changeDetector.markForCheck();
+    }));
   }
 
   private initializePage(): void {
