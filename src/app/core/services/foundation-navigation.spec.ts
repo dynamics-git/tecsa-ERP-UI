@@ -10,6 +10,7 @@ describe('F1 navigation registrations', () => {
     const menu = new MenuService(permission as unknown as PermissionService);
     const expected = [
       'accounting-periods',
+      'companies',
       'currencies',
       'dimension-combinations',
       'dimensions',
