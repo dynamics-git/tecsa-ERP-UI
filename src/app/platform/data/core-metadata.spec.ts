@@ -175,6 +175,19 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(get).toHaveBeenCalledTimes(3);
   });
 
+  it('retains Table contract lookup across multiple authorized route aliases', async () => {
+    expect(await firstValueFrom(data.loadSourceContract(source))).toBe(true);
+    const alias = {endpoint: '/fixtureAlias'};
+    const second = metadata();
+    second.data.entities['fixtures'].path = 'fixtureAlias';
+    get.mockReturnValue(of(second));
+    expect(await firstValueFrom(data.loadSourceContract(alias))).toBe(true);
+    expect(contracts.sourceName(source)).toBe('fixtures');
+    expect(contracts.sourceName(alias)).toBe('fixtures');
+    expect(data.resolveFieldContract(source, {key:'code',label:'Code'}).validation?.maxLength).toBe(20);
+    expect(data.resolveFieldContract(alias, {key:'code',label:'Code'}).validation?.maxLength).toBe(20);
+  });
+
   it('derives line create prerequisites after resolving Table field metadata', async () => {
     session.SuperAdmin = true;
     const child = metadata();
