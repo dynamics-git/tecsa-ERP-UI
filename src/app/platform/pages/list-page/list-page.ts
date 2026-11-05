@@ -342,14 +342,28 @@ export class ListPage implements OnInit, OnDestroy {
       fields: section.fields.map(field => this.dataSource.resolveFieldContract(source, field))}))};
     this.listConfig = {...this.listConfig, dataSource: this.dataSource.resolveSourceContract(source)};
     if (this.lineConfig) {
-      this.lineConfig = lineConfigDefaults(this.lineConfig);
-      const lineSource = this.lineConfig.dataSource;
-      this.lineConfig = {...this.lineConfig, dataSource: this.dataSource.resolveSourceContract(lineSource),
-        columns: this.lineConfig.columns.map(column => {
-          const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
-          return {...column, lookup: field.lookup, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
-            readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required, validation: field.validation};
-        })};
+      // First combine declared line/column options; then resolve API field rules.
+      // Only after resolution derive the create/modify and required-field lists.
+      // Otherwise the early requiredCreateFields: [] remains stale forever.
+      const declared = this.lineConfig;
+      const prepared = lineConfigDefaults(declared);
+      const lineSource = prepared.dataSource;
+      const columns = prepared.columns.map(column => {
+        const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
+        return {...column, lookup: field.lookup, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
+          readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required,
+          requiredWhen: field.requiredWhen, validation: field.validation};
+      });
+      this.lineConfig = lineConfigDefaults({
+        ...declared,
+        columns,
+        dataSource: {
+          ...this.dataSource.resolveSourceContract(lineSource),
+          // Keep deliberate page prerequisites; otherwise derive them from the
+          // final resolved columns, never the intermediate declaration.
+          requiredCreateFields: declared.dataSource.requiredCreateFields,
+        },
+      });
     }
     this.pageId = this.listConfig.pageId ?? this.pageId;
     this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
