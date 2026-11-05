@@ -441,30 +441,32 @@ button {
 }
 
 .app-module-menu {
-  height: 40px;
-  padding: 0 18px;
+  height: var(--ts-nav-h);
+  padding: 0 var(--ts-nav-padding-inline);
   background: var(--ts-surface-soft);
   border-top: 1px solid var(--ts-border-soft);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--ts-space-1);
 }
 
 .module-menu-item {
-  height: 40px;
-  padding: 0 12px;
+  height: var(--ts-nav-h);
+  padding: 0 var(--ts-nav-item-padding-inline);
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--ts-nav-item-gap);
   color: var(--ts-text);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--ts-font-body);
+  font-weight: var(--ts-weight-bold);
 
   i {
     color: var(--ts-text-soft);
-    font-size: 13px;
+    font-size: var(--ts-nav-icon-size);
   }
+
+  .ts-icon-down { font-size: var(--ts-nav-chevron-size); }
 
   &:hover {
     background: var(--ts-surface);

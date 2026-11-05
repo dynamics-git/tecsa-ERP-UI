@@ -1,5 +1,13 @@
 # What's new in developer documentation
 
+## 5 November 2026: scoped presentation token cleanup
+
+Moved repeated parent-menu, shared command and shared form presentation values
+into component/typography tokens without changing the palette or existing
+spacing/weights. Increased only parent-menu leading icons from 13px to 18px;
+dropdown chevrons remain 13px. Focus/info/selection colors now reference the
+existing identical brand token. No page config, API or editing behavior changed.
+
 ## 5 November 2026: checkbox activation safety
 
 Fixed shared header/form labels toggling booleans when their caption or empty

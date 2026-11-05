@@ -22,7 +22,7 @@
   --ts-border: #d7dee8;
   --ts-border-soft: #e7edf4;
   --ts-border-strong: #b8c4d3;
-  --ts-border-focus: #3d6696;
+  --ts-border-focus: var(--ts-brand-800);
 
   /* Foreground hierarchy: record values/titles, labels/actions, metadata, hints/icons.
      All four remain readable on the shared white, soft and selected surfaces. */
@@ -37,7 +37,7 @@
   --ts-warning: #f59e0b;
   --ts-danger: #d13438;
   --ts-danger-hover: #b12c30;
-  --ts-info: #3d6696;
+  --ts-info: var(--ts-brand-800);
 
   --ts-success-bg: #e7f6e7;
   --ts-warning-bg: #fff7e6;
