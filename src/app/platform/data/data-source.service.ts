@@ -52,7 +52,7 @@ export class DataSourceService {
   }
   /** Identifies the current read/access generation for prepared view snapshots. */
   getReadGeneration(): number { this.key('/'); return this.readGeneration; }
-  invalidateReadCache(): void { this.contracts.clearMetadata(); this.metadataLoadedAt = 0; this.metadataRequest = undefined; this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
+  invalidateReadCache(): void { this.contracts.clearMetadata(); this.metadataLoadedAt = 0; this.metadataRequest = undefined; this.sourceContractLoadedAt.clear(); this.sourceContractRequests.clear(); this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
   private cacheRecord(key: string, value: Record<string, unknown>, at = Date.now()): void {
     if (this.records.size >= 100) this.records.delete(this.records.keys().next().value!);
     this.records.set(key, { value: structuredClone(value), at });
@@ -90,6 +90,37 @@ export class DataSourceService {
     private readonly workspace: WorkspaceContext,
     @Optional() private readonly hookErrors?: ErrorHandler,
   ) {}
+
+  private readonly sourceContractRequests = new Map<string, Observable<boolean>>();
+  private readonly sourceContractLoadedAt = new Map<string, number>();
+
+  /** One published source at a time; scoped by current user, Company and workspace. */
+  loadSourceContract(source: DataSourceConfig): Observable<boolean> {
+    const path = this.contracts.sourcePath(source);
+    const cacheKey = this.key('/fieldContracts?path=' + path);
+    if (!this.session.Company || !this.rest || source.addressStyle === 'odata') return of(false);
+    const inFlight = this.sourceContractRequests.get(cacheKey);
+    if (inFlight) return inFlight;
+    if (Date.now() - (this.sourceContractLoadedAt.get(cacheKey) ?? 0) < 30000) return of(true);
+    const context = this.context();
+    const generation = this.readGeneration;
+    const url = this.endpoint({endpoint: '/fieldContracts'}) + '?path=' + encodeURIComponent(path);
+    const request = defer(() => this.client.get(url)).pipe(
+      map(response => {
+        if (context !== this.context() || generation !== this.readGeneration) return false;
+        const accepted = this.contracts.acceptSourceMetadata(response, path);
+        if (accepted) this.sourceContractLoadedAt.set(cacheKey, Date.now());
+        return accepted;
+      }),
+      catchError(() => of(false)),
+      finalize(() => {
+        if (this.sourceContractRequests.get(cacheKey) === request) this.sourceContractRequests.delete(cacheKey);
+      }),
+      shareReplay({bufferSize: 1, refCount: true}),
+    );
+    this.sourceContractRequests.set(cacheKey, request);
+    return request;
+  }
 
   private metadataRequest?: Observable<boolean>;
   private metadataLoadedAt = 0;
