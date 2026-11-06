@@ -51,7 +51,7 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     let request: TestRequest | undefined;
     await vi.waitFor(() => {
       if (request) return;
-      const matches = http.match(req => req.method === method && req.url === path);
+      const matches = http.match(req => req.method === method && req.url.split('?')[0] === path);
       if (matches.length !== 1) throw new Error(`Expected one pending ${method} ${path}, got ${matches.length}`);
       request = matches[0];
     });
@@ -83,9 +83,12 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
   });
 
   afterEach(() => {
-    http.verify();
-    vi.restoreAllMocks();
-    TestBed.resetTestingModule();
+    try {
+      http.verify();
+    } finally {
+      vi.restoreAllMocks();
+      TestBed.resetTestingModule();
+    }
   });
 
   it('round-trips Laravel list, detail cache, create, PATCH with If-Match, and DELETE 204', async () => {
