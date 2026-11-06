@@ -25,7 +25,7 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
   const companyB = '22222222-2222-4222-8222-222222222222';
   const rowId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   // Source Codes is a live API with DELETE disabled by its ApiSource declaration.
-  const source = { endpoint: '/sourceCodes', keyField: 'systemId' };
+  const source = { endpoint: '/sourceCodes', keyField: 'systemId', supportsDelete: false };
   // runtimeRecords is the SDK test fixture explicitly registered by Backend EntityRuntimeTest.
   const deleteEnabledFixture = { endpoint: '/runtimeRecords', keyField: 'systemId' };
   let http: HttpTestingController;
@@ -129,24 +129,14 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     http.expectNone(req => req.url.includes('/auth/context'));
   });
 
-  it('does not expose DELETE for Source Codes when the server declares it disabled', async () => {
-    const metadataPromise = firstValueFrom(data.loadCoreMetadata());
-    const metadataRequest = await receive('GET', `${base}/companies/${companyA}/apiCapabilities`);
-    metadataRequest.flush({ data: {
-      contractVersion: '1.0',
-      entities: {
-        sourceCodes: {
-          kind: 'generic', path: 'sourceCodes', endpoint: 'sourceCodes', key: 'systemId',
-          fields: { code: { type: 'code', read: true, create: true, update: false } },
-          operations: { read: true, create: true, update: true, delete: false },
-        },
-      },
-      endpoints: [],
-    } });
-    expect(await metadataPromise).toBe(true);
+  it('never sends DELETE for Source Codes, whose current Backend route explicitly disallows it', async () => {
+    // Backend main SourceCodeController has operations.delete = false.
+    // An /apiCapabilities response is NOT assumed: that endpoint does not
+    // exist on Backend main. The currently configured capability stays local.
     expect(data.resolveSourceContract(source).supportsDelete).toBe(false);
     await expect(firstValueFrom(data.delete(source, rowId, 2))).rejects.toThrow('does not support delete');
     http.expectNone(req => req.method === 'DELETE');
+    http.expectNone(req => req.url.includes('/apiCapabilities'));
   });
 
   it('accepts HTTP 204 only for a delete-enabled generic SDK record with an ETag', async () => {
