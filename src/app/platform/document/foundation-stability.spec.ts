@@ -10,7 +10,7 @@ import { DATA_REST_SERVICE } from '../data/data-source.service';
 import { DocumentPageCommandAssemblerService } from '../pages/document-page-command-assembler.service';
 import { StandardListActionsService } from '../pages/standard-list-actions.service';
 import { SessionService } from '../../core/services/session.service';
-import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../features/purchasing/purchase-requisition/purchase-requisition.config';
+import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../testing/pr-reference.fixture';
 
 afterEach(() => TestBed.resetTestingModule());
 
@@ -182,9 +182,9 @@ describe('PR document field layout follows its existing API', () => {
     fixture.componentRef.setInput('factBoxConfig', { enabled: false });
     fixture.detectChanges();
     const titles = [...fixture.nativeElement.querySelectorAll('.entry-work > .entry-section > .section-title h3')].map((element: any) => element.textContent.trim());
-    expect(titles).toEqual(['General', 'Lines', 'Request Details', 'Processing']);
+    expect(titles).toEqual(['General', 'Lines', 'Request Details']);
     const source = headerDataSourceDefaults(purchaseRequisitionListConfig.dataSource, purchaseRequisitionHeaderConfig);
-    expect(source.updateFields).toContain('locationId');
+    expect(source.updateFields).toContain('locationCode');
     for (const field of ['status', 'conversionStatus', 'purchaseOrderCount', 'statusChangedAt', 'systemCreatedAt', 'systemModifiedAt']) {
       expect(source.createFields).not.toContain(field);
       expect(source.updateFields).not.toContain(field);

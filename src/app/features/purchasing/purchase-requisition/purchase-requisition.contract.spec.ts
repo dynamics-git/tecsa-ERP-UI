@@ -1,48 +1,36 @@
-import { describe, expect, it } from 'vitest';
-import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
-import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from './purchase-requisition.config';
+import {describe, expect, it} from 'vitest';
+import {purchaseRequisitionHeaderConfig as header, purchaseRequisitionLineConfig as line, purchaseRequisitionListConfig as page} from './purchase-requisition.config';
+import {purchaseRequisitionFactBoxConfig as factBox} from './purchase-requisition.factbox.config';
+import {prFieldContractFixture, purchaseRequisitionLineConfig as resolved} from '../../../testing/pr-reference.fixture';
 
-describe('Purchase Requisition server contract', () => {
-  const line = purchaseRequisitionLineConfig;
-
-  it('declares the Item and G/L choices and explicit type identity', () => {
-    expect(line.typeField).toBe('lineType');
-    expect(line.columns.find(c => c.id === 'lineType')?.options?.map(x => x.value)).toEqual(['item', 'gl_account']);
-    expect(line.columns.find(c => c.id === 'itemId')?.lookup?.endpoint).toBe('/items');
-    expect(line.columns.find(c => c.id === 'glAccountId')?.lookup?.endpoint).toBe('/glAccounts');
-    expect(line.dataSource.navigation).toBeUndefined();
-    expect(line.dataSource.endpoint).toBe('/purchaseRequisitionLines');
-    expect(line.dataSource.headerPKProp).toBe('number');
-    expect(line.dataSource.lineFKProp).toBe('documentNumber');
-    expect(line.dataSource.parentFieldMap).toEqual({documentType:'documentType'});
-    expect(line.dataSource.invalidates).toEqual(['/purchaseRequisitions']);
+describe('Thin PR declaration against its real PostgreSQL field contract', () => {
+  it('binds one Page Object and declares no duplicate sources or ownership keys', () => {
+    expect(page.objectId).toBe(10000);
+    expect(page.dataSource).toEqual({defaultSort:'number desc',pageSize:25,autoGenerateNumber:true,omitEmptyFields:['number'],writableStates:{field:'status',values:['open']}});
+    expect(line.dataSource).toEqual({defaultSort:'lineNo asc'});
+    expect(resolved.dataSource).toMatchObject({endpoint:'/purchaseRequisitionLines',keyField:'systemId',headerPKProp:'number',lineFKProp:'documentNumber',parentFieldMap:{documentType:'documentType'}});
   });
-
-  it('declares active master bindings separately from create prerequisites and required indicators', () => {
-    expect(line.columns.find(c => c.id === 'itemId')?.editableWhen).toEqual({field:'lineType',values:['item']});
-    expect(line.columns.find(c => c.id === 'glAccountId')?.editableWhen).toEqual({field:'lineType',values:['gl_account']});
-    expect(line.columns.some(c => c.required || c.requiredWhen)).toBe(false);
-    expect(line.dataSource.requiredCreateFields).toBeUndefined();
+  it('uses one persisted No. with conditional Item and GL lookup presentation', () => {
+    const choices=line.columns.filter(column=>column.displayColumn==='number');
+    expect(choices.map(column=>column.field)).toEqual(['number','number']);
+    expect(choices.map(column=>column.lookup?.valueField)).toEqual(['number','number']);
+    expect(choices.map(column=>column.lookup?.endpoint)).toEqual(['/items','/glAccounts']);
+    expect(line.columns.find(column=>column.id==='lineType')?.clearFieldsOnChange).toEqual(['number','unitOfMeasureCode','locationCode']);
   });
-
-  it('uses existing fills and declares only supported editable fields', () => {
-    expect(line.columns.find(c => c.id === 'itemId')?.fill).toEqual({description:'description'});
-    expect(line.columns.find(c => c.id === 'glAccountId')?.fill).toEqual({description:'name'});
-    for (const id of ['unitOfMeasureId','locationId']) {
-      const column = line.columns.find(c => c.id === id)!;
-      expect(column.lookup?.endpoint).toBeTruthy();
-      expect(column.editableWhen).toBeUndefined();
-      expect(column.readonly).not.toBe(true);
-    }
-    for (const id of ['lineNo','qtyPerUnitOfMeasure','estimatedAmount','convertedQuantity','remainingQuantity']) expect(line.columns.find(c => c.id === id)?.readonly).toBe(true);
+  it('declares only published fields and leaves physical validation to Core', () => {
+    const sources=prFieldContractFixture.data.entities;
+    for(const field of header.sections.flatMap(section=>section.fields))expect(field.key in sources.purchaseRequisitions.fields).toBe(true);
+    for(const column of line.columns)expect((column.field??column.id) in sources.purchaseRequisitionLines.fields).toBe(true);
+    expect(line.columns.find(column=>column.id==='description')?.validation).toBeUndefined();
+    expect(resolved.columns.find(column=>column.id==='description')?.validation?.maxLength).toBe(100);
+    expect(line.columns.find(column=>column.id==='quantity')?.defaultValue).toBe('1');
+    expect(line.columns.find(column=>column.id==='quantity')?.validation?.custom).toBeTypeOf('function');
   });
-
-  it('configures list, document and FactBox directly from backend response names', () => {
-    expect(purchaseRequisitionListConfig.factBox).toBe(purchaseRequisitionFactBoxConfig);
-    expect(purchaseRequisitionListConfig.dataSource.endpoint).toBe('/purchaseRequisitions');
-    expect(purchaseRequisitionHeaderConfig.sections.flatMap(s => s.fields).map(f => f.key)).toContain('conversionStatus');
-    expect(purchaseRequisitionFactBoxConfig.sections?.flatMap(s => s.fields?.map(f => f.field) ?? [])).toContain('purchaseOrderCount');
-    expect(purchaseRequisitionFactBoxConfig.sections?.flatMap(s => s.fields ?? []).find(f => f.field === 'estimatedTotal')?.type).toBe('currency');
-    expect(line.columns.filter(c => Boolean(c.factBox)).map(c => c.id)).toEqual(['description','quantity','estimatedAmount']);
+  it('keeps workflow declarations, live preview, totals and collaboration behaviour', () => {
+    expect(header.toolbarButtons.map(command=>command.apiAction?.name)).toEqual(['submit','approve','reject','reopen','cancel']);
+    expect(line.calculation).toEqual([{target:'estimatedAmount',formula:'quantity * estimatedUnitCost',precision:6}]);
+    expect(factBox).toMatchObject({enabled:true,notes:true,attachments:true});
+    for(const field of factBox.sections?.flatMap(section=>section.fields??[])??[])
+      expect(field.field?.startsWith('system') || field.field! in prFieldContractFixture.data.entities.purchaseRequisitions.fields).toBe(true);
   });
 });

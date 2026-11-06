@@ -121,3 +121,43 @@ export class SamplesPage {
 Standard New/Delete/Refresh, HTTP save handlers, filtering controls, sorting controls, record ID routing, grid resize/reorder logic and modal infrastructure stay in core. Ordinary pages omit `autoSave: true` and omit a manual Save command.
 
 Give custom commands stable keys and existing icons. Do not use arbitrary CSS gaps or new grid markup to mimic the standard page. See [page types](/documentation/frontend/page-types) before choosing a different entry surface.
+
+## Minimal Page Object projection
+
+For a Page Object, source binding is resolved by shared Core. This minimal
+projection of the existing PR demonstrates the declaration shape; it is not a
+second registered page. The full PR config retains its existing commands and
+UI behaviours.
+
+```typescript
+import { HeaderConfig, ObjectLineConfig, ObjectPageConfig, listColumns } from '../../../platform/public-api';
+
+const header: HeaderConfig = {
+  toolbarButtons: [],
+  sections: [{id: 'general', title: 'General', fields: [
+    {key: 'number', label: 'No.', readonlyAfterCreate: true},
+    {key: 'purpose', label: 'Purpose', type: 'textarea'},
+  ]}],
+};
+
+const lines: ObjectLineConfig = {
+  placement: {mode: 'after-section', afterSectionId: 'general'},
+  columns: [
+    {id: 'description', label: 'Description'},
+    {id: 'quantity', label: 'Quantity'},
+  ],
+};
+
+const page: ObjectPageConfig = {
+  objectId: 10000,
+  pageId: 'purchase-requisition',
+  pageType: 'document',
+  title: 'Purchase Requisition',
+  dataSurface: {columns: listColumns(header, ['number', 'purpose'])},
+  factBox: {enabled: true, overview: true, notes: true, attachments: true},
+};
+```
+
+The backend supplies source paths, UUID record addressing, composite parent
+bindings and physical fields. UI declares only its layout and intentional
+presentation overrides. See [field contracts](/documentation/core/field-contract-details).

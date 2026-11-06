@@ -14,7 +14,7 @@ import {
   purchaseRequisitionHeaderConfig,
   purchaseRequisitionLineConfig,
   purchaseRequisitionListConfig,
-} from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
+} from '../../../testing/pr-reference.fixture';
 import { DATA_REST_SERVICE, DataSourceService } from '../../data/data-source.service';
 import { DocumentLines } from '../../document/document-lines/document-lines';
 import { ListPage } from '../list-page/list-page';

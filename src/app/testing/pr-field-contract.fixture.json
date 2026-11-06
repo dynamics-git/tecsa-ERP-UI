@@ -1,0 +1,343 @@
+{
+    "data": {
+        "contractVersion": "1.0",
+        "entities": {
+            "purchaseRequisitions": {
+                "kind": "generic",
+                "path": "purchaseRequisitions",
+                "endpoint": "purchaseRequisitions",
+                "key": "systemId",
+                "singleton": false,
+                "fields": {
+                    "documentType": {
+                        "maxLength": 24,
+                        "nullable": false,
+                        "required": false,
+                        "default": "purchase_requisition",
+                        "type": "text",
+                        "read": true,
+                        "create": false,
+                        "update": false
+                    },
+                    "number": {
+                        "maxLength": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "",
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": false
+                    },
+                    "noSeriesCode": {
+                        "maxLength": 20,
+                        "nullable": true,
+                        "required": false,
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "requestedByUserId": {
+                        "nullable": true,
+                        "required": false,
+                        "type": "uuid",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "requestDate": {
+                        "nullable": true,
+                        "required": false,
+                        "type": "date",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "requiredDate": {
+                        "nullable": true,
+                        "required": false,
+                        "type": "date",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "purpose": {
+                        "maxLength": 250,
+                        "nullable": false,
+                        "required": false,
+                        "default": "",
+                        "type": "text",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "status": {
+                        "maxLength": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "open",
+                        "values": [
+                            "open",
+                            "pending_approval",
+                            "approved",
+                            "rejected",
+                            "cancelled"
+                        ],
+                        "type": "enum",
+                        "read": true,
+                        "create": false,
+                        "update": false
+                    },
+                    "statusChangedByUserId": {
+                        "nullable": true,
+                        "required": false,
+                        "type": "uuid",
+                        "read": true,
+                        "create": false,
+                        "update": false
+                    },
+                    "statusChangedAt": {
+                        "nullable": true,
+                        "required": false,
+                        "type": "datetime",
+                        "read": true,
+                        "create": false,
+                        "update": false
+                    },
+                    "locationCode": {
+                        "maxLength": 10,
+                        "nullable": true,
+                        "required": false,
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "currencyCode": {
+                        "maxLength": 10,
+                        "nullable": true,
+                        "required": false,
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "dimensionSetId": {
+                        "min": 0,
+                        "max": 2147483647,
+                        "nullable": false,
+                        "required": false,
+                        "default": 0,
+                        "type": "integer",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    }
+                },
+                "operations": {
+                    "read": true,
+                    "create": true,
+                    "update": true,
+                    "delete": true
+                }
+            },
+            "purchaseRequisitionLines": {
+                "kind": "generic",
+                "path": "purchaseRequisitionLines",
+                "endpoint": "purchaseRequisitionLines",
+                "key": "systemId",
+                "singleton": false,
+                "fields": {
+                    "documentType": {
+                        "maxLength": 24,
+                        "nullable": false,
+                        "required": false,
+                        "default": "purchase_requisition",
+                        "type": "text",
+                        "read": true,
+                        "create": true,
+                        "update": false
+                    },
+                    "documentNumber": {
+                        "maxLength": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "",
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": false
+                    },
+                    "lineNo": {
+                        "min": 0,
+                        "max": 2147483647,
+                        "nullable": false,
+                        "required": false,
+                        "default": 0,
+                        "type": "integer",
+                        "read": true,
+                        "create": true,
+                        "update": false
+                    },
+                    "lineType": {
+                        "maxLength": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "item",
+                        "values": [
+                            "comment",
+                            "item",
+                            "gl_account",
+                            "item_charge",
+                            "fixed_asset"
+                        ],
+                        "type": "enum",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "number": {
+                        "maxLength": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "",
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "description": {
+                        "maxLength": 100,
+                        "nullable": false,
+                        "required": false,
+                        "default": "",
+                        "type": "text",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "description2": {
+                        "maxLength": 50,
+                        "nullable": false,
+                        "required": false,
+                        "default": "",
+                        "type": "text",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "unitOfMeasureCode": {
+                        "maxLength": 10,
+                        "nullable": true,
+                        "required": false,
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "qtyPerUnitOfMeasure": {
+                        "precision": 38,
+                        "scale": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "1",
+                        "type": "decimal",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "locationCode": {
+                        "maxLength": 10,
+                        "nullable": true,
+                        "required": false,
+                        "type": "code",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "quantity": {
+                        "precision": 38,
+                        "scale": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "0",
+                        "min": 0,
+                        "type": "decimal",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "estimatedUnitCost": {
+                        "precision": 38,
+                        "scale": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "0",
+                        "min": 0,
+                        "type": "decimal",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "estimatedAmount": {
+                        "precision": 38,
+                        "scale": 20,
+                        "nullable": false,
+                        "required": false,
+                        "default": "0",
+                        "min": 0,
+                        "type": "decimal",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "requiredDate": {
+                        "nullable": true,
+                        "required": false,
+                        "type": "date",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    },
+                    "dimensionSetId": {
+                        "min": 0,
+                        "max": 2147483647,
+                        "nullable": false,
+                        "required": false,
+                        "default": 0,
+                        "type": "integer",
+                        "read": true,
+                        "create": true,
+                        "update": true
+                    }
+                },
+                "operations": {
+                    "read": true,
+                    "create": true,
+                    "update": true,
+                    "delete": true
+                }
+            }
+        },
+        "endpoints": [],
+        "page": {
+            "objectType": "page",
+            "objectId": 10000,
+            "objectName": "Purchase Requisition",
+            "pageType": "document",
+            "source": "purchaseRequisitions",
+            "relationships": [
+                {
+                    "name": "purchaseRequisitionLines",
+                    "source": "purchaseRequisitionLines",
+                    "anchor": "documentNumber",
+                    "bindings": {
+                        "documentNumber": "number",
+                        "documentType": "documentType"
+                    }
+                }
+            ]
+        }
+    }
+}
