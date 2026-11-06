@@ -1,7 +1,6 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Injectable, DestroyRef, inject } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, map, Observable, of, switchMap, tap, throwError, fromEvent, throttleTime, finalize } from 'rxjs';
+import { Injectable } from '@angular/core';
+import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { featurePageModules } from '../../features/feature-pages.generated';
 import type { DataSourceConfig, ListPageConfig, LineConfig } from '../../platform/public-api';
@@ -36,55 +35,13 @@ type BackendLoginResponse = Record<string, unknown>;
   providedIn: 'root',
 })
 export class AuthService {
-  private pendingLogin?: { token: string; user: Record<string, unknown>; companies: AuthorizedCompany[] };
-  private refreshGeneration = 0;
-  private readonly destroyRef = inject(DestroyRef);
+  private pendingLogin?: { token: string; user: Record<string, unknown>; companies: AuthorizedCompany[]; session?: Record<string, unknown> };
   constructor(
     private readonly apiAuth: ApiAuthService,
     private readonly restService: RestService,
     private readonly sessionService: SessionService,
     private readonly http: HttpClient,
-  ) {
-    let refreshing = false;
-    let refreshAfterChange = false;
-    const refresh = (changed = false) => {
-      if (!this.sessionService.isSessionValid()) return;
-      // Focus must not queue repeated context requests behind a slow local PHP worker.
-      // A permission edit during the current request still requires one fresh follow-up.
-      if (refreshing) { refreshAfterChange ||= changed; return; }
-      refreshing = true;
-      const company = this.sessionService.Company;
-      this.refreshPermissions().pipe(finalize(() => {
-        refreshing = false;
-        if (refreshAfterChange && !this.destroyRef.destroyed) {
-          refreshAfterChange = false;
-          refresh(true);
-        }
-      })).subscribe({error: error => {
-        if (this.sessionService.Company === company && [401, 403].includes(error?.status)) this.sessionService.logout('permission-access-removed');
-      }});
-    };
-    this.sessionService.permissionRefreshRequested$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => refresh(true));
-    if (typeof window !== 'undefined') fromEvent(window, 'focus').pipe(throttleTime(1000), takeUntilDestroyed(this.destroyRef)).subscribe(() => refresh());
-    if (this.sessionService.isSessionValid()) queueMicrotask(() => { if (!this.destroyRef.destroyed) refresh(); });
-  }
-
-  refreshPermissions(): Observable<void> {
-    const companyId = this.sessionService.Company;
-    const generation = ++this.refreshGeneration;
-    return this.getPermissionEngine(companyId).pipe(map(response => {
-      // Ignore a response belonging to a company the user has already left.
-      if (this.sessionService.Company !== companyId || generation !== this.refreshGeneration) return;
-      const data = this.toRecord(this.readValue(this.toRecord(response) ?? {}, 'data'));
-      if (!data || this.toRecord(data['company'])?.['systemId'] !== companyId) throw new Error('Could not refresh company permissions.');
-      this.sessionService.applySessionContext({
-        permissions: this.mapEnginePagesToPermissions(data),
-        pagePermissions: this.readPagePermissions(data),
-        superAdmin: this.readBoolean(data, 'isSuperAdmin'),
-        companySuper: this.readBoolean(data, 'isCompanySuper'),
-      });
-    }));
-  }
+  ) {}
 
   authorizedCompanies(): Observable<AuthorizedCompany[]> {
     return this.http.get(this.buildAuthUrl('/auth/companies'), {headers: this.createBearerHeaders()}).pipe(
@@ -93,18 +50,15 @@ export class AuthService {
   }
 
   switchCompany(companyId: string): Observable<SessionContext> {
-    return this.authorizedCompanies().pipe(switchMap(companies => {
-      const company = companies.find(item => item.systemId === companyId);
-      if (!company) throw new Error('Choose an authorized company.');
-      return this.getPermissionEngine(companyId).pipe(map(response => {
-        const engine = this.toRecord(this.toRecord(response)?.['data']);
-        if (!engine || this.toRecord(engine['company'])?.['systemId'] !== companyId) throw new Error('Could not verify the selected company.');
-        const user = this.toRecord(this.sessionService.User) ?? {};
-        const context = this.mapEngineToSessionContext(user, {email: this.sessionService.Email, password: '',
-          companyId, companyName: company.name}, engine);
-        this.sessionService.applySessionContext(context);
-        return context;
-      }));
+    return this.getCompanySelection(companyId).pipe(map(response => {
+      const engine = this.toRecord(this.toRecord(response)?.['data']);
+      const company = this.toRecord(engine?.['company']);
+      if (!engine || company?.['systemId'] !== companyId) throw new Error('Could not verify the selected company.');
+      const user = this.toRecord(this.sessionService.User) ?? {};
+      const context = this.mapEngineToSessionContext(user, {email: this.sessionService.Email, password: '',
+        companyId, companyName: this.readFirstString(company, ['name', 'displayName'])}, engine);
+      this.sessionService.applySessionContext(context);
+      return context;
     }));
   }
 
@@ -136,11 +90,16 @@ export class AuthService {
     return this.restService.get('/companies');
   }
 
-  getPermissionEngine(companyId: string): Observable<unknown> {
-    return this.http.get(this.buildAuthUrl('/auth/context'), {
+  private getCompanySelection(companyId: string): Observable<unknown> {
+    return this.http.get(this.buildAuthUrl('/auth/companies'), {
       headers: this.createBearerHeaders(),
       params: { companyId },
-    });
+    }).pipe(map(response => {
+      const outer = this.toRecord(response);
+      const companies = this.extractAuthorizedCompanies(outer?.['data']);
+      if (!companies.some(company => company.systemId === companyId)) throw new Error('Choose an authorized company.');
+      return {data: this.toRecord(this.toRecord(outer?.['meta'])?.['session'])};
+    }));
   }
 
   login(request: LoginRequest): Observable<LoginResult> {
@@ -168,7 +127,7 @@ export class AuthService {
             );
           }
 
-          this.pendingLogin = { token, user, companies };
+          this.pendingLogin = { token, user, companies, session: this.toRecord(data?.['session']) };
           const defaultCompany = this.toRecord(data?.['defaultCompany']);
           const defaultId = defaultCompany ? this.readFirstString(defaultCompany, ['systemId']) : '';
           const selected =
@@ -177,6 +136,7 @@ export class AuthService {
           if (!selected) {
             return of({ user, companies, requiresCompanySelection: true });
           }
+          if (!this.pendingLogin.session) throw new Error('Login response is missing Company permissions.');
           return this.selectCompany(selected.systemId).pipe(
             map((session) => ({ user, session, companies, requiresCompanySelection: false })),
           );
@@ -197,7 +157,8 @@ export class AuthService {
     }
 
     this.sessionService.AccessToken = pending.token;
-    return this.getPermissionEngine(companyId).pipe(
+    const selection = pending.session ? of({data: pending.session}) : this.getCompanySelection(companyId);
+    return selection.pipe(
       map((response) => {
         const data = this.toRecord(this.readValue(this.toRecord(response) ?? {}, 'data'));
         const verified = this.toRecord(data?.['company']);

@@ -60,7 +60,9 @@ export class DocumentLines {
   lookupDisplay(column: LineColumnConfig, row: Record<string, unknown>): string {
     if (!this.getCellValue(row, column)) return ''; // A cleared ID must never reuse an old caption.
     if (row['__lookupRestricted_' + (column.field ?? column.id)]) return 'Restricted';
-    return this.getOptions(column, row).find(option => String(option.value) === this.getCellValue(row, column))?.label ?? this.selectedLookupLabels.get(row)?.get(column.id + ':' + this.getCellValue(row, column)) ?? (column.lookup ? String(row['__display_' + (column.field ?? column.id)] ?? '') : this.getCellValue(row, column));
+    const raw = this.getCellValue(row, column);
+    const fallback = column.lookup && column.lookup.displayField !== (column.lookup.valueField ?? 'systemId') ? '' : raw;
+    return this.getOptions(column, row).find(option => String(option.value) === raw)?.label ?? this.selectedLookupLabels.get(row)?.get(column.id + ':' + raw) ?? (column.lookup ? String(row['__display_' + (column.field ?? column.id)] ?? fallback) : raw);
   }
   searchLookup(column: LineColumnConfig, row: Record<string, unknown>, text: string, nextPage = false): void {
     if (!column.lookup || this.isReadonly(column, row)) return;

@@ -1,5 +1,26 @@
 # What's new in developer documentation
 
+## 6 November 2026: document lines before lookup captions
+
+Removed duplicate page-level waiting for line lookup names. The existing shared
+line component resolves selected captions in the background after real rows are
+shown; it preserves edits during completion. A write-only password field no longer
+forces a second header read of an unchanged complete Users list record. Ordinary
+CRUD also combines its one table's schema metadata reads into one PostgreSQL
+round trip per request, without a persistent cache or database changes. See
+[the field contract](/documentation/core/field-contract-details).
+
+## 6 November 2026: permission snapshot and local list loading
+
+Removed `auth/context` and its background refresh lifecycle. Login includes
+selected-Company permissions; explicit Company selection/switching uses the
+existing Company selection response. Startup, focus, navigation and permission
+row saves do not trigger extra session reads. Session discovery reads declared capabilities
+without introspecting every business table. Explicit catalogue reads use one
+bound PostgreSQL/Laravel query per metadata kind instead of hundreds of UNION
+arms. Record UUIDs, table definitions, CRUD routes and backend authorization remain
+unchanged. See [permission administration](/documentation/modules/permission-administration).
+
 ## 5 November 2026: scoped presentation token cleanup
 
 Moved repeated parent-menu, shared command and shared form presentation values
