@@ -104,25 +104,10 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'number',
           label: 'No.',
           type: 'code',
-          required: true,
           readonlyAfterCreate: true,
           validation: {
             maxLength: 20,
           },
-        },
-        {
-          key: 'noSeriesCode',
-          label: 'Number Series (optional)',
-          type: 'lookup',
-          valueType: 'code',
-          readonlyAfterCreate: true,
-          lookup: {
-            endpoint: '/noSeries',
-            valueField: 'code',
-            displayField: 'code',
-            recordRead: 'collection',
-          },
-          displayFormat: '[code] — [description]',
         },
         {
           key: 'status',
@@ -225,6 +210,8 @@ export const purchaseRequisitionListConfig: ListPageConfig & {
   dataSource: {
     endpoint: '/purchaseRequisitions',
     keyField: 'systemId',
+    autoGenerateNumber: true,
+    omitEmptyFields: ['number'],
     headerPKProp: 'number',
     defaultSort: 'number desc',
     pageSize: 25,
