@@ -1,6 +1,6 @@
 import {TestBed} from '@angular/core/testing';
 import {provideRouter} from '@angular/router';
-import {firstValueFrom, of, Subject} from 'rxjs';
+import {firstValueFrom, of, Subject, filter} from 'rxjs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {DataSourceService, DATA_REST_SERVICE} from './data-source.service';
 import {EntityContractService} from './entity-contract.service';
@@ -14,6 +14,7 @@ import {By} from '@angular/platform-browser';
 import {prPageContractFixture, prLineContractFixture} from '../../testing/pr-reference.fixture';
 import {RunModalService} from '../run-modal/run-modal.service';
 import {RunModalStackService} from '../run-modal/run-modal-stack.service';
+import {ActionDispatcherService} from '../../shared/ui/action-dispatcher.service';
 
 describe('Page Object to existing shared PR Core integration', () => {
   let get: ReturnType<typeof vi.fn>, post: ReturnType<typeof vi.fn>, patch: ReturnType<typeof vi.fn>;
@@ -35,6 +36,30 @@ describe('Page Object to existing shared PR Core integration', () => {
     const session=TestBed.inject(SessionService);session.Company='company-a';session.SuperAdmin=true;
   });
   afterEach(()=>{TestBed.resetTestingModule();localStorage.clear();});
+
+  it('shows Page identity and inert commands while Object metadata is pending', async () => {
+    const pending = new Subject<unknown>();
+    const originalGet = get.getMockImplementation()!;
+    get.mockImplementation((url: string) =>
+      url.includes('/fieldContracts?objectId=') ? pending : originalGet(url));
+    const dispatcher = TestBed.inject(ActionDispatcherService);
+    const context = firstValueFrom(dispatcher.pageContext$.pipe(filter(value => !!value?.title)));
+    const fixture = TestBed.createComponent(PurchaseRequisitionPage);
+    fixture.detectChanges();
+    expect((await context)?.title).toBe('Purchase Requisition');
+    expect((await firstValueFrom(dispatcher.pageContext$))?.pageId).toBeUndefined();
+    const pendingCommands = await firstValueFrom(dispatcher.pageCommands$);
+    expect(pendingCommands.length).toBeGreaterThan(0);
+    expect(pendingCommands.every(command => command.disabled)).toBe(true);
+    expect(post).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
+    pending.next(structuredClone(prPageContractFixture));
+    pending.complete();
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(fixture.debugElement.query(By.directive(ListPage)).componentInstance.rows).toHaveLength(1));
+    expect((await firstValueFrom(dispatcher.pageContext$))?.pageId).toBe('purchase-requisition');
+    fixture.destroy();
+  });
 
   it('resolves only the header source and retains the Angular composite link', async () => {
     const data=TestBed.inject(DataSourceService);
