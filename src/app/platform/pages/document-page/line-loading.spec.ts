@@ -6,10 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { providePlatformGovernance } from '../../../core/providers/platform-governance.provider';
 import { SessionService } from '../../../core/services/session.service';
 import {
-  noSeriesHeaderConfig,
-  noSeriesLineConfig,
-  noSeriesListConfig,
-} from '../../../features/administration/no-series/no-series.config';
+  noSeriesLinesHeaderConfig,
+  noSeriesLinesLineConfig,
+  noSeriesLinesListConfig,
+} from '../../../features/administration/no-series-lines/no-series-lines.config';
 import {
   purchaseRequisitionHeaderConfig,
   purchaseRequisitionLineConfig,
@@ -25,13 +25,13 @@ describe('Document line layout while the initial request is pending', () => {
 
   const pages = [
     {
-      name: 'No. Series',
-      list: noSeriesListConfig,
-      header: noSeriesHeaderConfig,
-      line: noSeriesLineConfig,
+      name: 'No. Series Lines',
+      list: noSeriesLinesListConfig,
+      header: noSeriesLinesHeaderConfig,
+      line: noSeriesLinesLineConfig,
       record: { systemId: 'series-1', systemRowVersion: 1, code: 'PURCH-ORD', description: 'Orders' },
-      isLines: (endpoint: string) => endpoint.includes('/series-1/lines'),
-      savedLine: { systemId: 'line-1', systemRowVersion: 1, lineNo: 10000, startingNo: 'PO00001' },
+      isLines: (endpoint: string) => endpoint.startsWith('/numberSeriesLines'),
+      savedLine: { systemId: 'line-1', seriesCode: 'PURCH-ORD', systemRowVersion: 1, lineNo: 10000, startingNo: 'PO00001' },
     },
     {
       name: 'Purchase Requisition',
