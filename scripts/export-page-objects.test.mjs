@@ -20,11 +20,8 @@ function fixture(t, config) {
 test('discovers current PR and pages without IDs through existing folder discovery', () => {
   const inventory = exportPageObjects();
   const pr = inventory.pages.find(page => page.pageId === 'purchase-requisition');
-  assert.equal(pr.objectId,10000);
-  // Source-less Object pages are completed by Laravel's existing ObjectRegistry,
-  // not a second source map embedded in the Angular exporter.
-  assert.equal(pr.endpoint,null);
-  assert.deepEqual(pr.endpoints,[]);
+  assert.equal(pr.objectId,10000); assert.equal(pr.endpoint,'/purchaseRequisitions');
+  assert.ok(pr.endpoints.includes('/purchaseRequisitionLines'));
   assert.ok(pr.files.some(file => file.role==='Angular TypeScript' && file.path.endsWith('/purchase-requisition.ts')));
   assert.ok(pr.files.some(file => file.role==='Angular Template' && file.path.endsWith('/purchase-requisition.html')));
   assert.ok(inventory.pages.filter(page => page.objectId===null).length > 30);

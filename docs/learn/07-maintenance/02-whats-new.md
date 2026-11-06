@@ -1,16 +1,5 @@
 # What's new in developer documentation
 
-## 6 November 2026: Page Object contract binding
-
-Preserved selected-resource permission navigation, integrated the reviewed
-per-source contracts, and connected existing Page Object IDs to ApiSource and
-schema-derived ownership. Explicit editor types no longer bypass contract loads;
-authorized write-only inputs retain writable flags without returning values.
-PR is the Header/Line/List/automatic-FactBox reference. No installed database,
-posting/costing service or second registry changed. See
-[the page pattern](/documentation/frontend/page-pattern) and
-[field contracts](/documentation/core/field-contract-details).
-
 ## 6 November 2026: selected-resource permission editing
 
 Permission Set resource lines now open Page Permissions with the selected business

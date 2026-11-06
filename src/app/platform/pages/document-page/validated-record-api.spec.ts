@@ -8,7 +8,7 @@ import { SessionService } from '../../../core/services/session.service';
 import { providePlatformGovernance } from '../../../core/providers/platform-governance.provider';
 import { FieldValidationContext } from '../../models/field-config.model';
 import { usersHeaderConfig, usersListConfig } from '../../../features/administration/users/users.config';
-import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../../testing/pr-reference.fixture';
+import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
 import { DocumentConfigDataService } from '../../data/document-config-data.service';
 
 afterEach(() => { vi.restoreAllMocks(); TestBed.resetTestingModule(); });

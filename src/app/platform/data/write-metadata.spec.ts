@@ -4,7 +4,7 @@ import { DocumentConfigDataService } from './document-config-data.service';
 import { LineMasterService } from './line-master.service';
 import { EntityContractService } from './entity-contract.service';
 import { LineConfig } from '../models/line-config.model';
-import { purchaseRequisitionLineConfig } from '../../testing/pr-reference.fixture';
+import { purchaseRequisitionLineConfig } from '../../features/purchasing/purchase-requisition/purchase-requisition.config';
 
 const service = new DocumentConfigDataService(new LineMasterService());
 const contract = new EntityContractService();
@@ -36,20 +36,20 @@ describe('Write metadata without duplicate page block lists',()=>{
   it('protects PR calculated fields with only their readonly declarations',()=>{
     const {updateBlockedFields,meaningfulFields,...source}=purchaseRequisitionLineConfig.dataSource;
     const pr=lineConfigDefaults({...purchaseRequisitionLineConfig,dataSource:source});
-    const row={lineType:'item',number:'ITEM',quantity:'2',estimatedUnitCost:'5',qtyPerUnitOfMeasure:'10',estimatedAmount:'10',convertedQuantity:'0',remainingQuantity:'2'};
-    expect(service.buildLineUpdatePayload(row,Object.keys(row),pr)).toEqual({lineType:'item',number:'ITEM',quantity:'2',estimatedUnitCost:'5'});
+    const row={lineType:'item',itemId:123,quantity:'2',estimatedUnitCost:'5',qtyPerUnitOfMeasure:'10',estimatedAmount:'10',convertedQuantity:'0',remainingQuantity:'2'};
+    expect(service.buildLineUpdatePayload(row,Object.keys(row),pr)).toEqual({lineType:'item',itemId:123,quantity:'2',estimatedUnitCost:'5'});
     const draft=service.createEmptyLineRow(pr,{number:'PR-TEST',documentType:'purchase_requisition'}, {defaultType:'item',emptyType:' ',byType:{}},{});
     expect(pr.dataSource.meaningfulFields!.some(key=>!!draft[key])).toBe(false);
-    expect(pr.dataSource.meaningfulFields).toEqual([]); // All persisted fields have schema defaults.
+    expect(pr.dataSource.meaningfulFields).toContain('description');
     expect(pr.dataSource.meaningfulFields).not.toContain('estimatedAmount');
     // A payload builder does not trigger POST. First-input gating belongs to ListPage.
     // Description-first drafts must not wait for an Item/G/L selection.
     draft['description']='Draft before selecting a master';
     const payload=service.buildLineCreatePayload(draft,pr,['description']);
     expect(payload).toMatchObject({description:'Draft before selecting a master',lineType:'item',quantity:'1',documentNumber:'PR-TEST',documentType:'purchase_requisition'});
-    expect(payload).not.toHaveProperty('number');
+    expect(payload).not.toHaveProperty('itemId');
     expect(payload).not.toHaveProperty('estimatedAmount');
-    draft['number']=123;
-    expect(service.buildLineCreatePayload(draft,pr, ['number'])).not.toHaveProperty('locationId');
+    draft['itemId']=123;
+    expect(service.buildLineCreatePayload(draft,pr, ['itemId'])).not.toHaveProperty('locationId');
   });
 });

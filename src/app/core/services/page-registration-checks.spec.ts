@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { buildPageRegistry, getFeaturePageRoutes, resolvePageModule } from './page-registry';
 import { featurePageModules } from '../../features/feature-pages.generated';
 import { HeaderConfig, LineConfig, ListPageConfig } from '../../platform/public-api';
-import {prFieldContractFixture} from '../../testing/pr-reference.fixture';
 
 describe('One shared ERP page declaration pattern', () => {
   it('resolves every discovered page by ID and derives routes from its own menu config', () => {
@@ -57,7 +56,7 @@ describe('One shared ERP page declaration pattern', () => {
       const lines = Object.entries(module).filter(([key]) => key.endsWith('LineConfig'));
       expect(headers, page.pageId).toHaveLength(1);
       const header = headers[0][1] as HeaderConfig;
-      expect(page.objectId ?? page.dataSource?.endpoint, page.pageId).toBeTruthy();
+      expect(page.dataSource?.endpoint, page.pageId).toBeTruthy();
       if (page.pageType === 'card') {
         expect(header.sections.length, page.pageId).toBeGreaterThan(0);
         expect(lines.length, page.pageId).toBeLessThanOrEqual(1);
@@ -87,10 +86,8 @@ describe('One shared ERP page declaration pattern', () => {
   });
   it('preserves discoverable page, permission mapping, field and action identities across shared defaults', () => {
     const contracts = new EntityContractService();
-    contracts.acceptPageMetadata(prFieldContractFixture,10000);
     for (const module of featurePageModules) {
-      const declared = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig;
-      const page = declared.objectId === undefined ? declared : contracts.resolvePage(declared).config;
+      const page = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig;
       const header = Object.entries(module).find(([key]) => key.endsWith('HeaderConfig'))![1] as HeaderConfig;
       const line = Object.entries(module).find(([key]) => key.endsWith('LineConfig'))?.[1] as LineConfig | undefined;
       const keys = header.sections.flatMap(section => section.fields.map(field => field.key));

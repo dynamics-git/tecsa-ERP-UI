@@ -1,7 +1,7 @@
 import {DocumentConfigDataService} from '../../data/document-config-data.service';
 import {LineMasterService} from '../../data/line-master.service';
 import {lineConfigDefaults} from '../../data/document-config-defaults';
-import {purchaseRequisitionLineConfig} from '../../../testing/pr-reference.fixture';
+import {purchaseRequisitionLineConfig} from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
 import { By } from '@angular/platform-browser';
 import { DocumentLines } from '../../document/document-lines/document-lines';
 import { TestBed } from '@angular/core/testing';

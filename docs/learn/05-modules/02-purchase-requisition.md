@@ -1,25 +1,5 @@
 # Purchase Requisition development map
 
-## 6 November 2026: Object-backed Core reference
-
-The Header/Line/List configs now bind Page Object `10000` through existing Core.
-Endpoints, record keys and composite parent maps are resolved from ApiSource
-ownership and PostgreSQL FKs. Layout, existing command declarations, UI validation
-hooks, explicit UI defaults and preview declarations remain in their configs;
-no workflow, posting, costing or numbering service was implemented or changed.
-This phase accepts ordinary CRUD/contracts and permission enforcement only.
-
-The corrected source uses one conditional `lineType` + `number` reference and
-published `noSeriesCode`, `unitOfMeasureCode` and `locationCode` fields. Obsolete
-UUID selectors and unpublished processing/count projections are not part of the
-normal CRUD reference. The FactBox uses shared automatic details and selected-line
-fields rather than duplicating Header/List captions and physical formatting.
-
-Tests include a DTO captured from the real contract endpoint in an isolated
-PostgreSQL transaction. That JSON is a test fixture, never runtime schema or a
-second registry. Backend HTTP tests verify actual PR CRUD and field denial;
-Angular tests verify the raw thin component, autosave and resolved key propagation.
-
 ## Current backend correction — 5 November 2026
 
 Normal CRUD is now the active backend contract. Header identity is still

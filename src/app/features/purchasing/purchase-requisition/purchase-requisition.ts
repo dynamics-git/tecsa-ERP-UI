@@ -14,15 +14,8 @@ export * from './purchase-requisition.config';
   templateUrl: './purchase-requisition.html',
 })
 export class PurchaseRequisitionPage {
-  private window?: RunModalPageWindow;
-  @Input() set runModal(value: RunModalPageWindow | undefined) {
-    this.window = value;
-    this.listConfig = (value?.module?.['purchaseRequisitionListConfig'] ?? purchaseRequisitionListConfig) as typeof purchaseRequisitionListConfig;
-    this.headerConfig = (value?.module?.['purchaseRequisitionHeaderConfig'] ?? purchaseRequisitionHeaderConfig) as typeof purchaseRequisitionHeaderConfig;
-    this.lineConfig = (value?.module?.['purchaseRequisitionLineConfig'] ?? purchaseRequisitionLineConfig) as typeof purchaseRequisitionLineConfig;
-  }
-  get runModal(): RunModalPageWindow | undefined { return this.window; }
-  listConfig = purchaseRequisitionListConfig;
-  headerConfig = purchaseRequisitionHeaderConfig;
-  lineConfig = purchaseRequisitionLineConfig;
+  @Input() runModal?: RunModalPageWindow;
+  readonly listConfig = purchaseRequisitionListConfig;
+  readonly headerConfig = purchaseRequisitionHeaderConfig;
+  readonly lineConfig = purchaseRequisitionLineConfig;
 }

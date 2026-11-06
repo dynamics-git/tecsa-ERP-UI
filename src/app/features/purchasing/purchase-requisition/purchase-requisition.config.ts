@@ -1,13 +1,15 @@
 import {
-  ObjectPageConfig,
+  DataSourceConfig,
   HeaderConfig,
-  ObjectLineConfig,
+  LineConfig,
+  ListPageConfig,
   listColumns,
 } from '../../../platform/public-api';
 import { purchaseRequisitionFactBoxConfig } from './purchase-requisition.factbox.config';
 
 // Header form.
 export const purchaseRequisitionHeaderConfig: HeaderConfig = {
+  dialogTitle: 'Purchase Requisition',
   toolbarButtons: [
     {
       label: 'Submit',
@@ -93,23 +95,27 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
       fields: [
         // Display the backend enum caption. Raw documentType remains in header data for line binding.
         {
-          key: 'documentType',
+          key: 'documentTypeLabel',
           label: 'Document Type',
+          type: 'text',
           readonly: true,
         },
         {
           key: 'number',
           label: 'No.',
+          type: 'code',
           readonlyAfterCreate: true,
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'noSeriesCode',
+          key: 'selectedNoSeriesId',
           label: 'Number Series (optional)',
           type: 'lookup',
           readonlyAfterCreate: true,
           lookup: {
-            endpoint: '/noSeries',
-            valueField: 'code',
+            endpoint: '/numberSeries',
             displayField: 'code',
           },
           displayFormat: '[code] — [description]',
@@ -117,22 +123,30 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
         {
           key: 'status',
           label: 'Status',
+          type: 'text',
+          defaultValue: 'open',
           readonly: true,
+          factBox: true,
         },
         {
           key: 'requestDate',
           label: 'Request Date',
+          type: 'date',
           defaultValue: () => new Date().toLocaleDateString('en-CA'),
           required: true,
         },
         {
           key: 'requiredDate',
           label: 'Required Date',
+          type: 'date',
         },
         {
           key: 'purpose',
           label: 'Purpose',
           type: 'textarea',
+          validation: {
+            maxLength: 250,
+          },
           width: 'wide',
         },
       ],
@@ -142,14 +156,51 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
       title: 'Request Details',
       fields: [
         {
-          key: 'locationCode',
+          key: 'locationId',
           label: 'Location',
           type: 'lookup',
           lookup: {
             endpoint: '/locations',
-            valueField: 'code',
             displayField: 'code',
           },
+        },
+      ],
+    },
+    {
+      id: 'processing',
+      title: 'Processing',
+      fields: [
+        {
+          key: 'conversionStatus',
+          label: 'Conversion Status',
+          type: 'dropdown',
+          readonly: true,
+          options: [
+            {
+              label: 'Not Converted',
+              value: 'not_converted',
+            },
+            {
+              label: 'Partially Converted',
+              value: 'partially_converted',
+            },
+            {
+              label: 'Fully Converted',
+              value: 'fully_converted',
+            },
+          ],
+        },
+        {
+          key: 'purchaseOrderCount',
+          label: 'Purchase Orders',
+          type: 'integer',
+          readonly: true,
+        },
+        {
+          key: 'statusChangedAt',
+          label: 'Status Changed At',
+          type: 'datetime',
+          readonly: true,
         },
       ],
     },
@@ -157,17 +208,25 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
 };
 
 // List page.
-export const purchaseRequisitionListConfig: ObjectPageConfig = {
+export const purchaseRequisitionListConfig: ListPageConfig & {
+  dataSource: DataSourceConfig;
+} = {
   pageId: 'purchase-requisition',
   objectId: 10000,
   pageType: 'document',
   title: 'Purchase Requisition',
   dataSource: {
+    endpoint: '/purchaseRequisitions',
+    keyField: 'systemId',
+    headerPKProp: 'number',
     defaultSort: 'number desc',
     pageSize: 25,
     autoGenerateNumber: true,
     omitEmptyFields: ['number'],
-    writableStates: { field: 'status', values: ['open'] },
+    writableStates: {
+      field: 'status',
+      values: ['open'],
+    },
   },
   identity: {
     primaryField: 'number',
@@ -227,6 +286,20 @@ export const purchaseRequisitionListConfig: ObjectPageConfig = {
           ],
         },
       },
+      {
+        field: 'lineCount',
+        label: 'Lines',
+        type: 'number',
+        sortable: false,
+        filterable: false,
+      },
+      {
+        field: 'estimatedTotal',
+        label: 'Estimated Total',
+        type: 'currency',
+        sortable: false,
+        filterable: false,
+      },
     ]),
   },
   views: [
@@ -255,17 +328,29 @@ export const purchaseRequisitionListConfig: ObjectPageConfig = {
 };
 
 // Document lines.
-export const purchaseRequisitionLineConfig: ObjectLineConfig = {
+export const purchaseRequisitionLineConfig: LineConfig = {
   typeField: 'lineType',
   placement: {
     mode: 'after-section',
     afterSectionId: 'general',
   },
-  dataSource: { defaultSort: 'lineNo asc' },
+  dataSource: {
+    endpoint: '/purchaseRequisitionLines',
+    keyField: 'systemId',
+    headerPKProp: 'number',
+    lineFKProp: 'documentNumber',
+    // Line documentType comes from the header.
+    parentFieldMap: {
+      documentType: 'documentType',
+    },
+    defaultSort: 'lineNo asc',
+    invalidates: ['/purchaseRequisitions'],
+  },
   columns: [
     {
       id: 'lineNo',
       label: 'Line No.',
+      type: 'integer',
       readonly: true,
     },
     {
@@ -284,12 +369,11 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
         },
       ],
       // On a Type change, reset master, UOM and location selections for the new line context.
-      clearFieldsOnChange: ['number', 'unitOfMeasureCode', 'locationCode'],
+      clearFieldsOnChange: ['itemId', 'glAccountId', 'unitOfMeasureId', 'locationId'],
     },
     {
       // Selects the Items binding in the shared No. column; does not require a value.
-      id: 'itemNumber',
-      field: 'number',
+      id: 'itemId',
       label: 'No.',
       type: 'lookup',
       editableWhen: {
@@ -298,7 +382,6 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
       },
       lookup: {
         endpoint: '/items',
-        valueField: 'number',
         filter: 'blocked eq false',
         displayField: 'number',
       },
@@ -309,8 +392,7 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
     },
     {
       // Selects the G/L binding in that same column.
-      id: 'glAccountNumber',
-      field: 'number',
+      id: 'glAccountId',
       label: 'No.',
       type: 'lookup',
       editableWhen: {
@@ -319,8 +401,7 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
       },
       lookup: {
         endpoint: '/glAccounts',
-        valueField: 'number',
-        filter: 'accountType eq 0 and blocked eq false',
+        filter: "accountType eq 'posting' and blocked eq false",
         displayField: 'number',
       },
       fill: {
@@ -332,6 +413,10 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
     {
       id: 'description',
       label: 'Description',
+      type: 'text',
+      validation: {
+        maxLength: 100,
+      },
       factBox: {
         sectionId: 'selected-line',
         sectionTitle: 'Selected line',
@@ -339,13 +424,12 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
       },
     },
     {
-      id: 'unitOfMeasureCode',
+      id: 'unitOfMeasureId',
       label: 'Unit of Measure',
       type: 'lookup',
       // Available on both Item and G/L draft lines.
       lookup: {
         endpoint: '/unitsOfMeasure',
-        valueField: 'code',
         displayField: 'code',
       },
     },
@@ -354,30 +438,31 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
     {
       id: 'qtyPerUnitOfMeasure',
       label: 'Qty. per Unit of Measure',
+      type: 'decimal',
       readonly: true,
       align: 'end',
     },
     {
       // Untouched locations can default from the header.
       // Select a location master record; free text is not a valid location ID.
-      id: 'locationCode',
+      id: 'locationId',
       label: 'Location',
       type: 'lookup',
       lookup: {
         endpoint: '/locations',
-        valueField: 'code',
         displayField: 'code',
       },
     },
     {
       id: 'quantity',
       label: 'Quantity',
+      type: 'decimal',
       defaultValue: '1',
       // Optional PR field rule. Other fields and ordinary draft creation remain independent.
       validation: {
         custom: ({ record }) => {
           if (!record['lineType']) return 'Choose Type before entering Quantity.';
-          const master = record['number'];
+          const master = record['lineType'] === 'item' ? record['itemId'] : record['glAccountId'];
           if (master === undefined || master === null || master === '')
             return 'Choose No. before entering Quantity.';
           return undefined;
@@ -393,6 +478,7 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
     {
       id: 'estimatedUnitCost',
       label: 'Estimated Unit Cost',
+      type: 'decimal',
       defaultValue: '0',
       align: 'end',
     },
@@ -400,6 +486,7 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
       // Preview = quantity × estimated unit cost; the server calculates the saved amount.
       id: 'estimatedAmount',
       label: 'Estimated Amount',
+      type: 'decimal',
       readonly: true,
       factBox: {
         sectionId: 'selected-line',
@@ -411,8 +498,23 @@ export const purchaseRequisitionLineConfig: ObjectLineConfig = {
     {
       id: 'requiredDate',
       label: 'Required Date',
+      type: 'date',
     },
     // Purchase-order progress is calculated by the server, never entered manually.
+    {
+      id: 'convertedQuantity',
+      label: 'Converted Quantity',
+      type: 'decimal',
+      readonly: true,
+      align: 'end',
+    },
+    {
+      id: 'remainingQuantity',
+      label: 'Remaining Quantity',
+      type: 'decimal',
+      readonly: true,
+      align: 'end',
+    },
   ],
   calculation: [
     {
