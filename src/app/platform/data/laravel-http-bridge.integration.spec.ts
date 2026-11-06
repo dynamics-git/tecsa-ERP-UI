@@ -98,7 +98,7 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     expect(list).toMatchObject({ value: [{ code: 'REFERENCE', systemRowVersion: 1 }], meta: { total: 1 } });
 
     // The server explicitly labels the list row complete: no second GET.
-    const editor = await firstValueFrom(data.loadById(source, rowId, { useCache: true }));
+    const editor = await firstValueFrom(data.loadById(source, rowId, { useCache: true })) as Record<string, unknown>;
     expect(editor).toMatchObject(record(1));
     http.expectNone(req => req.method === 'GET' && req.url.endsWith('/sourceCodes/' + rowId));
 
@@ -152,7 +152,7 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     const next = await receive('GET', resource(companyB));
     expect(next.request.headers.get('Authorization')).toBe('Bearer isolated-token');
     next.flush({ data: [], meta: { total: 0, recordShape: 'complete' } });
-    expect((await second).value).toEqual([]);
+    expect(await second).toMatchObject({ value: [] });
     http.expectNone(req => req.url.includes('/auth/context'));
   });
 });
