@@ -1,4 +1,3 @@
-import { EntityContractService } from '../../platform/data/entity-contract.service';
 import { describe, expect, it } from 'vitest';
 import { buildPageRegistry, getFeaturePageRoutes, resolvePageModule } from './page-registry';
 import { featurePageModules } from '../../features/feature-pages.generated';
@@ -85,7 +84,6 @@ describe('One shared ERP page declaration pattern', () => {
     }
   });
   it('preserves discoverable page, permission mapping, field and action identities across shared defaults', () => {
-    const contracts = new EntityContractService();
     for (const module of featurePageModules) {
       const page = Object.values(module).find(value => value && typeof value === 'object' && 'pageId' in value) as ListPageConfig;
       const header = Object.entries(module).find(([key]) => key.endsWith('HeaderConfig'))![1] as HeaderConfig;
@@ -93,12 +91,10 @@ describe('One shared ERP page declaration pattern', () => {
       const keys = header.sections.flatMap(section => section.fields.map(field => field.key));
       expect(keys.every(key => typeof key === 'string' && key.trim().length > 0)).toBe(true);
       expect(new Set(keys).size).toBe(keys.length);
-      expect(header.sections.flatMap(section => section.fields.map(field => contracts.resolveField(page.dataSource!, field).key))).toEqual(keys);
       for (const column of line?.columns ?? []) expect(column.field ?? column.id).toBeTruthy();
       for (const column of page.dataSurface?.columns ?? []) expect(column.field ?? column.id).toBeTruthy();
       for (const action of [...(page.commands ?? []), ...(header.toolbarButtons ?? []), ...(line?.toolbarButtons ?? [])]) expect(action.actionKey).toBeTruthy();
       if (page.permissionPageId !== undefined) expect(page.permissionPageId.trim()).not.toBe('');
-      expect(contracts.resolveSource(page.dataSource!)).toEqual(page.dataSource);
     }
   });
   it('uses one lookup declaration and shared autosave defaults throughout discovered configs', () => {

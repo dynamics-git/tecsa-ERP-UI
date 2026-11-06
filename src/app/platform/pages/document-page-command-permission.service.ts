@@ -23,11 +23,6 @@ export class DocumentPageCommandPermissionService {
       return button;
     }
 
-    if (source && button.apiAction && !button.runModalPageId) {
-      const allowed = this.dataSource?.actionAllowed(source, button.apiAction.name);
-      if (allowed === false) return {...button, disabled: true, tooltip: 'This action is not available for your access.'};
-      if (allowed === true && !button.permissionKey) return button;
-    }
     if (this.sessionService.SuperAdmin && !button.runModalPageId && !this.hasDeclaredPage(pageId)) return button;
     const permissions = this.resolvePagePermissionFlags(pageId);
     const action = this.normalizePopupCommandKey(button.actionKey);

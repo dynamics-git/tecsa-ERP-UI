@@ -52,7 +52,7 @@ export class DataSourceService {
   }
   /** Identifies the current read/access generation for prepared view snapshots. */
   getReadGeneration(): number { this.key('/'); return this.readGeneration; }
-  invalidateReadCache(): void { this.contracts.clearMetadata(); this.metadataLoadedAt = 0; this.metadataRequest = undefined; this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
+  invalidateReadCache(): void { this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
   private cacheRecord(key: string, value: Record<string, unknown>, at = Date.now()): void {
     if (this.records.size >= 100) this.records.delete(this.records.keys().next().value!);
     this.records.set(key, { value: structuredClone(value), at });
@@ -91,36 +91,14 @@ export class DataSourceService {
     @Optional() private readonly hookErrors?: ErrorHandler,
   ) {}
 
-  private metadataRequest?: Observable<boolean>;
-  private metadataLoadedAt = 0;
-  /** Optional discovery; an outage preserves explicit legacy configuration. */
-  loadCoreMetadata(): Observable<boolean> {
-    this.key('/apiCapabilities');
-    if (!this.session.Company || !this.rest) return of(false);
-    if (this.metadataRequest) return this.metadataRequest;
-    if (Date.now() - this.metadataLoadedAt < 30000) return of(true);
-    this.contracts.clearMetadata();
-    this.metadataLoadedAt = 0;
-    const context = this.context();
-    const generation = this.readGeneration;
-    const request = defer(() => this.client.get(this.endpoint({endpoint:'/apiCapabilities'}))).pipe(map(response => {
-      if (context !== this.context() || generation !== this.readGeneration) return false;
-      const accepted = this.contracts.acceptMetadata(response);
-      if (accepted) this.metadataLoadedAt = Date.now();
-      return accepted;
-    }), catchError(() => of(false)), finalize(() => { if (this.metadataRequest === request) this.metadataRequest = undefined; }), shareReplay({bufferSize:1,refCount:true}));
-    this.metadataRequest = request;
-    return request;
-  }
-  usesGenericContract(source: DataSourceConfig): boolean { this.key(source.endpoint); return this.contracts.usesGenericContract(source); }
   assertEditedFields(source: DataSourceConfig, operation: 'create' | 'update', record: Record<string, unknown>, fields: Iterable<string>): void {
     this.key(source.endpoint);
     this.contracts.assertEditedFields(source, operation, record, fields);
   }
   operationAllowed(source: DataSourceConfig, operation: 'create' | 'update' | 'delete'): boolean | undefined {
     this.key(source.endpoint);
-    const supported = this.contracts.operationAllowed(source, operation);
-    if (supported === false) return false;
+    const configuredFlag = {create:'supportsCreate',update:'supportsUpdate',delete:'supportsDelete'} as const;
+    if (source[configuredFlag[operation]] === false) return false;
     const normalizePath = (value: string) => value.split('?')[0].replace(/\{[^}]+\}/g, '{}').replace(/^\/+|\/+$/g, '');
     const path = normalizePath(source.navigation
       ? source.navigation.parentEndpoint + '/{parent}/' + source.navigation.childCollection
@@ -128,17 +106,10 @@ export class DataSourceService {
     const permissions = this.session.Permissions.filter(value => value && typeof value === 'object' &&
       typeof (value as Record<string, unknown>)['apiPath'] === 'string' &&
       normalizePath((value as Record<string, unknown>)['apiPath'] as string) === path) as Record<string, unknown>[];
-    if (!permissions.length) return supported;
+    if (!permissions.length) return undefined;
     const flag = {create: 'canCreate', update: 'canUpdate', delete: 'canDelete'}[operation];
     return permissions.some(permission => permission[flag] === true);
   }
-  actionAllowed(source: DataSourceConfig, action: string): boolean | undefined {
-    this.key(source.endpoint);
-    return this.contracts.actionAllowed(source, action);
-  }
-  resolveSourceContract(source: DataSourceConfig): DataSourceConfig { this.key(source.endpoint); return this.contracts.resolveSource(source); }
-  resolveFieldContract(source: DataSourceConfig, field: FieldConfig): FieldConfig { this.key(source.endpoint); return this.contracts.resolveField(source, field); }
-
   loadList(config: DataSourceConfig, options: DataSourceLoadOptions = {}): Observable<unknown> {
     if (config.singleton) return this.loadSingleton(config, options);
     const endpoint = this.listEndpoint(config, options);
@@ -327,7 +298,6 @@ export class DataSourceService {
   private mutate(config: DataSourceConfig, id: unknown, body: unknown, operation: 'create' | 'update' | 'delete', rowVersion?: unknown, editor?: Record<string, unknown>): Observable<unknown> {
     return defer(() => {
       this.key(config.endpoint);
-      config = this.contracts.resolveSource(config);
       if ((operation === 'create' && config.supportsCreate === false) || (operation === 'update' && config.supportsUpdate === false) || (operation === 'delete' && config.supportsDelete === false)) throw new Error(`This resource does not support ${operation}.`);
       const endpoint = operation === 'create' || config.singleton ? this.endpoint(config) : this.recordEndpoint(config, id);
       const identity = this.key(endpoint);
@@ -348,7 +318,7 @@ export class DataSourceService {
           if (message !== undefined) throw new Error(typeof message==='string' && message.trim() ? message : 'Before-write hook returned an invalid result.');
           if (identity !== this.key(endpoint)) throw new Error('Your company or session changed. Reopen the page.');
         const request = operation === 'delete' ? this.client.delete(endpoint, version)
-          : (config.singleton || (operation === 'update' && this.contracts.updateMethod(config) === 'PUT')) ? this.client.put?.(endpoint, payload, version)
+          : config.singleton ? this.client.put?.(endpoint, payload, version)
           : operation === 'create' ? this.client.post(endpoint, payload) : this.client.patch(endpoint, payload, version);
         if (!request) throw new Error('The configured data provider does not support PUT.');
           const response = await firstValueFrom(request);

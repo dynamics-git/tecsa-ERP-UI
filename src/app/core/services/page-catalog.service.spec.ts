@@ -13,7 +13,6 @@ import { SessionService } from './session.service';
 import { RestService } from './rest.service';
 import { dataRestProvider } from '../api/rest.provider';
 import { DATA_REST_SERVICE, DataSourceService } from '../../platform/data/data-source.service';
-import { EntityContractService } from '../../platform/data/entity-contract.service';
 import { resolvePageModule } from './page-registry';
 import { pagePermissionsLineConfig } from '../../features/administration/page-permissions/page-permissions.config';
 import { lookupQuery } from '../../platform/data/lookup-dependencies';
@@ -126,13 +125,12 @@ describe('Config-derived Page Configuration catalogue', () => {
     ).toBe(true);
   });
 
-  it('uses published metadata to fill field API source identities without naming guesses', () => {
+  it('does not invent API source identities from removed metadata', () => {
     const { catalog } = setup();
-    vi.spyOn(TestBed.inject(EntityContractService), 'sourceName').mockReturnValue('users');
     const row = catalog
       .snapshot()
       .controls.find((row) => row['pageId'] === 'users' && row['targetKey'] === 'email');
-    expect(row?.['apiSource']).toBe('users');
+    expect(row?.['apiSource']).toBeNull();
   });
   it('renders the catalogue through the existing list page and opens read-only control lines', async () => {
     TestBed.resetTestingModule();

@@ -98,8 +98,8 @@ selects search fields. Existing clients must send explicit `filter`/`$filter`.
 
 Frontend ListPage must separate queryable-field capability handling from UI-owned
 search flags; its fallback currently expects metadata that no longer exists.
-EntityContractService must use configured lookup fields/display fields instead of
-inferring search fields from backend metadata. ListFilterStateService and lookup
+Lookups use configured fields/display fields instead of inferring search fields
+from backend metadata. ListFilterStateService and lookup
 query construction already build explicit predicates and should remain the execution
 path. This is required coordinated UI migration; no Angular code is changed here.
 External service callers must also remove the obsolete search argument from the
