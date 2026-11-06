@@ -2,6 +2,51 @@
 
 Use the same feature-folder pattern as Users and Purchase Requisition. Start from an existing reference page and change its business fields, rather than rebuilding editors, save handling or navigation.
 
+## Four CRUD references — 7 November 2026
+
+Use these four existing features as the current configuration examples:
+
+| Page type | Feature folder | Authoring contract |
+| --- | --- | --- |
+| Document and its List | `purchasing/purchase-requisition` | Header `number` maps to line `documentNumber`; `documentType` is also mapped. Each record still uses its own `systemId`. |
+| Card and its List | `purchase-masters/payment-terms` | `code`, description and payment-term settings. The persisted credit-memo setting is `calcPmtDiscOnCrMemos`; this table has no `isActive` field. |
+| Setup | `purchase-masters/source-code-setup` | Company singleton, edited through PUT. Source settings store codes, not GUIDs. New/Delete commands are disabled. |
+| Worksheet | `administration/user-company-access` | User context supplies `userName`; rows store `companyCode`, `isDefault` and `isActive`. No Header editor is needed. |
+
+Each feature keeps the same four production files: `.html`, `.ts`, `.config.ts`
+and `.factbox.config.ts`. Keep configuration expanded and ordered **Header, List,
+then Line when applicable**. In fields, use key/id, label, editor type, optional
+value semantics/default, lookup, then presentation overrides. Keep the TypeScript
+wrapper and HTML shared-component bindings in the same order across features.
+Do not introduce a config factory or a different page engine for one page type.
+The FactBox file may explicitly disable the panel for a worksheet; do not add an
+unused Header or Line config just to make the files look alike.
+
+`listColumns(headerConfig, ...)` reuses Header labels/types for the selected list
+columns. A lookup remains an explicit Page choice: it can select a different
+source or scope on another page. `valueField: 'code'` (or `'number'`) stores the
+business value; `recordRead: 'collection'` resolves that selected value through
+a filtered collection instead of treating the code as a UUID record route.
+`valueType: 'code'` describes lookup value semantics while `type: 'lookup'`
+selects its editor. Those two declarations serve different purposes.
+
+PR's Item and G/L choices are two conditional editors over the same persisted
+`number` field, using separate column IDs and `field: 'number'`. They are not two
+stored master-ID columns. Existing FactBox sections, menu, actions and calculation
+declarations are retained. Approval/conversion/posting actions remain deferred;
+their presence in configuration is not a claim that those backend commands work.
+
+PR currently requires a manually entered No. before draft creation. Selecting an
+optional number-series code does not generate a number in this CRUD phase.
+The existing backend Enum supplies `documentTypeLabel` in record responses;
+an unsaved editor has no server-generated caption until its record is created.
+Do not substitute a frontend document-type constant or dictionary.
+
+The four references declare UI editor types and any intentional UI validation.
+PostgreSQL-derived backend validation remains authoritative. Object IDs are
+optional metadata; these pages keep explicit API sources and UI relationships.
+No retired capability metadata endpoint is required by this pattern.
+
 ## Files in the feature folder
 
 ```text

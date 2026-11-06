@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { paymentTermsListConfig, paymentTermsHeaderConfig } from './payment-terms.config';
+import {
+  paymentTermsListConfig,
+  paymentTermsHeaderConfig,
+} from './payment-terms.config';
 export * from './payment-terms.config';
 
 @Component({

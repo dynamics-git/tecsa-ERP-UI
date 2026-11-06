@@ -1,6 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import { sourceCodeSetupListConfig, sourceCodeSetupHeaderConfig } from './source-code-setup.config';
+import {
+  sourceCodeSetupListConfig,
+  sourceCodeSetupHeaderConfig,
+} from './source-code-setup.config';
 export * from './source-code-setup.config';
 
 @Component({

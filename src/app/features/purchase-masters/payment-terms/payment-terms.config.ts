@@ -57,21 +57,13 @@ export const paymentTermsHeaderConfig: HeaderConfig = {
           validation: {
             min: 0,
             max: 100,
-            precision: 7,
-            scale: 4,
           },
         },
         {
-          key: 'calculateDiscountOnCreditMemos',
+          key: 'calcPmtDiscOnCrMemos',
           label: 'Calculate Discount On Credit Memos',
           type: 'boolean',
           defaultValue: false,
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -120,10 +112,6 @@ export const paymentTermsListConfig: ListPageConfig & {
       },
       {
         field: 'discountPercent',
-        width: '140px',
-      },
-      {
-        field: 'isActive',
         width: '140px',
       },
       {

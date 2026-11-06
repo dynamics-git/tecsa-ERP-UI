@@ -1,4 +1,4 @@
-import { FactBoxConfig } from '../../../platform/public-api';
+import type { FactBoxConfig } from '../../../platform/public-api';
 
 export const userCompanyAccessFactBoxConfig: FactBoxConfig = {
   enabled: false,

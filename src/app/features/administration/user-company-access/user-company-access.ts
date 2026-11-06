@@ -1,9 +1,9 @@
 import { Component, Input } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
 import {
+  userCompanyAccessListConfig,
   userCompanyAccessHeaderConfig,
   userCompanyAccessLineConfig,
-  userCompanyAccessListConfig,
 } from './user-company-access.config';
 export * from './user-company-access.config';
 

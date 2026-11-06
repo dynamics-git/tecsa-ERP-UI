@@ -104,19 +104,23 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'number',
           label: 'No.',
           type: 'code',
+          required: true,
           readonlyAfterCreate: true,
           validation: {
             maxLength: 20,
           },
         },
         {
-          key: 'selectedNoSeriesId',
+          key: 'noSeriesCode',
           label: 'Number Series (optional)',
           type: 'lookup',
+          valueType: 'code',
           readonlyAfterCreate: true,
           lookup: {
-            endpoint: '/numberSeries',
+            endpoint: '/noSeries',
+            valueField: 'code',
             displayField: 'code',
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
         },
@@ -156,12 +160,15 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
       title: 'Request Details',
       fields: [
         {
-          key: 'locationId',
+          key: 'locationCode',
           label: 'Location',
           type: 'lookup',
+          valueType: 'code',
           lookup: {
             endpoint: '/locations',
+            valueField: 'code',
             displayField: 'code',
+            recordRead: 'collection',
           },
         },
       ],
@@ -221,8 +228,6 @@ export const purchaseRequisitionListConfig: ListPageConfig & {
     headerPKProp: 'number',
     defaultSort: 'number desc',
     pageSize: 25,
-    autoGenerateNumber: true,
-    omitEmptyFields: ['number'],
     writableStates: {
       field: 'status',
       values: ['open'],
@@ -369,13 +374,15 @@ export const purchaseRequisitionLineConfig: LineConfig = {
         },
       ],
       // On a Type change, reset master, UOM and location selections for the new line context.
-      clearFieldsOnChange: ['itemId', 'glAccountId', 'unitOfMeasureId', 'locationId'],
+      clearFieldsOnChange: ['number', 'unitOfMeasureCode', 'locationCode'],
     },
     {
       // Selects the Items binding in the shared No. column; does not require a value.
-      id: 'itemId',
+      id: 'itemNumber',
+      field: 'number',
       label: 'No.',
       type: 'lookup',
+      valueType: 'code',
       editableWhen: {
         field: 'lineType',
         values: ['item'],
@@ -383,7 +390,9 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       lookup: {
         endpoint: '/items',
         filter: 'blocked eq false',
+        valueField: 'number',
         displayField: 'number',
+        recordRead: 'collection',
       },
       fill: {
         description: 'description',
@@ -392,17 +401,21 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     },
     {
       // Selects the G/L binding in that same column.
-      id: 'glAccountId',
+      id: 'glAccountNumber',
+      field: 'number',
       label: 'No.',
       type: 'lookup',
+      valueType: 'code',
       editableWhen: {
         field: 'lineType',
         values: ['gl_account'],
       },
       lookup: {
         endpoint: '/glAccounts',
-        filter: "accountType eq 'posting' and blocked eq false",
+        filter: 'accountType eq 0 and blocked eq false',
+        valueField: 'number',
         displayField: 'number',
+        recordRead: 'collection',
       },
       fill: {
         description: 'name',
@@ -424,17 +437,20 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       },
     },
     {
-      id: 'unitOfMeasureId',
+      id: 'unitOfMeasureCode',
       label: 'Unit of Measure',
       type: 'lookup',
+      valueType: 'code',
       // Available on both Item and G/L draft lines.
       lookup: {
         endpoint: '/unitsOfMeasure',
+        valueField: 'code',
         displayField: 'code',
+        recordRead: 'collection',
       },
     },
     // Conversion from the selected item UOM (e.g. BOX = 10 base units), not requested quantity.
-    // The existing API calculates this factor and prohibits direct writes.
+    // CRUD retains the stored factor; automatic conversion belongs to later business logic.
     {
       id: 'qtyPerUnitOfMeasure',
       label: 'Qty. per Unit of Measure',
@@ -444,13 +460,16 @@ export const purchaseRequisitionLineConfig: LineConfig = {
     },
     {
       // Untouched locations can default from the header.
-      // Select a location master record; free text is not a valid location ID.
-      id: 'locationId',
+      // Store the selected master code, independently of its CRUD systemId.
+      id: 'locationCode',
       label: 'Location',
       type: 'lookup',
+      valueType: 'code',
       lookup: {
         endpoint: '/locations',
+        valueField: 'code',
         displayField: 'code',
+        recordRead: 'collection',
       },
     },
     {
@@ -462,7 +481,7 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       validation: {
         custom: ({ record }) => {
           if (!record['lineType']) return 'Choose Type before entering Quantity.';
-          const master = record['lineType'] === 'item' ? record['itemId'] : record['glAccountId'];
+          const master = record['number'];
           if (master === undefined || master === null || master === '')
             return 'Choose No. before entering Quantity.';
           return undefined;
