@@ -31,7 +31,7 @@ describe('Simplified PR configuration through shared autosave (mock API)',()=>{
    rows.push(row);return of({data:structuredClone(row)});
   });
   TestBed.configureTestingModule({imports:[DocumentPage],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{
-   get:(path:string)=>{expect(path).not.toContain('/apiCapabilities');return of({data:path.includes('/purchaseRequisitionLines')?structuredClone(rows):path.includes('/purchaseRequisitions')?structuredClone(header):[]});},post,patch,delete:()=>of({})
+   get:(path:string)=>{return of({data:path.includes('/purchaseRequisitionLines')?structuredClone(rows):path.includes('/purchaseRequisitions')?structuredClone(header):[]});},post,patch,delete:()=>of({})
   }}]});
   TestBed.inject(SessionService).SuperAdmin=superAdmin;
   TestBed.inject(SessionService).Permissions=[{pageId:'purchase-requisition',canRead:true,canCreate:true,canUpdate:true,canDelete:true,canExecute:true}];

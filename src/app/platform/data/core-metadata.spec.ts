@@ -81,7 +81,7 @@ describe('Authenticated shared Core metadata contract', () => {
       permissionsLoaded$: new Subject<boolean>(),
     };
     workspace = { slug: 'workspace-a' };
-    get = vi.fn(() => of(metadata()));
+    get = vi.fn(() => of({ data: [] }));
     post = vi.fn(() => of({ data: { systemId: 'created', systemRowVersion: 1 } }));
     patch = vi.fn(() => of({ data: { systemId: 'created', systemRowVersion: 2 } }));
     remove = vi.fn(() => of(null));
@@ -97,10 +97,12 @@ describe('Authenticated shared Core metadata contract', () => {
     });
     data = TestBed.inject(DataSourceService);
     contracts = TestBed.inject(EntityContractService);
+    // Match the real DataSource lifecycle: set its company scope before loading
+    // a directly injected fixture contract; a scope change invalidates contracts.
+    data.getReadGeneration();
   });
   it('resolves defaults, nullable values and write flags without repeating page rules', async () => {
-    expect(await firstValueFrom(data.loadCoreMetadata())).toBe(true);
-    expect(get.mock.calls[0][0]).toContain('/apiCapabilities');
+    expect(contracts.acceptMetadata(metadata())).toBe(true);
     expect(data.resolveSourceContract(source)).toMatchObject({
       keyField: 'systemId',
       supportsCreate: true,
@@ -134,15 +136,14 @@ describe('Authenticated shared Core metadata contract', () => {
       update: true,
       required: true,
     };
-    get.mockReturnValue(of(contract));
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(contract)).toBe(true);
     const field = data.resolveFieldContract(source, { key: 'later', label: 'Later' });
     expect(field.required).toBe(false);
     expect(fieldIsReadonly(field, {})).toBe(true);
     expect(fieldIsReadonly(field, { systemId: 'saved' })).toBe(false);
   });
   it('retains explicit identity, conditional rules, lookup and presentation overrides', async () => {
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(metadata())).toBe(true);
     const field = {
       key: 'code',
       label: 'Custom',
@@ -163,8 +164,7 @@ describe('Authenticated shared Core metadata contract', () => {
     const contract = metadata();
     contract.data.entities['fixtures'].addressKey = 'code';
     contract.data.entities['fixtures'].updateMethod = 'PUT';
-    get.mockReturnValue(of(contract));
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(contract)).toBe(true);
     expect(data.resolveSourceContract(source).keyField).toBe('code');
     expect(contracts.updateMethod(source)).toBe('PUT');
     await firstValueFrom(data.update(source, 'BUSINESS-KEY', { description: 'Kept' }, 1));
@@ -172,7 +172,7 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(put.mock.calls[0]).toEqual(['/fixtures/BUSINESS-KEY', { description: 'Kept' }, '"1"']);
   });
   it('preserves partial updates and rejects forbidden values without POST retry or omission', async () => {
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(metadata())).toBe(true);
     const input = { description: 'keep me', derived: 'also keep me' };
     await expect(firstValueFrom(data.create(source, input))).rejects.toThrow('derived');
     expect(input).toEqual({ description: 'keep me', derived: 'also keep me' });
@@ -187,7 +187,7 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(remove).not.toHaveBeenCalled();
   });
   it('rejects generic configured allowlist exclusions without losing the submitted edits', async () => {
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(metadata())).toBe(true);
     const input = { code: 'A', description: 'Keep this edit' };
     await expect(firstValueFrom(data.create({ ...source, createFields: ['code'] }, input))).rejects.toThrow('description');
     await expect(firstValueFrom(data.update({ ...source, updateFields: [] }, 'created', { description: input.description }, 1))).rejects.toThrow('description');
@@ -198,9 +198,7 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(post).toHaveBeenCalledTimes(1);
     expect(post.mock.calls[0][1]).toEqual(input);
   });
-  it('does not lose tracked edits to explicit allowlists when discovery is unavailable', async () => {
-    get.mockReturnValue(throwError(() => new Error('Discovery unavailable')));
-    expect(await firstValueFrom(data.loadCoreMetadata())).toBe(false);
+  it('does not lose tracked edits to explicit allowlists without remote metadata', async () => {
     const input = { description: 'Retain this edit' };
     expect(() => data.assertEditedFields({ ...source, createFields: ['code'] }, 'create', input, ['description'])).toThrow('description');
     expect(() => data.assertEditedFields({ ...source, updateBlockedFields: ['description'] }, 'update', input, ['description'])).toThrow('description');
@@ -209,7 +207,7 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(patch).not.toHaveBeenCalled();
   });
   it('checks generic server write rules before presentation overrides or omission rules', async () => {
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(metadata())).toBe(true);
     data.resolveFieldContract(source, { key: 'derived', label: 'Derived', readonly: false });
     for (const config of [
       { ...source, createFields: ['description'] },
@@ -244,8 +242,7 @@ describe('Authenticated shared Core metadata contract', () => {
         type: 'write',
       },
     ];
-    get.mockReturnValue(of(contract));
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(contract)).toBe(true);
     expect(data.resolveSourceContract(source)).toMatchObject({
       supportsCreate: true,
       supportsUpdate: true,
@@ -263,8 +260,7 @@ describe('Authenticated shared Core metadata contract', () => {
     contract.data.entities = {};
     contract.data.endpoints = [{path:'/api/v1/companies/{companyId}/documents/{documentId}/lines', methods:['POST'], type:'write',
       inputFields:{ locationId:{type:'string',format:'uuid',nullable:true}, quantity:{type:'string',required:true} }}];
-    get.mockReturnValue(of(contract));
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(contract)).toBe(true);
     const nested = {endpoint:'/documents', navigation:{parentEndpoint:'/documents',parentIdFields:['systemId'],childCollection:'lines'}};
     const field = {key:'locationId',label:'Location',lookup:{endpoint:'/locations',displayField:'code'}};
     expect(data.resolveFieldContract(nested,field)).toEqual({...field,defaultValue:null});
@@ -282,8 +278,7 @@ describe('Authenticated shared Core metadata contract', () => {
     const contract = metadata();
     contract.data.endpoints = [{path:'/api/v1/companies/{companyId}/locations', methods:['GET'],type:'read',queryProfiles:['location']}];
     contract.data.queryProfiles = {location:{search:['code','name','city']}};
-    get.mockReturnValue(of(contract));
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(contract)).toBe(true);
     const field = {key:'locationId',label:'Location',lookup:{endpoint:'/locations',displayField:'code'}};
     expect(data.resolveFieldContract({endpoint:'/documents'},field).lookup?.searchFields).toEqual(['code','name','city']);
     for (const searchFields of [[],['code']]) {
@@ -301,8 +296,7 @@ describe('Authenticated shared Core metadata contract', () => {
       endpoint: 'lines',
       parent: { entity: 'fixtures', parameter: 'parentId' },
     };
-    get.mockReturnValue(of(contract));
-    await firstValueFrom(data.loadCoreMetadata());
+    expect(contracts.acceptMetadata(contract)).toBe(true);
     const nested = {
       endpoint: '/lines',
       navigation: {
@@ -316,62 +310,13 @@ describe('Authenticated shared Core metadata contract', () => {
       '/fixtures/raw-id/lines',
     );
   });
-  it('preserves current configs and writes when discovery fails or is unsupported', async () => {
-    get.mockReturnValue(throwError(() => ({ status: 503 })));
-    expect(await firstValueFrom(data.loadCoreMetadata())).toBe(false);
+  it('does not require a metadata endpoint for ordinary configured CRUD', async () => {
     expect(data.resolveSourceContract(source)).toEqual(source);
     await firstValueFrom(data.create(source, { existing: 'value' }));
     expect(post.mock.calls[0][1]).toEqual({ existing: 'value' });
-    get.mockReturnValue(of({ data: { contractVersion: 'future' } }));
-    expect(await firstValueFrom(data.loadCoreMetadata())).toBe(false);
+    expect(get).not.toHaveBeenCalled();
   });
-  it('drops expired metadata on outage and ignores metadata invalidated during its request', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-27T00:00:00Z'));
-    await firstValueFrom(data.loadCoreMetadata());
-    vi.setSystemTime(new Date('2026-10-27T00:01:00Z'));
-    get.mockReturnValue(throwError(() => ({ status: 503 })));
-    expect(await firstValueFrom(data.loadCoreMetadata())).toBe(false);
-    expect(data.resolveSourceContract(source)).toEqual(source);
-    const pending = new Subject<unknown>();
-    get.mockReturnValue(pending);
-    const result = firstValueFrom(data.loadCoreMetadata());
-    data.invalidateReadCache();
-    pending.next(metadata());
-    pending.complete();
-    expect(await result).toBe(false);
-    expect(data.resolveSourceContract(source)).toEqual(source);
-  });
-  it('deduplicates discovery and rejects a late response from a different company', async () => {
-    const pending = new Subject<unknown>();
-    get.mockReturnValue(pending);
-    const one = firstValueFrom(data.loadCoreMetadata()),
-      two = firstValueFrom(data.loadCoreMetadata());
-    expect(get).toHaveBeenCalledTimes(1);
-    session.Company = 'B';
-    pending.next(metadata());
-    pending.complete();
-    expect(await one).toBe(false);
-    expect(await two).toBe(false);
-    expect(data.resolveSourceContract(source)).toEqual(source);
-  });
-  for (const context of ['user', 'company', 'workspace', 'token', 'permissions'] as const)
-    it('invalidates discovery on ' + context + ' change', async () => {
-      await firstValueFrom(data.loadCoreMetadata());
-      await firstValueFrom(data.loadCoreMetadata());
-      expect(get).toHaveBeenCalledTimes(1);
-      if (context === 'user') session.UserId = 'two';
-      if (context === 'company') session.Company = 'B';
-      if (context === 'workspace') workspace.slug = 'workspace-b';
-      if (context === 'token') session.AccessToken = 'new-token';
-      if (context === 'permissions') session.Permissions = [{ read: false }];
-      expect(data.resolveSourceContract(source)).toEqual(source);
-      get.mockReturnValue(of({ data: { contractVersion: '1.0', entities: {}, endpoints: [] } }));
-      await firstValueFrom(data.loadCoreMetadata());
-      expect(get).toHaveBeenCalledTimes(2);
-      expect(data.resolveSourceContract(source)).toEqual(source);
-    });
-  it('opens an ordinary configured page and autosaves first input without capability discovery', async () => {
+  it('opens an ordinary configured page and autosaves first input without metadata requests', async () => {
     session.SuperAdmin = true;
     const fixture = TestBed.createComponent(ListPage);
     fixture.componentRef.setInput('listConfig', { ...paymentTermsListConfig, dataSource: source });
@@ -396,14 +341,14 @@ describe('Authenticated shared Core metadata contract', () => {
     const page = fixture.componentInstance;
     expect(post).not.toHaveBeenCalled();
     expect(page.headerConfig.sections[0].fields[0].readonlyAfterCreate).toBeUndefined();
-    expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
+    expect(get).not.toHaveBeenCalled();
     page.handleInlineAction({
       actionKey: 'header:changed',
       payload: { fieldKey: 'code', value: 'NEW', previousValue: '' },
     });
     await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     expect(post.mock.calls[0][1]).toMatchObject({ code: 'NEW' });
-    expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
+    expect(get).not.toHaveBeenCalled();
     fixture.destroy();
   });
   for (const manual of [false, true])
@@ -435,7 +380,7 @@ describe('Authenticated shared Core metadata contract', () => {
   for (const persisted of [false, true])
     it('retains a direct line edit before ' + (persisted ? 'update' : 'create') + ' payload filtering', async () => {
       session.SuperAdmin = true;
-      await firstValueFrom(data.loadCoreMetadata());
+      expect(contracts.acceptMetadata(metadata())).toBe(true);
       const fixture = TestBed.createComponent(ListPage);
       const page = fixture.componentInstance;
       page.listConfig = { ...paymentTermsListConfig, dataSource: { endpoint: '/headers' } };
@@ -455,19 +400,17 @@ describe('Authenticated shared Core metadata contract', () => {
       expect(patch).not.toHaveBeenCalled();
       fixture.destroy();
     });
-  it('opens the setup page without waiting for capability discovery', async () => {
-    const pending = new Subject<unknown>();
-    get.mockImplementation((url: string) => url.endsWith('/apiCapabilities') ? pending : of({data:{systemId:'saved',code:'A',systemRowVersion:1}}));
+  it('opens the setup page without a metadata probe', async () => {
+    get.mockReturnValue(of({data:{systemId:'saved',code:'A',systemRowVersion:1}}));
     session.SuperAdmin = true;
     const fixture = TestBed.createComponent(ListPage);
     fixture.componentRef.setInput('listConfig',{...paymentTermsListConfig,pageType:'setup',dataSource:{...source,singleton:true}});
     fixture.componentRef.setInput('headerConfig',{sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code'}]}]});
     fixture.componentRef.setInput('documentOnly',true);fixture.componentRef.setInput('initialRecord',{});fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.entry-header')).not.toBeNull();
-    expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
-    // Existing record loading can still lock the editor; metadata must not gate it.
+    expect(get).toHaveBeenCalledWith('/fixtures');
+    // Existing record loading is the only async dependency of this Setup fixture.
     expect(post).not.toHaveBeenCalled();
-    // Leave discovery unresolved to prove page loading does not depend on it.
     await vi.waitFor(()=>expect(fixture.componentInstance.inlineDocumentWindowConfig?.contentReady).toBe(true));
     expect(post).not.toHaveBeenCalled();fixture.destroy();
   });
