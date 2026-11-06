@@ -217,6 +217,8 @@ export class ListPage implements OnInit, OnDestroy {
   @Output() businessCommand = new EventEmitter<PageCommandEvent>();
 
   error?: string;
+  /** Editor writes stay gated until the authenticated metadata contract resolves. */
+  pageContractPending = true;
   hasMore = true;
   private nextCursor?: string;
   rows: unknown[] = [];
@@ -340,11 +342,10 @@ export class ListPage implements OnInit, OnDestroy {
       this.listConfig = this.setupConfig;
     }
 
+    // Page identity and a disabled command shell are presentation-only. They
+    // must be visible for every Page type even while contracts are loading.
+    if (!this.documentOnly) this.publishPendingPageShell();
     if (this.configuredPage.objectId !== undefined) {
-      // Page identity is presentation, not a protected data contract. Show the
-      // title and configured command labels immediately, but keep actions inert
-      // until the authorized Object and field contracts have resolved.
-      if (!this.documentOnly) this.publishPendingPageShell();
       void this.dataSource.preparePage(this.configuredPage, this.configuredLines).then(resolved => {
         if (this.destroyed) return;
         this.resolvedPage = resolved.config;
@@ -352,6 +353,7 @@ export class ListPage implements OnInit, OnDestroy {
         this.loadFieldContracts();
       }).catch(() => {
         if (this.destroyed) return;
+        this.pageContractPending = false;
         this.error = 'The published Page Object contract could not be resolved. Refresh to retry.';
         this.changeDetector.markForCheck();
       });
@@ -399,6 +401,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private initializePage(): void {
+    this.pageContractPending = false;
     const source = this.listConfig.dataSource;
     this.headerConfig = {...this.headerConfig, sections: this.headerConfig.sections.map(section => ({...section,
       fields: section.fields.map(field => this.dataSource.resolveFieldContract(source, field))}))};
