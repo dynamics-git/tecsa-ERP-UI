@@ -10,10 +10,10 @@ import {
 } from '../no-series-relationships/no-series-relationships.config';
 import {
   purchaseRequisitionHeaderConfig, purchaseRequisitionListConfig,
-} from '../../../purchasing/purchase-requisition/purchase-requisition.config';
+} from '../../purchasing/purchase-requisition/purchase-requisition.config';
 import {
   purchasesPayablesSetupHeaderConfig,
-} from '../../../setup/purchases-payables-setup/purchases-payables-setup.config';
+} from '../../setup/purchases-payables-setup/purchases-payables-setup.config';
 
 describe('No. Series BC-style worksheet and document setup contract', () => {
   it('edits the series list as worksheet rows and uses related worksheets for ranges and alternatives', () => {
