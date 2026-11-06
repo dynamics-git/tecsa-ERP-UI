@@ -7,15 +7,30 @@ import { lineConfigDefaults } from '../../platform/data/document-config-defaults
 import { EntityContractService } from '../../platform/data/entity-contract.service';
 import { StandardListActionsService } from '../../platform/pages/standard-list-actions.service';
 import { PermissionService } from './permission.service';
+import { SessionService } from './session.service';
 import { queryCatalog } from './page-catalog-query';
 
 export type CatalogRow = Record<string, unknown>;
+const sourcePath = (value: string) => value.split('?')[0].replace(/\{[^}]*\}/g, '{}').replace(/^\/+|\/+$/g, '');
 
 /** Read-only projections of discovered UI configs. Permission rules remain server records. */
 @Injectable({ providedIn: 'root' })
 export class PageCatalogService {
   private readonly injector = inject(Injector);
   private readonly permissions = inject(PermissionService);
+  private readonly session = inject(SessionService);
+
+  private sourceIdentity(source: NonNullable<ListPageConfig['dataSource']>, publishedSources: Map<string, CatalogRow>): { resource?: string; apiSource?: string } {
+    const endpoint = source.navigation
+      ? source.navigation.parentEndpoint + '/{parentId}/' + source.navigation.childCollection
+      : source.endpoint;
+    const published = publishedSources.get(sourcePath(endpoint));
+    return {
+      resource: typeof published?.['ObjectName'] === 'string' ? published['ObjectName'] : undefined,
+      apiSource: typeof published?.['apiSource'] === 'string' ? published['apiSource']
+        : this.injector.get(EntityContractService).sourceName(source),
+    };
+  }
 
   read(endpoint: string): Observable<unknown> | undefined {
     const url = new URL(endpoint, 'https://ui.local');
@@ -42,12 +57,17 @@ export class PageCatalogService {
               } as Record<string, string>
             )[surface] ?? surface;
           const key = JSON.stringify([control['pageId'], control['targetType'], surface]);
+          const resources = [...new Set([
+            ...((areas.get(key)?.['resources'] as string[] | undefined) ?? []),
+            ...((control['resources'] as string[] | undefined) ?? []),
+          ])];
           areas.set(key, {
             systemId: key,
             pageId: control['pageId'],
             targetType: control['targetType'],
             surface,
             label,
+            resources,
           });
         }
         return of(queryCatalog([...areas.values()], url.searchParams));
@@ -74,6 +94,12 @@ export class PageCatalogService {
   } {
     const pages: CatalogRow[] = [];
     const controls = new Map<string, CatalogRow>();
+    // Read the existing login snapshot once per projection, not once per field/page.
+    const publishedSources = new Map<string, CatalogRow>();
+    for (const value of this.session.Permissions) {
+      const row = value as CatalogRow;
+      if (typeof row?.['apiPath'] === 'string') publishedSources.set(sourcePath(row['apiPath']), row);
+    }
     for (const module of modules) {
       const page = Object.values(module).find(
         (value) => value && typeof value === 'object' && 'pageId' in value,
@@ -86,6 +112,9 @@ export class PageCatalogService {
         name.endsWith('LineConfig'),
       )?.[1] as LineConfig | undefined;
       const line = declaredLine ? lineConfigDefaults(declaredLine) : undefined;
+      const headerSource = this.sourceIdentity(page.dataSource, publishedSources);
+      const lineSource = line ? this.sourceIdentity(line.dataSource, publishedSources) : {};
+      const resources = [...new Set([headerSource.resource, lineSource.resource].filter((value): value is string => !!value))];
       pages.push({
         systemId: page.pageId,
         pageId: page.pageId,
@@ -95,6 +124,7 @@ export class PageCatalogService {
         route: page.menu?.route ?? '',
         endpoint: page.dataSource.endpoint,
         related: !page.menu,
+        resources,
       });
       const add = (
         targetType: string,
@@ -104,11 +134,8 @@ export class PageCatalogService {
         endpoint = '',
       ) => {
         const systemId = JSON.stringify([page.pageId, targetType, surface, targetKey]);
-        const source = surface === 'line' ? line?.dataSource : page.dataSource;
-        const apiSource =
-          targetType === 'field' && source
-            ? this.injector.get(EntityContractService).sourceName(source)
-            : undefined;
+        const source = surface === 'line' ? lineSource : headerSource;
+        const apiSource = targetType === 'field' ? source.apiSource : undefined;
         controls.set(systemId, {
           systemId,
           pageId: page.pageId,
@@ -118,6 +145,7 @@ export class PageCatalogService {
           label,
           endpoint,
           apiSource: apiSource ?? null,
+          resources: targetType === 'page' ? resources : source.resource ? [source.resource] : [],
         });
       };
       add('page', 'header', '*', page.title ?? page.pageId);

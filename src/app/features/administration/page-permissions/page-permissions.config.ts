@@ -145,13 +145,10 @@ export const pagePermissionsLineConfig: LineConfig = {
     {
       id: 'apiSource',
       label: 'API Source (field protection)',
-      type: 'lookup',
-      lookup: {
-        endpoint: '/permissionSources',
-        valueField: 'name',
-        displayField: 'name',
-        recordRead: 'collection',
-      },
+      type: 'text',
+      // Filled by the chosen control. Conditional editor locking keeps this
+      // generated value in ordinary CRUD payloads; static readonly omits writes.
+      readonlyWhen: { field: 'targetType', values: ['page', 'command', 'field'] },
       width: '240px',
     },
     {

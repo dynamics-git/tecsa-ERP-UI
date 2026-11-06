@@ -1,10 +1,7 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, inject } from '@angular/core';
 import { ListPage, RunModalPageWindow } from '../../../platform/public-api';
-import {
-  pageConfigurationHeaderConfig,
-  pageConfigurationLineConfig,
-  pageConfigurationListConfig,
-} from './page-configuration.config';
+import { PermissionPageContextService } from '../../../core/services/permission-page-context.service';
+import * as config from './page-configuration.config';
 export * from './page-configuration.config';
 
 @Component({
@@ -14,8 +11,17 @@ export * from './page-configuration.config';
   templateUrl: './page-configuration.html',
 })
 export class PageConfigurationPage {
-  @Input() runModal?: RunModalPageWindow;
-  readonly listConfig = pageConfigurationListConfig;
-  readonly headerConfig = pageConfigurationHeaderConfig;
-  readonly lineConfig = pageConfigurationLineConfig;
+  private readonly scope = inject(PermissionPageContextService);
+  private window?: RunModalPageWindow;
+  @Input() set runModal(value: RunModalPageWindow | undefined) {
+    this.window = value;
+    const resolved = value?.module ?? this.scope.apply(config, 'page-configuration', {headerData: value?.record});
+    this.listConfig = resolved['pageConfigurationListConfig'] as typeof config.pageConfigurationListConfig;
+    this.headerConfig = resolved['pageConfigurationHeaderConfig'] as typeof config.pageConfigurationHeaderConfig;
+    this.lineConfig = resolved['pageConfigurationLineConfig'] as typeof config.pageConfigurationLineConfig;
+  }
+  get runModal(): RunModalPageWindow | undefined { return this.window; }
+  listConfig = config.pageConfigurationListConfig;
+  headerConfig = config.pageConfigurationHeaderConfig;
+  lineConfig = config.pageConfigurationLineConfig;
 }

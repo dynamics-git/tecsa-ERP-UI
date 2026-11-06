@@ -36,5 +36,7 @@ export interface RunModalHostData {
 /** Passed by the existing popup host to the same feature component used by routing. */
 export interface RunModalPageWindow {
   record: Record<string, unknown>;
+  /** The already-resolved config module used to open this window. */
+  module?: PageModule;
   close: () => void;
 }

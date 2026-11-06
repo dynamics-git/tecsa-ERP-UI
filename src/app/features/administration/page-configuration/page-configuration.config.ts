@@ -87,24 +87,12 @@ export const pageConfigurationListConfig: ListPageConfig & {
   },
   dataSurface: {
     columns: listColumns(pageConfigurationHeaderConfig, [
-      {
-        field: 'pageId',
-      },
-      {
-        field: 'title',
-      },
-      {
-        field: 'module',
-      },
-      {
-        field: 'pageType',
-      },
-      {
-        field: 'route',
-      },
-      {
-        field: 'endpoint',
-      },
+      'pageId',
+      'title',
+      'module',
+      'pageType',
+      'route',
+      'endpoint',
     ]),
   },
   factBox: pageConfigurationFactBoxConfig,

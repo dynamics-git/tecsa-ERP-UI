@@ -58,6 +58,51 @@ The UI catalog is derived from registered page/config metadata. It describes pag
 
 ## Saving permission rows
 
+### Selected-resource Page Permissions
+
+Select one saved resource line in a Permission Set, then use the line toolbar's
+**Page Permissions** action. It carries the set's business code, selected resource
+and system-owned status. **All Page Permissions** on the header remains the
+unfiltered set-wide editor.
+
+The resource editor discovers matching registered pages from both header and line
+data sources, using the source path/resource identity already received at login.
+Page, area and button/field choices stay within that resource. When only one page
+matches, a new rule starts with that page selected. Choosing a field fills its
+published API Source automatically; that column is read-only in both editors.
+Stored rules are filtered using their real page/type/area identities, not a
+fictional `resource` column on `page_permissions`. Page-open rules apply to the
+whole page, so a shared Header–Line page has one page-open rule, not separate
+copies for each table resource.
+
+**Page Configuration** opens the same resource-filtered read-only catalog, and
+keeps that scope when opening a page's controls. If no registered page consumes a
+resource yet, the editor says so and disables new rules; it never substitutes
+unrelated pages. A physical table or API source does not by itself create a UI page.
+
+This is local config composition over shared RunModal/CRUD, not a context API or
+another permission engine. No additional permission fetch runs on page opening.
+After updating the UI/backend, sign out and sign in once to receive source names
+in the login snapshot. Existing live backend authorization remains authoritative.
+
+### Keep ordinary page configs readable
+
+Declare header fields once. Reuse the existing `listColumns` helper for a normal
+list instead of repeating field labels and editor types:
+
+```ts
+dataSurface: {
+  columns: listColumns(usersHeaderConfig, ['userName', 'name', 'email', 'isActive', 'lastLoginAt']),
+},
+```
+
+Use an object entry only when that list needs an actual override, such as width
+or a badge. Keep record identity and Header–Line business bindings explicit.
+`pageId` is the UI route/command/permission identity; optional numeric `objectId`
+links the existing Page Object metadata. Neither replaces `systemId`, nor means
+that Laravel generates the Angular page layout. Do not copy backend table fields,
+Object Names, source tables or Codeunit declarations into a normal Angular config.
+
 These are ordinary row APIs with core autosave. New, edit and delete follow their source capabilities. There is no special collection PUT Save flow. Existing system-owned or unsupported operations remain protected on the backend and reflected by the UI.
 
 ## Review and testing boundary

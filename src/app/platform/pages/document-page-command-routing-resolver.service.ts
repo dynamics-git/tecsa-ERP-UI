@@ -144,6 +144,11 @@ export class DocumentPageCommandRoutingResolverService {
             ),
         ]),
       );
+      for (const [target, path] of Object.entries(params.recordMapping.headerFields ?? {})) {
+        mapped[target] = path.split('.').reduce<unknown>((value, key) =>
+          value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined,
+          params.headerData);
+      }
       context['headerData'] = mapped;
       context['recordMappingComplete'] =
         Object.keys(mapped).length > 0 &&

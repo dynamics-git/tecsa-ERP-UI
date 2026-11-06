@@ -50,6 +50,11 @@ export function queryCatalog(rows: Record<string, unknown>[], params: URLSearchP
       throw new Error('Unsupported catalogue operator.');
     return (row) => {
       const actual = row[field] ?? null;
+      // Virtual catalog membership, never an API/database field predicate.
+      if (Array.isArray(actual) && (operator === 'eq' || operator === 'ne')) {
+        const contains = actual.some((item) => String(item).toLowerCase() === String(value).toLowerCase());
+        return operator === 'eq' ? contains : !contains;
+      }
       const comparison = String(actual ?? '').localeCompare(String(value ?? ''), undefined, {
         numeric: true,
         sensitivity: 'base',

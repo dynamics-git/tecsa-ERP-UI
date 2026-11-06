@@ -1,5 +1,15 @@
 # What's new in developer documentation
 
+## 6 November 2026: selected-resource permission editing
+
+Permission Set resource lines now open Page Permissions with the selected business
+context. The editor and read-only Page Configuration catalog limit pages and
+controls to matching header/line sources from the login snapshot. Field API Source
+is filled by control metadata, and resources without configured pages show an
+explicit empty state. The header retains the all-pages editor. No database change,
+new permission endpoint or background permission fetch was added. See
+[permission administration](/documentation/modules/permission-administration).
+
 ## 6 November 2026: document lines before lookup captions
 
 Removed duplicate page-level waiting for line lookup names. The existing shared

@@ -19,6 +19,7 @@ import {
 import { UsersPage } from '../users/users';
 import { usersHeaderConfig, usersLineConfig, usersListConfig } from '../users/users.config';
 import { pagePermissionsListConfig } from '../page-permissions/page-permissions.config';
+import { PagePermissionsPage } from '../page-permissions/page-permissions';
 import { PermissionSetsPage } from './permission-sets';
 import {
   permissionSetsHeaderConfig,
@@ -194,7 +195,40 @@ describe('Permission module config-driven UI review', () => {
     expect(usersLineConfig.toolbarButtons![0].runModalRecord).toEqual({source: 'activeLine', fields: {code: 'permissionSetCode'}});
     expect(permissionSetsHeaderConfig.toolbarButtons.find(command => command.runModalPageId === 'page-permissions')).toBeDefined();
     expect(usersLineConfig.toolbarButtons!.map(command => command.actionKey)).toEqual(['cmd:open-permission-set']);
-    expect(permissionSetsLineConfig.toolbarButtons).toBeUndefined();
+    expect(permissionSetsLineConfig.toolbarButtons).toEqual([expect.objectContaining({
+      requireSelection: true, runModalPageId: 'page-permissions',
+      runModalRecord: {
+        source: 'activeLine', fields: {code: 'permissionSetCode', resource: 'resource'},
+        headerFields: {name: 'name', isSystem: 'isSystem'},
+      },
+    })]);
+  });
+
+  it('opens resource-scoped rules from the selected rendered permission line without extra permission discovery', async () => {
+    TestBed.inject(SessionService).Permissions = [{
+      pageId: 'purchase-requisition', apiPath: '/purchaseRequisitions',
+      apiSource: 'purchaseRequisitions', ObjectName: 'purchase_requisitions', canRead: true,
+    }];
+    const fixture = await open('permission-sets', sets[0]);
+    const parent = fixture.debugElement.query(By.directive(PermissionSetsPage));
+    (parent.nativeElement.querySelector('app-document-lines .row-pointer') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const action = [...parent.nativeElement.querySelectorAll('button')].find((element: any) =>
+      element.textContent.trim() === 'Page Permissions') as HTMLButtonElement;
+    expect(action.disabled).toBe(false);
+    action.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(fixture.debugElement.query(By.directive(PagePermissionsPage))).not.toBeNull();
+    });
+    const child = fixture.debugElement.query(By.directive(PagePermissionsPage)).query(By.directive(ListPage)).componentInstance as ListPage;
+    expect(child.inlineDocumentWindowConfig?.headerData).toMatchObject({code: 'PURCHASING', resource: 'purchase_requisitions'});
+    expect(child.lineConfig!.columns.find(column => column.id === 'pageId')!.lookup!.filter).toContain('purchase_requisitions');
+    expect(reads.mock.calls.some(([path]) => String(path).includes('auth/context') || String(path).includes('auth/companies'))).toBe(false);
+    expect(writes).not.toHaveBeenCalled();
+    fixture.destroy();
   });
 
   it('does not open an arbitrary card when a mapped business key is missing or ambiguous', async () => {

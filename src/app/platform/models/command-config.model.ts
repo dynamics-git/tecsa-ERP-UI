@@ -43,7 +43,11 @@ export interface CommandConfig {
   disabled?: boolean;
   hidden?: boolean;
   /** Declarative record mapping for opening a related master from a selected row. */
-  runModalRecord?: { source: 'header' | 'activeLine'; fields: Record<string, string> };
+  runModalRecord?: {
+    source: 'header' | 'activeLine'; fields: Record<string, string>;
+    /** Optional calling-header context alongside a selected line's business keys. */
+    headerFields?: Record<string, string>;
+  };
   runModalPageId?: string;
   runModalTarget?: CommandRunModalTarget;
   runModalView?: CommandRunModalTarget;

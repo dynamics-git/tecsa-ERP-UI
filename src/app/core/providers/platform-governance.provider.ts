@@ -1,6 +1,7 @@
 import { NOTIFICATION_TARGET_RESOLVER } from '../../platform/public-api';
 import { featurePageModules } from '../../features/feature-pages.generated';
 import { Provider } from '@angular/core';
+import { PermissionPageContextService } from '../services/permission-page-context.service';
 import {
   RUN_MODAL_STACK_POLICY,
   RUN_MODAL_CONFIG_RESOLVER,
@@ -23,7 +24,11 @@ export function providePlatformGovernance(): Provider[] {
     }},
     {
       provide: RUN_MODAL_CONFIG_RESOLVER,
-      useValue: runModalConfigResolver
+      useFactory: (scope: PermissionPageContextService): RunModalConfigResolver => async (pageId, context) => {
+        const module = await runModalConfigResolver(pageId);
+        return module ? scope.apply(module, pageId, context) : undefined;
+      },
+      deps: [PermissionPageContextService],
     },
     {
       provide: RUN_MODAL_STACK_POLICY,

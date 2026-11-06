@@ -375,7 +375,7 @@ export class AuthService {
           if (normalizedPath(sourcePath(binding.source)) !== normalizedPath(apiPath)) continue;
           for (const id of binding.ids) {
             if (!bindings.some((value) => value['pageId'] === id))
-              bindings.push({ ...record, pageId: id, pageName: config.title ?? id });
+              bindings.push({ ...record, apiSource: record?.['apiSource'] ?? record?.['pageId'], pageId: id, pageName: config.title ?? id });
           }
         }
       }
@@ -399,6 +399,7 @@ export class AuthService {
       permissions.push({
         query: pageRecord['query'],
         apiPath: pageRecord['apiPath'],
+        apiSource: pageRecord['apiSource'] ?? (pageRecord['apiPath'] ? pageRecord['pageId'] : undefined),
         PageId: pageId,
         pageId,
         ObjectName: pageCode,

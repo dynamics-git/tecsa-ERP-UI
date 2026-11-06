@@ -153,6 +153,8 @@ describe('Login-owned Company permissions', () => {
     expect(rows.find(row=>row['pageId']==='items')?.['canDelete']).toBe(true);
     expect(rows.find(row=>row['pageId']==='items-lines')?.['canDelete']).toBe(false);
     expect(rows.find(row=>row['pageId']==='no-series')?.['apiPath']).toBe('/numberSeries');
+    expect(rows.find(row=>row['pageId']==='no-series')?.['apiSource']).toBe('numberSeries');
+    expect(rows.find(row=>row['pageId']==='items-lines')?.['apiSource']).toBe('itemUnitsOfMeasure');
     expect(session.SuperAdmin).toBe(true);
   });
 });

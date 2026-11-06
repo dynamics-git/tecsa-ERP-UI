@@ -126,7 +126,7 @@ export class RunModalService {
   }
 
   async open(request: RunModalRequest): Promise<boolean> {
-    const definition = await this.definitions.resolve(request.pageId);
+    const definition = await this.definitions.resolve(request.pageId, request.context);
     const config = definition ? this.assembler.pickListPageConfig({ module: definition.module }) : undefined;
     if (!definition || !config?.dataSource) { this.failure = `config-not-found:${request.pageId}`; return false; }
     const permitted = this.session.SuperAdmin || this.session.Permissions.some((value: unknown) => {
@@ -187,7 +187,9 @@ export class RunModalService {
   async openEntryFromList(popupId: string, row: unknown): Promise<boolean> {
     const binding = this.lists.get(popupId);
     if (!binding) return false;
-    return this.open({ pageId: binding.pageId, target: 'entry', context: { headerData: row, parentPopupId: popupId }, allowNested: true });
+    return this.open({ pageId: binding.pageId, target: 'entry', context: {
+      headerData: row, parentPopupId: popupId, navigationContext: binding.context['navigationContext'],
+    }, allowNested: true });
   }
   async handleListCommand(id: string, event: { actionKey: string; payload?: unknown }): Promise<boolean> {
     const binding = this.lists.get(id);

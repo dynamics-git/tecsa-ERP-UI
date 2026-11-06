@@ -12,7 +12,7 @@ export const permissionSetsHeaderConfig: HeaderConfig = {
   dialogTitle: 'Permission Set',
   toolbarButtons: [
     {
-      label: 'Page Permissions',
+      label: 'All Page Permissions',
       actionKey: 'cmd:page-permissions',
       surface: 'header',
       order: 50,
@@ -140,24 +140,12 @@ export const permissionSetsListConfig: ListPageConfig & {
   },
   dataSurface: {
     columns: listColumns(permissionSetsHeaderConfig, [
-      {
-        field: 'code',
-      },
-      {
-        field: 'name',
-      },
-      {
-        field: 'description',
-      },
-      {
-        field: 'assignable',
-      },
-      {
-        field: 'isActive',
-      },
-      {
-        field: 'isSystem',
-      },
+      'code',
+      'name',
+      'description',
+      'assignable',
+      'isActive',
+      'isSystem',
     ]),
   },
   factBox: permissionSetsFactBoxConfig,
@@ -165,6 +153,15 @@ export const permissionSetsListConfig: ListPageConfig & {
 
 // Resource permissions use the same line relation and autosave as PR.
 export const permissionSetsLineConfig: LineConfig = {
+  toolbarButtons: [{
+    label: 'Page Permissions', actionKey: 'cmd:resource-page-permissions', surface: 'line',
+    order: 50, isPrimary: true, requireSelection: true,
+    runModalPageId: 'page-permissions', runModalTarget: 'entry',
+    runModalRecord: {
+      source: 'activeLine', fields: { code: 'permissionSetCode', resource: 'resource' },
+      headerFields: { name: 'name', isSystem: 'isSystem' },
+    },
+  }],
   placement: {
     mode: 'after-section',
     afterSectionId: 'general',

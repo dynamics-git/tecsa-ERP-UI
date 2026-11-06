@@ -47,7 +47,8 @@ export class RunModalHost {
   getRuntimeInputs(popup: PopupConfig): { runModal: RunModalPageWindow } {
     let inputs = this.runtimeInputs.get(popup.id);
     if (!inputs) {
-      inputs = { runModal: { record: this.getRuntimePage(popup)!.record, close: () => this.closePopup(popup) } };
+      inputs = { runModal: { record: this.getRuntimePage(popup)!.record,
+        module: this.getRuntimePage(popup)!.module, close: () => this.closePopup(popup) } };
       this.runtimeInputs.set(popup.id, inputs);
     }
     return inputs;

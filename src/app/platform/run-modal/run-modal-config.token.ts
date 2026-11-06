@@ -6,7 +6,7 @@ export type PageModule = {
   [key: string]: unknown;
 };
 
-export type RunModalConfigResolver = (pageId: string) => Promise<PageModule | undefined>;
+export type RunModalConfigResolver = (pageId: string, context?: RunModalContext) => Promise<PageModule | undefined>;
 
 export const RUN_MODAL_CONFIG_RESOLVER = new InjectionToken<RunModalConfigResolver>(
   'RUN_MODAL_CONFIG_RESOLVER',

@@ -4,6 +4,7 @@ import {
   RUN_MODAL_CONFIG_RESOLVER,
   PageModule,
   RunModalConfigResolver,
+  RunModalContext,
 } from './run-modal-config.token';
 
 // The registry validates that the resolved module actually declares the requested page.
@@ -21,13 +22,13 @@ export class RunModalPageDefinitionResolverService {
     private readonly valueMapper: RuntimeValueMapperService,
   ) {}
 
-  async resolve(pageId: string): Promise<RunModalPageDefinition | undefined> {
+  async resolve(pageId: string, context?: RunModalContext): Promise<RunModalPageDefinition | undefined> {
     const normalized = pageId.trim().toLowerCase();
     if (!normalized) {
       return undefined;
     }
 
-    const module = await this.loadPageModule(normalized);
+    const module = await this.loadPageModule(normalized, context);
     if (!module) {
       return undefined;
     }
@@ -44,6 +45,7 @@ export class RunModalPageDefinitionResolverService {
 
   private async loadPageModule(
     pageId: string,
+    context?: RunModalContext,
   ): Promise<PageModule | undefined> {
     const normalized = pageId.trim().toLowerCase();
     if (!normalized.length) {
@@ -51,7 +53,7 @@ export class RunModalPageDefinitionResolverService {
     }
 
     try {
-      const resolved = await this.configResolver(normalized);
+      const resolved = context ? await this.configResolver(normalized, context) : await this.configResolver(normalized);
       if (resolved && this.moduleDeclaresPageId(resolved, normalized)) {
         return resolved;
       }
