@@ -157,17 +157,4 @@ describe('Login-owned Company permissions', () => {
     expect(rows.find(row=>row['pageId']==='items-lines')?.['apiSource']).toBe('itemUnitsOfMeasure');
     expect(session.SuperAdmin).toBe(true);
   });
-
-  it('binds source-less Page Object declarations from code-only login identities without another API call', async () => {
-    const operation=firstValueFrom(auth.login({email:user.email,password:'pass'}));
-    const value={...grants(),pages:[
-      {pageId:'purchaseRequisitions',apiSource:'purchaseRequisitions',apiPath:'/purchaseRequisitions',pageCode:'purchase_requisitions',pageObjects:[{objectId:10000,surface:'header'}],canRead:true,canCreate:true},
-      {pageId:'purchaseRequisitionLines',apiSource:'purchaseRequisitionLines',apiPath:'/purchaseRequisitionLines',pageCode:'purchase_requisitions',pageObjects:[{objectId:10000,surface:'line'}],canRead:true,canCreate:false,canUpdate:true},
-    ]};
-    http.expectOne(loginUrl).flush(login([a],a,value));await operation;
-    expect(permissions.canView('purchase-requisition')).toBe(true);
-    const rows=session.Permissions as Record<string,unknown>[];
-    expect(rows.find(row=>row['pageId']==='purchase-requisition-lines')).toMatchObject({canCreate:false,canUpdate:true,apiSource:'purchaseRequisitionLines'});
-    http.expectNone(()=>true);
-  });
 });

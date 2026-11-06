@@ -97,7 +97,7 @@ export function listColumns(
     if (!field && !system && (!override.label || !override.type)) throw new Error('Declare the list field: ' + override.field);
     return {
       label: field?.label ?? system?.label ?? override.label!,
-      type: (field ? resolvedValueType(field) : undefined) ?? system?.type ?? override.type,
+      type: (field ? resolvedValueType(field) : undefined) ?? system?.type ?? override.type ?? 'text',
       width: system?.width ?? (index === 0 ? '140px' : index === 1 ? '280px' : undefined),
       isPrimary: index === 0,
       ...(field?.options ? { filter: { type: 'select' as const, options: field.options } } : {}),

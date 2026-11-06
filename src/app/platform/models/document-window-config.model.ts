@@ -79,7 +79,7 @@ export interface LinePlacementConfig {
 }
 
 export interface HeaderConfig {
-  dialogTitle?: string;
+  dialogTitle: string;
   commandBar?: CommandBarConfig;
   toolbarButtons: CommandConfig[];
   detailToolbarButtons?: CommandConfig[];

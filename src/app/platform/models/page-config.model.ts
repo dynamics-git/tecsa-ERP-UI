@@ -88,14 +88,5 @@ export interface ListPageConfig extends BasePageConfig {
   factBox?: FactBoxConfig;
 }
 
-/** A Page Object supplies the source; these remain optional Page-specific overrides. */
-type DeclaredPageProperties = {
-  [Key in keyof ListPageConfig as string extends Key ? never : number extends Key ? never : Key]: ListPageConfig[Key];
-};
-export type ObjectPageConfig = Omit<DeclaredPageProperties, 'dataSource'> & {
-  objectId: number;
-  dataSource?: Partial<DataSourceConfig>;
-};
-
 // Setup pages share the same shape today; this alias keeps naming explicit.
 export type SetupPageConfig = ListPageConfig;

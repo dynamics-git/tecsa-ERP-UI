@@ -1,5 +1,4 @@
-import { Inject, Injectable, Optional } from '@angular/core';
-import { DataSourceService } from '../data/data-source.service';
+import { Inject, Injectable } from '@angular/core';
 import { RuntimeValueMapperService } from '../data/runtime-value-mapper.service';
 import {
   RUN_MODAL_CONFIG_RESOLVER,
@@ -21,7 +20,6 @@ export class RunModalPageDefinitionResolverService {
     @Inject(RUN_MODAL_CONFIG_RESOLVER)
     private readonly configResolver: RunModalConfigResolver,
     private readonly valueMapper: RuntimeValueMapperService,
-    @Optional() private readonly data?: DataSourceService,
   ) {}
 
   async resolve(pageId: string, context?: RunModalContext): Promise<RunModalPageDefinition | undefined> {
@@ -30,7 +28,7 @@ export class RunModalPageDefinitionResolverService {
       return undefined;
     }
 
-    let module = await this.loadPageModule(normalized, context);
+    const module = await this.loadPageModule(normalized, context);
     if (!module) {
       return undefined;
     }
@@ -38,8 +36,6 @@ export class RunModalPageDefinitionResolverService {
     if (!this.moduleDeclaresPageId(module, normalized)) {
       return undefined;
     }
-    try { if (this.data) module = await this.data.preparePageModule(module); }
-    catch { return undefined; }
 
     return {
       pageId: normalized,

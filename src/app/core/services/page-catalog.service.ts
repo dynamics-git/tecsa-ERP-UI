@@ -32,17 +32,6 @@ export class PageCatalogService {
     };
   }
 
-  private pageSource(page: ListPageConfig, surface: string, declared: Partial<NonNullable<ListPageConfig['dataSource']>> | undefined,
-    published: Map<string, CatalogRow>, relationship?: string): NonNullable<ListPageConfig['dataSource']> | undefined {
-    if (declared?.endpoint) return declared as NonNullable<ListPageConfig['dataSource']>;
-    const candidates = [...published.values()].filter(row => (Array.isArray(row['pageObjects']) &&
-      (row['pageObjects'] as Array<{objectId:number;surface:string}>).some(binding => binding.objectId === page.objectId && binding.surface === surface)
-      || row['pageId'] === (surface === 'line' ? page.pageId + '-lines' : page.pageId))
-      && (!relationship || row['apiSource'] === relationship));
-    if (new Set(candidates.map(row => row['apiSource'])).size !== 1) return undefined;
-    return {endpoint: String(candidates[0]['apiPath']), ...declared};
-  }
-
   read(endpoint: string): Observable<unknown> | undefined {
     const url = new URL(endpoint, 'https://ui.local');
     if (!url.pathname.startsWith('/uiCatalog/')) return undefined;
@@ -115,18 +104,15 @@ export class PageCatalogService {
       const page = Object.values(module).find(
         (value) => value && typeof value === 'object' && 'pageId' in value,
       ) as ListPageConfig | undefined;
-      if (!page?.pageId) continue;
-      const pageSource = this.pageSource(page, 'header', page.dataSource, publishedSources);
-      if (!pageSource) continue;
+      if (!page?.pageId || !page.dataSource) continue;
       const header = Object.entries(module).find(([name]) => name.endsWith('HeaderConfig'))?.[1] as
         | HeaderConfig
         | undefined;
       const declaredLine = Object.entries(module).find(([name]) =>
         name.endsWith('LineConfig'),
       )?.[1] as LineConfig | undefined;
-      const lineSourceConfig = declaredLine ? this.pageSource(page, 'line', declaredLine.dataSource, publishedSources, declaredLine.relationship) : undefined;
-      const line = declaredLine && lineSourceConfig ? lineConfigDefaults({...declaredLine, dataSource: lineSourceConfig}) : undefined;
-      const headerSource = this.sourceIdentity(pageSource, publishedSources);
+      const line = declaredLine ? lineConfigDefaults(declaredLine) : undefined;
+      const headerSource = this.sourceIdentity(page.dataSource, publishedSources);
       const lineSource = line ? this.sourceIdentity(line.dataSource, publishedSources) : {};
       const resources = [...new Set([headerSource.resource, lineSource.resource].filter((value): value is string => !!value))];
       pages.push({
@@ -136,7 +122,7 @@ export class PageCatalogService {
         module: page.module ?? '',
         pageType: page.pageType,
         route: page.menu?.route ?? '',
-        endpoint: pageSource.endpoint,
+        endpoint: page.dataSource.endpoint,
         related: !page.menu,
         resources,
       });
@@ -164,7 +150,7 @@ export class PageCatalogService {
       };
       add('page', 'header', '*', page.title ?? page.pageId);
       for (const field of header?.sections.flatMap((section) => section.fields) ?? [])
-        if (!field.hidden) add('field', 'header', field.key, field.label, pageSource.endpoint);
+        if (!field.hidden) add('field', 'header', field.key, field.label, page.dataSource.endpoint);
       for (const column of line?.columns ?? [])
         if (!column.hidden)
           add('field', 'line', column.field ?? column.id, column.label, line!.dataSource.endpoint);
@@ -176,12 +162,12 @@ export class PageCatalogService {
             'header',
             (column.field ?? column.id)!,
             column.label,
-            pageSource.endpoint,
+            page.dataSource.endpoint,
           );
       for (const section of page.factBox?.sections ?? [])
         for (const field of section.fields ?? [])
           if (field.field)
-            add('field', 'header', field.field, field.label, pageSource.endpoint);
+            add('field', 'header', field.field, field.label, page.dataSource.endpoint);
       for (const [key, command] of Object.entries(
         this.injector.get(StandardListActionsService).resolve(page),
       ))
@@ -190,7 +176,7 @@ export class PageCatalogService {
       const headerCommands = this.injector
         .get(DocumentPageCommandAssemblerService)
         .resolveHeaderToolbarButtons({
-          dataSource: pageSource,
+          dataSource: page.dataSource,
           toolbarButtons: header?.toolbarButtons,
           pageId: page.pageId,
         });

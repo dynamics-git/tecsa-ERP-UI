@@ -7,9 +7,6 @@ import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
 import { DataSourceConfig, DataWriteContext } from '../models/data-source-config.model';
 import { EntityContractService } from './entity-contract.service';
-import type { ListPageConfig, ObjectPageConfig } from '../models/page-config.model';
-import type { LineConfig, ObjectLineConfig } from '../models/line-config.model';
-import type { PageModule } from '../run-modal/run-modal-config.token';
 
 export interface DataRestService {
   get(endpoint: string): Observable<unknown>;
@@ -97,57 +94,11 @@ export class DataSourceService {
   private readonly sourceContractRequests = new Map<string, Observable<boolean>>();
   private readonly sourceContractLoadedAt = new Map<string, number>();
 
-  async preparePage(config: ListPageConfig | ObjectPageConfig, lines?: LineConfig | ObjectLineConfig): Promise<{
-    config: ListPageConfig & {dataSource: DataSourceConfig}; lineConfig?: LineConfig;
-  }> {
-    if (config.objectId === undefined) {
-      if (!config.dataSource?.endpoint || lines && !lines.dataSource?.endpoint) throw new Error('An explicit source or a published Page Object is required.');
-      return {config: config as ListPageConfig & {dataSource: DataSourceConfig}, lineConfig: lines as LineConfig | undefined};
-    }
-    if (!await firstValueFrom(this.loadPageContract(config.objectId))) throw new Error('The published Page Object contract could not be loaded.');
-    return this.contracts.resolvePage(config, lines);
-  }
-
-  async preparePageModule(module: PageModule): Promise<PageModule> {
-    const entry = Object.entries(module).find(([, value]) => value && typeof value === 'object' && 'pageId' in value);
-    if (!entry || (entry[1] as ListPageConfig).objectId === undefined) return module;
-    const line = Object.entries(module).find(([key]) => key.endsWith('LineConfig'));
-    const resolved = await this.preparePage(entry[1] as ObjectPageConfig, line?.[1] as ObjectLineConfig | undefined);
-    return {...module, [entry[0]]: resolved.config, ...(line ? {[line[0]]: resolved.lineConfig} : {})};
-  }
-
-  loadPageContract(objectId: number): Observable<boolean> {
-    const selector = '/fieldContracts?objectId=' + objectId;
-    const cacheKey = this.key(selector);
-    if (!Number.isInteger(objectId) || objectId < 1 || !this.session.Company || !this.rest) return of(false);
-    const pending = this.sourceContractRequests.get(cacheKey);
-    if (pending) return pending;
-    if (Date.now() - (this.sourceContractLoadedAt.get(cacheKey) ?? 0) < 30000) return of(true);
-    const context = this.context(), generation = this.readGeneration;
-    const request = defer(() => this.client.get(this.endpoint({endpoint:'/fieldContracts'}) + '?objectId=' + objectId)).pipe(
-      map(response => {
-        if (context !== this.context() || generation !== this.readGeneration) return false;
-        const accepted = this.contracts.acceptPageMetadata(response, objectId);
-        if (accepted) {
-          this.sourceContractLoadedAt.set(cacheKey, Date.now());
-          const entities = (response as {data: {entities: Record<string, {path: string}>}}).data.entities;
-          for (const entity of Object.values(entities))
-            this.sourceContractLoadedAt.set(this.key('/fieldContracts?path=/' + entity.path.replace(/^\//, '')), Date.now());
-        }
-        return accepted;
-      }), catchError(() => of(false)), finalize(() => {
-        if (this.sourceContractRequests.get(cacheKey) === request) this.sourceContractRequests.delete(cacheKey);
-      }), shareReplay({bufferSize:1, refCount:false}),
-    );
-    this.sourceContractRequests.set(cacheKey, request);
-    return request;
-  }
-
   /** One published source at a time; scoped by current user, Company and workspace. */
   loadSourceContract(source: DataSourceConfig): Observable<boolean> {
     const path = this.contracts.sourcePath(source);
     const cacheKey = this.key('/fieldContracts?path=' + path);
-    if (!this.session.Company || !this.rest || source.addressStyle === 'odata' || source.endpoint.startsWith('/uiCatalog/')) return of(false);
+    if (!this.session.Company || !this.rest || source.addressStyle === 'odata') return of(false);
     const inFlight = this.sourceContractRequests.get(cacheKey);
     if (inFlight) return inFlight;
     if (Date.now() - (this.sourceContractLoadedAt.get(cacheKey) ?? 0) < 30000) return of(true);
@@ -324,8 +275,7 @@ export class DataSourceService {
     if (!query.ready || !query.endpoint) return of(undefined);
     const cached = this.getCachedLookup(lookup, id, record, header);
     if (cached) return of(cached);
-    const recordRead = lookup.recordRead ?? ((lookup.valueField ?? 'systemId') === 'systemId' ? 'record' : 'collection');
-    if (recordRead === 'record') return this.loadById({endpoint: query.endpoint}, id, {useCache: true, maxAgeMs: 30000});
+    if (lookup.recordRead !== 'collection') return this.loadById({endpoint: query.endpoint}, id, {useCache: true, maxAgeMs: 30000});
     const identity = (lookup.valueField ?? 'systemId') + " eq '" + String(id).replace(/'/g, "''") + "'";
     return this.loadList({endpoint: query.endpoint, defaultFilter: [query.filter, identity].filter(Boolean).map(value => '(' + value + ')').join(' and ')}, {top: 1, useCache: true, maxAgeMs: 30000, count: false}).pipe(map(response => {
       const selected = (response as DataPage).value[0];

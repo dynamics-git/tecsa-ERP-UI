@@ -5,8 +5,6 @@ import { ENTITY_CONTRACT_PROFILES } from './entity-contract-profiles';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { ContractOperation, EntityContractProfile } from '../models/entity-contract.model';
 import type { ObjectIdentity } from '../models/object-definition.model';
-import type { ListPageConfig, ObjectPageConfig } from '../models/page-config.model';
-import type { LineConfig, ObjectLineConfig } from '../models/line-config.model';
 
 export interface CoreField {
   type: string;
@@ -21,8 +19,7 @@ export interface CoreField {
   max?: number;
   precision?: number;
   scale?: number;
-  values?: Array<string | number>;
-  valueLabels?: Record<string, string>;
+  values?: string[];
 }
 export interface CoreEntity {
   /** Optional stable Table Object metadata, independent of record/key fields. */
@@ -39,7 +36,6 @@ export interface CoreEntity {
   operations: Record<string, boolean>;
 }
 export interface CoreMetadata {
-  pages?: Record<number, CorePage>;
   queryProfiles?: Record<string, { search?: string[] }>;
   contractVersion: string;
   entities: Record<string, CoreEntity>;
@@ -50,12 +46,6 @@ export interface CoreMetadata {
     inputFields?: Record<string, unknown>;
     queryProfiles?: string[];
   }>;
-}
-
-export interface CorePage extends ObjectIdentity<'page'> {
-  pageType: string;
-  source: string;
-  relationships: Array<{name: string; source: string; anchor: string; bindings: Record<string, string>}>;
 }
 
 @Injectable({
@@ -159,73 +149,12 @@ export class EntityContractService {
       entities: {...previous?.entities, ...incoming.entities},
       endpoints: previous?.endpoints ?? [],
       queryProfiles: {...previous?.queryProfiles, ...incoming.queryProfiles},
-      pages: previous?.pages,
     };
     const name = entries[0][0];
     const paths = this.sourcePaths.get(name) ?? new Set<string>();
     paths.add(requestedPath);
     this.sourcePaths.set(name, paths);
     return true;
-  }
-
-  acceptPageMetadata(response: unknown, objectId: number): boolean {
-    const previous = this.metadata;
-    if (!this.acceptMetadata(response)) return false;
-    const incoming = this.metadata!;
-    const page = this.isRecord(response) && this.isRecord(response['data']) ? response['data']['page'] as CorePage | undefined : undefined;
-    const valid = page?.objectType === 'page' && page.objectId === objectId && incoming.endpoints.length === 0
-      && typeof page.objectName === 'string' && !!incoming.entities[page.source]
-      && Array.isArray(page.relationships) && page.relationships.every(relation =>
-        typeof relation.name === 'string' && !!incoming.entities[relation.source]
-        && typeof relation.anchor === 'string' && this.isRecord(relation.bindings)
-        && typeof relation.bindings[relation.anchor] === 'string'
-        && Object.entries(relation.bindings).every(([child, parent]) => typeof parent === 'string'
-          && (incoming.entities[relation.source].fields[child]?.read || child === incoming.entities[relation.source].key)
-          && (incoming.entities[page.source].fields[parent]?.read || parent === incoming.entities[page.source].key)));
-    if (!valid) { this.metadata = previous; return false; }
-    this.metadata = {...incoming, entities: {...previous?.entities, ...incoming.entities},
-      endpoints: previous?.endpoints ?? [], pages: {...previous?.pages, [objectId]: page!}};
-    return true;
-  }
-
-  resolvePage(config: ListPageConfig | ObjectPageConfig, lines?: LineConfig | ObjectLineConfig): {
-    config: ListPageConfig & {dataSource: DataSourceConfig}; lineConfig?: LineConfig;
-  } {
-    const page = config.objectId === undefined ? undefined : this.metadata?.pages?.[config.objectId];
-    if (!page) throw new Error('The published Page Object contract is unavailable.');
-    const header = this.metadata!.entities[page.source];
-    if (config.pageType && config.pageType !== page.pageType) throw new Error('Page Object type does not match the configured page.');
-    const source = (entity: CoreEntity, overrides?: Partial<DataSourceConfig>): DataSourceConfig => {
-      if (overrides?.keyField && overrides.keyField !== (entity.addressKey ?? entity.key))
-        throw new Error('The configured record identity does not match the published API.');
-      if (overrides?.endpoint && !this.matchesPath('/' + entity.path.replace(/^\//, ''), overrides.endpoint))
-        throw new Error('The configured endpoint does not belong to this Page Object.');
-      return this.resolveSource({endpoint: '/' + entity.path.replace(/^\//, ''), keyField: entity.addressKey ?? entity.key, ...overrides});
-    };
-    let lineConfig: LineConfig | undefined;
-    const headerSource = source(header, config.dataSource);
-    if (lines) {
-      const matches = page.relationships.filter(relation => !lines.relationship || relation.name === lines.relationship);
-      if (matches.length !== 1) throw new Error('Select one published Page relationship; Core will not guess.');
-      const relation = matches[0];
-      const bindings = {...relation.bindings};
-      const headerPKProp = bindings[relation.anchor];
-      delete bindings[relation.anchor];
-      const lineSource = source(this.metadata!.entities[relation.source], lines.dataSource);
-      for (const [key, expected] of Object.entries({headerPKProp, lineFKProp: relation.anchor})) {
-        const override = lines.dataSource?.[key as keyof DataSourceConfig];
-        if (override !== undefined && override !== expected) throw new Error('Page relationship keys cannot override the published ownership.');
-      }
-      if (lines.dataSource?.parentFieldMap && (Object.keys(lines.dataSource.parentFieldMap).length !== Object.keys(bindings).length
-          || Object.entries(bindings).some(([key,value]) => lines.dataSource!.parentFieldMap![key] !== value)))
-        throw new Error('Page relationship bindings must match the published ownership.');
-      lineConfig = {...lines, dataSource: {...lineSource, headerPKProp, lineFKProp: relation.anchor, parentFieldMap: bindings,
-        invalidates: lineSource.invalidates ?? [headerSource.endpoint]}};
-      if (headerSource.headerPKProp && headerSource.headerPKProp !== headerPKProp)
-        throw new Error('Page relationship keys cannot override the published ownership.');
-      headerSource.headerPKProp ??= headerPKProp;
-    }
-    return {config: {...config, title: config.title ?? page.objectName, pageType: page.pageType as ListPageConfig['pageType'], dataSource: headerSource}, lineConfig};
   }
 
   sourcePath(source: DataSourceConfig): string { return this.path(source); }
@@ -404,25 +333,20 @@ export class EntityContractService {
           ? comparison > 0 ? requested : physical
           : comparison < 0 ? requested : physical;
     }
-    if (metadata.precision !== undefined && metadata.scale !== undefined && validation.scale !== undefined
-        && validation.scale < metadata.scale && validation.precision !== undefined) {
-      // Reducing fractional places must not enlarge the physical integer part.
-      validation.precision = Math.min(validation.precision, metadata.precision - metadata.scale + validation.scale);
-    }
     return {
       ...field,
-      type: field.type ?? (metadata.type === 'enum' && !field.lookup ? 'select' : types[metadata.type]),
-      options: field.options ?? metadata.values?.map((value) => ({ label: metadata.valueLabels?.[String(value)] ?? String(value), value })),
-      valueType: types[metadata.type] ?? field.valueType,
+      type: field.type ?? (metadata.type === 'enum' && !field.lookup ? 'select' : undefined),
+      options: field.options ?? metadata.values?.map((value) => ({ label: value, value })),
+      valueType: field.valueType ?? types[metadata.type],
       required:
-        field.required === true || (metadata.create && metadata.required) || field.required,
+        field.required ?? (field.requiredWhen ? undefined : metadata.create && metadata.required),
       readonlyWhen:
         field.readonlyWhen ??
         (!metadata.create && metadata.update
           ? { field: entity!.key, values: [undefined, null, ''] }
           : undefined),
-      readonly: field.readonly === true || (!metadata.create && !metadata.update),
-      readonlyAfterCreate: field.readonlyAfterCreate === true || (metadata.create && !metadata.update),
+      readonly: field.readonly ?? (!metadata.create && !metadata.update),
+      readonlyAfterCreate: field.readonlyAfterCreate ?? (metadata.create && !metadata.update),
       defaultValue:
         field.defaultValue !== undefined
           ? field.defaultValue
