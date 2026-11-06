@@ -2,7 +2,7 @@ import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { ListPage } from './list-page/list-page';
 import { DocumentLines } from '../document/document-lines/document-lines';
 import { DATA_REST_SERVICE } from '../data/data-source.service';
@@ -161,6 +161,30 @@ describe('Core acceptance: four independent reference Pages', () => {
     page.handleCommand({ actionKey: 'delete' });
     await vi.waitFor(() => expect(remove).toHaveBeenCalledOnce());
     expect(remove).toHaveBeenCalledWith('/referenceCards/header-1', '"3"');
+    fixture.destroy();
+  });
+
+  it('Card: required-field validation blocks a new record before any POST', async () => {
+    const { fixture, page, post, patch } = mount('card', { initial: { description: 'Incomplete' } });
+    await vi.waitFor(() => expect(page.inlineDocumentWindowConfig?.headerData?.['description']).toBe('Incomplete'));
+    page.handleInlineAction({ actionKey: 'cmd:save' });
+    await vi.waitFor(() => expect(page.savingEntry).toBe(false));
+    expect(post).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
+    expect(page.inlineDocumentWindowConfig?.headerData?.['systemId']).toBeUndefined();
+    fixture.destroy();
+  });
+
+  it('Card/List: a rejected Delete keeps the record visible and reports the failure', async () => {
+    const { fixture, page, remove } = mount('card', { browser: true });
+    await vi.waitFor(() => expect(page.rows).toHaveLength(1));
+    vi.spyOn(TestBed.inject(ConfirmationService), 'confirmIntent').mockResolvedValue(true);
+    remove.mockImplementationOnce(() => throwError(() => new Error('Related records prevent deletion.')));
+    page.handleCheckedKeysChanged(['header-1']);
+    page.handleCommand({ actionKey: 'delete' });
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(page.error).toContain('Related records prevent deletion'));
+    expect(page.rows).toHaveLength(1);
     fixture.destroy();
   });
 
