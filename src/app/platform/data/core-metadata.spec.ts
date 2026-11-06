@@ -97,6 +97,9 @@ describe('Authenticated shared Core metadata contract', () => {
     });
     data = TestBed.inject(DataSourceService);
     contracts = TestBed.inject(EntityContractService);
+    // Match the real DataSource lifecycle: set its company scope before loading
+    // a directly injected fixture contract; a scope change invalidates contracts.
+    data.getReadGeneration();
   });
   it('resolves defaults, nullable values and write flags without repeating page rules', async () => {
     expect(contracts.acceptMetadata(metadata())).toBe(true);
@@ -405,7 +408,7 @@ describe('Authenticated shared Core metadata contract', () => {
     fixture.componentRef.setInput('headerConfig',{sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code'}]}]});
     fixture.componentRef.setInput('documentOnly',true);fixture.componentRef.setInput('initialRecord',{});fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.entry-header')).not.toBeNull();
-    expect(get).not.toHaveBeenCalled();
+    expect(get).toHaveBeenCalledWith('/fixtures');
     // Existing record loading is the only async dependency of this Setup fixture.
     expect(post).not.toHaveBeenCalled();
     await vi.waitFor(()=>expect(fixture.componentInstance.inlineDocumentWindowConfig?.contentReady).toBe(true));
