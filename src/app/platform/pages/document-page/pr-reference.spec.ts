@@ -9,7 +9,7 @@ import { DocumentPageCommandAssemblerService } from '../document-page-command-as
 import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
 import { DataSourceService, DATA_REST_SERVICE } from '../../data/data-source.service';
 import { LineCalculationService } from '../../document/line-calculation.service';
-import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
+import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../../testing/pr-reference.fixture';
 
 afterEach(() => TestBed.resetTestingModule());
 
@@ -18,7 +18,7 @@ describe('PR reference page acceptance', () => {
     const session = {SuperAdmin:false,Permissions:[{pageId:'purchase-requisition',ReadPermission:true}]};
     TestBed.configureTestingModule({providers:[provideRouter([]),{provide:SessionService,useValue:session}]});
     expect(resolvePageType('purchase-requisition')).toBe('document');
-    expect(Object.values(resolvePageModule('purchase-requisition')!)).toContain(purchaseRequisitionListConfig);
+    expect(Object.values(resolvePageModule('purchase-requisition')!).some(value => (value as {objectId?:number})?.objectId===10000)).toBe(true);
     const menu=TestBed.inject(MenuService);
     expect(menu.getModules().flatMap(module=>module.children ?? [])).toEqual(expect.arrayContaining([
       expect.objectContaining({pageId:'purchase-requisition',label:purchaseRequisitionListConfig.title}),

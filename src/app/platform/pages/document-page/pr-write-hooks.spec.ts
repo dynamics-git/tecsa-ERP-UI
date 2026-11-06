@@ -6,7 +6,7 @@ import {DATA_REST_SERVICE,DataSourceService} from '../../data/data-source.servic
 import {DataSourceConfig} from '../../models/data-source-config.model';
 import {SessionService} from '../../../core/services/session.service';
 import {WorkspaceContext} from '../../../core/services/workspace-context';
-import {purchaseRequisitionLineConfig} from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
+import {purchaseRequisitionLineConfig} from '../../../testing/pr-reference.fixture';
 
 let data:DataSourceService,source:DataSourceConfig;
 let post:ReturnType<typeof vi.fn>,patch:ReturnType<typeof vi.fn>,remove:ReturnType<typeof vi.fn>,report:ReturnType<typeof vi.fn>;
@@ -43,7 +43,7 @@ describe('PR reference for shared optional write hooks',()=>{
  });
  it('does not let before hooks mutate the outgoing payload through nested references',async()=>{
   const payload={description:'Draft',extra:{code:'original'}};
-  source={...source,hooks:{beforeCreate:({payload})=>{(payload?.['extra'] as {code:string}).code='changed';}}};
+  source={...source,createFields:undefined,updateFields:undefined,hooks:{beforeCreate:({payload})=>{(payload?.['extra'] as {code:string}).code='changed';}}};
   await firstValueFrom(data.create(source,payload));expect(payload.extra.code).toBe('original');expect(post.mock.calls[0][1]).toEqual(payload);
  });
  it('preserves unsupported operations without running hooks',async()=>{

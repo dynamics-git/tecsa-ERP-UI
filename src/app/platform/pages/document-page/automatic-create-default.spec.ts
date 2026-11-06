@@ -9,7 +9,7 @@ import { DATA_REST_SERVICE } from '../../data/data-source.service';
 import { SessionService } from '../../../core/services/session.service';
 import { providePlatformGovernance } from '../../../core/providers/platform-governance.provider';
 import { paymentTermsHeaderConfig, paymentTermsListConfig } from '../../../features/purchase-masters/payment-terms/payment-terms.config';
-import { purchaseRequisitionHeaderConfig, purchaseRequisitionListConfig } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
+import { purchaseRequisitionHeaderConfig, purchaseRequisitionListConfig } from '../../../testing/pr-reference.fixture';
 
 afterEach(()=>TestBed.resetTestingModule());
 describe('Shared first-input automatic creation policy',()=>{

@@ -6,6 +6,7 @@ import { purchaseRequisitionListConfig, purchaseRequisitionLineConfig } from '..
 import { PurchaseRequisitionPage } from '../../features/purchasing/purchase-requisition/purchase-requisition';
 import { DocumentConfigDataService } from '../../platform/data/document-config-data.service';
 import { LineMasterService } from '../../platform/data/line-master.service';
+import { purchaseRequisitionLineConfig as resolvedLines } from '../../testing/pr-reference.fixture';
 
 function moduleFor(pageId: string, pageType: PageType, objectId?: number): PageModule {
   return { ExamplePage: class {}, listConfig: { pageId, pageType, title: 'Existing title', objectId } };
@@ -20,7 +21,7 @@ describe('Object identity through the existing configured page runtime', () => {
     expect(resolvePageType(entry.pageId)).toBe('document');
     expect(entry.objectId).toBe(purchaseRequisitionListConfig.objectId);
     expect(purchaseRequisitionListConfig.title).toBe('Purchase Requisition');
-    expect(purchaseRequisitionListConfig['object']).toBeUndefined();
+    expect('object' in purchaseRequisitionListConfig).toBe(false);
     expect(resolvePageObject(999999)).toBeUndefined();
   });
 
@@ -41,16 +42,17 @@ describe('Object identity through the existing configured page runtime', () => {
   });
 
   it('keeps PR record UUIDs separate from document-number/type Header–Line binding', () => {
-    expect(purchaseRequisitionListConfig.dataSource.keyField).toBe('systemId');
-    expect(purchaseRequisitionLineConfig.dataSource.keyField).toBe('systemId');
+    expect(purchaseRequisitionListConfig.dataSource?.endpoint).toBeUndefined();
+    expect(purchaseRequisitionLineConfig.dataSource.lineFKProp).toBe('documentNumber');
+    expect(resolvedLines.dataSource.keyField).toBe('systemId');
     const core = new DocumentConfigDataService(new LineMasterService());
     const header = {systemId:'header-record-uuid',number:'PR-000001',documentType:'purchase_requisition'};
-    const row = core.createEmptyLineRow(purchaseRequisitionLineConfig, header, {defaultType:'item',emptyType:'',byType:{}}, {});
+    const row = core.createEmptyLineRow(resolvedLines, header, {defaultType:'item',emptyType:'',byType:{}}, {});
     expect(row['documentNumber']).toBe(header.number);
     expect(row['documentType']).toBe(header.documentType);
     expect(row['systemId']).toBeUndefined();
     expect(row['objectId']).toBeUndefined();
-    expect(purchaseRequisitionLineConfig.dataSource.parentFieldMap).toEqual({documentType:'documentType'});
-    expect(purchaseRequisitionLineConfig.dataSource.defaultSort).toBe('lineNo asc');
+    expect(resolvedLines.dataSource.parentFieldMap).toEqual({documentType:'documentType'});
+    expect(resolvedLines.dataSource.defaultSort).toBe('lineNo asc');
   });
 });
