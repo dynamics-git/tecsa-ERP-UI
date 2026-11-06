@@ -1,5 +1,12 @@
 # UI architecture rules
 
+## Owner correction: source defaults are not Page links, 6 November 2026
+
+Keep Object ID -> ApiSource/schema-field resolution. Page composition and links
+remain explicit in Angular's existing Header/Line config. Never infer or restrict
+them from backend ownership/FKs; another published source may be displayed as a
+related part using its own declared link/filter. Do not add another link layer.
+
 ## Phase 2: Object Architecture
 
 Object metadata and PR integration are authorized on the existing

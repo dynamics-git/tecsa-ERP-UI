@@ -353,6 +353,7 @@ export class AuthService {
     const pages = rawPages.flatMap((page) => {
       const record = this.toRecord(page);
       const apiPath = record ? this.readFirstString(record, ['apiPath']) : '';
+      const pageObjects = Array.isArray(record?.['pageObjects']) ? record['pageObjects'] as Array<{objectId: number; surface: string}> : [];
       if (!apiPath) return [page]; // Preserve the established session format.
       const normalizedPath = (value: string) => value.replace(/\{[^}]*\}/g, '{}').replace(/^\/+|\/+$/g, '');
       const sourcePath = (source: DataSourceConfig) =>
@@ -364,12 +365,20 @@ export class AuthService {
         const config = Object.values(module).find(
           (value) => value && typeof value === 'object' && 'pageId' in value,
         ) as ListPageConfig | undefined;
-        if (!config?.dataSource) continue;
-        const sources: Array<{ ids: string[]; source: DataSourceConfig }> = [
-          { ids: [...new Set([config.permissionPageId ?? config.pageId!, config.pageId!])], source: config.dataSource },
-        ];
+        if (!config) continue;
+        if (config.objectId !== undefined) {
+          for (const binding of pageObjects.filter(binding => binding.objectId === config.objectId && binding.surface === 'header')) {
+            const id = config.permissionPageId ?? config.pageId!;
+            if (!bindings.some(value => value['pageId'] === id)) bindings.push({...record,
+              apiSource: record?.['apiSource'] ?? record?.['pageId'], pageId: id, pageName: config.title ?? id});
+          }
+        }
+        const sources: Array<{ ids: string[]; source: DataSourceConfig }> = [];
+        if (config.dataSource?.endpoint) sources.push({
+          ids: [...new Set([config.permissionPageId ?? config.pageId!, config.pageId!])], source: config.dataSource,
+        });
         const lines = Object.entries(module).find(([key]) => key.endsWith('LineConfig'))?.[1] as LineConfig | undefined;
-        if (lines)
+        if (lines?.dataSource?.endpoint)
           sources.push({ ids: [lines.permissionPageId ?? config.pageId! + '-lines'], source: lines.dataSource });
         for (const binding of sources) {
           if (normalizedPath(sourcePath(binding.source)) !== normalizedPath(apiPath)) continue;
@@ -400,6 +409,7 @@ export class AuthService {
         query: pageRecord['query'],
         apiPath: pageRecord['apiPath'],
         apiSource: pageRecord['apiSource'] ?? (pageRecord['apiPath'] ? pageRecord['pageId'] : undefined),
+        pageObjects: pageRecord['pageObjects'],
         PageId: pageId,
         pageId,
         ObjectName: pageCode,

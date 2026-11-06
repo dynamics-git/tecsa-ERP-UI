@@ -8,8 +8,8 @@ New thin ordinary CRUD Pages can declare just the field identity and caption:
 {key: 'code', label: 'Code'}
 ```
 
-When a header or line leaves its physical editor type unspecified, the shared
-Page initializes against the current Company's `fieldContracts` API before
+The shared Page loads the current Company's `fieldContracts` API regardless of
+explicit editor `type`/`valueType` settings before
 constructing the editor. A PostgreSQL `varchar(20)` is therefore limited to
 20 characters without repeating `maxLength: 20` in the Page. Defaults,
 precision/scale and writable state follow the same existing schema-backed
@@ -23,6 +23,23 @@ An unavailable metadata API retains older explicit configs, but thin Pages must
 be tested against the actual published API. Backend business validation and
 permissions are never replaced by editor assistance. No new CRUD, permission,
 posting or Object execution engine was created.
+
+## Source defaults and explicit Page links
+
+`objectId` may resolve a Page's existing ApiSource and physical field metadata.
+It does not choose the Page's related parts. Keep `headerPKProp`, `lineFKProp`,
+`parentFieldMap`, the line endpoint and Page-specific filters in Angular config.
+These declarations are the Page's link, not duplicated database field definitions.
+Another published source may be displayed without becoming an owned child of the
+header. Backend permissions, Company scope and database constraints still apply
+to its actual reads/writes. Showing related rows does not authorize cascading
+deletion. No backend ownership/FK is consulted to compose the Page.
+
+An Object-backed Page fails before CRUD if its source cannot resolve. Source
+contracts are cached per existing user/workspace/Company context; each explicit
+line source loads its own authorized contract. Existing explicit-endpoint Pages
+retain their compatibility fallback. Presentation overrides do not skip physical
+validation/defaults or grant writes denied by the API contract.
 
 ## Document readiness and selected lookup captions
 

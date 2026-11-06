@@ -145,11 +145,43 @@ describe('Authenticated shared Core metadata contract', () => {
       key: 'amount', label: 'Amount', validation: { precision: 10, scale: 3 },
     }).validation).toMatchObject({ precision: 10, scale: 3 });
     expect(data.resolveFieldContract(source, {
+      key: 'amount', label: 'Amount', validation: {scale: 3},
+    }).validation).toMatchObject({precision: 17, scale: 3});
+    expect(data.resolveFieldContract(source, {
       key: 'quantity', label: 'Quantity', validation: { min: -10, max: 999 },
     }).validation).toMatchObject({ min: 1, max: 100 });
     expect(data.resolveFieldContract(source, {
       key: 'quantity', label: 'Quantity', validation: { min: 10, max: 90 },
     }).validation).toMatchObject({ min: 10, max: 90 });
+  });
+
+  it('accepts authorized write-only inputs but rejects unpublished and denied inputs', async () => {
+    const contract = metadata();
+    contract.data.entities['fixtures'].fields['password'] = {
+      type: 'text', read: false, create: true, update: true,
+    };
+    get.mockReturnValue(of(contract));
+    await firstValueFrom(data.loadSourceContract(source));
+    expect(contracts.sanitizePayload(source, 'create', {password: 'input-only'})).toEqual({password: 'input-only'});
+    expect(() => contracts.sanitizePayload(source, 'create', {rememberToken: 'denied'})).toThrow('Cannot save field');
+    expect(() => contracts.sanitizePayload(source, 'update', {derived: 'denied'})).toThrow('Cannot save field');
+  });
+
+  it('resolves the Page source while preserving an independently declared Angular link', async () => {
+    const parent = metadata().data.entities['fixtures'];
+    get.mockReturnValue(of({data:{contractVersion:'1.0',endpoints:[],entities:{fixtures:parent},
+      page:{objectType:'page',objectId:43210,objectName:'Fixture Document',pageType:'document',source:'fixtures'}}}));
+    const declared={objectId:43210,pageId:'fixture-document',pageType:'document' as const,
+      dataSource:{headerPKProp:'code'}};
+    const lines={placement:{mode:'end' as const},columns:[{id:'parentCode',label:'Parent'}],
+      dataSource:{endpoint:'/differentSource',headerPKProp:'code',lineFKProp:'parentCode',parentFieldMap:{parentCategory:'category'}}};
+    const bound=await data.preparePage(declared,lines);
+    expect(bound.config.dataSource).toMatchObject({endpoint:'/fixtures',keyField:'systemId',headerPKProp:'code'});
+    expect(bound.lineConfig!.dataSource).toMatchObject(lines.dataSource);
+    expect(await data.preparePage(declared,lines)).toEqual(bound);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(contracts.resolvePage(declared,{...lines,dataSource:{endpoint:'/comments',lineFKProp:'recordId'}})
+      .lineConfig!.dataSource.lineFKProp).toBe('recordId');
   });
 
   it('loads only a requested published source and retains it per Company', async () => {
@@ -240,7 +272,7 @@ describe('Authenticated shared Core metadata contract', () => {
     get.mockReturnValue(of(contract));
     await firstValueFrom(data.loadCoreMetadata());
     const field = data.resolveFieldContract(source, { key: 'later', label: 'Later' });
-    expect(field.required).toBe(false);
+    expect(field.required).not.toBe(true);
     expect(fieldIsReadonly(field, {})).toBe(true);
     expect(fieldIsReadonly(field, { systemId: 'saved' })).toBe(false);
   });
@@ -255,7 +287,9 @@ describe('Authenticated shared Core metadata contract', () => {
       validation: { maxLength: 8 },
       lookup: { endpoint: '/custom', valueField: 'legacyId', displayField: 'caption' },
     };
-    expect(data.resolveFieldContract(source, field)).toMatchObject(field);
+    expect(data.resolveFieldContract(source, field)).toMatchObject({
+      ...field, required: true, readonlyAfterCreate: true, valueType: 'code',
+    });
     const legacy = { ...source, addressStyle: 'odata' as const };
     expect(data.resolveSourceContract(legacy)).toEqual(legacy);
     expect(
@@ -510,6 +544,33 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
     fixture.destroy();
   });
+
+  it('loads schema constraints even when every Page editor has an explicit presentation type', async () => {
+    session.SuperAdmin = true;
+    vi.spyOn(data, 'loadList').mockReturnValue(of({value: [], meta: {total: 0}}));
+    const fixture = TestBed.createComponent(ListPage);
+    fixture.componentRef.setInput('listConfig', {pageId: 'fixtures', pageType: 'card', title: 'Fixtures', dataSource: source});
+    fixture.componentRef.setInput('headerConfig', {sections: [{id: 'general', fields: [{key: 'code', label: 'Code', type: 'text'}]}]});
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(get.mock.calls.some(([url]) => String(url).includes('/fieldContracts?path='))).toBe(true);
+    expect(fixture.componentInstance.headerConfig.sections[0].fields[0].validation?.maxLength).toBe(20);
+    expect(fixture.componentInstance.headerConfig.sections[0].fields[0].type).toBe('text');
+    fixture.destroy();
+  });
+
+  it('does not open an Object editor or issue record reads when its required contract fails', async () => {
+    session.SuperAdmin = true;
+    get.mockReturnValue(throwError(() => new Error('unavailable')));
+    const records = vi.spyOn(data, 'loadList');
+    const fixture = TestBed.createComponent(ListPage);
+    fixture.componentRef.setInput('listConfig', {pageId: 'fixtures', objectId: 10000, pageType: 'card', title: 'Fixtures'});
+    fixture.componentRef.setInput('headerConfig', {sections: [{id: 'general', fields: [{key: 'code', label: 'Code'}]}]});
+    fixture.detectChanges(); await fixture.whenStable();
+    await vi.waitFor(() => expect(fixture.componentInstance.error).toContain('Page Object contract could not be resolved'));
+    expect(records).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+    fixture.destroy();
+  });
   for (const manual of [false, true])
     it('retains a header edit excluded by configuration in ' + (manual ? 'manual' : 'automatic') + ' save', async () => {
       session.SuperAdmin = true;
@@ -559,14 +620,15 @@ describe('Authenticated shared Core metadata contract', () => {
       expect(patch).not.toHaveBeenCalled();
       fixture.destroy();
     });
-  it('opens the setup page without waiting for capability discovery', async () => {
+  it('opens the setup page after its source contract without schema-wide discovery', async () => {
     const pending = new Subject<unknown>();
-    get.mockImplementation((url: string) => url.endsWith('/apiCapabilities') ? pending : of({data:{systemId:'saved',code:'A',systemRowVersion:1}}));
+    get.mockImplementation((url: string) => url.endsWith('/apiCapabilities') ? pending : url.includes('/fieldContracts?') ? of(metadata()) : of({data:{systemId:'saved',code:'A',systemRowVersion:1}}));
     session.SuperAdmin = true;
     const fixture = TestBed.createComponent(ListPage);
     fixture.componentRef.setInput('listConfig',{...paymentTermsListConfig,pageType:'setup',dataSource:{...source,singleton:true}});
     fixture.componentRef.setInput('headerConfig',{sections:[{id:'general',title:'General',fields:[{key:'code',label:'Code'}]}]});
     fixture.componentRef.setInput('documentOnly',true);fixture.componentRef.setInput('initialRecord',{});fixture.detectChanges();
+    await fixture.whenStable(); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.entry-header')).not.toBeNull();
     expect(get.mock.calls.some(([url]) => String(url).includes('/apiCapabilities'))).toBe(false);
     // Existing record loading can still lock the editor; metadata must not gate it.

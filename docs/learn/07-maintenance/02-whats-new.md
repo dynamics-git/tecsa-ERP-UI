@@ -1,5 +1,13 @@
 # What's new in developer documentation
 
+## 6 November 2026: explicit Page links, optional source defaults
+
+Reverted backend-ownership-driven Page composition. Object IDs still resolve the
+Page's published API source and authorized schema fields. Header/Line config
+explicitly selects the related source, business-key mapping and filters; shared
+Core does not select or constrain parts from backend ownership or database FKs.
+See [field contracts](/documentation/core/field-contract-details).
+
 ## 6 November 2026: selected-resource permission editing
 
 Permission Set resource lines now open Page Permissions with the selected business
