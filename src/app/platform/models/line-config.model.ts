@@ -54,6 +54,8 @@ export interface LineColumnConfig extends DataSurfaceColumnConfig {
 }
 
 export interface LineConfig {
+  /** Select an existing published ownership only when the Page has several. */
+  relationship?: string;
   /** Explicit data field containing the line kind; unlike lineType, it is a column key. */
   typeField?: string;
   /** Explicit permission scope for a child master with separate backend rights. */
@@ -73,3 +75,6 @@ export interface LineConfig {
   totalsCalculation?: LineTotalsCalculationConfig;
   footerSections?: FooterSectionConfig[];
 }
+
+/** Declaration resolved by the existing Page Core before any line CRUD runs. */
+export type ObjectLineConfig = Omit<LineConfig, 'dataSource'> & { dataSource?: Partial<DataSourceConfig> };

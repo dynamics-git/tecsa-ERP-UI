@@ -13,9 +13,9 @@ import { catchError, map } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
 import { AttachmentsConfig, DocumentWindowConfig, HeaderConfig, LineTotalsConfig, DocumentStatusMessage } from '../../models/document-window-config.model';
-import { MINIMUM_LINE_GRID_ROWS, LineColumnConfig, LineConfig } from '../../models/line-config.model';
+import { MINIMUM_LINE_GRID_ROWS, LineColumnConfig, LineConfig, ObjectLineConfig } from '../../models/line-config.model';
 import { CommandConfig } from '../../models/command-config.model';
-import { ListCommandSelectionMode, ListPageConfig } from '../../models/page-config.model';
+import { ListCommandSelectionMode, ListPageConfig, ObjectPageConfig } from '../../models/page-config.model';
 import { DataSourceConfig } from '../../models/data-source-config.model';
 import { GENERIC_MESSAGES } from '../../models/generic-messages';
 import { ActionDispatcherService } from '../../../shared/ui/action-dispatcher.service';
@@ -195,10 +195,22 @@ export class ListPage implements OnInit, OnDestroy {
     return this.documentWindow?.validateLine(row,field,value) ?? Promise.resolve({valid:false,errors:['Open a record before changing lines.']});
   }
   @Input() pageId = 'document';
-  @Input() listConfig: RequiredListConfig = {} as RequiredListConfig;
+  private configuredPage: ListPageConfig | ObjectPageConfig = {};
+  private resolvedPage: RequiredListConfig = {} as RequiredListConfig;
+  @Input() set listConfig(value: ListPageConfig | ObjectPageConfig) {
+    this.configuredPage = value;
+    this.resolvedPage = {...value, dataSource: {endpoint: '', ...value.dataSource}};
+  }
+  get listConfig(): RequiredListConfig { return this.resolvedPage; }
   @Input() setupConfig?: RequiredListConfig;
   @Input() headerConfig: HeaderConfig = {dialogTitle: '', toolbarButtons: [], sections: []};
-  @Input() lineConfig?: LineConfig;
+  private configuredLines?: LineConfig | ObjectLineConfig;
+  private resolvedLines?: LineConfig;
+  @Input() set lineConfig(value: LineConfig | ObjectLineConfig | undefined) {
+    this.configuredLines = value;
+    this.resolvedLines = value ? {...value, dataSource: {endpoint: '', ...value.dataSource}} : undefined;
+  }
+  get lineConfig(): LineConfig | undefined { return this.resolvedLines; }
   @Input() documentOnly = false;
   @Input() initialRecord?: Record<string, unknown>;
   @Output() closeRequested = new EventEmitter<void>();
@@ -328,22 +340,30 @@ export class ListPage implements OnInit, OnDestroy {
       this.listConfig = this.setupConfig;
     }
 
+    if (this.configuredPage.objectId !== undefined) {
+      void this.dataSource.preparePage(this.configuredPage, this.configuredLines).then(resolved => {
+        if (this.destroyed) return;
+        this.resolvedPage = resolved.config;
+        this.resolvedLines = resolved.lineConfig;
+        this.loadFieldContracts();
+      }).catch(() => {
+        if (this.destroyed) return;
+        this.error = 'The published Page Object contract could not be resolved. Refresh to retry.';
+        this.changeDetector.markForCheck();
+      });
+      return;
+    }
+
     if (!this.listConfig?.dataSource) {
       throw new Error('ListPage requires listConfig or setupConfig with dataSource.');
     }
 
-    // Thin BC-style Pages omit physical field types; resolve those from the
-    // published source before constructing editors or create prerequisites.
-    // Existing explicit configs remain usable when discovery is unavailable.
-    const needsFieldContract = this.headerConfig.sections.some(section =>
-      section.fields.some(field => field.type === undefined && field.valueType === undefined)
-    ) || !!this.lineConfig?.columns.some(column =>
-      column.type === undefined && column.valueType === undefined
-    );
-    if (!needsFieldContract) {
-      this.initializePage();
-      return;
-    }
+    this.loadFieldContracts();
+  }
+
+  private loadFieldContracts(): void {
+    // Editor presentation is not a field-contract opt-out. Resolve published
+    // constraints before deriving defaults/readiness even for explicit editors.
     const sources = [this.listConfig.dataSource, ...(this.lineConfig ? [this.lineConfig.dataSource] : [])];
     this.subscriptions.add(forkJoin(sources.map(source =>
       this.dataSource.loadSourceContract(source).pipe(
@@ -371,7 +391,7 @@ export class ListPage implements OnInit, OnDestroy {
       const lineSource = prepared.dataSource;
       const columns = prepared.columns.map(column => {
         const field = this.dataSource.resolveFieldContract(lineSource, {...column, type: undefined, key: column.field ?? column.id});
-        return {...column, lookup: field.lookup, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
+        return {...column, type: column.type ?? field.type, lookup: field.lookup, options: column.options ?? field.options, valueType: field.valueType, defaultValue: field.defaultValue, readonly: field.readonly,
           readonlyAfterCreate: field.readonlyAfterCreate, readonlyWhen: field.readonlyWhen, required: field.required,
           requiredWhen: field.requiredWhen, validation: field.validation};
       });
@@ -379,7 +399,7 @@ export class ListPage implements OnInit, OnDestroy {
         ...declared,
         columns,
         dataSource: {
-          ...this.dataSource.resolveSourceContract(lineSource),
+          ...this.dataSource.resolveSourceContract(declared.dataSource),
           // Keep deliberate page prerequisites; otherwise derive them from the
           // final resolved columns, never the intermediate declaration.
           requiredCreateFields: declared.dataSource.requiredCreateFields,
@@ -388,6 +408,16 @@ export class ListPage implements OnInit, OnDestroy {
     }
     this.pageId = this.listConfig.pageId ?? this.pageId;
     this.listConfig = { ...this.listConfig, dataSource: headerDataSourceDefaults(this.listConfig.dataSource, this.headerConfig) };
+    if (this.listConfig.dataSurface) this.resolvedPage = {...this.listConfig, dataSurface: {...this.listConfig.dataSurface,
+      columns: this.listConfig.dataSurface.columns.map(column => {
+        const field = this.dataSource.resolveFieldContract(source, {key: column.field ?? column.id ?? '', label: column.label});
+        return {...column, type: column.type ?? field.type};
+      })}};
+    if (this.listConfig.factBox?.sections) this.resolvedPage = {...this.listConfig, factBox: {...this.listConfig.factBox,
+      sections: this.listConfig.factBox.sections.map(section => ({...section, fields: section.fields?.map(field => {
+        const contract = this.dataSource.resolveFieldContract(source, {key: field.field ?? field.id, label: field.label});
+        return {...field, type: field.type ?? contract.type};
+      })}))}};
     const permission = this.sessionService.Permissions.find(value => this.isRecord(value) && (value['pageId'] === this.permissionPageId || value['PageId'] === this.permissionPageId));
     const query = this.isRecord(permission) && this.isRecord(permission['query']) ? permission['query'] : undefined;
     // Search-field selection belongs to the Page. Older server search lists
@@ -3254,7 +3284,7 @@ export class ListPage implements OnInit, OnDestroy {
   private isLineRowMeaningfullyEmpty(row: Record<string, unknown>): boolean {
     if (this.invalidLineDrafts.get(row)?.size) return false;
     const fields = this.lineConfig?.dataSource.meaningfulFields;
-    if (fields?.length) {
+    if (fields) {
       const hasMeaningfulValue = fields.some(field => this.hasValue(row[field]) && row[field] !== 0 && row[field] !== false);
       const changedDefault = (this.lineConfig?.columns ?? []).some(column => {
         if (column.readonly || column.defaultValue === undefined) return false;
