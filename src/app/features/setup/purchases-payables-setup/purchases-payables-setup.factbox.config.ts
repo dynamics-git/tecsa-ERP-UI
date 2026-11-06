@@ -8,33 +8,33 @@ export const purchasesPayablesSetupFactBoxConfig: FactBoxConfig = {
       title: 'Setup',
       fields: [
         {
-          id: 'vendorNoSeriesId',
-          field: 'vendorNoSeriesId',
+          id: 'vendorNos',
+          field: 'vendorNos',
           label: 'Vendor No Series',
         },
         {
-          id: 'requisitionNoSeriesId',
-          field: 'requisitionNoSeriesId',
+          id: 'requisitionNos',
+          field: 'requisitionNos',
           label: 'Requisition No Series',
         },
         {
-          id: 'orderNoSeriesId',
-          field: 'orderNoSeriesId',
+          id: 'orderNos',
+          field: 'orderNos',
           label: 'Order No Series',
         },
         {
-          id: 'postedReceiptNoSeriesId',
-          field: 'postedReceiptNoSeriesId',
+          id: 'postedReceiptNos',
+          field: 'postedReceiptNos',
           label: 'Posted Receipt No Series',
         },
         {
-          id: 'invoiceNoSeriesId',
-          field: 'invoiceNoSeriesId',
+          id: 'invoiceNos',
+          field: 'invoiceNos',
           label: 'Invoice No Series',
         },
         {
-          id: 'postedInvoiceNoSeriesId',
-          field: 'postedInvoiceNoSeriesId',
+          id: 'postedInvoiceNos',
+          field: 'postedInvoiceNos',
           label: 'Posted Invoice No Series',
         },
         {
