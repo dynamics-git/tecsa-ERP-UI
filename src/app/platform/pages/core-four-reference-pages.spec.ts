@@ -168,7 +168,7 @@ describe('Core acceptance: four independent reference Pages', () => {
     const { fixture, page, post, patch } = mount('card', { initial: { description: 'Incomplete' } });
     await vi.waitFor(() => expect(page.inlineDocumentWindowConfig?.headerData?.['description']).toBe('Incomplete'));
     page.handleInlineAction({ actionKey: 'cmd:save' });
-    await vi.waitFor(() => expect(page.savingEntry).toBe(false));
+    await fixture.whenStable();
     expect(post).not.toHaveBeenCalled();
     expect(patch).not.toHaveBeenCalled();
     expect(page.inlineDocumentWindowConfig?.headerData?.['systemId']).toBeUndefined();
