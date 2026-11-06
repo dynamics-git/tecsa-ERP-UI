@@ -1,7 +1,7 @@
 import { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
 import { lookupQuery } from './lookup-dependencies';
 import { Inject, Injectable, InjectionToken, Optional, ErrorHandler } from '@angular/core';
-import { Observable, Subject, firstValueFrom, from, of } from 'rxjs';
+import { Observable, Subject, defer, firstValueFrom, from, of } from 'rxjs';
 import { finalize, map, shareReplay, catchError } from 'rxjs/operators';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
