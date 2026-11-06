@@ -166,10 +166,12 @@ describe('Core acceptance: four independent reference Pages', () => {
 
   it('Card: creates only on explicit Save and updates only the changed field', async () => {
     const { fixture, page, post, patch } = mount('card', { initial: { code: 'NEW', description: 'New' } });
-    await vi.waitFor(() => expect(page.inlineDocumentWindowConfig?.contentReady).toBe(true));
+    // An unsaved Card is initialized locally, not hydrated from an API record.
+    await vi.waitFor(() => expect(page.inlineDocumentWindowConfig?.headerData?.['code']).toBe('NEW'));
     expect(post).not.toHaveBeenCalled();
     page.handleInlineAction({ actionKey: 'cmd:save' });
     await vi.waitFor(() => expect(post).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(page.hasPendingWrites).toBe(false));
     expect(post.mock.calls[0][0]).toBe('/referenceCards');
     expect(post.mock.calls[0][1]).toMatchObject({ code: 'NEW', description: 'New' });
     expect(post.mock.calls[0][1]).not.toHaveProperty('systemId');
