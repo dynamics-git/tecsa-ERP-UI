@@ -1,4 +1,5 @@
 @if (documentOnly || isInlineEntryPage) {
+  @if (pageContractPending) { <div role="status" aria-live="polite">Loading page…</div> }
   @if (inlineDocumentWindowConfig; as entry) {
     <app-document-window
       [preferenceKey]="pageId" [embedded]="!documentOnly" [worksheet]="isWorksheetPage"
@@ -22,7 +23,7 @@
   [data]="rows"
   [showCommandBar]="false"
   [hasMore]="hasMore"
-  [loading]="loading"
+  [loading]="loading || pageContractPending"
   [errorMessage]="error"
   [selectedRecord]="selectedRow"
   (loadMore)="loadNextPage()"
