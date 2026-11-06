@@ -93,9 +93,12 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
       fields: [
         // Display the backend enum caption. Raw documentType remains in header data for line binding.
         {
-          key: 'documentType',
+          key: 'documentTypeLabel',
           label: 'Document Type',
+          type: 'text',
           readonly: true,
+          // Unsaved generic-CRUD records do not yet have the derived API caption.
+          defaultValue: 'Purchase Requisition',
         },
         {
           key: 'number',

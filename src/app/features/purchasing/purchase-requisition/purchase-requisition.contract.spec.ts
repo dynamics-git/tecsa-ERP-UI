@@ -19,7 +19,10 @@ describe('Thin PR declaration against its real PostgreSQL field contract', () =>
   });
   it('declares only published fields and leaves physical validation to Core', () => {
     const sources=prFieldContractFixture.data.entities;
-    for(const field of header.sections.flatMap(section=>section.fields))expect(field.key in sources.purchaseRequisitions.fields).toBe(true);
+    for(const field of header.sections.flatMap(section=>section.fields).filter(field=>field.key!=='documentTypeLabel'))
+      expect(field.key in sources.purchaseRequisitions.fields).toBe(true);
+    expect(header.sections.flatMap(section=>section.fields).find(field=>field.key==='documentTypeLabel'))
+      .toMatchObject({type:'text',readonly:true,defaultValue:'Purchase Requisition'});
     for(const column of line.columns)expect((column.field??column.id) in sources.purchaseRequisitionLines.fields).toBe(true);
     expect(line.columns.find(column=>column.id==='description')?.validation).toBeUndefined();
     expect(resolved.columns.find(column=>column.id==='description')?.validation?.maxLength).toBe(100);

@@ -2,6 +2,10 @@
 
 ## 6 November 2026: explicit Page links, optional source defaults
 
+The original PR FactBox configuration is retained in full. Document Type displays
+the existing read-only `documentTypeLabel`, with the PR caption for a record that
+does not yet have a derived label; raw `documentType` stays in the data for links.
+
 Reverted backend-ownership-driven Page composition. Object IDs still resolve the
 Page's published API source and authorized schema fields. Header/Line config
 explicitly selects the related source, business-key mapping and filters; shared
