@@ -146,6 +146,30 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     http.expectNone(req => req.url.includes('/auth/context'));
   });
 
+  it('does not erase a record or retry when Laravel rejects a Delete with 409', async () => {
+    const operation = firstValueFrom(data.delete(source, rowId, 1));
+    const request = await receive('DELETE', resource() + '/' + rowId);
+    expect(request.request.headers.get('If-Match')).toBe('"1"');
+    request.flush({ message: 'Related records prevent deletion.' }, { status: 409, statusText: 'Conflict' });
+    await expect(operation).rejects.toMatchObject({ status: 409 });
+    http.expectNone(req => req.method === 'DELETE');
+    expect(session.logout).not.toHaveBeenCalled();
+  });
+
+  it('preserves invalid input and the server 422 validation response without a POST retry', async () => {
+    const draft = { code: 'TOO-LONG-FOR-COLUMN-20', description: 'Unsaved draft' };
+    const operation = firstValueFrom(data.create(source, draft));
+    const request = await receive('POST', resource());
+    expect(request.request.body).toEqual(draft);
+    request.flush({
+      error: { message: 'Validation failed', details: { code: ['Code must have at most 20 characters'] } },
+    }, { status: 422, statusText: 'Unprocessable Entity' });
+    await expect(operation).rejects.toMatchObject({ status: 422 });
+    expect(draft).toEqual({ code: 'TOO-LONG-FOR-COLUMN-20', description: 'Unsaved draft' });
+    http.expectNone(req => req.method === 'POST');
+    expect(session.logout).not.toHaveBeenCalled();
+  });
+
   it('uses the newly selected company for its next Page GET, without a context API fetch', async () => {
     const first = firstValueFrom(data.loadList(source, { useCache: true }));
     (await receive('GET', resource())).flush({ data: [record(1)], meta: { total: 1, recordShape: 'complete' } });
