@@ -32,11 +32,6 @@ export const noSeriesFactBoxConfig: FactBoxConfig = {
           field: 'dateOrder',
           label: 'Date Order',
         },
-        {
-          id: 'isActive',
-          field: 'isActive',
-          label: 'Is Active',
-        },
       ],
     },
   ],
