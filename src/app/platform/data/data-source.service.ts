@@ -1,7 +1,7 @@
 import { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
 import { lookupQuery } from './lookup-dependencies';
 import { Inject, Injectable, InjectionToken, Optional, ErrorHandler } from '@angular/core';
-import { Observable, Subject, defer, firstValueFrom, from, of } from 'rxjs';
+import { Observable, Subject, firstValueFrom, from, of } from 'rxjs';
 import { finalize, map, shareReplay, catchError } from 'rxjs/operators';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceContext } from '../../core/services/workspace-context';
@@ -52,7 +52,7 @@ export class DataSourceService {
   }
   /** Identifies the current read/access generation for prepared view snapshots. */
   getReadGeneration(): number { this.key('/'); return this.readGeneration; }
-  invalidateReadCache(): void { this.contracts.clearMetadata(); this.metadataLoadedAt = 0; this.metadataRequest = undefined; this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
+  invalidateReadCache(): void { this.contracts.clearMetadata(); this.readGeneration++; this.records.clear(); this.lists.clear(); this.requests.clear(); }
   private cacheRecord(key: string, value: Record<string, unknown>, at = Date.now()): void {
     if (this.records.size >= 100) this.records.delete(this.records.keys().next().value!);
     this.records.set(key, { value: structuredClone(value), at });
@@ -91,27 +91,6 @@ export class DataSourceService {
     @Optional() private readonly hookErrors?: ErrorHandler,
   ) {}
 
-  private metadataRequest?: Observable<boolean>;
-  private metadataLoadedAt = 0;
-  /** Optional discovery; an outage preserves explicit legacy configuration. */
-  loadCoreMetadata(): Observable<boolean> {
-    this.key('/apiCapabilities');
-    if (!this.session.Company || !this.rest) return of(false);
-    if (this.metadataRequest) return this.metadataRequest;
-    if (Date.now() - this.metadataLoadedAt < 30000) return of(true);
-    this.contracts.clearMetadata();
-    this.metadataLoadedAt = 0;
-    const context = this.context();
-    const generation = this.readGeneration;
-    const request = defer(() => this.client.get(this.endpoint({endpoint:'/apiCapabilities'}))).pipe(map(response => {
-      if (context !== this.context() || generation !== this.readGeneration) return false;
-      const accepted = this.contracts.acceptMetadata(response);
-      if (accepted) this.metadataLoadedAt = Date.now();
-      return accepted;
-    }), catchError(() => of(false)), finalize(() => { if (this.metadataRequest === request) this.metadataRequest = undefined; }), shareReplay({bufferSize:1,refCount:true}));
-    this.metadataRequest = request;
-    return request;
-  }
   usesGenericContract(source: DataSourceConfig): boolean { this.key(source.endpoint); return this.contracts.usesGenericContract(source); }
   assertEditedFields(source: DataSourceConfig, operation: 'create' | 'update', record: Record<string, unknown>, fields: Iterable<string>): void {
     this.key(source.endpoint);
