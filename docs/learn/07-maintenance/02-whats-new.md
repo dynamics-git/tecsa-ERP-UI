@@ -1,5 +1,34 @@
 # What's new in developer documentation
 
+## 7 November 2026: consistent list loading position
+
+Initial loading and refreshing an existing list now place the existing indicator
+in the center of the table body. Refresh still retains the existing rows and
+does not block their interaction. Background-save notices remain separate and
+continue reporting unconfirmed writes after an editor closes; they are not
+replaced by a list-loading indicator. This presentation correction does not
+change write queues, save confirmation, retries or API timing.
+
+## 7 November 2026: four consistent CRUD page references
+
+Aligned PR Document/List, Payment Terms Card/List, Source Code Setup and Company
+Access Worksheet against current declarations and individual migrations. Kept
+the same HTML/TypeScript/Config/FactBox files and expanded configuration pattern.
+Corrected retired master GUID fields to stored codes/numbers and collection-based
+lookup reads; removed Payment Terms' nonexistent Active field and obsolete decimal
+limit. PR record responses reuse the existing Enum-aware Resources. Normal PR
+authoring requires a manual No.; automatic numbering and business command behavior
+remain deferred. See [the four examples](/documentation/frontend/page-pattern).
+
+## 7 November 2026: individual backend API source declarations
+
+Restored individual thin Laravel controllers in place of the consolidated table
+controller. Removed its bulk publisher, which stripped individual declarations.
+All 765 relocated effective API contracts retain their existing endpoints,
+permissions and operation restrictions. Business command controllers and Angular
+page configuration remain unchanged. See
+[table and API development](/documentation/backend/table-and-api).
+
 ## 7 November 2026: remove retired capability discovery
 
 Removed the unused `apiCapabilities` HTTP loader and its metadata parser/cache,

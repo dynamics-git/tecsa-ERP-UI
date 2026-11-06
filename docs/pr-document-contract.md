@@ -1,5 +1,22 @@
 # Purchase Requisition document contract
 
+## Current normal CRUD alignment — 7 November 2026
+
+The Header stores `noSeriesCode` and `locationCode`; line master identity is
+`lineType` + `number`, with `unitOfMeasureCode` and `locationCode`. The former
+GUID field names are not part of this schema. Lookup searches and selected-value
+reads use the published master source and business code/number.
+
+A manual Header No. is required before draft creation. Automatic number assignment
+is not implemented by the current generic PR source. The existing backend PR
+Resources are reused by shared CRUD responses, including create/update, so the
+existing `DocumentType` Enum supplies the caption after the record exists.
+No client document-type value is fabricated for an unsaved editor.
+
+Existing FactBox sections, actions and UI preview calculations remain in place.
+Their deferred business aggregates/workflows are not completed by this correction.
+Earlier test counts below are historical evidence, not acceptance of this change.
+
 ## Record identity and document relationship
 
 `systemId` remains the API identity for reading, updating and deleting a record.

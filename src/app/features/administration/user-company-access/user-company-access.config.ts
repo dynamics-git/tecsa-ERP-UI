@@ -6,6 +6,7 @@ import {
 } from '../../../platform/public-api';
 import { userCompanyAccessFactBoxConfig } from './user-company-access.factbox.config';
 
+// The list and worksheet rows use the same source and user context.
 const userCompanyAccessDataSource: DataSourceConfig = {
   endpoint: '/companyUsers',
   keyField: 'systemId',
@@ -54,6 +55,7 @@ export const userCompanyAccessLineConfig: LineConfig = {
       id: 'companyCode',
       label: 'Company',
       type: 'lookup',
+      valueType: 'code',
       required: true,
       readonlyAfterCreate: true,
       lookup: {

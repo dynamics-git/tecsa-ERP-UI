@@ -1,5 +1,14 @@
 # Create a table and its API
 
+## Individual controller recovery — 7 November 2026
+
+The Laravel correction branch restores individual controllers for the 765
+declarations previously held in the consolidated table controller. This moves
+the declarations without changing their API paths, field contracts, permissions,
+singleton/read-only restrictions or existing deletion policies. Angular endpoint
+and Header–Line configuration is unchanged. No business command controller was
+overwritten and no replacement CRUD engine or metadata endpoint was introduced.
+
 ## Current table-first phase — 5 November 2026
 
 Required structure: **Individual Migration -> Model -> Individual Controller +

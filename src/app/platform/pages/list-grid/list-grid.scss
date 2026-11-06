@@ -81,18 +81,15 @@
 
 .list-loading-state {
   position: absolute;
-  inset: 0;
+  inset: var(--ts-table-head-h) 0 0;
   z-index: 3;
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: calc(var(--ts-table-head-h) + 10px) 14px 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
   pointer-events: none;
 
   &.initial-loading {
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
     background: var(--ts-loader-surface);
   }
 }
@@ -526,7 +523,6 @@
 .list-save-view > span { width: 100%; color: var(--ts-muted); font-size: var(--ts-font-caption); }
 .list-preference-message { padding: 6px 10px; color: var(--ts-text-soft); font-size: var(--ts-font-caption); background: var(--ts-surface-soft); }
 .list-preference-message button { border: 0; background: transparent; color: inherit; cursor: pointer; }
-.list-loading-state.initial-loading { inset: var(--ts-table-head-h) 0 0; }
 .app-grid tbody tr:focus-visible { outline: 2px solid var(--ts-border-focus); outline-offset: -2px; }
 .column-resizer:focus-visible { background: var(--ts-surface-selected); outline: 2px solid var(--ts-border-focus); }
 .list-statusbar { flex: 0 0 auto; min-height: 32px; padding: 4px 10px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--ts-border-soft); color: var(--ts-muted); font-size: var(--ts-font-caption); }
