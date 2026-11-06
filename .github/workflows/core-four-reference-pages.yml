@@ -29,3 +29,9 @@ jobs:
       - run: npx tsc --noEmit -p tsconfig.app.json
       - name: Four reference CRUD and Save flows
         run: npm run ng -- test --watch=false --include='src/app/platform/pages/core-four-reference-pages.spec.ts'
+      - name: Shared Page, Data and Document Core regression suite
+        run: >-
+          npm run ng -- test --watch=false
+          --include='src/app/platform/pages/**/*.spec.ts'
+          --include='src/app/platform/data/**/*.spec.ts'
+          --include='src/app/platform/document/**/*.spec.ts'
