@@ -196,7 +196,7 @@ describe('Authenticated shared Core metadata contract', () => {
     expect(post.mock.calls[0][1]).toEqual(input);
   });
   it('does not lose tracked edits to explicit allowlists without remote metadata', async () => {
-        const input = { description: 'Retain this edit' };
+    const input = { description: 'Retain this edit' };
     expect(() => data.assertEditedFields({ ...source, createFields: ['code'] }, 'create', input, ['description'])).toThrow('description');
     expect(() => data.assertEditedFields({ ...source, updateBlockedFields: ['description'] }, 'update', input, ['description'])).toThrow('description');
     expect(input.description).toBe('Retain this edit');
