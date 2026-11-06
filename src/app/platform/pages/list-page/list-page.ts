@@ -341,6 +341,10 @@ export class ListPage implements OnInit, OnDestroy {
     }
 
     if (this.configuredPage.objectId !== undefined) {
+      // Page identity is presentation, not a protected data contract. Show the
+      // title and configured command labels immediately, but keep actions inert
+      // until the authorized Object and field contracts have resolved.
+      if (!this.documentOnly) this.publishPendingPageShell();
       void this.dataSource.preparePage(this.configuredPage, this.configuredLines).then(resolved => {
         if (this.destroyed) return;
         this.resolvedPage = resolved.config;
@@ -359,6 +363,23 @@ export class ListPage implements OnInit, OnDestroy {
     }
 
     this.loadFieldContracts();
+  }
+
+  private publishPendingPageShell(): void {
+    const config = this.configuredPage;
+    this.actionDispatcher.setPageContext({
+      title: config.title ?? '',
+      module: config.module,
+      company: config.company,
+      viewSuffix: config.viewSuffix,
+    });
+    const visible = [
+      ...(config.commands ?? []),
+      ...(config.pageType === 'worksheet' ? this.configuredLines?.toolbarButtons ?? [] : []),
+    ];
+    // Do not publish a pageId or enable actions before permission/field
+    // metadata is available; initializePage installs the authorized commands.
+    this.actionDispatcher.setPageCommands(visible.map(command => ({...command, disabled: true})));
   }
 
   private loadFieldContracts(): void {
