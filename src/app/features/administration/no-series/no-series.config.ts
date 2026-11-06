@@ -3,85 +3,30 @@ import {
   HeaderConfig,
   LineConfig,
   ListPageConfig,
-  listColumns,
 } from '../../../platform/public-api';
 import { noSeriesFactBoxConfig } from './no-series.factbox.config';
 
-// Header form.
+// BC-style worksheet: the series themselves are editable grid rows.
+// Range Lines and Relationships open as separate related worksheets.
+const noSeriesSource: DataSourceConfig = {
+  endpoint: '/numberSeries',
+  keyField: 'systemId',
+  defaultSort: 'code asc',
+  pageSize: 50,
+};
+
 export const noSeriesHeaderConfig: HeaderConfig = {
   dialogTitle: 'No. Series',
   toolbarButtons: [],
-  sections: [
-    {
-      id: 'general',
-      title: 'General',
-      fields: [
-        {
-          key: 'code',
-          label: 'Code',
-          type: 'code',
-          required: true,
-          validation: {
-            maxLength: 20,
-          },
-        },
-        {
-          key: 'description',
-          label: 'Description',
-          type: 'text',
-          required: true,
-          validation: {
-            maxLength: 100,
-          },
-          width: 'wide',
-        },
-        {
-          key: 'defaultNos',
-          label: 'Default Nos.',
-          type: 'boolean',
-          defaultValue: true,
-        },
-        {
-          key: 'manualNos',
-          label: 'Manual Nos.',
-          type: 'boolean',
-          defaultValue: false,
-        },
-        {
-          key: 'dateOrder',
-          label: 'Date Order',
-          type: 'boolean',
-          defaultValue: false,
-        },
-        {
-          key: 'isActive',
-          label: 'Active',
-          type: 'boolean',
-          defaultValue: true,
-        },
-      ],
-    },
-  ],
+  sections: [],
 };
 
-// List page.
-export const noSeriesListConfig: ListPageConfig & {
-  dataSource: DataSourceConfig;
-} = {
+export const noSeriesListConfig: ListPageConfig & { dataSource: DataSourceConfig } = {
   pageId: 'no-series',
-  pageType: 'document',
+  pageType: 'worksheet',
   title: 'No. Series',
-  dataSource: {
-    endpoint: '/numberSeries',
-    keyField: 'systemId',
-    headerPKProp: 'code',
-    defaultSort: 'code asc',
-    pageSize: 25,
-  },
-  identity: {
-    primaryField: 'code',
-    secondaryField: 'description',
-  },
+  dataSource: noSeriesSource,
+  identity: { primaryField: 'code', secondaryField: 'description' },
   module: 'Administration',
   menu: {
     module: 'Administration',
@@ -90,119 +35,39 @@ export const noSeriesListConfig: ListPageConfig & {
     moduleIcon: 'ts-icon ts-icon-administration-module',
     route: '/no-series',
   },
-  dataSurface: {
-    columns: listColumns(noSeriesHeaderConfig, [
-      {
-        field: 'code',
-        isPrimary: true,
-        type: 'text',
-      },
-      {
-        field: 'description',
-        width: '300px',
-      },
-      {
-        field: 'defaultNos',
-      },
-      {
-        field: 'manualNos',
-      },
-      {
-        field: 'dateOrder',
-      },
-      {
-        field: 'isActive',
-      },
-    ]),
-  },
   factBox: noSeriesFactBoxConfig,
 };
 
-// Document lines.
 export const noSeriesLineConfig: LineConfig = {
-  placement: {
-    mode: 'end',
-  },
-  dataSource: {
-    endpoint: '/numberSeries',
-    keyField: 'systemId',
-    // The saved header's systemId scopes every line request.
-    navigation: {
-      parentEndpoint: '/numberSeries',
-      parentIdFields: ['systemId'],
-      childCollection: 'lines',
+  placement: { mode: 'end' },
+  dataSource: noSeriesSource,
+  toolbarButtons: [
+    {
+      label: 'Lines',
+      actionKey: 'cmd:open-number-series-lines',
+      group: 'Related',
+      order: 40,
+      runModalPageId: 'no-series-lines',
+      runModalTarget: 'entry',
+      runModalRecord: { source: 'activeLine', fields: { code: 'code', systemId: 'systemId' } },
     },
-    defaultSort: 'lineNo asc',
-    pageSize: 100,
-    lineNo: true,
-  },
-  toolbarButtons: [],
+    {
+      label: 'Relationships',
+      actionKey: 'cmd:open-number-series-relationships',
+      group: 'Related',
+      order: 50,
+      runModalPageId: 'no-series-relationships',
+      runModalTarget: 'entry',
+      runModalRecord: { source: 'activeLine', fields: { code: 'code', systemId: 'systemId' } },
+    },
+  ],
   columns: [
-    {
-      id: 'lineNo',
-      label: 'Line No.',
-      type: 'integer',
-      readonly: true,
-    },
-    {
-      id: 'startingDate',
-      label: 'Starting Date',
-      type: 'date',
-      required: true,
-    },
-    {
-      id: 'startingNo',
-      label: 'Starting No.',
-      type: 'code',
-      required: true,
-      validation: {
-        maxLength: 20,
-      },
-    },
-    {
-      id: 'endingNo',
-      label: 'Ending No.',
-      type: 'code',
-      validation: {
-        maxLength: 20,
-      },
-    },
-    {
-      id: 'warningNo',
-      label: 'Warning No.',
-      type: 'code',
-      validation: {
-        maxLength: 20,
-      },
-    },
-    {
-      id: 'incrementBy',
-      label: 'Increment By',
-      type: 'integer',
-      defaultValue: 1,
-      required: true,
-      validation: {
-        min: 1,
-        max: 2147483647,
-      },
-    },
-    {
-      id: 'lastNoUsed',
-      label: 'Last No. Used',
-      type: 'code',
-      readonly: true,
-    },
-    {
-      id: 'lastDateUsed',
-      label: 'Last Date Used',
-      type: 'date',
-      readonly: true,
-    },
-    {
-      id: 'isOpen',
-      label: 'Open',
-      type: 'boolean',
-      readonly: true,
-    },
+    { id: 'code', label: 'Code', type: 'code', required: true, readonlyAfterCreate: true,
+      validation: { maxLength: 20 } },
+    { id: 'description', label: 'Description', type: 'text', width: '300px',
+      validation: { maxLength: 100 } },
+    { id: 'defaultNos', label: 'Default Nos.', type: 'boolean', defaultValue: false },
+    { id: 'manualNos', label: 'Manual Nos.', type: 'boolean', defaultValue: false },
+    { id: 'dateOrder', label: 'Date Order', type: 'boolean', defaultValue: false },
   ],
 };
