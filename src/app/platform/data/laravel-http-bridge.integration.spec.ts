@@ -24,7 +24,10 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
   const companyA = '11111111-1111-4111-8111-111111111111';
   const companyB = '22222222-2222-4222-8222-222222222222';
   const rowId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  // Source Codes is a live API with DELETE disabled by its ApiSource declaration.
   const source = { endpoint: '/sourceCodes', keyField: 'systemId' };
+  // runtimeRecords is the SDK test fixture explicitly registered by Backend EntityRuntimeTest.
+  const deleteEnabledFixture = { endpoint: '/runtimeRecords', keyField: 'systemId' };
   let http: HttpTestingController;
   let data: DataSourceService;
   let session: {
@@ -45,6 +48,7 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     isActive: true,
   });
   const resource = (company = companyA) => `${base}/companies/${company}/sourceCodes`;
+  const fixtureResource = `${base}/companies/${companyA}/runtimeRecords`;
 
   /** Mutations are queued; wait for the actual HttpClient request, not a timer. */
   async function receive(method: string, path: string): Promise<TestRequest> {
@@ -91,7 +95,7 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     }
   });
 
-  it('round-trips Laravel list, detail cache, create, PATCH with If-Match, and DELETE 204', async () => {
+  it('round-trips enabled Source Codes list, detail cache, POST and PATCH with If-Match', async () => {
     const listPromise = firstValueFrom(data.loadList(source, { top: 20, useCache: true }));
     const listRequest = await receive('GET', resource());
     expect(listRequest.request.urlWithParams).toContain('%24top=20');
@@ -121,14 +125,37 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
     updateRequest.flush({ data: record(2, 'Changed') }, { headers: { ETag: '"2"' } });
     expect(await updatePromise).toMatchObject({ description: 'Changed', systemRowVersion: 2 });
     expect(editor['systemRowVersion']).toBe(2);
-
-    const deletePromise = firstValueFrom(data.delete(source, rowId, editor['systemRowVersion']));
-    const deleteRequest = await receive('DELETE', resource() + '/' + rowId);
-    expect(deleteRequest.request.headers.get('If-Match')).toBe('"2"');
-    deleteRequest.flush(null, { status: 204, statusText: 'No Content' });
-    expect(await deletePromise).toBeNull();
     expect(session.logout).not.toHaveBeenCalled();
     http.expectNone(req => req.url.includes('/auth/context'));
+  });
+
+  it('does not expose DELETE for Source Codes when the server declares it disabled', async () => {
+    const metadataPromise = firstValueFrom(data.loadCoreMetadata());
+    const metadataRequest = await receive('GET', `${base}/companies/${companyA}/apiCapabilities`);
+    metadataRequest.flush({ data: {
+      contractVersion: '1.0',
+      entities: {
+        sourceCodes: {
+          kind: 'generic', path: 'sourceCodes', endpoint: 'sourceCodes', key: 'systemId',
+          fields: { code: { type: 'code', read: true, create: true, update: false } },
+          operations: { read: true, create: true, update: true, delete: false },
+        },
+      },
+      endpoints: [],
+    } });
+    expect(await metadataPromise).toBe(true);
+    expect(data.resolveSourceContract(source).supportsDelete).toBe(false);
+    await expect(firstValueFrom(data.delete(source, rowId, 2))).rejects.toThrow('does not support delete');
+    http.expectNone(req => req.method === 'DELETE');
+  });
+
+  it('accepts HTTP 204 only for a delete-enabled generic SDK record with an ETag', async () => {
+    const deletion = firstValueFrom(data.delete(deleteEnabledFixture, rowId, 2));
+    const request = await receive('DELETE', fixtureResource + '/' + rowId);
+    expect(request.request.headers.get('If-Match')).toBe('"2"');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    expect(await deletion).toBeNull();
+    expect(session.logout).not.toHaveBeenCalled();
   });
 
   it('preserves dirty edits on Laravel 412 and never blindly retries a stale PATCH', async () => {
@@ -147,8 +174,8 @@ describe('Laravel HTTP contract through the production Angular REST adapter', ()
   });
 
   it('does not erase a record or retry when Laravel rejects a Delete with 409', async () => {
-    const operation = firstValueFrom(data.delete(source, rowId, 1));
-    const request = await receive('DELETE', resource() + '/' + rowId);
+    const operation = firstValueFrom(data.delete(deleteEnabledFixture, rowId, 1));
+    const request = await receive('DELETE', fixtureResource + '/' + rowId);
     expect(request.request.headers.get('If-Match')).toBe('"1"');
     request.flush({ message: 'Related records prevent deletion.' }, { status: 409, statusText: 'Conflict' });
     await expect(operation).rejects.toMatchObject({ status: 409 });
