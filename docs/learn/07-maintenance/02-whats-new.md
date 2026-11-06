@@ -1,5 +1,15 @@
 # What's new in developer documentation
 
+## 7 November 2026: remove retired capability discovery
+
+Removed the unused `apiCapabilities` HTTP loader and its metadata parser/cache,
+inferred API methods, field rules, lookup search and nullable-to-null defaults.
+Page configuration and the existing Company login permissions remain the UI
+inputs. Explicit field defaults, including `null`, are preserved. Existing
+payload aliases/allowlists, CRUD hooks, ETags, autosave/manual save and Angular
+Header–Line links remain in their shared implementations. No replacement
+discovery endpoint or backend/schema change was added.
+
 ## 6 November 2026: document lines before lookup captions
 
 Removed duplicate page-level waiting for line lookup names. The existing shared

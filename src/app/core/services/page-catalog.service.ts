@@ -4,7 +4,6 @@ import { featurePageModules } from '../../features/feature-pages.generated';
 import { HeaderConfig, LineConfig, ListPageConfig, PageModule } from '../../platform/public-api';
 import { DocumentPageCommandAssemblerService } from '../../platform/pages/document-page-command-assembler.service';
 import { lineConfigDefaults } from '../../platform/data/document-config-defaults';
-import { EntityContractService } from '../../platform/data/entity-contract.service';
 import { StandardListActionsService } from '../../platform/pages/standard-list-actions.service';
 import { PermissionService } from './permission.service';
 import { queryCatalog } from './page-catalog-query';
@@ -104,11 +103,6 @@ export class PageCatalogService {
         endpoint = '',
       ) => {
         const systemId = JSON.stringify([page.pageId, targetType, surface, targetKey]);
-        const source = surface === 'line' ? line?.dataSource : page.dataSource;
-        const apiSource =
-          targetType === 'field' && source
-            ? this.injector.get(EntityContractService).sourceName(source)
-            : undefined;
         controls.set(systemId, {
           systemId,
           pageId: page.pageId,
@@ -117,7 +111,7 @@ export class PageCatalogService {
           targetKey,
           label,
           endpoint,
-          apiSource: apiSource ?? null,
+          apiSource: null,
         });
       };
       add('page', 'header', '*', page.title ?? page.pageId);
