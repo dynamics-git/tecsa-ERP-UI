@@ -1,0 +1,31 @@
+name: Core four reference Pages acceptance
+on:
+  push:
+    branches:
+      - 'core/four-reference-page-acceptance-20261106'
+    paths:
+      - '.github/workflows/core-four-reference-pages.yml'
+      - 'src/app/platform/pages/core-four-reference-pages.spec.ts'
+      - 'src/app/platform/**'
+  pull_request:
+    paths:
+      - '.github/workflows/core-four-reference-pages.yml'
+      - 'src/app/platform/pages/core-four-reference-pages.spec.ts'
+      - 'src/app/platform/**'
+permissions:
+  contents: read
+jobs:
+  core-four:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit -p tsconfig.app.json
+      - name: Four reference CRUD and Save flows
+        run: npm run ng -- test --watch=false --include='src/app/platform/pages/core-four-reference-pages.spec.ts'
