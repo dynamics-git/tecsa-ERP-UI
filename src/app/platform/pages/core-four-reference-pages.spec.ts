@@ -91,7 +91,6 @@ function mount(kind: ReferenceKind, options: {
   let savedHeader = structuredClone(header);
   const savedLines = kind === 'worksheet' ? [structuredClone(firstRow)] : [];
   const get = vi.fn((url: string) => {
-    if (url.includes('/apiCapabilities')) return of({ data: { contractVersion: '1.0', entities: {}, endpoints: [] } });
     if (url.includes('/referenceLines') || url.includes('/referenceWorksheetRows')) {
       return of({ data: structuredClone(savedLines), meta: { total: savedLines.length } });
     }
