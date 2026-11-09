@@ -9,7 +9,7 @@ import { resolvePageIdentity, recordIdentityText } from '../../data/record-ident
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
 import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, tap } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
 import { AttachmentsConfig, DocumentWindowConfig, HeaderConfig, LineTotalsConfig, DocumentStatusMessage } from '../../models/document-window-config.model';
@@ -208,6 +208,7 @@ export class ListPage implements OnInit, OnDestroy {
   hasMore = true;
   private nextCursor?: string;
   rows: unknown[] = [];
+  private listLookupGeneration = 0;
   selectedRow?: unknown;
 
   private listLoadSubscription?: Subscription;
@@ -3396,17 +3397,11 @@ export class ListPage implements OnInit, OnDestroy {
 
       buildFilter: (scope) => this.listFilterState.buildFilter(scope),
       hydrateTargetsFromRecords: (scope, records) => this.listFilterState.hydrateTargetsFromRecords(scope, records),
-      loadList: (dataSource, options) => this.dataSource.loadList(dataSource, { ...options, useCache: true, maxAgeMs: 30000 }).pipe(switchMap(response => {
-        const fields = this.headerConfig.sections.flatMap(section => section.fields).filter(field => field.lookup);
-        if (!fields.length) return of(response);
-        const page = response as DataPage;
-        return from(this.documentHydration.resolveListLookups(page.value, fields)).pipe(map(value => {
-          for (const record of value) {
-            const id = this.resolvePersistedRecordId(record, dataSource);
-            if (this.hasValue(id)) this.dataSource.cachePreparedRecord(dataSource, id, record, fields);
-          }
-          return {...page, value};
-        }));
+      loadList: (dataSource, options) => this.dataSource.loadList(dataSource, { ...options, useCache: true, maxAgeMs: 30000 }).pipe(tap(() => {
+        // Publish the API rows first. Caption lookups must not hold the list's
+        // data/loading lifecycle open or cause a second pagination emission.
+        const generation = ++this.listLookupGeneration;
+        queueMicrotask(() => void this.hydrateListCaptions(dataSource, generation));
       })),
       toRecords: (response) => this.toRecords(response),
       getErrorMessage: (error) => this.getErrorMessage(error),
@@ -3417,6 +3412,40 @@ export class ListPage implements OnInit, OnDestroy {
       beginScopeLoading: (scope, message) => this.runModalLoading.begin(scope, message),
       endScopeLoading: (scope) => this.runModalLoading.end(scope),
     };
+  }
+
+  private async hydrateListCaptions(dataSource: DataSourceConfig, generation: number): Promise<void> {
+    if (this.destroyed || generation !== this.listLookupGeneration) return;
+    const fields = this.headerConfig.sections.flatMap(section => section.fields).filter(field => field.lookup);
+    if (!fields.length) return;
+    const rows = this.rows;
+    const records = rows.filter((row): row is Record<string, unknown> => this.isRecord(row));
+    const current = () => !this.destroyed && generation === this.listLookupGeneration && rows === this.rows;
+    try {
+      const captions = await this.documentHydration.resolveListLookups(records, fields, {}, current);
+      if (!current()) return;
+      const optionKeys = new Set(fields.map(field => field.optionsDataKey ?? '__options_' + field.key));
+      for (let index = 0; index < records.length; index++) {
+        const row = records[index];
+        const caption = captions[index];
+        // A user may edit a row while a slow lookup is in flight. Never restore
+        // its old business values or attach an old caption to a new identity.
+        if (!caption || fields.some(field => row[field.key] !== caption[field.key])) continue;
+        const unchanged = Object.keys(caption).filter(key => !key.startsWith('__') && !optionKeys.has(key))
+          .every(key => row[key] === caption[key]);
+        for (const [key, value] of Object.entries(caption)) {
+          if (optionKeys.has(key) || key.startsWith('__display_') || key.startsWith('__lookup')) row[key] = value;
+        }
+        const id = this.resolvePersistedRecordId(row, dataSource);
+        if (unchanged && this.hasValue(id)) this.dataSource.cachePreparedRecord(dataSource, id, row, fields);
+      }
+      this.rows = [...rows];
+      this.changeDetector.markForCheck();
+    } catch (error) {
+      if (!current()) return;
+      this.error = this.getErrorMessage(error);
+      this.changeDetector.markForCheck();
+    }
   }
 
   private isUncertainSave(error: unknown): boolean {
