@@ -251,7 +251,7 @@
 
       <app-document-lines
         [preferenceKey]="preferenceKey || pageLabel || 'document'" [worksheet]="worksheet" [headerData]="resolvedHeaderData" [columns]="resolvedLineColumns"
-        [rows]="resolvedLineRows" [disabled]="interactionLocked"
+        [rows]="resolvedLineRows" [disabled]="isInteractionLocked"
         [showSelection]="true" [rowCommands]="resolvedLineRowCommands"
         (action)="handleLineAction($event)"
         (dropdownOpened)="handleLineDropdownOpened($event)"
