@@ -774,14 +774,12 @@ export class ListPage implements OnInit, OnDestroy {
     let setupRecordLoaded = false;
     this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource, { useCache: true, maxAgeMs: 30000, onRequest: () => this.startPopupLoading('Loading setup...') }).pipe(
       optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs),
-      switchMap(record => {
-        setupRecordLoaded = true;
-        return from(this.documentHydration.resolveHeaderLookups(this.isRecord(record) ? record : {}, this.headerConfig.sections.flatMap(section => section.fields), () => this.startPopupLoading('Loading selected values...')));
-      }),
     ).subscribe({
       next: record => {
-        this.applyHydratedHeaderRecord(this.isRecord(record) ? record : {});
+        setupRecordLoaded = true;
+        const hydrated = this.applyHydratedHeaderRecord(this.isRecord(record) ? record : {});
         this.stopPopupLoading();
+        this.hydrateHeaderCaptionsInBackground(hydrated);
       },
       error: error => {
         this.stopPopupLoading();
