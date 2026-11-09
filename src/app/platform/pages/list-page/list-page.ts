@@ -209,6 +209,7 @@ export class ListPage implements OnInit, OnDestroy {
   private nextCursor?: string;
   rows: unknown[] = [];
   private listLookupGeneration = 0;
+  private headerCaptionGeneration = 0;
   selectedRow?: unknown;
 
   private listLoadSubscription?: Subscription;
@@ -519,10 +520,11 @@ export class ListPage implements OnInit, OnDestroy {
     // Loading starts only when the shared read actually has to await the server.
     // Header, selected labels and child rows each retain their own request deadline.
     // Do not cut off a healthy multi-request hydration with one aggregate request timeout.
-    this.subscriptions.add(this.loadHeaderRecord(record).subscribe({
+    this.subscriptions.add(this.loadHeaderRecord(record, false).subscribe({
       next: header => {
         const hydrated = this.applyHydratedHeaderRecord(header);
         this.hydrateOpenedDocumentLines(hydrated);
+        this.hydrateHeaderCaptionsInBackground(hydrated);
       },
       error: error => {
         this.stopPopupLoading();
@@ -669,7 +671,7 @@ export class ListPage implements OnInit, OnDestroy {
     );
   }
 
-  private loadHeaderRecord(row: Record<string, unknown>): Observable<Record<string, unknown>> {
+  private loadHeaderRecord(row: Record<string, unknown>, hydrateLookups = true): Observable<Record<string, unknown>> {
     const pageType = this.toText(this.listConfig.pageType).trim().toLowerCase();
     if (pageType === 'worksheet' || pageType === 'setup') {
       return of(row);
@@ -695,6 +697,7 @@ export class ListPage implements OnInit, OnDestroy {
           this.listConfig.dataSource, recordId, row, this.timeoutPolicy.hydrationTimeoutMs,
           () => this.startPopupLoading('Loading document...'),
         )).pipe(map(response => this.resolveHeaderRecordResponse(response, row)));
+    if (!hydrateLookups) return header;
     return header.pipe(switchMap(record => from(this.documentHydration.resolveHeaderLookups(
       record, this.headerConfig.sections.flatMap(section => section.fields),
       () => this.startPopupLoading('Loading selected values...'),
@@ -702,6 +705,42 @@ export class ListPage implements OnInit, OnDestroy {
       this.dataSource.cachePreparedRecord(this.listConfig.dataSource, recordId, prepared, this.headerConfig.sections.flatMap(section => section.fields));
       return prepared;
     }));
+  }
+
+  /** Selected lookup captions are presentation data, not a prerequisite for Header/Lines. */
+  private hydrateHeaderCaptionsInBackground(header: Record<string, unknown>): void {
+    const opened = this.activeDocumentWindowConfig;
+    const fields = this.headerConfig.sections.flatMap(section => section.fields).filter(field => field.lookup);
+    if (!opened || fields.length === 0) return;
+
+    const generation = ++this.headerCaptionGeneration;
+    const validScope = this.dataSource.captureWriteScope();
+    const snapshot = { ...header };
+    // Start after the line read has been subscribed, without locking the editor.
+    queueMicrotask(() => {
+      if (this.destroyed || !validScope() || generation !== this.headerCaptionGeneration
+          || this.activeDocumentWindowConfig !== opened || opened.headerData !== header) return;
+      void this.documentHydration.resolveHeaderLookups(snapshot, fields).then(prepared => {
+        if (this.destroyed || !validScope() || generation !== this.headerCaptionGeneration
+            || this.activeDocumentWindowConfig !== opened || opened.headerData !== header) return;
+        for (const field of fields) {
+          // Never overwrite business fields, unsaved changes or a later lookup selection.
+          if (!Object.is(header[field.key], snapshot[field.key])
+              || !Object.is(prepared[field.key], snapshot[field.key])) continue;
+          for (const key of [field.optionsDataKey ?? '__options_' + field.key,
+            '__display_' + field.key, '__lookupStamp_' + field.key,
+            '__lookupFailed_' + field.key, '__lookupRestricted_' + field.key]) {
+            if (Object.prototype.hasOwnProperty.call(prepared, key)) header[key] = prepared[key];
+          }
+        }
+        const id = this.resolvePersistedRecordId(header, this.listConfig.dataSource);
+        if (this.hasValue(id)) this.dataSource.cachePreparedRecord(
+          this.listConfig.dataSource, id, header, fields);
+        this.changeDetector.markForCheck();
+      }).catch(() => {
+        // A failed caption lookup must not make the existing business record unusable.
+      });
+    });
   }
 
   private resolveHeaderRecordResponse(
@@ -2376,11 +2415,12 @@ export class ListPage implements OnInit, OnDestroy {
 
     this.startCardLineLoading();
     this.subscriptions.add(
-      this.loadHeaderRecord(headerData)
+      this.loadHeaderRecord(headerData, false)
         .subscribe({
           next: (headerRecord) => {
-            this.applyHydratedHeaderRecord(headerRecord);
-            this.hydrateOpenedDocumentLines(headerRecord);
+            const hydrated = this.applyHydratedHeaderRecord(headerRecord);
+            this.hydrateOpenedDocumentLines(hydrated);
+            this.hydrateHeaderCaptionsInBackground(hydrated);
           },
           error: (error: unknown) => {
             this.finishCardLineLoading(true, error, 'Document');
