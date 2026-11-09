@@ -52,19 +52,38 @@ export class DocumentHydrationOrchestratorService {
       displayFormat: column.displayFormat,
     }));
     const result = await this.resolveListLookups(rows, fields, header, isCurrent, onRequest);
+    const readonlyTargets = new Set(columns.filter(column => column.readonly)
+      .map(column => column.field ?? column.id));
     for (const row of result)
-      for (const field of fields) {
+      for (const [index, field] of fields.entries()) {
         if (!field.lookup) continue;
         const bucket = field.optionsDataKey ?? `__options_${field.key}`;
         const options = row[bucket];
-        if (Array.isArray(options))
-          row[bucket] = options.map((record) => ({
+        if (!Array.isArray(options)) continue;
+        // A read-only display field may be filled from the same selected master
+        // that resolved the Code. Never treat this derived caption as an edit.
+        const source = options.map(option => option?.record ?? option)
+          .find(record => record && String(record[field.lookup!.valueField ?? 'systemId']) === String(row[field.key]));
+        const fill = columns[index].fill;
+        if (source && fill && row[`__lookupRestricted_${field.key}`] !== true) {
+          for (const [destination, candidate] of Object.entries(fill)) {
+            if (!readonlyTargets.has(destination)) continue;
+            const fieldsToTry = Array.isArray(candidate) ? candidate : [candidate];
+            const value = fieldsToTry.map(key => source[key])
+              .find(value => value !== null && value !== undefined && String(value).length > 0);
+            if (value !== undefined) row[destination] = value;
+          }
+        }
+        row[bucket] = options.map((option) => {
+          const record = option?.record ?? option;
+          return {
             value: record[(field.lookup!.valueField ?? 'systemId')],
             label: row[`__lookupRestricted_${field.key}`]
               ? 'Restricted'
               : this.lookupLabel(field, record),
             record,
-          }));
+          };
+        });
       }
     return result;
   }
