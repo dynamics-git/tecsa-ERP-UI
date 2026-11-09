@@ -591,7 +591,8 @@ export class ListPage implements OnInit, OnDestroy {
     this.subscriptions.add(this.loadLineRows(headerData).subscribe({
       next: (response) => {
         received = true;
-        const records = this.toRecords(response);
+        const records = this.toRecords(response)
+          .filter((row): row is Record<string, unknown> => this.isRecord(row));
         if (!records.length || !lineColumns.some(column => column.lookup)) {
           publish(records);
           return;
