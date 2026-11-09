@@ -519,13 +519,16 @@ export class ListPage implements OnInit, OnDestroy {
     // Loading starts only when the shared read actually has to await the server.
     // Header, selected labels and child rows each retain their own request deadline.
     // Do not cut off a healthy multi-request hydration with one aggregate request timeout.
+    const opened = this.activeDocumentWindowConfig;
     this.subscriptions.add(this.loadHeaderRecord(record, false).subscribe({
       next: header => {
+        if (!opened || this.destroyed || this.activeDocumentWindowConfig !== opened) return;
         const hydrated = this.applyHydratedHeaderRecord(header, false);
         this.hydrateOpenedDocumentLines(hydrated);
         this.hydrateHeaderCaptionsInBackground(hydrated);
       },
       error: error => {
+        if (!opened || this.destroyed || this.activeDocumentWindowConfig !== opened) return;
         this.stopPopupLoading();
         if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.interactionLocked = true;
         this.setEntryStatus({ tone: 'error', title: 'Load failed', message: this.getErrorMessage(error) });
@@ -2415,12 +2418,16 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
+    // Retry/refresh uses the same atomic Card readiness as the first open.
+    const opened = this.activeDocumentWindowConfig;
+    if (opened) opened.contentReady = false;
     this.startCardLineLoading();
     this.subscriptions.add(
       this.loadHeaderRecord(headerData, false)
         .subscribe({
           next: (headerRecord) => {
-            const hydrated = this.applyHydratedHeaderRecord(headerRecord);
+            if (!opened || this.destroyed || this.activeDocumentWindowConfig !== opened) return;
+            const hydrated = this.applyHydratedHeaderRecord(headerRecord, false);
             this.hydrateOpenedDocumentLines(hydrated);
             this.hydrateHeaderCaptionsInBackground(hydrated);
           },
