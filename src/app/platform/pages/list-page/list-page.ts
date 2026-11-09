@@ -514,15 +514,14 @@ export class ListPage implements OnInit, OnDestroy {
     this.pendingListSyncRecord = undefined;
     this.openDocumentPopup(record, []);
     if (!persisted) { this.stopPopupLoading(); return; }
-    // Keep the existing blank entry rows visible while the saved document hydrates.
-    // The loading scope locks their editors until the server's rows replace them.
+    // Initial saved records stay behind the single Card skeleton until Header and Lines are ready.
     if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
     // Loading starts only when the shared read actually has to await the server.
     // Header, selected labels and child rows each retain their own request deadline.
     // Do not cut off a healthy multi-request hydration with one aggregate request timeout.
     this.subscriptions.add(this.loadHeaderRecord(record, false).subscribe({
       next: header => {
-        const hydrated = this.applyHydratedHeaderRecord(header);
+        const hydrated = this.applyHydratedHeaderRecord(header, false);
         this.hydrateOpenedDocumentLines(hydrated);
         this.hydrateHeaderCaptionsInBackground(hydrated);
       },
@@ -543,14 +542,14 @@ export class ListPage implements OnInit, OnDestroy {
     return resolved.lineContextReady;
   }
 
-  private applyHydratedHeaderRecord(headerRecord: Record<string, unknown>): Record<string, unknown> {
+  private applyHydratedHeaderRecord(headerRecord: Record<string, unknown>, reveal = true): Record<string, unknown> {
     const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig) {
       return this.buildHeaderData(headerRecord);
     }
 
     const nextHeaderData = this.buildHeaderData(headerRecord);
-    currentConfig.contentReady = true;
+    if (reveal) currentConfig.contentReady = true;
     currentConfig.headerData = nextHeaderData;
     currentConfig.subtitle = '';
     currentConfig.title = this.getDocumentTitle(headerRecord);
@@ -561,50 +560,50 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private hydrateOpenedDocumentLines(headerData: Record<string, unknown>): void {
-    if (!this.lineConfig) {
+    const opened = this.activeDocumentWindowConfig;
+    if (!opened || !this.lineConfig) {
       this.finishCardLineLoading();
       return;
     }
 
-    let lineLoadHandled = false;
-    const finishLineLoad = (failed: boolean, error?: unknown): void => {
-      if (lineLoadHandled) {
-        return;
-      }
-
-      lineLoadHandled = true;
+    const lineColumns = this.lineConfig.columns;
+    const validScope = this.dataSource.captureWriteScope();
+    let received = false;
+    let finished = false;
+    const isCurrent = () => !this.destroyed && validScope()
+      && this.activeDocumentWindowConfig === opened && opened.headerData === headerData;
+    const finish = (failed: boolean, error?: unknown): void => {
+      if (finished || !isCurrent()) return;
+      finished = true;
       this.finishCardLineLoading(failed, error);
     };
+    const publish = (records: Record<string, unknown>[]): void => {
+      if (!isCurrent()) return;
+      opened.lineRows = this.buildLineRows(headerData, records);
+      opened.lineTotals = this.buildLineTotals(opened.lineRows, headerData);
+      this.applyLineOptions(opened.lineRows);
+      finish(false);
+    };
 
-    this.subscriptions.add(
-      this.loadLineRows(headerData)
-        .subscribe({
-          next: (response) => {
-            const records = this.toRecords(response);
-            const currentConfig = this.activeDocumentWindowConfig;
-            if (!currentConfig?.headerData || !this.lineConfig) {
-              return;
-            }
-
-            currentConfig.lineRows = this.buildLineRows(currentConfig.headerData, records);
-            currentConfig.lineTotals = this.buildLineTotals(
-              currentConfig.lineRows,
-              currentConfig.headerData,
-            );
-            this.applyLineOptions(currentConfig.lineRows);
-            this.changeDetector.detectChanges();
-
-
-            finishLineLoad(false);
-          },
-          error: (error: unknown) => {
-            finishLineLoad(true, error);
-          },
-          complete: () => {
-            finishLineLoad(false);
-          },
-        }),
-    );
+    this.subscriptions.add(this.loadLineRows(headerData).subscribe({
+      next: (response) => {
+        received = true;
+        const records = this.toRecords(response);
+        if (!records.length || !lineColumns.some(column => column.lookup)) {
+          publish(records);
+          return;
+        }
+        // Fill selected Names and lookup captions before the first complete Card paint.
+        // A selection change/company switch cannot apply an old response to a newer Card.
+        void this.documentHydration.resolveLineLookups(records, lineColumns, headerData, isCurrent)
+          .then(publish)
+          .catch(error => finish(true, error));
+      },
+      error: error => finish(true, error),
+      complete: () => {
+        if (!received) publish([]);
+      },
+    }));
   }
 
   private startCardLineLoading(): void {
@@ -625,6 +624,8 @@ export class ListPage implements OnInit, OnDestroy {
 
     this.stopPopupLoading();
 
+    // Do not expose a half-hydrated Card when Header succeeded but Lines failed.
+    if (!failed) currentConfig.contentReady = true;
     currentConfig.interactionLocked = failed;
     currentConfig.statusMessage = failed
       ? {
@@ -948,6 +949,9 @@ export class ListPage implements OnInit, OnDestroy {
 
   private openDocumentPopup(row: unknown, lineRows: unknown[]): void {
     const documentWindowConfig = this.buildDocumentWindowConfig(row, lineRows);
+    if (!this.isWorksheetPage && this.isRecord(row) && this.hasPersistedIdentity(row)) {
+      documentWindowConfig.contentReady = false;
+    }
     this.activeDocumentWindowConfig = documentWindowConfig;
     this.refreshEntryPolicy();
     this.activeLineRow = undefined;
