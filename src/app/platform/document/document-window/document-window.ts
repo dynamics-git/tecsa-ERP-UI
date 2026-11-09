@@ -446,7 +446,7 @@ export class DocumentWindow {
   }
 
   get isInteractionLocked(): boolean {
-    return this.interactionLocked;
+    return this.interactionLocked || !this.contentReady;
   }
 
   shouldRenderLinesAfter(section: HeaderSectionConfig): boolean {
