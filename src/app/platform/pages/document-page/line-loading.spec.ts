@@ -50,7 +50,7 @@ describe('Document line layout while the initial request is pending', () => {
     },
   ];
 
-  it('shows editable Users permission lines while selected captions remain pending', async () => {
+  it('shows one skeleton until Users permission lines and selected Name are ready', async () => {
     const captions = new Subject<unknown>();
     const record = {systemId: 'user-1', systemRowVersion: 1, userName: 'ayan', name: 'Ayan Rahman', email: 'ayan@tecsa.com.my', isActive: true, lastLoginAt: null};
     const assignment = {systemId: 'assignment-1', systemRowVersion: 1, userName: 'ayan', permissionSetCode: 'REQ-ENTRY', companyCode: 'TECSA', isActive: true};
@@ -73,22 +73,26 @@ describe('Document line layout while the initial request is pending', () => {
     const page = fixture.componentInstance;
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(page.inlineDocumentWindowConfig?.lineRows?.some(row => row['systemId'] === assignment.systemId)).toBe(true);
-      expect(page.popupLoading).toBe(false);
       expect(captions.observers.length).toBeGreaterThan(0);
     });
-    const editor = fixture.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
-    expect(captions.observers.length).toBeGreaterThan(0);
-    expect(editor.disabled).toBe(false);
+    expect(page.inlineDocumentWindowConfig?.contentReady).toBe(false);
+    expect(fixture.nativeElement.querySelector('.entry-complete-skeleton')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.entry-work').style.visibility).toBe('hidden');
     expect(get.mock.calls.some(([endpoint]) => endpoint === '/users/user-1')).toBe(false);
-    const row = page.inlineDocumentWindowConfig!.lineRows!.find(row => row['systemId'] === assignment.systemId)!;
-    expect(row['permissionSetCode']).toBe('REQ-ENTRY');
-    expect(editor.lookupDisplay(usersLineConfig.columns[0], row)).toBe('REQ-ENTRY');
-    expect(fixture.nativeElement.textContent).not.toContain('Loading lines...');
     expect(patch).not.toHaveBeenCalled();
+
     captions.next({data: [{code: 'REQ-ENTRY', name: 'Requisition Entry'}, {code: 'TECSA', name: 'TecSA'}], meta: {total: 2}});
     captions.complete();
-    await vi.waitFor(() => {fixture.detectChanges(); expect(editor.lookupDisplay(usersLineConfig.columns[1], row)).toBe('Requisition Entry');});
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(page.inlineDocumentWindowConfig?.contentReady).toBe(true);
+      expect(page.inlineDocumentWindowConfig?.lineRows?.some(row => row['systemId'] === assignment.systemId)).toBe(true);
+    });
+    const row = page.inlineDocumentWindowConfig!.lineRows!.find(row => row['systemId'] === assignment.systemId)!;
+    const editor = fixture.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
+    expect(editor.disabled).toBe(false);
+    expect(editor.lookupDisplay(usersLineConfig.columns[0], row)).toBe('REQ-ENTRY');
+    expect(row['permissionSetName']).toBe('Requisition Entry');
     expect(row['permissionSetCode']).toBe('REQ-ENTRY');
     expect(patch).not.toHaveBeenCalled();
     fixture.destroy();
@@ -96,7 +100,7 @@ describe('Document line layout while the initial request is pending', () => {
 
   for (const page of pages) {
     it.each([false, true])(
-      `${page.name} keeps blank rows visible and locked, then shows the response (hasLines=%s)`,
+      `${page.name} keeps full Card hidden behind skeleton, then shows the response (hasLines=%s)`,
       async hasLines => {
         const pending = new Subject<unknown>();
         const get = vi.fn((endpoint: string) => page.isLines(endpoint)
@@ -126,7 +130,8 @@ describe('Document line layout while the initial request is pending', () => {
         const state = fixture.componentInstance;
         expect(state.popupLoading).toBe(true);
         expect(state.popupLoadingMessage).toBe('Loading lines...');
-        expect(fixture.nativeElement.querySelector('.entry-work').style.visibility).not.toBe('hidden');
+        expect(fixture.nativeElement.querySelector('.entry-work').style.visibility).toBe('hidden');
+        expect(fixture.nativeElement.querySelector('.entry-complete-skeleton')).not.toBeNull();
         expect(rowCount()).toBe(8);
         expect(editor.disabled).toBe(true);
         expect(state.inlineDocumentWindowConfig!.lineRows!.every(row => row['__entryPlaceholder'])).toBe(true);
@@ -140,6 +145,8 @@ describe('Document line layout while the initial request is pending', () => {
         fixture.detectChanges();
         expect(rowCount()).toBe(8);
         expect(editor.disabled).toBe(false);
+        expect(state.inlineDocumentWindowConfig!.contentReady).toBe(true);
+        expect(fixture.nativeElement.querySelector('.entry-complete-skeleton')).toBeNull();
         const savedRows = state.inlineDocumentWindowConfig!.lineRows!.filter(row => !row['__entryPlaceholder']);
         expect(savedRows).toHaveLength(hasLines ? 1 : 0);
         if (hasLines) expect(savedRows[0]['systemId']).toBe('line-1');
