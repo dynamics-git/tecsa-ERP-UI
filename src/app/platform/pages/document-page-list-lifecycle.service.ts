@@ -56,7 +56,9 @@ export class DocumentPageListLifecycleService {
   loadFirstPage(ctx: DocumentPageListLifecycleContext, forceRefresh = false): void {
     this.clearFilterReloadTimer(ctx);
     if (ctx.loading) {
-      ctx.pendingFirstPageReload = true;
+      // A second ordinary load does not imply changed data. Only an explicit
+      // refresh/filter/save invalidation needs one follow-up after this read.
+      if (forceRefresh) ctx.pendingFirstPageReload = true;
       return;
     }
 
@@ -141,7 +143,7 @@ export class DocumentPageListLifecycleService {
     }
 
     ctx.pendingFirstPageReload = false;
-    this.loadPage(ctx, true);
+    this.loadPage(ctx, true, true);
   }
 
   scheduleFilterReload(ctx: DocumentPageListLifecycleContext): void {

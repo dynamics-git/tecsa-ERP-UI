@@ -477,7 +477,8 @@
 @media (max-width: 1180px) {
   .dataset-strip {
     align-items: stretch;
-    flex-direction: column;
+    // Keep the search flex-basis on the width axis; wrapping places tools below.
+    flex-direction: row;
   }
 
   .dataset-search {

@@ -2,7 +2,31 @@
 
 The UI builds query requests from its shared filter, sort and data-source config. The backend validates and executes them against published fields. Do not add a query-field map for each ordinary table.
 
+## Request source processing — 9 November 2026
+
+The backend resolves the trusted route's named ApiSource rather than rebuilding
+every API routing definition during each list/query/field-policy check. Safe reads
+do not resolve write sources. Source binding and Company/permission validation
+remain enforced. The final generic EntityResource filters once; custom response
+Resources retain their final guard after projections. No UI capability/context
+request, new endpoint or cross-request permission cache is introduced.
+
 ## Query the published fields
+
+### Local API timing — 10 November 2026
+
+One list HTTP call can contain several backend SQL statements. PostgreSQL
+schema-derived fields, Company storage and permission checks remain backend
+responsibilities. The backend now sends bound statements without a separate
+named-prepare exchange, combines the three storage checks into one SELECT and
+keeps membership inside each grant query. No UI API contract/config change is
+required and no context/capability request is added.
+
+A read-only Users kernel diagnostic returned 23 records with 21 queries in
+3.20 seconds, versus 26 queries in 9.86 seconds before these corrections. It
+supplied the actor in memory; this is not browser/bearer-token acceptance.
+The API ran locally against remote PostgreSQL. Remaining SQL network trips and
+local PHP startup/queuing still need attention; this is not a fast-UI sign-off.
 
 ```http
 GET /api/v1/companies/{companyId}/samples?$filter=isActive eq true&$orderby=code asc&$top=25&$skip=0

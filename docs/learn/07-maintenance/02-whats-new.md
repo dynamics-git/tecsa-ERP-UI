@@ -1,5 +1,27 @@
 # What's new in developer documentation
 
+## 10 November 2026: measured backend read-path correction
+
+Backend PostgreSQL transport now uses server-bound parameters without an extra
+named-prepare round trip. Company storage checks are combined, and active
+membership stays inside grant SQL rather than a separate query. The Company,
+permission and missing-table guards remain. A read-only Users kernel diagnostic
+improved from 26 queries/9.86 seconds to 21 queries/3.20 seconds; browser and
+production latency acceptance remain outstanding. No UI Page, save engine,
+hydration, permission snapshot, context endpoint or business logic was changed.
+
+## 9 November 2026: request source overhead and responsive list toolbar
+
+Normal API source resolution no longer rebuilds unrelated routing definitions;
+GET requests skip write-source resolution. Generic record serialization reuses its
+source definition and avoids duplicate filtering while preserving direct-read
+privacy and the final custom-Resource projection guard. These changes retain the
+existing ApiSource/EntityController and permission engine. The list toolbar now
+keeps a horizontal flex axis at the intermediate responsive width, preventing a
+220-pixel width basis from becoming the search box height. Save behavior, menu,
+FactBoxes, schema and Page configurations are unchanged. Deployed request latency
+still requires measurement after review/deployment.
+
 ## 7 November 2026: consistent list loading position
 
 Initial loading and refreshing an existing list now place the existing indicator
