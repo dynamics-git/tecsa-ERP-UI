@@ -2159,7 +2159,8 @@ export class ListPage implements OnInit, OnDestroy {
           if (this.autosaveDeferredUntilDraftCreate) {
             this.autosaveDeferredUntilDraftCreate = false;
             this.queueLocalAutosave();
-          } else {
+          }
+          if (!this.hasUnsavedChanges && !this.hasPendingWrites) {
             this.setEntryStatus({ tone: 'success', title: 'Saved', message: 'Record created.' });
           }
 
