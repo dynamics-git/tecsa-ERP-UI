@@ -98,6 +98,38 @@ describe('Document line layout while the initial request is pending', () => {
     fixture.destroy();
   });
 
+  it('does not load persisted Lines or show a loader for an unsaved New Card', () => {
+    const get = vi.fn(() => of({ data: [], meta: { total: 0 } }));
+    TestBed.configureTestingModule({
+      imports: [ListPage],
+      providers: [
+        provideRouter([]), ...providePlatformGovernance(),
+        { provide: DATA_REST_SERVICE, useValue: { get } },
+      ],
+    });
+    TestBed.inject(SessionService).SuperAdmin = true;
+    const fixture = TestBed.createComponent(ListPage);
+    fixture.componentRef.setInput('documentOnly', true);
+    fixture.componentRef.setInput('initialRecord', {});
+    fixture.componentRef.setInput('listConfig', usersListConfig);
+    fixture.componentRef.setInput('headerConfig', usersHeaderConfig);
+    fixture.componentRef.setInput('lineConfig', usersLineConfig);
+    fixture.detectChanges();
+
+    const page = fixture.componentInstance;
+    expect(page.inlineDocumentWindowConfig?.contentReady).not.toBe(false);
+    expect(page.popupLoading).toBe(false);
+    expect(get).not.toHaveBeenCalled();
+
+    // Even a refresh on a locally created Header must not query child data.
+    (page as unknown as { refreshActiveLines(): void }).refreshActiveLines();
+    fixture.detectChanges();
+    expect(get).not.toHaveBeenCalled();
+    expect(page.popupLoading).toBe(false);
+    expect(page.inlineDocumentWindowConfig?.contentReady).not.toBe(false);
+    fixture.destroy();
+  });
+
   for (const page of pages) {
     it.each([false, true])(
       `${page.name} keeps full Card hidden behind skeleton, then shows the response (hasLines=%s)`,
