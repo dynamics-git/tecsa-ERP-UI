@@ -22,7 +22,6 @@ import { ActionDispatcherService } from '../../../shared/ui/action-dispatcher.se
 import { ApiErrorService } from '../../data/api-error.service';
 import { ConfirmationService } from '../../../shared/ui/confirmation.service';
 import { DataPage, DataSourceService } from '../../data/data-source.service';
-import { DraftCreateService } from '../../data/draft-create.service';
 import { DocumentConfigDataService } from '../../data/document-config-data.service';
 import { DocumentPayloadService } from '../../data/document-payload.service';
 import { DocumentRecordService } from '../../data/document-record.service';
@@ -89,7 +88,6 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly actionDispatcher = inject(ActionDispatcherService);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly dataSource = inject(DataSourceService);
-  private readonly draftCreate = inject(DraftCreateService);
   private readonly documentConfigData = inject(DocumentConfigDataService);
   private readonly documentPayload = inject(DocumentPayloadService);
   private readonly documentRecord = inject(DocumentRecordService);
@@ -2824,10 +2822,10 @@ export class ListPage implements OnInit, OnDestroy {
   private createDraftRecord(newRecord: Record<string, unknown>): Observable<Record<string, unknown> | null> {
     return defer(() => {
       this.dataSource.assertEditedFields(this.listConfig.dataSource, 'create', newRecord, this.unsavedFields.get(newRecord)?.keys() ?? []);
-      return this.draftCreate.createWithUnknownPropertyFallback(
-        this.listConfig.dataSource,
-        this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
-      );
+      const payload = this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections);
+      return Object.keys(payload).length
+        ? this.dataSource.create(this.listConfig.dataSource, payload)
+        : of(null);
     }).pipe(map((response) => this.toCreatedRecord(response)));
   }
 
