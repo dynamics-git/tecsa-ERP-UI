@@ -9,11 +9,11 @@ import { DATA_REST_SERVICE } from '../../data/data-source.service';
 import { SessionService } from '../../../core/services/session.service';
 import { providePlatformGovernance } from '../../../core/providers/platform-governance.provider';
 import { paymentTermsHeaderConfig, paymentTermsListConfig } from '../../../features/purchase-masters/payment-terms/payment-terms.config';
-import { purchaseRequisitionHeaderConfig, purchaseRequisitionListConfig } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
+import { purchaseRequisitionHeaderConfig, purchaseRequisitionLineConfig, purchaseRequisitionListConfig } from '../../../features/purchasing/purchase-requisition/purchase-requisition.config';
 
 afterEach(()=>TestBed.resetTestingModule());
 describe('Shared first-input automatic creation policy',()=>{
- async function setup(options:{pr?:boolean;manual?:boolean;saveCommand?:boolean;unsupported?:boolean;singleton?:boolean;worksheet?:boolean}={}) {
+ async function setup(options:{pr?:boolean;withLines?:boolean;manual?:boolean;saveCommand?:boolean;unsupported?:boolean;singleton?:boolean;worksheet?:boolean}={}) {
   const {autoSave,...base}=options.pr?purchaseRequisitionListConfig:paymentTermsListConfig;
   const header=options.pr?purchaseRequisitionHeaderConfig:paymentTermsHeaderConfig;
   const pending=new Subject<unknown>();
@@ -27,6 +27,7 @@ describe('Shared first-input automatic creation policy',()=>{
   f.componentRef.setInput('initialRecord',{});
   f.componentRef.setInput('listConfig',{...base,...(options.manual?{autoSave:false}:{}),...(options.worksheet?{pageType:'worksheet'}:{}),dataSource:{...base.dataSource,...(options.unsupported?{supportsCreate:false}:{}),...(options.singleton?{singleton:true}:{})}});
   f.componentRef.setInput('headerConfig',{...header,toolbarButtons:options.saveCommand?[{label:'Save',actionKey:'cmd:save'}]:header.toolbarButtons});
+  if (options.withLines) f.componentRef.setInput('lineConfig',purchaseRequisitionLineConfig);
   f.detectChanges();await f.whenStable();f.detectChanges();
   const page=f.componentInstance;
   const edit=(fieldKey:string,value:unknown)=>page.handleInlineAction({actionKey:'header:changed',payload:{fieldKey,value,previousValue:page.inlineDocumentWindowConfig?.headerData?.[fieldKey]}});
@@ -71,6 +72,34 @@ describe('Shared first-input automatic creation policy',()=>{
   await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
   pending.next({data:{systemId:'created',systemRowVersion:1,number:'PR00001',status:'open',requestDate:'2026-10-27',purpose:'Test request'}});pending.complete();
   await vi.waitFor(()=>expect(page.inlineDocumentWindowConfig!.headerData!['number']).toBe('PR00001'));expect(post).toHaveBeenCalledTimes(1);f.destroy();
+ });
+ it('PR create stays editable and does not PATCH unchanged Lines after a deferred Header edit',async()=>{
+  const {f,page,edit,post,patch,pending}=await setup({pr:true,withLines:true});
+  edit('purpose','Original');
+  await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
+  // The POST is in flight, but the editor is not masked by a "draft" loading overlay.
+  expect(page.popupLoading).toBe(false);
+  expect(page.inlineDocumentWindowConfig?.interactionLocked).not.toBe(true);
+  // The already-loaded line has no edits; creating/updating the Header must not write it.
+  const existingLine = {
+    systemId:'line-1', systemRowVersion:1, documentNumber:'PR00001',
+    documentType:'Requisition', lineNo:10000, lineType:'item', number:'ITEM01',
+  };
+  page.inlineDocumentWindowConfig!.lineRows = [existingLine];
+  edit('purpose','Updated while creating');
+  pending.next({data:{
+    systemId:'created',systemRowVersion:1,number:'PR00001',
+    status:'open',requestDate:'2026-10-27',purpose:'Original',
+  }});
+  pending.complete();
+  await vi.waitFor(()=>expect(patch).toHaveBeenCalled());
+  expect(patch).toHaveBeenCalledTimes(1);
+  expect(patch.mock.calls[0]![0]).toContain('purchaseRequisitions');
+  expect(patch.mock.calls[0]![1]).toEqual(expect.objectContaining({purpose:'Updated while creating'}));
+  expect(page.inlineDocumentWindowConfig?.headerData?.['purpose']).toBe('Updated while creating');
+  expect(post).toHaveBeenCalledTimes(1);
+  expect(page.popupLoading).toBe(false);
+  f.destroy();
  });
  for (const [name,options] of Object.entries({explicitManual:{manual:true},saveCommand:{saveCommand:true},unsupported:{unsupported:true},singleton:{singleton:true},worksheet:{worksheet:true}})) {
   it('does not automatically POST a header for '+name,async()=>{
