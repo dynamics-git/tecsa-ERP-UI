@@ -26,7 +26,6 @@ export * from './models/run-modal-host-data.model';
 export * from './data/api-error.service';
 export * from './data/notification-client.service';
 export * from './data/data-source.service';
-export * from './data/draft-create.service';
 export * from './data/entity-contract.service';
 export * from './data/document-config-data.service';
 export * from './data/document-payload.service';
