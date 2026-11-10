@@ -6,11 +6,9 @@ import { DocumentSaveService } from '../../core/services/document-save.service';
 import { DataSourceConfig } from '../models/data-source-config.model';
 const fixtureSource: DataSourceConfig = { endpoint: '/fixtureHeaders', keyField: 'Id', supportsCreate: true, supportsUpdate: true, supportsDelete: true };
 import { DATA_REST_SERVICE, DataRestService } from './data-source.service';
-import { DraftCreateService } from './draft-create.service';
 import { DataSourceService } from './data-source.service';
 
 describe('Enterprise persistence integration', () => {
-  let draftCreate: DraftCreateService;
   let entrySave: DocumentSaveService;
   let dataSource: DataSourceService;
   let restMock: DataRestService;
@@ -49,7 +47,6 @@ describe('Enterprise persistence integration', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        DraftCreateService,
         DocumentSaveService,
         DataSourceService,
         {
@@ -68,7 +65,6 @@ describe('Enterprise persistence integration', () => {
       ]
     });
 
-    draftCreate = TestBed.inject(DraftCreateService);
     entrySave = TestBed.inject(DocumentSaveService);
     dataSource = TestBed.inject(DataSourceService);
   });
@@ -77,7 +73,7 @@ describe('Enterprise persistence integration', () => {
     const error = bcError("The property 'CurrencyCode' does not exist on type 'purchaseOrderHeader'.");
     postImpl = () => postCalls.length === 1 ? throwError(() => error) : of({ Id: 'PO-1' });
     const payload = { CreatedBy: 'tester', CurrencyCode: 'MYR' };
-    await expect(firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, payload))).rejects.toBe(error);
+    await expect(firstValueFrom(dataSource.create(fixtureSource, payload))).rejects.toBe(error);
     expect(postCalls).toHaveLength(1);
     expect(postCalls[0][1]).toEqual(payload);
     expect(payload.CurrencyCode).toBe('MYR');
@@ -85,7 +81,7 @@ describe('Enterprise persistence integration', () => {
   it('propagates the actual create validation error without retrying', async () => {
     const error = bcError('Values must be provided in the body.');
     postImpl = () => throwError(() => error);
-    await expect(firstValueFrom(draftCreate.createWithUnknownPropertyFallback(fixtureSource, { UnknownField: 'value' }))).rejects.toBe(error);
+    await expect(firstValueFrom(dataSource.create(fixtureSource, { UnknownField: 'value' }))).rejects.toBe(error);
     expect(postCalls).toHaveLength(1);
     expect(postCalls[0][1]).toEqual({ UnknownField: 'value' });
   });
@@ -113,14 +109,6 @@ describe('Enterprise persistence integration', () => {
     expect(actualMessage.toLowerCase()).toContain('read-only');
     expect(patchCalls.length).toBe(1);
     expect(patchCalls[0][1]).toEqual({ VendorOrderNumber: 'V-123' });
-  });
-
-  it('does not send an empty draft create request', () => {
-    let actual: unknown;
-    draftCreate.createWithUnknownPropertyFallback(fixtureSource, {})
-      .subscribe(response => actual = response);
-    expect(actual).toBeNull();
-    expect(postCalls).toEqual([]);
   });
 
   it('reports missing save configuration without sending a patch request', () => {
