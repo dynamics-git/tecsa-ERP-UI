@@ -2129,14 +2129,14 @@ export class ListPage implements OnInit, OnDestroy {
   private startDraftCreate(headerData: Record<string, unknown>): void {
     const savedEdits = this.beginAutosave(headerData);
     this.draftCreateInProgress = true;
-    this.startPopupLoading(`Creating ${this.documentLabel.toLowerCase()} draft...`);
+    // A normal CRUD POST is not a separate Draft workflow or a blocking page load.
+    this.setEntryStatus({ tone: 'info', title: 'Saving', message: 'Creating record...' });
 
     this.subscriptions.add(
       this.createDraftRecord(headerData).subscribe({
         next: (createdRecord) => {
           this.finishAutosave(headerData, savedEdits, !!createdRecord);
           this.draftCreateInProgress = false;
-          this.stopPopupLoading();
 
           if (!createdRecord || !this.activeDocumentWindowConfig?.headerData) {
             this.setEntryStatus({
@@ -2159,6 +2159,8 @@ export class ListPage implements OnInit, OnDestroy {
           if (this.autosaveDeferredUntilDraftCreate) {
             this.autosaveDeferredUntilDraftCreate = false;
             this.queueLocalAutosave();
+          } else {
+            this.setEntryStatus({ tone: 'success', title: 'Saved', message: 'Record created.' });
           }
 
           this.changeDetector.detectChanges();
@@ -2166,7 +2168,6 @@ export class ListPage implements OnInit, OnDestroy {
         error: (error: unknown) => {
           this.finishAutosave(headerData, savedEdits, false);
           this.draftCreateInProgress = false;
-          this.stopPopupLoading();
           this.setEntryStatus({
             tone: 'error',
             title: GENERIC_MESSAGES.createFailedTitle,
@@ -2207,51 +2208,29 @@ export class ListPage implements OnInit, OnDestroy {
       void this.saveEntry();
       return;
     }
-    const headerData = this.activeDocumentWindowConfig?.headerData;
-    if (!headerData) {
-      return;
-    }
-
-    if (!this.dirty && this.hasPersistedIdentity(headerData)) return;
-    const headerId = this.resolvePersistedRecordId(headerData, this.listConfig.dataSource);
-    if (this.pendingDraftCreateFromNew || this.draftCreateInProgress || !this.hasValue(headerId)) {
+    const header = this.activeDocumentWindowConfig?.headerData;
+    if (!header) return;
+    if (this.pendingDraftCreateFromNew || this.draftCreateInProgress || !this.hasPersistedIdentity(header)) {
       this.autosaveDeferredUntilDraftCreate = true;
       return;
     }
 
-    const previousSnapshot = { ...headerData };
-    this.setEntryStatus({
-      tone: 'info',
-      title: 'Saving',
-      message: this.usesManualSaveMode() ? 'Saving changes...' : 'Autosaving changes...',
-    });
-    this.documentState.scheduleHeaderAutosave(this.pageId, headerData, {
-      dataSourceConfig: this.listConfig.dataSource,
-      headerSections: this.headerConfig.sections,
-      lineRows: this.activeDocumentWindowConfig?.lineRows,
-      lineDataSourceConfig: this.lineConfig?.dataSource,
-      meta: {
-        page: this.pageId,
-      },
-      onFailed: (result) => {
-        Object.assign(this.activeDocumentWindowConfig?.headerData ?? {}, previousSnapshot);
-        this.setEntryStatus({
-          tone: 'error',
-          title: 'Save failed',
-          message: result.errorMessage || GENERIC_MESSAGES.saveFailedDefault,
-        });
-        this.changeDetector.detectChanges();
-      },
-      onCompleted: () => {
-        this.stageListSyncFromActiveHeader();
-        this.setEntryStatus({
-          tone: 'success',
-          title: GENERIC_MESSAGES.saveSuccessTitle,
-          message: GENERIC_MESSAGES.saveSuccessMessage,
-        });
-        this.changeDetector.detectChanges();
-      },
-    });
+    // Individual field changes already use the shared Header and Line CRUD writes.
+    // Do not send a second full-document save that PATCHes every unchanged Line.
+    const pendingHeaderFields = [...(this.unsavedFields.get(header)?.keys() ?? [])];
+    const pendingLines = (this.activeDocumentWindowConfig?.lineRows ?? [])
+      .map(row => ({ row, fields: [...(this.unsavedFields.get(row)?.keys() ?? [])] }))
+      .filter(change => change.fields.length > 0);
+
+    if (pendingHeaderFields.length) {
+      const [fieldKey, ...rest] = pendingHeaderFields;
+      this.saveHeaderFields({
+        fieldKey,
+        updates: Object.fromEntries(rest.map(key => [key, header[key]])),
+      }, pendingLines);
+      return;
+    }
+    for (const { row, fields } of pendingLines) this.saveLineFields(row, fields);
   }
 
   private usesManualSaveMode(): boolean {
