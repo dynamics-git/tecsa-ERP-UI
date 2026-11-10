@@ -1163,7 +1163,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private openNewPreview(): void {
-    this.startPopupLoading(`Preparing ${this.documentLabel.toLowerCase()}...`);
+    // New is a local draft; do not show a network loader for an unsaved record.
     this.pendingDraftCreateFromNew =
       this.shouldCreateDraftOnInput();
     this.draftCreateInProgress = false;
@@ -2440,16 +2440,13 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private refreshActiveLines(): void {
-    this.dataSource.invalidateReadCache();
-    if (!this.lineConfig) {
-      return;
-    }
-
+    if (!this.lineConfig) return;
     const headerData = this.activeDocumentWindowConfig?.headerData;
-    if (!this.isRecord(headerData)) {
-      return;
-    }
+    // A new unsaved Header has no persisted child records. Keep its local draft rows.
+    if (!this.isRecord(headerData) || !this.hasPersistedIdentity(headerData)) return;
+    if (!this.canHydrateOpenedDocumentLinesFromHeader(headerData)) return;
 
+    this.dataSource.invalidateReadCache();
     this.startCardLineLoading();
     this.subscriptions.add(
       this.loadLineRows(headerData)
