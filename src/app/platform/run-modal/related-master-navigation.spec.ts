@@ -35,6 +35,7 @@ describe('Related master pages use the shared navigation stack', () => {
   let popups: PopupConfig[];
   let requests: string[];
   let write: ReturnType<typeof vi.fn>;
+  let relatedItemRows: Record<string, unknown>[];
   const item = {
     systemId: 'item-1',
     number: 'CABLE-CAT6-2M',
@@ -50,6 +51,7 @@ describe('Related master pages use the shared navigation stack', () => {
 
   beforeEach(() => {
     requests = [];
+    relatedItemRows = [];
     popups = [];
     write = vi.fn((..._args: unknown[]) => of({}));
     TestBed.configureTestingModule({
@@ -62,6 +64,7 @@ describe('Related master pages use the shared navigation stack', () => {
           useValue: {
             get: (url: string) => {
               requests.push(url);
+              if (url.startsWith('/items?')) return of({data: relatedItemRows, meta: {hasMore: false}});
               if (url.startsWith('/items/item-1/unitsOfMeasure'))
                 return of({ data: [{ ...uomRow }], meta: { total: 1 } });
               if (url === '/items/item-1') return of({ data: { ...item } });
@@ -108,6 +111,21 @@ describe('Related master pages use the shared navigation stack', () => {
   const page = (index: number) =>
     fixture.debugElement.queryAll(By.directive(DocumentPage))[index]
       .componentInstance as DocumentPage;
+
+  it.each([0, 1, 2])('resolves a business-key card without a total count and rejects %i ambiguous/missing matches', async matches => {
+    relatedItemRows = Array.from({length: matches}, (_, index) => ({...item, systemId: 'item-' + (index + 1)}));
+    const opened = await modal.open({pageId: 'items', target: 'entry', context: {
+      recordMappingComplete: true, headerData: {number: item.number},
+    }});
+    expect(opened).toBe(matches === 1);
+    const query = new URL(requests.find(url => url.startsWith('/items?'))!, 'http://fixture').searchParams;
+    expect(query.get('$top')).toBe('2');
+    expect(query.get('$count')).toBe('false');
+    expect(query.get('$filter')).toContain(item.number);
+    if (matches === 1) await settle();
+    else expect(popups).toHaveLength(0);
+    expect(write).not.toHaveBeenCalled();
+  });
 
   for (const [id, endpoint] of relatedPages) {
     it('opens only the parent-scoped grid for ' + id, async () => {
@@ -178,6 +196,12 @@ describe('Related master pages use the shared navigation stack', () => {
     expect(parentState.lineColumns).toEqual([]);
     expect(requests.some((url) => url.startsWith('/items/item-1/unitsOfMeasure'))).toBe(false);
     expect(fixture.nativeElement.querySelectorAll('app-fact-box').length).toBe(1);
+    // Exercise the navigation stack with an explicit fixture command. The current
+    // Item card no longer publishes this legacy nested worksheet shortcut.
+    parentState.headerToolbarButtons = [...(parentState.headerToolbarButtons ?? []), {
+      label: 'Fixture units', actionKey: 'cmd:open-item-units-of-measure',
+      runModalPageId: 'item-units-of-measure', runModalTarget: 'entry',
+    }];
     parentState.headerData!['description'] = 'Retained local parent state';
     fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();

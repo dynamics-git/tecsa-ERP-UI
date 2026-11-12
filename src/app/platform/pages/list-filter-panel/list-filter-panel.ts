@@ -411,7 +411,7 @@ export class ListFilterPanel implements OnInit, OnDestroy {
     this.dropdownLoading[row.id] = true;
     const scope = this.buildFilterLoadScope(config.field);
     this.loading.begin(scope, `Loading ${config.label} options...`);
-    this.subscriptions.add(this.dataSource.loadList({ endpoint: config.apiUrl, pageSize: 50 }).pipe(
+    this.subscriptions.add(this.dataSource.loadList({ endpoint: config.apiUrl, pageSize: 50 }, {count: false}).pipe(
       optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs),
       finalize(() => {
         this.dropdownLoading[row.id] = false; this.loading.end(scope);

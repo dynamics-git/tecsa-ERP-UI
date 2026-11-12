@@ -149,7 +149,7 @@ export class RunModalService {
           !config.dataSource.singleton && record[config.dataSource.keyField ?? 'systemId'] == null && config.dataSource.headerPKProp) {
         try {
           const source = this.contextualSource({...config.dataSource, lineFKProp: config.dataSource.headerPKProp}, {headerData: record});
-          const page = await firstValueFrom(this.data.loadList(source, {top: 2}).pipe(optionalRequestTimeout<unknown>(this.policy.requestTimeoutMs))) as DataPage;
+          const page = await firstValueFrom(this.data.loadList(source, {top: 2, count: false}).pipe(optionalRequestTimeout<unknown>(this.policy.requestTimeoutMs))) as DataPage;
           if (page.value.length !== 1) { this.failure = 'related-record-missing'; return false; }
           record = page.value[0];
         } catch {
@@ -238,11 +238,11 @@ export class RunModalService {
     try {
       const source = { ...binding.source, defaultFilter: this.filters.buildFilter(id) };
       const size = source.pageSize ?? 20;
-      const page = await firstValueFrom(this.data.loadList(source, { top: size, skip: reset ? 0 : binding.rows.length, cursor: reset ? undefined : binding.cursor, useCache: true, maxAgeMs: 30000, forceRefresh }).pipe(optionalRequestTimeout<unknown>(this.policy.hydrationTimeoutMs))) as DataPage;
+      const page = await firstValueFrom(this.data.loadList(source, { top: size, skip: reset ? 0 : binding.rows.length, count: false, cursor: reset ? undefined : binding.cursor, useCache: true, maxAgeMs: 30000, forceRefresh }).pipe(optionalRequestTimeout<unknown>(this.policy.hydrationTimeoutMs))) as DataPage;
       if (generation !== binding.generation || !this.lists.has(id)) return;
       binding.rows = reset ? page.value : [...binding.rows, ...page.value];
       binding.cursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
-      binding.hasMore = source.paging === 'cursor' ? !!binding.cursor : typeof page.meta['total'] === 'number' ? binding.rows.length < page.meta['total'] : page.value.length === size;
+      binding.hasMore = source.paging === 'cursor' ? !!binding.cursor : typeof page.meta['hasMore'] === 'boolean' ? page.meta['hasMore'] : typeof page.meta['total'] === 'number' ? binding.rows.length < page.meta['total'] : page.value.length === size;
       this.patch(id, { rows: binding.rows, hasMore: binding.hasMore, loading: false });
     } catch (error) {
       if (generation === binding.generation) this.patch(id, { loading: false, errorMessage: this.errors.toMessage(error, 'Unable to load list.') });

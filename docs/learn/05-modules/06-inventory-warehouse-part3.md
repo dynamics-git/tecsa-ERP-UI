@@ -1,5 +1,48 @@
 # Inventory & Warehouse Part 3 — database and API guide
 
+## 12 November 2026: current Items card
+
+The Items card now matches the currently installed schema-backed `/items` source
+(`App\Models\Tables\Item`), rather than the older hand-written Item model. The
+30 declared UI fields were compared with the installed API field metadata for
+names, types, defaults, lengths, decimal precision/scale, enum values and immutable
+Number behavior. This was a read-only metadata check; it created no product rows.
+
+| Section | Content |
+| --- | --- |
+| General | Manual No., descriptions, search description, No. 2, integer Type, category code, GTIN and Blocked |
+| Inventory | Base UOM code, shelf and integer Default/No/Yes warning settings |
+| Costs | Integer Costing Method and exact decimal unit/standard/last-direct costs |
+| Prices & Sales | Unit price, VAT-inclusive pricing and Sales Blocked |
+| Purchasing | Vendor business number, vendor item number, lead time and Purchasing Blocked |
+| Posting Groups | Inventory, general-product and VAT-product business codes |
+| Physical Properties | Gross/net weight and unit volume |
+
+Create remains ordinary shared CRUD/autosave. Enter a manual **No. first**: the
+current API declares no Item number allocator and Number cannot be PATCHed after
+creation. This is the card's only required entry prerequisite, preventing a blank
+immutable business number. Description and Base UOM no longer block the first
+POST. Other defaults match the API, including empty code/text, integer enum zero
+and exact decimal strings. Subsequent edits PATCH only changed fields through
+the existing shared Core; the Item page adds no save service or `autoSave:true`.
+
+The old `itemType`, `baseUnitOfMeasureId`, `generalProductPostingGroupId` and
+`vatProductPostingGroupId` bindings are not used. Current fields include `type`,
+`baseUnitOfMeasure`, `genProdPostingGroup` and `vatProdPostingGroup`. Code lookups
+display their saved code directly and use the existing bounded choices/search
+path. Decimal validation follows the current API's numeric(38,20) contract.
+
+The shared FactBox binds Number/Description and groups Price & Cost,
+Classification, Restrictions and collapsed Record Information, alongside standard
+Overview/Notes/Files panels. It reuses card types/enum labels and does not fetch
+another master merely to display a saved code or invent inventory/ledger totals.
+
+The old Item Units/Dimensions shortcuts were removed from this card because their
+worksheet configurations still target obsolete nested endpoints. Converting those
+separate pages remains separate work. No Item schema, backend rule, posting logic
+or other module configuration was changed. The older sections below record
+historical Part 3 work and do not override this current card/API contract.
+
 ## Phase A physical FK integrity correction
 
 Warehouse Receipt/Shipment Lines now have an **unconditional Company + Header SystemId parent FK** as well as the optional Header Location-scoped FK. This matters because PostgreSQL skips a composite FK whenever a nullable referencing column is NULL. A Zone or Bin cannot be supplied without a Location. Registered/Posted Warehouse history keeps source draft Line SystemIds as indexed immutable **snapshots**, not restrictive draft FKs that prevent removing completed handling documents. Posting source validation and journal registration remain outside Phase A. All these changes reside on the integrated backend development branch until migrations and acceptance.

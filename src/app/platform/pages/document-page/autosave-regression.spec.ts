@@ -63,6 +63,27 @@ describe('Per-field autosave regressions',()=>{
   expect(page.hasPendingWrites).toBe(false);expect(page.hasUnsavedChanges).toBe(false);f.destroy();
  });
 
+ it('coalesces line edits during PATCH and keeps the latest values without rewriting another line',async()=>{
+  const {f}=await create(false,true,true),page=f.componentInstance;
+  const responses:Subject<unknown>[]=[];
+  const patch=vi.spyOn(TestBed.inject(DATA_REST_SERVICE),'patch').mockImplementation(()=>{
+   const response=new Subject<unknown>();responses.push(response);return response;
+  });
+  const grid=f.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
+  const row=page.inlineDocumentWindowConfig!.lineRows![0];
+  const edit=(field:string,value:unknown)=>grid.updateCellValue(grid.columns.find(c=>c.id===field)!,row,value);
+  edit('description','First');await vi.waitFor(()=>expect(patch).toHaveBeenCalledTimes(1));
+  edit('description','Second');edit('description','Latest');edit('quantity','7');
+  page.handleInlineAction({actionKey:'cmd:autosave'});
+  responses[0].next({data:{id:'line-a',description:'First',quantity:'2.123456',systemRowVersion:6}});responses[0].complete();
+  await vi.waitFor(()=>expect(patch).toHaveBeenCalledTimes(2));
+  expect(patch.mock.calls[1]).toEqual(['/fixtures/header-a/lines/line-a',{description:'Latest',quantity:'7'},'"6"']);
+  responses[1].next({data:{id:'line-a',description:'Latest',quantity:'7',systemRowVersion:7}});responses[1].complete();
+  await vi.waitFor(()=>expect(page.hasPendingWrites).toBe(false));
+  expect(patch).toHaveBeenCalledTimes(2);expect(page.hasUnsavedChanges).toBe(false);
+  expect(row).toMatchObject({description:'Latest',quantity:'7'});f.destroy();
+ });
+
 });
 
 describe('Configured create payload readiness',()=>{
@@ -74,16 +95,16 @@ describe('Configured create payload readiness',()=>{
   row['lineType']='gl_account';expect(service.buildLineCreatePayload(row,config)).not.toBeNull();
  });
  it('retains explicitly required master prerequisites',()=>{
-  const required={...config,columns:config.columns.map(column=>column.id==='itemId'?{...column,required:true}:column)};
+  const required={...config,columns:config.columns.map(column=>column.id==='itemNumber'?{...column,required:true}:column)};
   const row=draft();expect(service.buildLineCreatePayload(row,required)).toBeNull();
-  row['itemId']=123;expect(service.buildLineCreatePayload(row,required)?.['itemId']).toBe(123);
+  row['number']='ITEM01';expect(service.buildLineCreatePayload(row,required)?.['number']).toBe('ITEM01');
  });
  it('omits untouched empty lookup defaults but preserves explicit null and update clears',()=>{
-  const row={...draft(),itemId:123,locationId:null};
+  const row={...draft(),number:'ITEM01',locationCode:null};
   const build=service.buildLineCreatePayload.bind(service) as (...args:any[])=>Record<string,unknown>;
-  expect(build(row,config,['itemId'])).not.toHaveProperty('locationId');
-  expect(build(row,config,['itemId'])).not.toHaveProperty('unitOfMeasureId');
-  expect(build(row,config,['itemId','locationId'])).toHaveProperty('locationId',null);
-  expect(service.buildLineUpdatePayload(row,['locationId'],config)).toEqual({locationId:null});
+  expect(build(row,config,['number'])).not.toHaveProperty('locationCode');
+  expect(build(row,config,['number'])).not.toHaveProperty('unitOfMeasureCode');
+  expect(build(row,config,['number','locationCode'])).toHaveProperty('locationCode',null);
+  expect(service.buildLineUpdatePayload(row,['locationCode'],config)).toEqual({locationCode:null});
  });
 });

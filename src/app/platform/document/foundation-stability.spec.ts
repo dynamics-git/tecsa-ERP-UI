@@ -167,7 +167,7 @@ describe('PR uses supported header and line capabilities', () => {
     expect(standard.delete).toMatchObject({ disabled: false });
     // PR uses the existing autosave default; pr-authoring.spec exercises writes and reopening.
     expect(purchaseRequisitionListConfig.autoSave).toBeUndefined();
-    expect(purchaseRequisitionListConfig.dataSource.autoGenerateNumber).toBe(true);
+    expect(purchaseRequisitionHeaderConfig.sections.flatMap(section=>section.fields).find(field=>field.key==='number')?.required).toBeUndefined();
   });
 });
 

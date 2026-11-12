@@ -1,14 +1,14 @@
 import { moveQuickEntry } from '../quick-entry';
 import { FieldValidationResult, FieldValidationService } from '../../../platform/document/field-validation.service';
 import { fieldIsRequired, fieldIsHidden, fieldIsReadonly } from '../../../platform/models/field-state';
-import { lookupQuery, clearDependentLookups } from '../../../platform/data/lookup-dependencies';
+import { lookupQuery, clearDependentLookups, selectedLookupCaption } from '../../../platform/data/lookup-dependencies';
 import { resolveLookupIdentity } from '../../../platform/data/record-identity';
 import { LookupSelect } from '../lookup-select/lookup-select';
 import { normalizeFieldValue, fieldValuesEqual, fieldInputType, fieldEditorValue } from '../../../platform/models/field-value';
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output, ChangeDetectorRef, SimpleChanges } from '@angular/core';
 import { FieldChangeSource, FieldConfig, FormSectionConfig } from '../../../platform/models/field-config.model';
-import { DataSourceService } from '../../../platform/data/data-source.service';
+import { DataSourceService, LOOKUP_PAGE_SIZE } from '../../../platform/data/data-source.service';
 import { Subscription, timer, switchMap } from 'rxjs';
 
 type FieldChangeEvent = {
@@ -35,6 +35,8 @@ type FieldDropdownOpenEvent = {
   styleUrl: './dynamic-form.scss',
 })
 export class DynamicForm {
+  /** A saved Card's seed is not a confirmed record to resolve captions from. */
+  @Input() dataReady = true;
   readonly moveQuickEntry = moveQuickEntry;
   constructor(private readonly source: DataSourceService, private readonly changes: ChangeDetectorRef, private readonly validation: FieldValidationService) {}
   readonly errors = new Map<string,string>();
@@ -65,15 +67,19 @@ export class DynamicForm {
       this.lookups.forEach(request => request.unsubscribe()); this.lookups.clear();
       this.selectedLookups.clear(); this.pendingSelectedLookups.clear(); this.lookupLabels.clear(); this.closeLookup();
     }
+    if (!this.dataReady) return;
     for (const section of this.sections) for (const field of section.fields) {
       const id = this.data[field.key];
       const bucket = field.optionsDataKey ?? `__options_${field.key}`;
-      if (this.isHidden(field) || !field.lookup || !id || !lookupQuery(field.lookup, this.data).ready) continue;
+      if (this.isHidden(field) || !field.lookup || !id) continue;
+      if (selectedLookupCaption(field, this.data) !== undefined) continue;
       if (this.data['__lookupFailed_' + field.key]) continue;
-      const context = JSON.stringify(lookupQuery(field.lookup, this.data));
+      const query = lookupQuery(field.lookup, this.data);
+      if (!query.ready) continue;
+      const context = JSON.stringify(query);
       const records = this.data[bucket];
       if (Array.isArray(records) && records.some(record => this.isRecord(record) && String(this.resolveOptionValue(field, record)) === String(id))) continue;
-      const selectedKey = `${field.key}:${id}:${JSON.stringify(lookupQuery(field.lookup, this.data))}`;
+      const selectedKey = `${field.key}:${id}:${context}`;
       if (this.selectedLookups.has(selectedKey)) continue;
       this.selectedLookups.add(selectedKey);
       this.pendingSelectedLookups.add(field.key);
@@ -105,27 +111,26 @@ export class DynamicForm {
   lookupRetryNextPage = false;
   private lookupOffset = 0;
   private lookupCursor?: string;
-  lookupActive = -1;
   private static nextId = 0;
   readonly lookupId = 'lookup-' + DynamicForm.nextId++;
   lookupLabel(field: FieldConfig): string {
     if (!this.getFieldValue(field)) return ''; // A cleared ID must never reuse an old caption.
     if (this.data[`__lookupRestricted_${field.key}`]) return 'Restricted';
-    return this.lookupLabels.get(field.key + ':' + this.getFieldValue(field)) ?? this.getFieldOptions(field).find(option => this.isOptionSelected(field, option.value))?.label ?? String(this.data['__display_' + field.key] ?? (this.getFieldValue(field) && this.pendingSelectedLookups.has(field.key) ? 'Loading selected value…' : ''));
+    return selectedLookupCaption(field, this.data) ?? this.lookupLabels.get(field.key + ':' + this.getFieldValue(field)) ?? this.getFieldOptions(field).find(option => this.isOptionSelected(field, option.value))?.label ?? String(this.data['__display_' + field.key] ?? (this.getFieldValue(field) && this.pendingSelectedLookups.has(field.key) ? 'Loading selected value…' : ''));
   }
   openLookup(field: FieldConfig): void {
     if (this.isFieldDisabled(field)) return;
     const currentLabel = this.lookupLabel(field);
     if (currentLabel) this.lookupLabels.set(field.key + ':' + this.getFieldValue(field), currentLabel);
-    this.lookupSearch?.unsubscribe();
     this.lookupOpen = field.key;
     this.lookupQuery = '';
-    this.lookupActive = -1;
     this.notifyFieldInteracted(field);
     this.notifyDropdownOpened(field);
     this.searchLookup(field, '');
   }
-  closeLookup(): void { this.lookupSearch?.unsubscribe(); this.lookupOpen = ''; this.lookupActive = -1; this.lookupLoading = false; }
+  // Let this one bounded read finish into the shared cache; reopening reuses it.
+  // A new search or component destruction still releases the old subscription.
+  closeLookup(): void { this.lookupOpen = ''; this.lookupLoading = false; }
   chooseLookup(field: FieldConfig, value: unknown): void {
     const option = this.getFieldOptions(field).find(item => String(item.value) === String(value));
     if (option) this.lookupLabels.set(field.key + ':' + value, option.label);
@@ -140,15 +145,13 @@ export class DynamicForm {
     this.lookupRetryNextPage = nextPage;
     if (!nextPage) { this.lookupOffset = 0; this.lookupCursor = undefined; this.lookupHasMore = false; }
     this.lookupQuery = text;
-    this.lookupActive = -1;
     this.lookupLoading = true;
     this.lookupError = '';
-    if (!field.lookup) return;
-    this.lookupSearch?.unsubscribe();
+    const previousSearch = this.lookupSearch;
     const bucket = field.optionsDataKey ?? `__options_${field.key}`;
     if (!nextPage) this.data[bucket] = [];
     const filter = query.filter;
-    const config = { endpoint: query.endpoint!, paging: field.lookup.paging, defaultFilter: filter, pageSize: 20 };
+    const config = { endpoint: query.endpoint!, paging: field.lookup.paging, defaultFilter: filter, pageSize: LOOKUP_PAGE_SIZE };
     const options = { useCache: true, maxAgeMs: 30000, skip: this.lookupOffset, cursor: this.lookupCursor, count: false };
     const load = () => this.source.loadList(config, options);
     const cached = this.source.getCachedList?.(config, options, options.maxAgeMs) !== undefined;
@@ -160,10 +163,11 @@ export class DynamicForm {
         const page = response as { value: unknown[]; meta: Record<string, unknown> };
         this.lookupOffset += page.value.length;
         this.lookupCursor = typeof page.meta?.['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
-        this.lookupHasMore = typeof page.meta?.['hasMore'] === 'boolean' ? page.meta['hasMore'] : field.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === 20);
+        this.lookupHasMore = typeof page.meta?.['hasMore'] === 'boolean' ? page.meta['hasMore'] : field.lookup!.paging === 'cursor' ? !!this.lookupCursor : !!this.lookupCursor || (typeof page.meta?.['total'] === 'number' ? this.lookupOffset < page.meta['total'] : page.value.length === LOOKUP_PAGE_SIZE);
         this.data[bucket] = nextPage ? [...(Array.isArray(this.data[bucket]) ? this.data[bucket] as unknown[] : []), ...page.value] : page.value; this.lookupLoading = false; this.changes.markForCheck(); },
       error: () => { if (lookupQuery(field.lookup!, this.data, text).filter !== query.filter || this.lookupOpen !== field.key) return; this.lookupLoading = false; this.lookupError = 'Unable to load choices. Try again.'; this.changes.markForCheck(); },
     });
+    previousSearch?.unsubscribe();
   }
   ngOnDestroy(): void { this.destroyed=true; this.validationRuns.clear(); this.lookupSearch?.unsubscribe(); this.lookups.forEach(subscription => subscription.unsubscribe()); }
   @Input() sections: FormSectionConfig[] = [];

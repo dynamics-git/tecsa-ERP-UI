@@ -15,23 +15,78 @@ describe('Shared lookup paging and keyboard contract',()=>{
  const records=Array.from({length:45},(_,id)=>({systemId:'fixture-'+id,code:'PR-'+id}));
  const field:FieldConfig={key:'series',label:'Series',lookup:{endpoint:'/fixtureSeries',valueField:'systemId',displayField:'code',dependsOn:[{field:'companyId',valueFrom:'company'}]}};
  function create(loadList:any){TestBed.configureTestingModule({imports:[DynamicForm],providers:[{provide:DataSourceService,useValue:{loadList,loadById:()=>of(records[0])}}]});const f=TestBed.createComponent(DynamicForm);f.componentRef.setInput('sections',[{id:'general',fields:[field]}]);f.componentRef.setInput('data',{company:'fixture-company'});f.detectChanges();return f;}
- it('loads 20, then 20, then the remainder; duplicate and end-of-results requests are ignored and search resets paging',async()=>{
-  const load=vi.fn((_config:any,options:any)=>of({value:records.slice(options.skip,options.skip+20),meta:{total:45}}));const f=create(load),form=f.componentInstance;
-  form.openLookup(field);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(20));
-  form.searchLookup(field,'',true);form.searchLookup(field,'',true);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(40));
-  form.searchLookup(field,'',true);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(45));
-  form.searchLookup(field,'',true);expect(load).toHaveBeenCalledTimes(3);expect(form.lookupHasMore).toBe(false);
-  form.searchLookup(field,'PR');await vi.waitFor(()=>expect(load).toHaveBeenCalledTimes(4));expect(load.mock.calls[3][1].skip).toBe(0);expect(load.mock.calls[3][0].defaultFilter).toContain("companyId eq 'fixture-company'");expect(load.mock.calls[3][0].defaultFilter).toContain("contains(code, 'PR')");f.destroy();
+ it('renders returned names immediately and fills from the chosen dropdown record without a second read',()=>{
+  const loadLookup=vi.fn(()=>{throw new Error('Returned values must not need another read');});
+  TestBed.configureTestingModule({imports:[DynamicForm],providers:[{provide:DataSourceService,useValue:{loadLookup}}]});
+  const f=TestBed.createComponent(DynamicForm),form=f.componentInstance;
+  const choice:FieldConfig={key:'vendorCode',label:'Vendor',lookup:{endpoint:'/vendors',valueField:'code',displayField:'name'},fill:{vendorName:'name'}};
+  const data:Record<string,unknown>={vendorCode:'V1',vendorName:'Saved Vendor'};
+  f.componentRef.setInput('sections',[{id:'general',fields:[choice,{key:'vendorName',label:'Name'}]}]);f.componentRef.setInput('data',data);f.detectChanges();
+  expect(form.lookupLabel(choice)).toBe('Saved Vendor');expect(loadLookup).not.toHaveBeenCalled();
+  data['__options_vendorCode']=[{code:'V2',name:'Chosen Vendor'}];
+  form.chooseLookup(choice,'V2');
+  expect(data).toMatchObject({vendorCode:'V2',vendorName:'Chosen Vendor'});
+  expect(form.lookupLabel(choice)).toBe('Chosen Vendor');expect(loadLookup).not.toHaveBeenCalled();f.destroy();
+ });
+ it('fills arbitrary line targets from the chosen record and lets config decide which targets are editable',()=>{
+  const load=vi.fn(()=>{throw new Error('Choosing a cached record must not fetch it again');});
+  TestBed.configureTestingModule({imports:[DocumentLines],providers:[{provide:DataSourceService,useValue:{loadList:load}}]});
+  const fixture=TestBed.createComponent(DocumentLines),grid=fixture.componentInstance;
+  const columns:LineColumnConfig[]=[
+   {id:'vendorCode',label:'Vendor',lookup:{endpoint:'/vendors',valueField:'number',displayField:'number'},fill:{chosenLabel:'name',deliveryText:'address',currencyCode:'currency'}},
+   {id:'chosenLabel',label:'Name',type:'text'},
+   {id:'deliveryText',label:'Delivery',type:'text',readonly:true},
+   {id:'currencyCode',label:'Currency',type:'text'},
+  ];
+  const row:Record<string,unknown>={vendorCode:null};
+  fixture.componentRef.setInput('columns',columns);fixture.componentRef.setInput('rows',[row]);fixture.detectChanges();
+  row['__options_vendorCode']=[{value:'V2',label:'V2',record:{number:'V2',name:'Chosen vendor',address:'Chosen address',currency:'MYR'}}];
+  grid.updateCellValue(columns[0],row,'V2');
+  expect(row).toMatchObject({vendorCode:'V2',chosenLabel:'Chosen vendor',deliveryText:'Chosen address',currencyCode:'MYR'});
+  grid.updateCellValue(columns[1],row,'Custom name');expect(row['chosenLabel']).toBe('Custom name');
+  expect(grid.updateCellValue(columns[2],row,'Changed')).toMatchObject({valid:false});expect(row['deliveryText']).toBe('Chosen address');
+  expect(load).not.toHaveBeenCalled();fixture.destroy();
+ });
+ it('loads ten at a time, ignores duplicate/end requests and resets paging for server search',async()=>{
+  const load=vi.fn((config:any,options:any)=>of({value:records.slice(options.skip,options.skip+config.pageSize),meta:{total:45}}));const f=create(load),form=f.componentInstance;
+  form.openLookup(field);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(10));
+  for(const length of [20,30,40,45]) {
+   form.searchLookup(field,'',true);form.searchLookup(field,'',true);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(length));
+  }
+  form.searchLookup(field,'',true);expect(load).toHaveBeenCalledTimes(5);expect(form.lookupHasMore).toBe(false);
+  expect(load.mock.calls.every(([config])=>config.pageSize===10)).toBe(true);
+  form.searchLookup(field,'PR');await vi.waitFor(()=>expect(load).toHaveBeenCalledTimes(6));expect(load.mock.calls[5][1].skip).toBe(0);expect(load.mock.calls[5][0].defaultFilter).toContain("companyId eq 'fixture-company'");expect(load.mock.calls[5][0].defaultFilter).toContain("contains(code, 'PR')");f.destroy();
  });
  it('retains loaded choices on a continuation error and retries the same page',async()=>{
-  let attempt=0;const load=vi.fn((_config:any,options:any)=>++attempt===2?throwError(()=>new Error('offline')):of({value:records.slice(options.skip,options.skip+20),meta:{total:45}}));const f=create(load),form=f.componentInstance;
-  form.openLookup(field);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(20));form.searchLookup(field,'',true);await vi.waitFor(()=>expect(form.lookupError).not.toBe(''));
-  expect(form.getFieldOptions(field).length).toBe(20);form.searchLookup(field,'',form.lookupRetryNextPage);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(40));expect(load.mock.calls.map(call=>call[1].skip)).toEqual([0,20,20]);f.destroy();
+  let attempt=0;const load=vi.fn((config:any,options:any)=>++attempt===2?throwError(()=>new Error('offline')):of({value:records.slice(options.skip,options.skip+config.pageSize),meta:{total:45}}));const f=create(load),form=f.componentInstance;
+  form.openLookup(field);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(10));form.searchLookup(field,'',true);await vi.waitFor(()=>expect(form.lookupError).not.toBe(''));
+  expect(form.getFieldOptions(field).length).toBe(10);form.searchLookup(field,'',form.lookupRetryNextPage);await vi.waitFor(()=>expect(form.getFieldOptions(field).length).toBe(20));expect(load.mock.calls.map(call=>call[1].skip)).toEqual([0,10,10]);f.destroy();
  });
  it('does not let an obsolete lookup response replace a newer search',async()=>{
   const old=new Subject<unknown>(),fresh=new Subject<unknown>();const load=vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(fresh);const f=create(load),form=f.componentInstance;
   form.openLookup(field);await vi.waitFor(()=>expect(load).toHaveBeenCalledTimes(1));form.searchLookup(field,'NEW');await vi.waitFor(()=>expect(load).toHaveBeenCalledTimes(2));
   fresh.next({value:[{systemId:'new',code:'NEW'}],meta:{total:1}});fresh.complete();old.next({value:records,meta:{total:45}});old.complete();expect(form.getFieldOptions(field).map(option=>option.value)).toEqual(['new']);f.destroy();
+ });
+ it('keeps the selected value on arrow open and searches without committing until a choice is selected',()=>{
+  TestBed.configureTestingModule({imports:[LookupSelect]});
+  const f=TestBed.createComponent(LookupSelect),select=f.componentInstance;
+  f.componentRef.setInput('display','Existing vendor');f.componentRef.setInput('value','V001');
+  f.componentRef.setInput('options',[{label:'Other vendor',value:'V002'}]);f.detectChanges();
+  const editor=f.nativeElement.querySelector('input') as HTMLInputElement;
+  const arrow=f.nativeElement.querySelector('.lookup-toggle') as HTMLButtonElement;
+  const selected=vi.fn(),searched=vi.fn(),opened=vi.fn();
+  select.selected.subscribe(selected);select.searched.subscribe(searched);select.opened.subscribe(opened);
+  arrow.click();f.detectChanges();
+  expect(select.expanded).toBe(true);expect(opened).toHaveBeenCalledTimes(1);
+  expect(editor.value).toBe('Existing vendor');expect(selected).not.toHaveBeenCalled();expect(searched).not.toHaveBeenCalled();
+  editor.value='Other';editor.dispatchEvent(new Event('input',{bubbles:true}));f.detectChanges();
+  expect(searched).toHaveBeenCalledWith('Other');expect(editor.value).toBe('Other');
+  expect(select.value).toBe('V001');expect(selected).not.toHaveBeenCalled();
+  editor.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));f.detectChanges();
+  expect(editor.value).toBe('Existing vendor');expect(selected).not.toHaveBeenCalled();
+  arrow.click();f.detectChanges();expect(editor.value).toBe('Existing vendor');
+  f.nativeElement.querySelector('[role=option]').click();expect(selected).toHaveBeenCalledExactlyOnceWith('V002');
+  f.destroy();
  });
  it('bounds 100,000 options, keeps keyboard selection visible and supports keyboard retry',()=>{
   TestBed.configureTestingModule({imports:[LookupSelect]});const f=TestBed.createComponent(LookupSelect),select=f.componentInstance;
@@ -61,6 +116,8 @@ describe('Shared lookup paging and keyboard contract',()=>{
    expect(popup.getAttribute('popover')).toBe('manual');expect(show).toHaveBeenCalledTimes(1);
    expect(parseFloat(popup.style.top)).toBe(anchorTop-204);
    expect(parseFloat(popup.style.width)).toBe(300);
+   geometry.mockClear();f.detectChanges();f.detectChanges();
+   expect(geometry).not.toHaveBeenCalled();
    anchorTop=20;window.dispatchEvent(new Event('resize'));
    expect(parseFloat(popup.style.top)).toBe(60);
    const selected=vi.fn();select.selected.subscribe(selected);

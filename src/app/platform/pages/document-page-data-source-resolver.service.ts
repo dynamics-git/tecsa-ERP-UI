@@ -71,7 +71,10 @@ export class DocumentPageDataSourceResolverService {
     }
 
     const baseDataSource = params.lineConfig.dataSource;
-    const missingParentFields = Object.values(baseDataSource.parentFieldMap ?? {}).filter(field => !params.hasValue(params.header[field]));
+    const parentFields = Object.values(baseDataSource.parentFieldMap ?? {});
+    if (!baseDataSource.navigation && baseDataSource.lineFKProp)
+      parentFields.push(baseDataSource.contextHeaderPKProp ?? baseDataSource.headerPKProp ?? baseDataSource.lineFKProp);
+    const missingParentFields = [...new Set(parentFields)].filter(field => !params.hasValue(params.header[field]));
     if (missingParentFields.length) {
       const saved = params.hasValue(params.header[baseDataSource.keyField ?? 'systemId']);
       return { dataSource: baseDataSource, lineContextReady: false, reason: saved

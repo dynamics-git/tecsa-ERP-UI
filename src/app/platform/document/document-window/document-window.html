@@ -7,7 +7,7 @@
     </div>
 
     <div class="entry-window-actions">
-      <div class="entry-status-chip" [class]="'entry-status-chip tone-' + (resolvedStatusMessage?.tone ?? 'idle')" aria-live="polite">
+      <div class="entry-status-chip" [class]="'entry-status-chip tone-' + (resolvedStatusMessage?.tone ?? 'idle')" [attr.role]="resolvedStatusMessage?.tone === 'error' ? 'alert' : null" aria-live="polite">
         @if (resolvedStatusMessage && (!isInteractionLocked || resolvedStatusMessage.blocking !== true)) {
           <span class="status-dot" aria-hidden="true">
             @if (resolvedStatusMessage.tone === 'info') {
@@ -108,7 +108,30 @@
   }
 
   <div class="entry-body" [class.without-factbox]="!resolvedFactBoxSections.length || !factBoxOpen" [attr.aria-busy]="isInteractionLocked">
-    @if (isInteractionLocked && resolvedStatusMessage?.tone === 'info') {
+    @if (!contentReady) {
+      <div class="entry-complete-skeleton" role="status" aria-label="Loading record, related lines and selected values">
+        <div class="entry-skeleton-main" aria-hidden="true">
+          <div class="entry-skeleton-heading"></div>
+          <div class="entry-skeleton-fields">
+            <div class="entry-skeleton-field"></div><div class="entry-skeleton-field"></div>
+            <div class="entry-skeleton-field"></div><div class="entry-skeleton-field"></div>
+            <div class="entry-skeleton-field"></div><div class="entry-skeleton-field"></div>
+          </div>
+          <div class="entry-skeleton-heading entry-skeleton-lines-heading"></div>
+          <div class="entry-skeleton-line"></div>
+          <div class="entry-skeleton-line"></div>
+          <div class="entry-skeleton-line"></div>
+        </div>
+        @if (resolvedFactBoxSections.length && factBoxOpen) {
+          <div class="entry-skeleton-details" aria-hidden="true">
+            <div class="entry-skeleton-heading"></div>
+            <div class="entry-skeleton-line"></div>
+            <div class="entry-skeleton-line"></div>
+          </div>
+        }
+      </div>
+    }
+    @if (contentReady && isInteractionLocked && resolvedStatusMessage?.tone === 'info') {
       <div class="entry-local-loader" aria-live="polite" aria-busy="true">
         <app-loading-indicator [label]="resolvedStatusLabel || 'Loading…'"></app-loading-indicator>
       </div>
@@ -128,7 +151,7 @@
               }
             </div>
 
-            <app-dynamic-form [hidden]="collapsedSections.has(headerSection.id)"
+            <app-dynamic-form [hidden]="collapsedSections.has(headerSection.id)" [dataReady]="contentReady"
               [sections]="[headerSection]" [dependencySections]="resolvedHeaderSections"
               [data]="resolvedHeaderData"
               (draftChanged)="action.emit({actionKey: 'header-draft', payload: $event})"
@@ -151,7 +174,7 @@
     </div>
 
     @if (resolvedFactBoxSections.length) {
-      <aside class="entry-info" [style.display]="factBoxOpen ? null : 'none'">
+      <aside class="entry-info" [style.display]="factBoxOpen ? null : 'none'" [style.visibility]="contentReady ? null : 'hidden'">
         <app-fact-box
           [sections]="resolvedFactBoxSections" [config]="factBoxConfig" [context]="factBoxContext"
           [label]="factBoxConfig?.label ?? pageLabel ?? 'Record information'" [title]="title ?? ''" [subtitle]="subtitle ?? ''"
@@ -227,8 +250,9 @@
       }
 
       <app-document-lines
+        (pointerdown)="action.emit({actionKey: 'line:interacted'})"
         [preferenceKey]="preferenceKey || pageLabel || 'document'" [worksheet]="worksheet" [headerData]="resolvedHeaderData" [columns]="resolvedLineColumns"
-        [rows]="resolvedLineRows" [disabled]="interactionLocked"
+        [rows]="resolvedLineRows" [dataReady]="contentReady" [disabled]="isInteractionLocked"
         [showSelection]="true" [rowCommands]="resolvedLineRowCommands"
         (action)="handleLineAction($event)"
         (dropdownOpened)="handleLineDropdownOpened($event)"

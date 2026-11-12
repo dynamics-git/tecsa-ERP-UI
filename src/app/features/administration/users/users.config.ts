@@ -177,6 +177,7 @@ export const usersLineConfig: LineConfig = {
       type: 'lookup',
       required: true,
       optionsDataKey: '__permissionSetCodeOptions',
+      fill: { permissionSetName: 'name' },
       lookup: {
         endpoint: '/permissionSets',
         valueField: 'code',
@@ -187,17 +188,9 @@ export const usersLineConfig: LineConfig = {
     },
     {
       id: 'permissionSetName',
-      field: 'permissionSetCode',
       label: 'Name',
-      type: 'lookup',
+      type: 'text',
       readonly: true,
-      optionsDataKey: '__permissionSetNameOptions',
-      lookup: {
-        endpoint: '/permissionSets',
-        valueField: 'code',
-        displayField: 'name',
-        recordRead: 'collection',
-      },
       width: '240px',
     },
     {

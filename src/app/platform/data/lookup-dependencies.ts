@@ -1,4 +1,31 @@
-import type { FieldLookupConfig } from '../models/field-config.model';
+import type { FieldConfig, FieldLookupConfig } from '../models/field-config.model';
+
+/** Display a saved value from the row itself; fill maps describe explicit name projections. */
+export function selectedLookupCaption(field: Pick<FieldConfig, 'lookup' | 'fill' | 'displayFormat' | 'labelField' | 'bindLabel'> & {key?: string; field?: string; id?: string}, record: Record<string, unknown>): string | undefined {
+  if (!field.lookup) return undefined;
+  if (!field.displayFormat && (field.labelField || field.bindLabel)) return undefined;
+  const key = field.key ?? field.field ?? field.id;
+  if (!key) return undefined;
+  const value = record[key];
+  if (value === undefined || value === null || value === '') return undefined;
+  const valueField = field.lookup.valueField ?? 'systemId';
+  if (!field.displayFormat && field.lookup.displayField === valueField) return String(value);
+  const sourceValue = (source: string): unknown => {
+    if (source === valueField) return value;
+    const target = Object.entries(field.fill ?? {}).find(([, sources]) => sources === source || Array.isArray(sources) && sources.length === 1 && sources[0] === source)?.[0];
+    return target ? record[target] : undefined;
+  };
+  let missing = false;
+  const render = (source: string): string => {
+    const result = sourceValue(source);
+    if (result === undefined || result === null || result === '') missing = true;
+    return String(result ?? '');
+  };
+  const caption = field.displayFormat
+    ? field.displayFormat.replace(/\[([^\]]+)\]/g, (_, source: string) => render(source))
+    : render(field.lookup.displayField);
+  return missing ? undefined : caption;
+}
 
 export interface LookupDependencyField {
   key?: string; field?: string; id?: string;

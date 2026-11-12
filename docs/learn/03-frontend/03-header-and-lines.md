@@ -2,6 +2,41 @@
 
 LineConfig describes the child data source, business relation, placement and typed columns. The shared document host renders it for documents, cards and worksheets.
 
+Existing infinite scroll uses bounded reads with count=false and the backend's
+hasMore continuation rather than counting all matching records on each read.
+The same behavior applies to ordinary lists, modal lists and worksheets.
+Document Lines honor hasMore while retaining the existing 1,000-line editor
+limit and compatibility with older total/short-batch responses. A full final
+batch with hasMore=false completes without another empty read. No numbered
+pagination or new loading button is added.
+
+Ordinary saves use the shared Header/Line field CRUD paths. The unused global
+DocumentSavePort/DocumentSaveService and DocumentStateService.scheduleHeaderAutosave
+wrapper were retired, including their application provider and public exports.
+They are not an alternative page save extension point. Existing config-driven
+manual/singleton modes still use ListPage's shared persistence; no new save engine
+or separate draft endpoint is introduced. New records POST normally, then changes
+PATCH the returned identity/version. Generic create errors refer to a record,
+not a draft workflow. Business document statuses remain their own backend rules.
+
+For ordinary header/line documents, an attempted line interaction or add/copy/paste
+before Header creation shows a visible error explaining that the Header must be
+created first. Editors retain their configured editability, rather than silently
+turning gray. Entered line values remain local until the parent is confirmed.
+Typing a header business key is not confirmation that its POST succeeded. The
+write guard blocks child POST/PATCH during pending or failed Header creation.
+It uses the Header CRUD identity plus configured headerPKProp/lineFKProp and every
+parentFieldMap value, independently of field required validation. Worksheets keep
+their separate existing row-only behavior. Autosave is the default; no per-page
+autoSave:true declaration is needed for this parent-before-child guarantee.
+
+Refresh on an unsaved Header resets it to configured defaults after any discard
+confirmation; it does not attempt to reload nonexistent children and silently
+return. Accepted discard clears the previous field-validation/unsent-edit state
+and pending autosave timer. Cancelling retains the input. A saved Header still
+reloads Header and Lines from the server. Corrected Header input/create progress
+replaces the obsolete missing-parent message through the existing status path.
+
 ## Placement
 
 ```typescript
@@ -66,6 +101,11 @@ Editable entry rows show the supported typed controls even before a saved value 
 ## Loading and refresh
 
 Keep grid structure stable while data loads. Loading indicates an outstanding read; a ready empty response is an empty collection. Server-changed lines should refresh without overwriting unsaved local drafts. A missing route or timeout must be shown as an error rather than silently presenting “0 lines” as a successful read.
+
+The initial Card waits for its Header and business Lines, then the existing form
+and grid finish selected captions independently. Optional lookup names do not
+delay readiness. Header/Lines failures still keep the load error and Retry state;
+this is not permission to hide failed record reads or replace them with empty rows.
 
 ## Totals and calculated fields
 

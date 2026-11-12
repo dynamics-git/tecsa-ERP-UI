@@ -1,6 +1,169 @@
 # Query, write and handle concurrency
 
+## Return unchanged ordinary PATCH records without another SELECT
+
+After the normal permission, locked-record, version and validation checks, a
+plain unchanged PATCH returns the locked record directly. No save or final
+refresh query is needed when there is no rules adapter or active beforeWrite,
+determine or validate behavior. Actual writes and hook/rules paths retain
+refresh to return database-generated and hook-modified values. Create and PUT
+behavior is unchanged; stale row versions still fail before this optimization.
+
+Related-card business-key probes and filter-panel choices explicitly use
+count=false, so they do not count all matches just to inspect the returned rows.
+Related cards still require exactly one of at most two returned matches. Filter
+options keep their existing bounded size and component-local reuse.
+
+## Remove repeated request queries and writes
+
+Sanctum last-used timestamp tracking is disabled through its supported config,
+removing a token UPDATE from authenticated reads. Token validity, expiry,
+revocation and active-user checks remain. This application does not use that
+timestamp to expire idle sessions.
+
+Shared EntityInput no longer counts uniqueness matches for unchanged persisted
+keys. It compares every composite-key member and scope column through model
+storage casts. Creates and changed keys/scopes retain friendly duplicate checks
+and database unique constraints. Read-only Users verification reduced unchanged
+key COUNT queries from two to zero; changing Email still checked its unique key.
+
+CompanyStorage combines template availability and readiness in one live query.
+Repeated template probes within a request reuse the current connection/database
+snapshot. Schema/transaction boundaries invalidate it. The live completeness
+guard stays in place to prevent missing Company tables resolving to shared ones.
+
+Existing infinite scroll requests count=false for ordinary lists, worksheets,
+modal lists and document Lines. hasMore drives the existing continuation without
+an exact total COUNT or an extra read after a full final batch. Cursor behavior
+and old-response metadata fallback remain supported. No UI pagination feature,
+new button or unbounded master-table read is introduced.
+
+## Server authorization reuse
+
+Login and API authorization now share PermissionService's server-owned effective
+grant snapshot. Warm operation checks, Company membership, page rules and source
+field rights reuse a dedicated Laravel file cache across PHP workers instead of
+querying permission tables again. Its keys isolate database, user, Company and
+workspace; the current single-server store has a 60-second lifetime.
+
+Security-table writes observed by the backend retire the database's cache
+generation, including shared Core atomic updates and bulk SQL. Dirty security
+transactions bypass cached values. Commit/rollback retires the generation again;
+cold transaction reads publish only after commit if their generation is current.
+Last-login updates do not invalidate permissions. Out-of-process SQL changes are
+bounded by the TTL; immediate administrative revocation outside the application
+requires clearing this authorization store. Multi-node installations require a
+shared cache store rather than node-local files.
+
+This preserves operation, field, row and company/workspace enforcement. Browser
+permissions do not authorize backend calls. Authentication/token and actual data
+queries remain; this change does not claim that every API runs without SQL.
+UI config, field autosave and lookup-fill behavior are unchanged.
+
+## Shared API startup
+
+Ordinary root Notes/Files URLs reuse registered collaboration transports instead
+of generating nine routes for every source in both Company/workspace groups.
+CRUD URLs and existing nested/singleton/alias/domain bindings remain. The path
+source must resolve to an eligible backend registration; body/query values cannot
+redirect owner access. Company/workspace, record and collaboration authorization
+still run. A local three-process comparison reduced route count from 20,909 to
+7,553, boot+health from 932–969 to 520–528 ms and peak memory from 128 to 78 MB.
+This is startup evidence, not a server CRUD benchmark.
+
 The UI builds query requests from its shared filter, sort and data-source config. The backend validates and executes them against published fields. Do not add a query-field map for each ordinary table.
+
+## Remove ordinary read setup round trips
+
+Company context reads combine the active company and active user/company
+membership predicate in one query instead of fetching the company and issuing
+a second membership `exists` call. Unauthenticated/inactive users, inactive
+companies and missing/inactive memberships retain their rejection behavior.
+This is existing server context validation, not a new frontend permission API.
+
+CompanyStorage captures the prior search_path and sets its transaction-local
+path in one PostgreSQL statement. The prior-value CTE is materialized before
+set_config executes. PostgreSQL's returned active path seeds the existing
+request metadata snapshot; subsequent metadata resolution does not issue a
+redundant SHOW. Cleanup still restores the original server state after success,
+exception, nested calls and callback session changes, disconnecting on restore
+failure. No schema, posting/workflow or record-write behavior changes.
+
+Runtime placement remains material: a local Windows artisan serve instance with
+a remote database incurs connection setup and network round trips even for an
+empty collection. PHP documents its built-in server as single-threaded and
+does not support its multi-worker option on Windows. Production capacity must
+be assessed with an appropriate concurrent web runtime and API/database placement,
+not inferred from either this development server or a handful of query probes.
+
+## One authorization boundary for ordinary CRUD
+
+Generated ordinary CRUD routes use the existing EntityRuntime grant check rather
+than generating a second permission middleware check for the same operation.
+Previously both layers executed the same permission `exists` query. Users and PR
+inherit this shared transport/runtime behavior; no page config opt-in is needed.
+Runtime authorization also remains effective for direct service callers.
+Business controllers retain generated permission middleware, and explicitly
+configured middleware remains unchanged. Authentication, company/workspace
+context, field rights and row-version checks retain their existing responsibilities.
+Login's UI capability response does not replace server authorization.
+
+## Reuse resolved metadata within one request
+
+The backend reuses each source's resolved EntityDefinition and a table's physical
+model-field mapping within the same active database connection/search path.
+Collection model/resource instances do not rebuild the same interpretation for
+every row. Source-declaration changes invalidate resolved definitions. Existing
+DDL, search-path and transaction invalidation also clear this derived metadata;
+request completion releases it. The existing cross-request catalogue cache stays
+separate. Records and authorization decisions are not added to this cache.
+
+Routing declarations are also reused while their source config remains identical;
+changed declarations trigger the same validation again. This metadata reuse does
+not cache database rows or authorize requests.
+
+Code-only controller discovery now loads through Laravel's `config/api_sources.php`.
+`config:cache` can retain that discovery instead of bootstrap rebuilding it on
+every cached boot. The existing registry still accepts package sources after
+loading the core declarations, without restoring stale provider registrations.
+Older config caches without this base declaration use the existing discovery
+fallback. Rebuild config/route caches after deploying source changes. Uncached
+development still discovers controllers, and the large generated route collection
+remains a startup cost; these corrections do not establish live ERP latency.
+
+Bounded collection reads delegate directly to the existing paginator instead of
+resolving/authorizing the query profile twice. `$count=false` retains bounded
+continuation without an aggregate count. Company applicability choices now use
+that same query contract: identity filters, typed search, paging and field rights
+run over the existing active-company/membership restrictions. The DTO remains
+`systemId`, `code`, `name`; it does not become a complete Company record cache.
+
+## Header numbering through the same CRUD POST
+
+The existing backend `numbering` declaration names its Number and series fields.
+A code-based series uses current `no_series.code`, `no_series_lines.series_code`,
+`increment_by_no` and `open`; it does not reuse a CRUD UUID as a relationship.
+PR declares `number`/`noSeriesCode` and accepts manual No. without a series, or
+allocates from the selected series. Manual No. with a selected series requires
+that series's Manual Nos. permission. Allocation locks the series/line and rolls
+back if Header creation fails. Counters, dates and exhausted-line state are
+server-owned; used series lines cannot change their sequence definition or be
+deleted. Normal series lines are supported; Sequence mode is rejected explicitly.
+
+This is one shared behavior, not a PR-specific save route or allocator. A source
+may additionally declare an existing company setup model/field for its default
+series. No PR default setup field exists in the current schema, so none is
+invented; PR selects a series directly. Legacy UUID-series paths remain
+compatibility code, not the current No. Series UI contract.
+
+## Lookup display and fill stay in UI configuration
+
+User assignments expose their stored permissionSetCode. The UI's existing lookup
+selects /permissionSets by code and fill maps its name to permissionSetName.
+No virtual permissionSetName field, schemaFrom/readRelation binding or extra
+projection permission mechanism is added to this CRUD API for UI display.
+The original userName update restriction predates this correction and remains.
+Related source reads still use their existing API authorization and field rights.
 
 ## Query the published fields
 

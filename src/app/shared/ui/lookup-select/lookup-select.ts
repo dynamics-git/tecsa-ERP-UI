@@ -27,21 +27,30 @@ export class LookupSelect {
   @ViewChild('list') private list?: ElementRef<HTMLElement>;
   @ViewChild('editor') private editor?: ElementRef<HTMLInputElement>;
   private popup?: HTMLElement;
+  private popupResize?: ResizeObserver;
   private readonly repositionOnScroll = (event: Event) => {
     if (!this.popup?.contains(event.target as Node)) this.positionPopup();
   };
   @ViewChild('popup') set popupElement(ref: ElementRef<HTMLElement> | undefined) {
+    this.detachPopup();
     this.popup = ref?.nativeElement;
     if (!this.popup) return;
     // Keep Angular ownership and inherited theme tokens, but escape all ancestor clipping.
     this.popup.showPopover?.();
     this.positionPopup();
     this.popup.ownerDocument.addEventListener('scroll', this.repositionOnScroll, true);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.popupResize = new ResizeObserver(() => this.positionPopup());
+      this.popupResize.observe(this.popup);
+      const editor = this.anchor ?? this.editor?.nativeElement;
+      if (editor) this.popupResize.observe(editor);
+    }
   }
-  ngAfterViewChecked(): void { this.positionPopup(); }
   ngOnDestroy(): void { this.detachPopup(); }
   @HostListener('window:resize') onResize(): void { this.positionPopup(); }
   private detachPopup(): void {
+    this.popupResize?.disconnect();
+    this.popupResize = undefined;
     this.popup?.ownerDocument.removeEventListener('scroll', this.repositionOnScroll, true);
     this.popup?.hidePopover?.();
   }
@@ -78,16 +87,18 @@ export class LookupSelect {
   }
   expanded = false;
   query = '';
+  searching = false;
   active = -1;
   open(): void {
     if (this.disabled || this.expanded) return;
     this.resetViewport();
-    this.expanded = true; this.query = ''; this.active = -1;
+    this.expanded = true; this.query = ''; this.searching = false; this.active = -1;
+    this.editor?.nativeElement.select();
     this.opened.emit();
   }
   toggle(editor: HTMLInputElement): void {
     if (this.expanded) this.close();
-    else { editor.focus(); this.open(); }
+    else { this.open(); editor.focus(); }
   }
   loadMoreOnScroll(event: Event): void {
     const list = event.target as HTMLElement;
@@ -97,7 +108,7 @@ export class LookupSelect {
     if (this.hasMore && !this.loading && !this.error && list.scrollHeight - list.scrollTop - list.clientHeight <= 40) this.nextPage.emit();
   }
   close(): void { this.detachPopup(); this.expanded = false; this.active = -1; }
-  search(value: string): void { this.resetViewport(); this.query = value; this.active = -1; this.searched.emit(value); }
+  search(value: string): void { this.resetViewport(); this.query = value; this.searching = true; this.active = -1; this.searched.emit(value); }
   choose(value: unknown): void { this.selected.emit(value); this.close(); }
   key(event: KeyboardEvent): void {
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.close(); }

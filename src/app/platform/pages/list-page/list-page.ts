@@ -9,7 +9,7 @@ import { resolvePageIdentity, recordIdentityText } from '../../data/record-ident
 import { headerDataSourceDefaults, lineConfigDefaults } from '../../data/document-config-defaults';
 import { HostListener, ChangeDetectorRef, Component, forwardRef, EventEmitter, Input, OnDestroy, OnInit, Output, inject, ViewChild } from '@angular/core';
 import { Observable, Subscription, from, of, firstValueFrom, defer } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, tap } from 'rxjs/operators';
 import { switchMap } from 'rxjs/operators';
 import { SessionService } from '../../../core/services/session.service';
 import { AttachmentsConfig, DocumentWindowConfig, HeaderConfig, LineTotalsConfig, DocumentStatusMessage } from '../../models/document-window-config.model';
@@ -22,7 +22,6 @@ import { ActionDispatcherService } from '../../../shared/ui/action-dispatcher.se
 import { ApiErrorService } from '../../data/api-error.service';
 import { ConfirmationService } from '../../../shared/ui/confirmation.service';
 import { DataPage, DataSourceService } from '../../data/data-source.service';
-import { DraftCreateService } from '../../data/draft-create.service';
 import { DocumentConfigDataService } from '../../data/document-config-data.service';
 import { DocumentPayloadService } from '../../data/document-payload.service';
 import { DocumentRecordService } from '../../data/document-record.service';
@@ -89,7 +88,6 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly actionDispatcher = inject(ActionDispatcherService);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly dataSource = inject(DataSourceService);
-  private readonly draftCreate = inject(DraftCreateService);
   private readonly documentConfigData = inject(DocumentConfigDataService);
   private readonly documentPayload = inject(DocumentPayloadService);
   private readonly documentRecord = inject(DocumentRecordService);
@@ -154,10 +152,10 @@ export class ListPage implements OnInit, OnDestroy {
       this.startPopupLoading('Loading records...');
       const existing = reset ? [] : (this.activeDocumentWindowConfig?.lineRows ?? []).filter(row => this.hasValue(this.resolvePersistedRecordId(row, this.worksheetSource)));
       const size = this.worksheetSource.pageSize ?? 25;
-      const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
+      const page = await firstValueFrom(this.dataSource.loadList(this.worksheetSource, {top: size, skip: existing.length, count: false, cursor: reset ? undefined : this.nextCursor, forceRefresh, useCache: true, maxAgeMs: 30000}).pipe(optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs))) as DataPage;
       const records = await this.documentHydration.resolveLineLookups(page.value, this.lineConfig.columns, this.initialRecord ?? {}, () => true, () => this.startPopupLoading('Loading selected values...'));
       this.nextCursor = typeof page.meta['nextCursor'] === 'string' ? page.meta['nextCursor'] : undefined;
-      this.hasMore = this.worksheetSource.paging === 'cursor' ? !!this.nextCursor : typeof page.meta['total'] === 'number' ? existing.length + records.length < page.meta['total'] : records.length === size;
+      this.hasMore = this.worksheetSource.paging === 'cursor' ? !!this.nextCursor : typeof page.meta['hasMore'] === 'boolean' ? page.meta['hasMore'] : typeof page.meta['total'] === 'number' ? existing.length + records.length < page.meta['total'] : records.length === size;
       this.activeDocumentWindowConfig!.lineRows = this.buildLineRows(this.initialRecord ?? {}, [...existing, ...records]);
       this.activeLineRow = undefined; this.selectedLineIndexes = [];
       this.ensureTrailingEmptyRows();
@@ -208,6 +206,7 @@ export class ListPage implements OnInit, OnDestroy {
   hasMore = true;
   private nextCursor?: string;
   rows: unknown[] = [];
+  private listLookupGeneration = 0;
   selectedRow?: unknown;
 
   private listLoadSubscription?: Subscription;
@@ -222,6 +221,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
   private readonly invalidHeaderDrafts = new Set<string>();
   private autosavePending = 0;
+  private readonly autosavingRecords = new WeakSet<Record<string, unknown>>();
   private lineBatchPending = false;
   private editSequence = 0;
   private readonly unsavedFields = new Map<Record<string, unknown>, Map<string, number>>();
@@ -234,11 +234,13 @@ export class ListPage implements OnInit, OnDestroy {
 
   private beginAutosave(record: Record<string, unknown>, fields?: string[]): Map<string, number> {
     this.autosavePending++;
+    this.autosavingRecords.add(record);
     return new Map([...(this.unsavedFields.get(record) ?? [])].filter(([field]) => !fields || fields.includes(field)));
   }
 
   private finishAutosave(record: Record<string, unknown>, sent: Map<string, number>, success: boolean): void {
     this.autosavePending = Math.max(0, this.autosavePending - 1);
+    this.autosavingRecords.delete(record);
     this.runModal.notifyBackground(this.initialRecord);
     if (!success) return;
     const edits = this.unsavedFields.get(record);
@@ -512,18 +514,20 @@ export class ListPage implements OnInit, OnDestroy {
     this.pendingListSyncRecord = undefined;
     this.openDocumentPopup(record, []);
     if (!persisted) { this.stopPopupLoading(); return; }
-    // Keep the existing blank entry rows visible while the saved document hydrates.
-    // The loading scope locks their editors until the server's rows replace them.
+    // Initial saved records stay behind the single Card skeleton until Header and Lines are ready.
     if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.contentReady = false;
     // Loading starts only when the shared read actually has to await the server.
     // Header, selected labels and child rows each retain their own request deadline.
     // Do not cut off a healthy multi-request hydration with one aggregate request timeout.
-    this.subscriptions.add(this.loadHeaderRecord(record).subscribe({
+    const opened = this.activeDocumentWindowConfig;
+    this.subscriptions.add(this.loadHeaderRecord(record, false).subscribe({
       next: header => {
-        const hydrated = this.applyHydratedHeaderRecord(header);
+        if (!opened || this.destroyed || this.activeDocumentWindowConfig !== opened) return;
+        const hydrated = this.applyHydratedHeaderRecord(header, false);
         this.hydrateOpenedDocumentLines(hydrated);
       },
       error: error => {
+        if (!opened || this.destroyed || this.activeDocumentWindowConfig !== opened) return;
         this.stopPopupLoading();
         if (this.activeDocumentWindowConfig) this.activeDocumentWindowConfig.interactionLocked = true;
         this.setEntryStatus({ tone: 'error', title: 'Load failed', message: this.getErrorMessage(error) });
@@ -540,14 +544,14 @@ export class ListPage implements OnInit, OnDestroy {
     return resolved.lineContextReady;
   }
 
-  private applyHydratedHeaderRecord(headerRecord: Record<string, unknown>): Record<string, unknown> {
+  private applyHydratedHeaderRecord(headerRecord: Record<string, unknown>, reveal = true): Record<string, unknown> {
     const currentConfig = this.activeDocumentWindowConfig;
     if (!currentConfig) {
       return this.buildHeaderData(headerRecord);
     }
 
     const nextHeaderData = this.buildHeaderData(headerRecord);
-    currentConfig.contentReady = true;
+    if (reveal) currentConfig.contentReady = true;
     currentConfig.headerData = nextHeaderData;
     currentConfig.subtitle = '';
     currentConfig.title = this.getDocumentTitle(headerRecord);
@@ -558,50 +562,44 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private hydrateOpenedDocumentLines(headerData: Record<string, unknown>): void {
-    if (!this.lineConfig) {
+    const opened = this.activeDocumentWindowConfig;
+    if (!opened || !this.lineConfig) {
       this.finishCardLineLoading();
       return;
     }
 
-    let lineLoadHandled = false;
-    const finishLineLoad = (failed: boolean, error?: unknown): void => {
-      if (lineLoadHandled) {
-        return;
-      }
-
-      lineLoadHandled = true;
+    const validScope = this.dataSource.captureWriteScope();
+    let received = false;
+    let finished = false;
+    const isCurrent = () => !this.destroyed && validScope()
+      && this.activeDocumentWindowConfig === opened && opened.headerData === headerData;
+    const finish = (failed: boolean, error?: unknown): void => {
+      if (finished || !isCurrent()) return;
+      finished = true;
       this.finishCardLineLoading(failed, error);
     };
+    const publish = (records: Record<string, unknown>[]): void => {
+      if (!isCurrent()) return;
+      opened.lineRows = this.buildLineRows(headerData, records);
+      opened.lineTotals = this.buildLineTotals(opened.lineRows, headerData);
+      this.applyLineOptions(opened.lineRows);
+      finish(false);
+    };
 
-    this.subscriptions.add(
-      this.loadLineRows(headerData)
-        .subscribe({
-          next: (response) => {
-            const records = this.toRecords(response);
-            const currentConfig = this.activeDocumentWindowConfig;
-            if (!currentConfig?.headerData || !this.lineConfig) {
-              return;
-            }
-
-            currentConfig.lineRows = this.buildLineRows(currentConfig.headerData, records);
-            currentConfig.lineTotals = this.buildLineTotals(
-              currentConfig.lineRows,
-              currentConfig.headerData,
-            );
-            this.applyLineOptions(currentConfig.lineRows);
-            this.changeDetector.detectChanges();
-
-
-            finishLineLoad(false);
-          },
-          error: (error: unknown) => {
-            finishLineLoad(true, error);
-          },
-          complete: () => {
-            finishLineLoad(false);
-          },
-        }),
-    );
+    this.subscriptions.add(this.loadLineRows(headerData).subscribe({
+      next: (response) => {
+        received = true;
+        const records = this.toRecords(response)
+          .filter((row): row is Record<string, unknown> => this.isRecord(row));
+        // Business rows own document readiness. DocumentLines is the single
+        // owner of selected captions; optional names must not hold the Card.
+        publish(records);
+      },
+      error: error => finish(true, error),
+      complete: () => {
+        if (!received) publish([]);
+      },
+    }));
   }
 
   private startCardLineLoading(): void {
@@ -622,6 +620,8 @@ export class ListPage implements OnInit, OnDestroy {
 
     this.stopPopupLoading();
 
+    // Do not expose a half-hydrated Card when Header succeeded but Lines failed.
+    if (!failed) currentConfig.contentReady = true;
     currentConfig.interactionLocked = failed;
     currentConfig.statusMessage = failed
       ? {
@@ -634,41 +634,7 @@ export class ListPage implements OnInit, OnDestroy {
     this.changeDetector.detectChanges();
   }
 
-  private scheduleOpenEntryOptionHydration(): void {
-    this.hydrateOpenEntryOptions();
-  }
-
-  private hydrateOpenEntryOptions(): void {
-    const documentWindowConfig = this.activeDocumentWindowConfig;
-    if (!documentWindowConfig) {
-      return;
-    }
-
-    this.subscriptions.add(
-      this.loadLineMasterOptions()
-        .pipe(
-          switchMap((masters) =>
-            this.loadConfiguredHeaderDropdownOptions().pipe(
-              map((headerDropdownOptions) => ({ masters, headerDropdownOptions })),
-            ),
-          ),
-        )
-        .subscribe({
-          next: ({ masters, headerDropdownOptions }) => {
-            this.lineMasterRecordsByType = masters.lineMasterRecordsByType;
-            this.lineMasterOptionsByType = masters.lineMasterOptionsByType;
-            this.optionFieldMap = masters.optionFieldMap;
-            this.setHeaderDropdownRecords(headerDropdownOptions);
-            this.applyHeaderDropdownOptions(documentWindowConfig);
-            this.applyLineOptions(documentWindowConfig.lineRows ?? []);
-            this.changeDetector.detectChanges();
-          },
-          error: () => {},
-        }),
-    );
-  }
-
-  private loadHeaderRecord(row: Record<string, unknown>): Observable<Record<string, unknown>> {
+  private loadHeaderRecord(row: Record<string, unknown>, hydrateLookups = true): Observable<Record<string, unknown>> {
     const pageType = this.toText(this.listConfig.pageType).trim().toLowerCase();
     if (pageType === 'worksheet' || pageType === 'setup') {
       return of(row);
@@ -694,6 +660,7 @@ export class ListPage implements OnInit, OnDestroy {
           this.listConfig.dataSource, recordId, row, this.timeoutPolicy.hydrationTimeoutMs,
           () => this.startPopupLoading('Loading document...'),
         )).pipe(map(response => this.resolveHeaderRecordResponse(response, row)));
+    if (!hydrateLookups) return header;
     return header.pipe(switchMap(record => from(this.documentHydration.resolveHeaderLookups(
       record, this.headerConfig.sections.flatMap(section => section.fields),
       () => this.startPopupLoading('Loading selected values...'),
@@ -734,12 +701,9 @@ export class ListPage implements OnInit, OnDestroy {
     let setupRecordLoaded = false;
     this.subscriptions.add(this.dataSource.loadSingleton(this.listConfig.dataSource, { useCache: true, maxAgeMs: 30000, onRequest: () => this.startPopupLoading('Loading setup...') }).pipe(
       optionalRequestTimeout(this.timeoutPolicy.hydrationTimeoutMs),
-      switchMap(record => {
-        setupRecordLoaded = true;
-        return from(this.documentHydration.resolveHeaderLookups(this.isRecord(record) ? record : {}, this.headerConfig.sections.flatMap(section => section.fields), () => this.startPopupLoading('Loading selected values...')));
-      }),
     ).subscribe({
       next: record => {
+        setupRecordLoaded = true;
         this.applyHydratedHeaderRecord(this.isRecord(record) ? record : {});
         this.stopPopupLoading();
       },
@@ -910,6 +874,9 @@ export class ListPage implements OnInit, OnDestroy {
 
   private openDocumentPopup(row: unknown, lineRows: unknown[]): void {
     const documentWindowConfig = this.buildDocumentWindowConfig(row, lineRows);
+    if (!this.isWorksheetPage && this.isRecord(row) && this.hasPersistedIdentity(row)) {
+      documentWindowConfig.contentReady = false;
+    }
     this.activeDocumentWindowConfig = documentWindowConfig;
     this.refreshEntryPolicy();
     this.activeLineRow = undefined;
@@ -935,6 +902,10 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private handleEntryInteractionAction(actionKey: string, payload: unknown): void {
+    if (actionKey === 'line:interacted') {
+      if (!this.hasReadyLineParent()) this.showLineParentError();
+      return;
+    }
     if (actionKey === 'header:dropdown-opened') {
       this.handleHeaderDropdownOpened(payload);
       return;
@@ -980,12 +951,12 @@ export class ListPage implements OnInit, OnDestroy {
 
   private loadHeaderDropdownOptionsForField(fieldKey: string): void {
     const fieldConfig = this.findHeaderFieldByKey(fieldKey);
-    if (!fieldConfig || fieldConfig.type !== 'dropdown') {
+    if (!fieldConfig || fieldConfig.lookup || fieldConfig.type !== 'dropdown') {
       return;
     }
 
     const optionsKey = fieldConfig.optionsDataKey?.trim() || `__options_${fieldConfig.key}`;
-    if (!optionsKey.length || this.loadingHeaderDropdownKeys.has(optionsKey) || this.loadedHeaderDropdownKeys.has(optionsKey)) {
+    if (this.loadingHeaderDropdownKeys.has(optionsKey) || this.loadedHeaderDropdownKeys.has(optionsKey)) {
       return;
     }
 
@@ -1117,7 +1088,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private openNewPreview(): void {
-    this.startPopupLoading(`Preparing ${this.documentLabel.toLowerCase()}...`);
+    // New is a local draft; do not show a network loader for an unsaved record.
     this.pendingDraftCreateFromNew =
       this.shouldCreateDraftOnInput();
     this.draftCreateInProgress = false;
@@ -1173,73 +1144,8 @@ export class ListPage implements OnInit, OnDestroy {
     ));
   }
 
-  private expandLineRowsInBackground(
-    header: Record<string, unknown>,
-    initialCount: number,
-  ): void {
-    if (!this.lineConfig || !this.activeDocumentWindowConfig?.headerData) {
-      return;
-    }
-
-    const resolved = this.resolveLineDataSourceForHeader(header);
-    if (!resolved.lineContextReady) {
-      return;
-    }
-
-    const initialTop = this.resolveInitialLineFetchTop(resolved.dataSource);
-    const backgroundTop = this.resolveBackgroundLineFetchTop(resolved.dataSource);
-    if (backgroundTop <= initialTop || initialCount < initialTop) {
-      return;
-    }
-
-    const pageType = this.toText(this.listConfig.pageType).trim().toLowerCase();
-
-    const baselineCount = this.activeDocumentWindowConfig.lineRows?.length ?? 0;
-    this.subscriptions.add(
-      from(this.documentHydration.loadLineRowsForHeader(
-        resolved.dataSource,
-        header,
-        {
-          timeoutMs: this.timeoutPolicy.hydrationTimeoutMs,
-          fallbackHeaderPKProp: this.listConfig.dataSource.headerPKProp,
-          defaultTop: backgroundTop,
-          allowWithoutParentKey: pageType === 'worksheet',
-        },
-      ))
-        .pipe(catchError(() => of([])))
-        .subscribe((response) => {
-          const currentConfig = this.activeDocumentWindowConfig;
-          if (!currentConfig?.headerData) {
-            return;
-          }
-
-          // Skip background replacement if user already changed row count.
-          if ((currentConfig.lineRows?.length ?? 0) !== baselineCount) {
-            return;
-          }
-
-          const records = this.toRecords(response);
-          if (records.length <= baselineCount) {
-            return;
-          }
-
-          currentConfig.lineRows = this.buildLineRows(currentConfig.headerData, records);
-          currentConfig.lineTotals = this.buildLineTotals(
-            currentConfig.lineRows,
-            currentConfig.headerData,
-          );
-          this.applyLineOptions(currentConfig.lineRows);
-          this.changeDetector.detectChanges();
-        }),
-    );
-  }
-
   private resolveInitialLineFetchTop(dataSource: DataSourceConfig): number {
     return Math.max(1, dataSource.pageSize ?? 20);
-  }
-
-  private resolveBackgroundLineFetchTop(dataSource: DataSourceConfig): number {
-    return Math.max(this.resolveInitialLineFetchTop(dataSource), 200);
   }
 
   private buildDocumentWindowConfig(row?: unknown, lineSource?: unknown[]): DocumentWindowConfig {
@@ -1301,6 +1207,26 @@ export class ListPage implements OnInit, OnDestroy {
     if (operation !== 'read') return !this.commandPermission.applyOperation({label: 'Edit', actionKey: 'edit'}, pageId, operation === 'create' ? 'create' : 'modify').disabled;
     const grants = this.sessionService.Permissions.filter(value => this.isRecord(value) && (value['pageId'] === pageId || value['PageId'] === pageId));
     return grants.length ? grants.some(value => (value as Record<string, unknown>)['canRead'] === true) : this.sessionService.SuperAdmin;
+  }
+
+  private hasReadyLineParent(): boolean {
+    if (this.isWorksheetPage) return true;
+    const header = this.activeDocumentWindowConfig?.headerData;
+    return !!header && !this.pendingDraftCreateFromNew && !this.draftCreateInProgress
+      && this.hasPersistedIdentity(header)
+      && this.resolveLineDataSourceForHeader(header).lineContextReady;
+  }
+
+  private showLineParentError(): void {
+    const header = this.activeDocumentWindowConfig?.headerData;
+    const message = this.draftCreateInProgress
+      ? 'The header is still being saved. You cannot create a line until the header is created.'
+      : !header || !this.hasPersistedIdentity(header) || this.pendingDraftCreateFromNew
+        ? 'You cannot create a line until the header is created. Complete the header fields first.'
+        : this.resolveLineDataSourceForHeader(header).reason ?? 'The header relationship is incomplete. You cannot create a line yet.';
+    if (this.activeDocumentWindowConfig?.statusMessage?.message !== message)
+      this.setEntryStatus({tone: 'error', title: 'Cannot create line', message});
+    this.changeDetector.markForCheck();
   }
 
   private refreshEntryPolicy(): void {
@@ -1460,105 +1386,6 @@ export class ListPage implements OnInit, OnDestroy {
       total: '0.00',
       difference: '0.00',
     };
-  }
-
-  private loadLineMasterOptions(): Observable<{
-    lineMasterRecordsByType: Record<string, Record<string, unknown>[]>;
-    lineMasterOptionsByType: Record<string, SelectOption[]>;
-    optionFieldMap: Record<string, SelectOption[]>;
-  }> {
-    if (!this.lineConfig) {
-      return of({
-        lineMasterRecordsByType: {},
-        lineMasterOptionsByType: {},
-        optionFieldMap: {},
-      });
-    }
-
-    const lineTypeMasterEndpoints = this.getLineTypeMasterEndpoints();
-    const columnEndpointSources = this.getLineColumnEndpointSources();
-
-    return this.masterData
-      .loadMasterLists({
-        ...lineTypeMasterEndpoints,
-        ...columnEndpointSources,
-      })
-      .pipe(
-        map((masters) => {
-          const masterRecords = masters as Record<string, Record<string, unknown>[]>;
-          const lineMasterRecordsByType: Record<string, Record<string, unknown>[]> = {};
-          const lineMasterOptionsByType: Record<string, SelectOption[]> = {};
-          const optionFieldMap: Record<string, SelectOption[]> = {};
-
-          for (const type of Object.keys(lineTypeMasterEndpoints)) {
-            const records = masterRecords[type] ?? [];
-            lineMasterRecordsByType[type] = records;
-            lineMasterOptionsByType[type] = this.masterData.toSelectOptions(
-              records,
-              this.getLineMasterValueFields(),
-              this.getLineMasterLabelFields(),
-            );
-          }
-
-          for (const [optionsKey, records] of Object.entries(masterRecords)) {
-            if (optionsKey in lineTypeMasterEndpoints) {
-              continue;
-            }
-
-            const column = this.getLineColumnByOptionsKey(optionsKey);
-            optionFieldMap[optionsKey] = this.masterData.toSelectOptions(
-              records,
-              this.resolveConfiguredFields(column?.valueField),
-              this.resolveConfiguredFields(column?.labelField),
-            );
-          }
-
-          return {
-            lineMasterRecordsByType,
-            lineMasterOptionsByType,
-            optionFieldMap,
-          };
-        }),
-        catchError(() =>
-          of({
-            lineMasterRecordsByType: {},
-            lineMasterOptionsByType: {},
-            optionFieldMap: {},
-          }),
-        ),
-      );
-  }
-
-  private getLineColumnEndpointSources(): Record<string, string[]> {
-    const sources: Record<string, string[]> = {};
-    for (const column of this.lineConfig?.columns ?? []) {
-      const endpoints = this.resolveApiEndpoints(column.api ?? column.optionsEndpoints);
-      const field = this.getColumnField(column);
-      if (!field || !endpoints.length || field === this.getLineTypeField()) {
-        continue;
-      }
-
-      sources[this.getLineColumnOptionsDataKey(field)] = endpoints;
-    }
-
-    return sources;
-  }
-
-  private getLineTypeMasterEndpoints(): Record<string, string[]> {
-    const typeColumn = this.lineConfig?.columns.find(
-      (column) => this.getColumnField(column) === this.getLineTypeField(),
-    );
-    const result: Record<string, string[]> = {};
-
-    for (const option of typeColumn?.options ?? []) {
-      const type = this.toText(option.value);
-      const endpoints = this.resolveApiEndpoints(option.api);
-      if (type && endpoints.length) {
-        result[type] = endpoints;
-      }
-    }
-
-    return result;
   }
 
   private getLineMasterRegistry(): LineMasterRegistry {
@@ -1760,6 +1587,10 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
 
+    // The dirty-field revisions already retain newer edits. Do not enqueue a
+    // separate snapshot for every edit while this record is being written.
+    if (this.autosavingRecords.has(headerData)) return;
+
     const updatePayload: Record<string, unknown> = {
       [fieldKey]: headerData[fieldKey],
     };
@@ -1813,6 +1644,10 @@ export class ListPage implements OnInit, OnDestroy {
             if (pending.length && this.activeDocumentWindowConfig.lineRows?.includes(change.row)) this.saveLineFields(change.row,pending);
           }
           this.stageListSyncFromActiveHeader();
+          if (this.unsavedFields.get(headerData)?.size) {
+            this.queueLocalAutosave();
+            return;
+          }
           this.setEntryStatus({
             tone: 'success',
             title: 'Saved',
@@ -1838,6 +1673,7 @@ export class ListPage implements OnInit, OnDestroy {
       !this.hasPersistedIdentity(this.activeDocumentWindowConfig.headerData)
     )) {
       this.autosaveDeferredUntilDraftCreate = true;
+      this.showLineParentError();
       options.onSettled?.(false); return;
     }
 
@@ -1880,6 +1716,10 @@ export class ListPage implements OnInit, OnDestroy {
 
     if (this.lineCreateInProgress.has(row)) {
       this.deferLineSaveFields(row, uniqueFields);
+      options.onSettled?.(false); return;
+    }
+
+    if (this.autosavingRecords.has(row)) {
       options.onSettled?.(false); return;
     }
 
@@ -1942,6 +1782,8 @@ export class ListPage implements OnInit, OnDestroy {
             const deferred = this.takeDeferredLineSaveFields(row);
             if (deferred.length) { this.saveLineFields(row, deferred); return; }
           }
+          const pending = [...(this.unsavedFields.get(row)?.keys() ?? [])];
+          if (pending.length) { this.saveLineFields(row, pending); return; }
           this.recalculateActiveLineTotals();
           this.setEntryStatus({
             tone: 'success',
@@ -2083,14 +1925,14 @@ export class ListPage implements OnInit, OnDestroy {
   private startDraftCreate(headerData: Record<string, unknown>): void {
     const savedEdits = this.beginAutosave(headerData);
     this.draftCreateInProgress = true;
-    this.startPopupLoading(`Creating ${this.documentLabel.toLowerCase()} draft...`);
+    // A normal CRUD POST is not a separate Draft workflow or a blocking page load.
+    this.setEntryStatus({ tone: 'info', title: 'Saving', message: 'Creating record...' });
 
     this.subscriptions.add(
       this.createDraftRecord(headerData).subscribe({
         next: (createdRecord) => {
           this.finishAutosave(headerData, savedEdits, !!createdRecord);
           this.draftCreateInProgress = false;
-          this.stopPopupLoading();
 
           if (!createdRecord || !this.activeDocumentWindowConfig?.headerData) {
             this.setEntryStatus({
@@ -2102,10 +1944,8 @@ export class ListPage implements OnInit, OnDestroy {
             return;
           }
 
-          const localEdits = { ...this.activeDocumentWindowConfig.headerData };
           const createdHeader = this.buildHeaderData(createdRecord);
-          Object.assign(this.activeDocumentWindowConfig.headerData, createdHeader);
-          this.restoreEditableLocalEdits(localEdits, this.activeDocumentWindowConfig.headerData);
+          this.mergeAutosaveResponse(this.activeDocumentWindowConfig.headerData, createdHeader);
           this.pendingListSyncRecord = this.buildListSyncRecord(createdRecord);
           this.pendingDraftCreateFromNew = false;
           this.refreshEntryPolicy();
@@ -2114,13 +1954,15 @@ export class ListPage implements OnInit, OnDestroy {
             this.autosaveDeferredUntilDraftCreate = false;
             this.queueLocalAutosave();
           }
+          if (!this.hasUnsavedChanges && !this.hasPendingWrites) {
+            this.setEntryStatus({ tone: 'success', title: 'Saved', message: 'Record created.' });
+          }
 
           this.changeDetector.detectChanges();
         },
         error: (error: unknown) => {
           this.finishAutosave(headerData, savedEdits, false);
           this.draftCreateInProgress = false;
-          this.stopPopupLoading();
           this.setEntryStatus({
             tone: 'error',
             title: GENERIC_MESSAGES.createFailedTitle,
@@ -2161,51 +2003,29 @@ export class ListPage implements OnInit, OnDestroy {
       void this.saveEntry();
       return;
     }
-    const headerData = this.activeDocumentWindowConfig?.headerData;
-    if (!headerData) {
-      return;
-    }
-
-    if (!this.dirty && this.hasPersistedIdentity(headerData)) return;
-    const headerId = this.resolvePersistedRecordId(headerData, this.listConfig.dataSource);
-    if (this.pendingDraftCreateFromNew || this.draftCreateInProgress || !this.hasValue(headerId)) {
+    const header = this.activeDocumentWindowConfig?.headerData;
+    if (!header) return;
+    if (this.pendingDraftCreateFromNew || this.draftCreateInProgress || !this.hasPersistedIdentity(header)) {
       this.autosaveDeferredUntilDraftCreate = true;
       return;
     }
 
-    const previousSnapshot = { ...headerData };
-    this.setEntryStatus({
-      tone: 'info',
-      title: 'Saving',
-      message: this.usesManualSaveMode() ? 'Saving changes...' : 'Autosaving changes...',
-    });
-    this.documentState.scheduleHeaderAutosave(this.pageId, headerData, {
-      dataSourceConfig: this.listConfig.dataSource,
-      headerSections: this.headerConfig.sections,
-      lineRows: this.activeDocumentWindowConfig?.lineRows,
-      lineDataSourceConfig: this.lineConfig?.dataSource,
-      meta: {
-        page: this.pageId,
-      },
-      onFailed: (result) => {
-        Object.assign(this.activeDocumentWindowConfig?.headerData ?? {}, previousSnapshot);
-        this.setEntryStatus({
-          tone: 'error',
-          title: 'Save failed',
-          message: result.errorMessage || GENERIC_MESSAGES.saveFailedDefault,
-        });
-        this.changeDetector.detectChanges();
-      },
-      onCompleted: () => {
-        this.stageListSyncFromActiveHeader();
-        this.setEntryStatus({
-          tone: 'success',
-          title: GENERIC_MESSAGES.saveSuccessTitle,
-          message: GENERIC_MESSAGES.saveSuccessMessage,
-        });
-        this.changeDetector.detectChanges();
-      },
-    });
+    // Individual field changes already use the shared Header and Line CRUD writes.
+    // Do not send a second full-document save that PATCHes every unchanged Line.
+    const pendingHeaderFields = [...(this.unsavedFields.get(header)?.keys() ?? [])];
+    const pendingLines = (this.activeDocumentWindowConfig?.lineRows ?? [])
+      .map(row => ({ row, fields: [...(this.unsavedFields.get(row)?.keys() ?? [])] }))
+      .filter(change => change.fields.length > 0);
+
+    if (pendingHeaderFields.length) {
+      const [fieldKey, ...rest] = pendingHeaderFields;
+      this.saveHeaderFields({
+        fieldKey,
+        updates: Object.fromEntries(rest.map(key => [key, header[key]])),
+      }, pendingLines);
+      return;
+    }
+    for (const { row, fields } of pendingLines) this.saveLineFields(row, fields);
   }
 
   private usesManualSaveMode(): boolean {
@@ -2298,6 +2118,11 @@ export class ListPage implements OnInit, OnDestroy {
   private async refreshEntrySafely(): Promise<void> {
     if (this.hasPendingWrites || this.popupLoading) return;
     if (this.hasUnsavedChanges && !await this.confirmation.confirm({ title: 'Unsaved changes', message: 'Discard unsaved changes and reload this record?' })) return;
+    if (this.hasPendingWrites || this.popupLoading) return;
+    this.documentState.clearAutosave(this.pageId);
+    this.unsavedFields.clear();
+    this.invalidHeaderDrafts.clear();
+    this.invalidLineDrafts.clear();
     this.dirty = false;
     this.refreshActiveEntry();
   }
@@ -2369,17 +2194,21 @@ export class ListPage implements OnInit, OnDestroy {
     }
 
     if (!this.hasPersistedIdentity(headerData)) {
-      this.refreshActiveLines();
+      this.openNewPreview();
       return;
     }
 
+    // Retry/refresh uses the same atomic Card readiness as the first open.
+    const opened = this.activeDocumentWindowConfig;
+    if (opened) opened.contentReady = false;
     this.startCardLineLoading();
     this.subscriptions.add(
-      this.loadHeaderRecord(headerData)
+      this.loadHeaderRecord(headerData, false)
         .subscribe({
           next: (headerRecord) => {
-            this.applyHydratedHeaderRecord(headerRecord);
-            this.hydrateOpenedDocumentLines(headerRecord);
+            if (!opened || this.destroyed || this.activeDocumentWindowConfig !== opened) return;
+            const hydrated = this.applyHydratedHeaderRecord(headerRecord, false);
+            this.hydrateOpenedDocumentLines(hydrated);
           },
           error: (error: unknown) => {
             this.finishCardLineLoading(true, error, 'Document');
@@ -2389,16 +2218,13 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private refreshActiveLines(): void {
-    this.dataSource.invalidateReadCache();
-    if (!this.lineConfig) {
-      return;
-    }
-
+    if (!this.lineConfig) return;
     const headerData = this.activeDocumentWindowConfig?.headerData;
-    if (!this.isRecord(headerData)) {
-      return;
-    }
+    // A new unsaved Header has no persisted child records. Keep its local draft rows.
+    if (!this.isRecord(headerData) || !this.hasPersistedIdentity(headerData)) return;
+    if (!this.canHydrateOpenedDocumentLinesFromHeader(headerData)) return;
 
+    this.dataSource.invalidateReadCache();
     this.startCardLineLoading();
     this.subscriptions.add(
       this.loadLineRows(headerData)
@@ -2679,6 +2505,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private copySelectedLines(payload: unknown, paste = false): void {
+    if (!this.hasReadyLineParent()) { this.showLineParentError(); return; }
     const entry = this.activeDocumentWindowConfig, config = this.lineConfig;
     if (!entry || !config || config.editable === false || config.dataSource.supportsCreate === false ||
         this.deleting || this.hasPendingWrites || this.popupLoading || entry.interactionLocked || !this.canModifyLines('create') ||
@@ -2737,6 +2564,7 @@ export class ListPage implements OnInit, OnDestroy {
   }
 
   private appendNewLine(mode: 'append' | 'prepend'): void {
+    if (!this.hasReadyLineParent()) { this.showLineParentError(); return; }
     if (this.isWorksheetPage && !this.worksheetAllowed({})) return;
     if (!this.canModifyLines('create') || this.lineConfig?.dataSource.supportsCreate === false || !this.dataSource.canWrite(this.listConfig.dataSource, this.activeDocumentWindowConfig?.headerData ?? {})) return;
     if (!this.activeDocumentWindowConfig || !this.lineConfig) {
@@ -2796,63 +2624,11 @@ export class ListPage implements OnInit, OnDestroy {
   private createDraftRecord(newRecord: Record<string, unknown>): Observable<Record<string, unknown> | null> {
     return defer(() => {
       this.dataSource.assertEditedFields(this.listConfig.dataSource, 'create', newRecord, this.unsavedFields.get(newRecord)?.keys() ?? []);
-      return this.draftCreate.createWithUnknownPropertyFallback(
-        this.listConfig.dataSource,
-        this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections),
-      );
+      const payload = this.documentPayload.buildHeaderCreatePayload(newRecord, this.headerConfig.sections);
+      return Object.keys(payload).length
+        ? this.dataSource.create(this.listConfig.dataSource, payload)
+        : of(null);
     }).pipe(map((response) => this.toCreatedRecord(response)));
-  }
-
-  private loadConfiguredHeaderDropdownOptions(): Observable<Record<string, Record<string, unknown>[]>> {
-    const endpointMap: Record<string, string[]> = {};
-    const prefetchedEmpty: Record<string, Record<string, unknown>[]> = {};
-
-    for (const section of this.headerConfig.sections) {
-      for (const field of section.fields) {
-        const optionsKey = field.optionsDataKey?.trim() || `__options_${field.key}`;
-        if (field.type !== 'dropdown' || !optionsKey || optionsKey in endpointMap || optionsKey in prefetchedEmpty) {
-          continue;
-        }
-
-        const endpoints = this.resolveApiEndpoints(field.api ?? field.optionsEndpoints);
-        if (field.optionsSkipWhenSuperAdmin && this.sessionService.SuperAdmin) {
-          prefetchedEmpty[optionsKey] = [];
-          continue;
-        }
-
-        if (!endpoints.length) {
-          prefetchedEmpty[optionsKey] = [];
-          continue;
-        }
-
-        endpointMap[optionsKey] = endpoints;
-      }
-    }
-
-    if (!Object.keys(endpointMap).length) {
-      return of(prefetchedEmpty);
-    }
-
-    return this.masterData.loadMasterLists(endpointMap).pipe(
-      map((source) => {
-        const merged: Record<string, Record<string, unknown>[]> = { ...prefetchedEmpty };
-        for (const [key, records] of Object.entries(source)) {
-          merged[key] = this.toRecordList(records);
-        }
-
-        return merged;
-      }),
-      catchError(() => of(prefetchedEmpty)),
-    );
-  }
-
-  private setHeaderDropdownRecords(source: Record<string, Record<string, unknown>[]>): void {
-    const next: Record<string, Record<string, unknown>[]> = {};
-    for (const [key, records] of Object.entries(source)) {
-      next[key] = this.toRecordList(records);
-    }
-
-    this.headerDropdownRecords = next;
   }
 
   private applyHeaderDropdownOptions(documentWindowConfig: DocumentWindowConfig): void {
@@ -2880,24 +2656,6 @@ export class ListPage implements OnInit, OnDestroy {
     for (const row of rows) {
       const type = this.lineMasters.resolveType(row[this.getLineTypeField()], registry);
       this.lineMasters.assignTypeOptions(row, type, registry, this.optionFieldMap, numberOptionFieldKey);
-    }
-  }
-
-  private restoreEditableLocalEdits(
-    localEdits: Record<string, unknown>,
-    headerData: Record<string, unknown>,
-  ): void {
-    for (const section of this.headerConfig.sections) {
-      for (const field of section.fields) {
-        if (field.readonly) {
-          continue;
-        }
-
-        const localValue = localEdits[field.key];
-        if (this.hasValue(localValue)) {
-          headerData[field.key] = localValue;
-        }
-      }
     }
   }
 
@@ -3118,25 +2876,6 @@ export class ListPage implements OnInit, OnDestroy {
     return this.dataSourceResolver.getLineColumnOptionsDataKey({
       lineConfig: this.lineConfig,
       fieldName,
-    });
-  }
-
-  private getLineColumnByOptionsKey(optionsKey: string): LineColumnConfig | undefined {
-    return this.dataSourceResolver.getLineColumnByOptionsKey({
-      lineConfig: this.lineConfig,
-      optionsKey,
-    });
-  }
-
-  private getLineMasterValueFields(): string[] {
-    return this.dataSourceResolver.getLineMasterValueFields({
-      lineConfig: this.lineConfig,
-    });
-  }
-
-  private getLineMasterLabelFields(): string[] {
-    return this.dataSourceResolver.getLineMasterLabelFields({
-      lineConfig: this.lineConfig,
     });
   }
 
@@ -3396,17 +3135,11 @@ export class ListPage implements OnInit, OnDestroy {
 
       buildFilter: (scope) => this.listFilterState.buildFilter(scope),
       hydrateTargetsFromRecords: (scope, records) => this.listFilterState.hydrateTargetsFromRecords(scope, records),
-      loadList: (dataSource, options) => this.dataSource.loadList(dataSource, { ...options, useCache: true, maxAgeMs: 30000 }).pipe(switchMap(response => {
-        const fields = this.headerConfig.sections.flatMap(section => section.fields).filter(field => field.lookup);
-        if (!fields.length) return of(response);
-        const page = response as DataPage;
-        return from(this.documentHydration.resolveListLookups(page.value, fields)).pipe(map(value => {
-          for (const record of value) {
-            const id = this.resolvePersistedRecordId(record, dataSource);
-            if (this.hasValue(id)) this.dataSource.cachePreparedRecord(dataSource, id, record, fields);
-          }
-          return {...page, value};
-        }));
+      loadList: (dataSource, options) => this.dataSource.loadList(dataSource, { ...options, useCache: true, maxAgeMs: 30000 }).pipe(tap(() => {
+        // Publish the API rows first. Caption lookups must not hold the list's
+        // data/loading lifecycle open or cause a second pagination emission.
+        const generation = ++this.listLookupGeneration;
+        queueMicrotask(() => void this.hydrateListCaptions(dataSource, generation));
       })),
       toRecords: (response) => this.toRecords(response),
       getErrorMessage: (error) => this.getErrorMessage(error),
@@ -3417,6 +3150,40 @@ export class ListPage implements OnInit, OnDestroy {
       beginScopeLoading: (scope, message) => this.runModalLoading.begin(scope, message),
       endScopeLoading: (scope) => this.runModalLoading.end(scope),
     };
+  }
+
+  private async hydrateListCaptions(dataSource: DataSourceConfig, generation: number): Promise<void> {
+    if (this.destroyed || generation !== this.listLookupGeneration) return;
+    const fields = this.headerConfig.sections.flatMap(section => section.fields).filter(field => field.lookup);
+    if (!fields.length) return;
+    const rows = this.rows;
+    const records = rows.filter((row): row is Record<string, unknown> => this.isRecord(row));
+    const current = () => !this.destroyed && generation === this.listLookupGeneration && rows === this.rows;
+    try {
+      const captions = await this.documentHydration.resolveListLookups(records, fields, {}, current);
+      if (!current()) return;
+      const optionKeys = new Set(fields.map(field => field.optionsDataKey ?? '__options_' + field.key));
+      for (let index = 0; index < records.length; index++) {
+        const row = records[index];
+        const caption = captions[index];
+        // A user may edit a row while a slow lookup is in flight. Never restore
+        // its old business values or attach an old caption to a new identity.
+        if (!caption || fields.some(field => row[field.key] !== caption[field.key])) continue;
+        const unchanged = Object.keys(caption).filter(key => !key.startsWith('__') && !optionKeys.has(key))
+          .every(key => row[key] === caption[key]);
+        for (const [key, value] of Object.entries(caption)) {
+          if (optionKeys.has(key) || key.startsWith('__display_') || key.startsWith('__lookup')) row[key] = value;
+        }
+        const id = this.resolvePersistedRecordId(row, dataSource);
+        if (unchanged && this.hasValue(id)) this.dataSource.cachePreparedRecord(dataSource, id, row, fields);
+      }
+      this.rows = [...rows];
+      this.changeDetector.markForCheck();
+    } catch (error) {
+      if (!current()) return;
+      this.error = this.getErrorMessage(error);
+      this.changeDetector.markForCheck();
+    }
   }
 
   private isUncertainSave(error: unknown): boolean {
@@ -3497,10 +3264,6 @@ export class ListPage implements OnInit, OnDestroy {
 
   private toODataId(value: unknown): string {
     return this.valueMapper.toODataId(value);
-  }
-
-  private isGuid(value: string): boolean {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
   }
 
   private hasValue(value: unknown): boolean {

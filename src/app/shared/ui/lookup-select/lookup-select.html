@@ -4,7 +4,7 @@
     [attr.aria-invalid]="error ? true : null" [attr.aria-label]="label" [attr.aria-required]="required || null"
     [attr.aria-expanded]="expanded" [attr.aria-controls]="expanded ? id : null"
     [attr.aria-activedescendant]="expanded && active >= 0 && !loading ? id + '-' + active : null"
-    [value]="expanded ? query : display" [disabled]="disabled" [attr.placeholder]="placeholder || null"
+    [value]="expanded && searching ? query : display" [disabled]="disabled" [attr.placeholder]="placeholder || null"
     (focus)="open()" (click)="open()" (input)="search($any($event.target).value)" (keydown)="key($event)" />
   <button type="button" class="lookup-toggle" tabindex="-1" [disabled]="disabled"
     [attr.aria-label]="'Show choices for ' + label" (mousedown)="$event.preventDefault()"

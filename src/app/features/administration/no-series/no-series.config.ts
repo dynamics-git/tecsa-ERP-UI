@@ -21,6 +21,7 @@ export const noSeriesHeaderConfig: HeaderConfig = {
           label: 'Code',
           type: 'code',
           required: true,
+          readonlyAfterCreate: true,
           validation: {
             maxLength: 20,
           },
@@ -29,7 +30,6 @@ export const noSeriesHeaderConfig: HeaderConfig = {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
@@ -53,12 +53,6 @@ export const noSeriesHeaderConfig: HeaderConfig = {
           type: 'boolean',
           defaultValue: false,
         },
-        {
-          key: 'isActive',
-          label: 'Active',
-          type: 'boolean',
-          defaultValue: true,
-        },
       ],
     },
   ],
@@ -72,7 +66,7 @@ export const noSeriesListConfig: ListPageConfig & {
   pageType: 'document',
   title: 'No. Series',
   dataSource: {
-    endpoint: '/numberSeries',
+    endpoint: '/noSeries',
     keyField: 'systemId',
     headerPKProp: 'code',
     defaultSort: 'code asc',
@@ -110,9 +104,6 @@ export const noSeriesListConfig: ListPageConfig & {
       {
         field: 'dateOrder',
       },
-      {
-        field: 'isActive',
-      },
     ]),
   },
   factBox: noSeriesFactBoxConfig,
@@ -124,14 +115,10 @@ export const noSeriesLineConfig: LineConfig = {
     mode: 'end',
   },
   dataSource: {
-    endpoint: '/numberSeries',
+    endpoint: '/noSeriesLines',
     keyField: 'systemId',
-    // The saved header's systemId scopes every line request.
-    navigation: {
-      parentEndpoint: '/numberSeries',
-      parentIdFields: ['systemId'],
-      childCollection: 'lines',
-    },
+    headerPKProp: 'code',
+    lineFKProp: 'seriesCode',
     defaultSort: 'lineNo asc',
     pageSize: 100,
     lineNo: true,
@@ -148,7 +135,6 @@ export const noSeriesLineConfig: LineConfig = {
       id: 'startingDate',
       label: 'Starting Date',
       type: 'date',
-      required: true,
     },
     {
       id: 'startingNo',
@@ -176,11 +162,10 @@ export const noSeriesLineConfig: LineConfig = {
       },
     },
     {
-      id: 'incrementBy',
+      id: 'incrementByNo',
       label: 'Increment By',
       type: 'integer',
       defaultValue: 1,
-      required: true,
       validation: {
         min: 1,
         max: 2147483647,
@@ -199,7 +184,7 @@ export const noSeriesLineConfig: LineConfig = {
       readonly: true,
     },
     {
-      id: 'isOpen',
+      id: 'open',
       label: 'Open',
       type: 'boolean',
       readonly: true,

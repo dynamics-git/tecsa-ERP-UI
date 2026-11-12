@@ -104,7 +104,7 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           key: 'number',
           label: 'No.',
           type: 'code',
-          required: true,
+          requiredWhen: { field: 'noSeriesCode', values: ['', null, undefined] },
           readonlyAfterCreate: true,
           validation: {
             maxLength: 20,
@@ -137,7 +137,6 @@ export const purchaseRequisitionHeaderConfig: HeaderConfig = {
           label: 'Request Date',
           type: 'date',
           defaultValue: () => new Date().toLocaleDateString('en-CA'),
-          required: true,
         },
         {
           key: 'requiredDate',
@@ -477,16 +476,6 @@ export const purchaseRequisitionLineConfig: LineConfig = {
       label: 'Quantity',
       type: 'decimal',
       defaultValue: '1',
-      // Optional PR field rule. Other fields and ordinary draft creation remain independent.
-      validation: {
-        custom: ({ record }) => {
-          if (!record['lineType']) return 'Choose Type before entering Quantity.';
-          const master = record['number'];
-          if (master === undefined || master === null || master === '')
-            return 'Choose No. before entering Quantity.';
-          return undefined;
-        },
-      },
       factBox: {
         sectionId: 'selected-line',
         sectionTitle: 'Selected line',

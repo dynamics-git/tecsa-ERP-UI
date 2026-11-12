@@ -1,5 +1,4 @@
 import type { FactBoxConfig } from '../../../platform/public-api';
-/** Presentation only. Field precision, captions and lookups remain in the existing page contract. */
 
 export const itemsFactBoxConfig: FactBoxConfig = {
   enabled: true,
@@ -8,75 +7,43 @@ export const itemsFactBoxConfig: FactBoxConfig = {
   notes: true,
   attachments: true,
   defaultSectionId: 'overview',
+  binding: { titleField: 'number', subtitleField: 'description' },
   sections: [
     {
-      id: 'item-overview',
-      title: 'Item overview',
+      id: 'value',
+      title: 'Price & Cost',
       layout: 'metrics',
       fields: [
-        {
-          id: 'price',
-          label: 'Unit price',
-          field: 'unitPrice',
-        },
-        {
-          id: 'cost',
-          label: 'Unit cost',
-          field: 'unitCost',
-        },
+        { id: 'price', label: 'Unit Price', field: 'unitPrice' },
+        { id: 'cost', label: 'Unit Cost', field: 'unitCost' },
       ],
     },
     {
       id: 'classification',
       title: 'Classification',
       fields: [
-        {
-          id: 'type',
-          label: 'Item type',
-          field: 'itemType',
-        },
-        {
-          id: 'unit',
-          label: 'Base unit of measure',
-          field: 'baseUnitOfMeasureId',
-        },
-        {
-          id: 'costing',
-          label: 'Costing method',
-          field: 'costingMethod',
-        },
-        {
-          id: 'blocked',
-          label: 'Blocked',
-          field: 'blocked',
-        },
+        { id: 'type', label: 'Type', field: 'type' },
+        { id: 'unit', label: 'Base Unit of Measure', field: 'baseUnitOfMeasure' },
+        { id: 'category', label: 'Item Category Code', field: 'itemCategoryCode' },
+        { id: 'costing', label: 'Costing Method', field: 'costingMethod' },
+      ],
+    },
+    {
+      id: 'restrictions',
+      title: 'Restrictions',
+      fields: [
+        { id: 'blocked', label: 'Blocked', field: 'blocked' },
+        { id: 'sales-blocked', label: 'Sales Blocked', field: 'salesBlocked' },
+        { id: 'purchasing-blocked', label: 'Purchasing Blocked', field: 'purchasingBlocked' },
       ],
     },
     {
       id: 'record-information',
-      title: 'Record information',
+      title: 'Record Information',
       collapsed: true,
       fields: [
-        {
-          id: 'created-at',
-          label: 'Created at',
-          field: 'systemCreatedAt',
-        },
-        {
-          id: 'created-by',
-          label: 'Created by',
-          field: 'systemCreatedBy',
-        },
-        {
-          id: 'modified-at',
-          label: 'Modified at',
-          field: 'systemModifiedAt',
-        },
-        {
-          id: 'modified-by',
-          label: 'Modified by',
-          field: 'systemModifiedBy',
-        },
+        { id: 'created', label: 'Created at', field: 'systemCreatedAt', type: 'datetime' },
+        { id: 'modified', label: 'Modified at', field: 'systemModifiedAt', type: 'datetime' },
       ],
     },
   ],

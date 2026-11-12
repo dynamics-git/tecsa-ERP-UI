@@ -5,6 +5,8 @@ import { DataSourceService,DATA_REST_SERVICE } from './data-source.service';
 import { EntityContractService } from './entity-contract.service';
 import { SessionService } from '../../core/services/session.service';
 import { DataSourceConfig } from '../models/data-source-config.model';
+import { lookupQuery } from './lookup-dependencies';
+import { DocumentHydrationOrchestratorService } from './document-hydration-orchestrator.service';
 
 describe('Shared data lifecycle with controlled synthetic API responses',()=>{
  let source:DataSourceService;
@@ -159,6 +161,51 @@ describe('Shared data lifecycle with controlled synthetic API responses',()=>{
   await firstValueFrom(source.loadList(config,{useCache:true}));
   expect(source.getCachedRecord(config,'0')?.['id']).toBe('0');expect(get).toHaveBeenCalledTimes(1);
   session.Company='B';expect(source.getCachedRecord(config,'0')).toBeUndefined();
+ });
+
+ it('resolves collection lookup identity instead of accepting an unrelated first row',async()=>{
+  const lookup={endpoint:'/fixtureChoices',valueField:'code',displayField:'name',recordRead:'collection' as const};
+  get.mockReturnValue(of({data:[{code:'OTHER',name:'Wrong name'},{code:'CHOSEN',name:'Chosen name'}]}));
+  await expect(firstValueFrom(source.loadLookup(lookup,'CHOSEN',{}))).resolves.toMatchObject({code:'CHOSEN',name:'Chosen name'});
+  source.invalidateReadCache();get.mockReturnValue(of({data:[{code:'OTHER',name:'Wrong name'}]}));
+  await expect(firstValueFrom(source.loadLookup(lookup,'CHOSEN',{}))).rejects.toThrow('unavailable or ambiguous');
+  source.invalidateReadCache();get.mockReturnValue(of({data:[{code:'CHOSEN'},{code:'CHOSEN'}]}));
+  await expect(firstValueFrom(source.loadLookup(lookup,'CHOSEN',{}))).rejects.toThrow('unavailable or ambiguous');
+ });
+
+ it('reuses the exact scoped choice page for names without treating it as a complete CRUD record',async()=>{
+  const lookup={endpoint:'/fixtureChoices',valueField:'code',displayField:'name',recordRead:'collection' as const,
+   dependsOn:[{field:'parentCode',valueFrom:'parent'}]};
+  const row={parent:'A'},query=lookupQuery(lookup,row);
+  get.mockReturnValue(of({data:[{code:'C1',name:'Configured name',address:'Configured address'}],meta:{hasMore:false}}));
+  await firstValueFrom(source.loadList({endpoint:lookup.endpoint,defaultFilter:query.filter,pageSize:10},{useCache:true,count:false}));
+  expect(source.getCachedRecord({endpoint:lookup.endpoint,keyField:'code'},'C1')).toBeUndefined();
+  const selected:any=await firstValueFrom(source.loadLookup(lookup,'C1',row));
+  expect(selected.name).toBe('Configured name');expect(get).toHaveBeenCalledTimes(1);
+  selected.name='Local edit';expect(source.getCachedLookup(lookup,'C1',row)?.['name']).toBe('Configured name');
+  expect(source.getCachedLookup(lookup,'C1',{parent:'B'})).toBeUndefined();
+  session.Company='B';expect(source.getCachedLookup(lookup,'C1',row)).toBeUndefined();
+ });
+
+ it('reuses partial selected names across different batches only in the same dependency and access scope',async()=>{
+  const hydrate=TestBed.inject(DocumentHydrationOrchestratorService);
+  const columns=[{id:'choice',label:'Choice',lookup:{endpoint:'/fixtureChoices',valueField:'code',displayField:'code',recordRead:'collection' as const,dependsOn:[{field:'parentCode',valueFrom:'parent'}]},fill:{caption:'name'}},{id:'caption',label:'Name',readonly:true}];
+  get.mockReturnValue(of({data:[{code:'C1',name:'Name one'},{code:'C2',name:'Name two'}],meta:{hasMore:false}}));
+  const first=await hydrate.resolveLineLookups([{parent:'A',choice:'C1'},{parent:'A',choice:'C2'}],columns);
+  expect(first.map(row=>row['caption'])).toEqual(['Name one','Name two']);expect(get).toHaveBeenCalledTimes(1);
+  get.mockReturnValue(of({data:[{code:'C3',name:'Name three'}],meta:{hasMore:false}}));
+  const next=await hydrate.resolveLineLookups([{parent:'A',choice:'C2'},{parent:'A',choice:'C3'}],columns);
+  expect(next.map(row=>row['caption'])).toEqual(['Name two','Name three']);expect(get).toHaveBeenCalledTimes(2);
+  const filter=new URL(get.mock.calls[1][0],'http://fixture').searchParams.get('$filter');
+  expect(filter).toContain("code eq 'C3'");expect(filter).not.toContain("code eq 'C2'");
+  expect(get.mock.calls[1][0]).not.toContain('selectedLookupScope');
+  expect(source.getCachedRecord({endpoint:'/fixtureChoices',keyField:'code'},'C2')).toBeUndefined();
+  const lookup=columns[0].lookup!;
+  const copy=source.getCachedLookup(lookup,'C2',{parent:'A'})!;copy['name']='Changed locally';
+  expect(source.getCachedLookup(lookup,'C2',{parent:'A'})?.['name']).toBe('Name two');
+  expect(source.getCachedLookup(lookup,'C2',{parent:'B'})).toBeUndefined();
+  await firstValueFrom(source.update({endpoint:'/fixtureChoices'},'id-2',{name:'Updated'},1));
+  expect(source.getCachedLookup(lookup,'C2',{parent:'A'})).toBeUndefined();
  });
 
 });
