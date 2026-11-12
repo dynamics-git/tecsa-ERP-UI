@@ -1,9 +1,6 @@
 import { resolvedValueType, normalizeFieldValue, fieldValuesEqual } from '../models/field-value';
-import { Inject, Injectable, Optional } from '@angular/core';
-import { catchError, of, take } from 'rxjs';
-import { DOCUMENT_SAVE_PORT, DocumentSavePort, DocumentSaveResult } from './document-save.port';
+import { Injectable } from '@angular/core';
 import { FieldConfig, FieldValueType, FormSectionConfig } from '../models/field-config.model';
-import { DataSourceConfig } from '../models/data-source-config.model';
 import { DocumentWindowConfig } from '../models/document-window-config.model';
 import { LineConfig } from '../models/line-config.model';
 import { LineCalculationService } from '../document/line-calculation.service';
@@ -13,18 +10,6 @@ export interface LineChangeEvent {
   field: string;
   value: unknown;
   calculatedFields?: string[];
-}
-
-export interface AutosaveOptions {
-  delay?: number;
-  modifiedAtKey?: string;
-  lineRows?: Record<string, unknown>[];
-  lineDataSourceConfig?: DataSourceConfig;
-  meta?: Record<string, unknown>;
-  dataSourceConfig?: DataSourceConfig;
-  headerSections?: FormSectionConfig[];
-  onCompleted?: (result: DocumentSaveResult) => void;
-  onFailed?: (result: DocumentSaveResult) => void;
 }
 
 export interface PopupActionEvent {
@@ -61,10 +46,8 @@ export interface DocumentRuntimeConfig {
 })
 export class DocumentStateService {
   private readonly autosaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly autosaveGenerations = new Map<string, number>();
 
   constructor(
-    @Optional() @Inject(DOCUMENT_SAVE_PORT) private readonly savePort: DocumentSavePort | null,
     private readonly lineCalculation: LineCalculationService
   ) {}
 
@@ -180,90 +163,6 @@ export class DocumentStateService {
     }
 
     this.autosaveTimers.clear();
-  }
-
-  touchHeaderModifiedAt(headerData: Record<string, unknown>, key: string): void {
-    if (!key.trim()) {
-      return;
-    }
-
-    headerData[key] = new Date().toISOString();
-  }
-
-  scheduleHeaderAutosave(
-    scope: string,
-    headerData: Record<string, unknown>,
-    options: AutosaveOptions = {}
-  ): void {
-    const modifiedAtKey = options.modifiedAtKey?.trim() ?? '';
-    const generation = this.nextAutosaveGeneration(scope);
-
-    this.scheduleAutosave(scope, () => {
-      const request = {
-        scope,
-        headerData: { ...headerData },
-        lineRows: options.lineRows,
-        lineDataSourceConfig: options.lineDataSourceConfig,
-        meta: options.meta,
-        dataSourceConfig: options.dataSourceConfig,
-        headerSections: options.headerSections,
-        modifiedAtKey: modifiedAtKey || undefined
-      };
-
-      if (!this.savePort) {
-        if (!this.isCurrentAutosaveGeneration(scope, generation)) {
-          return;
-        }
-
-        if (modifiedAtKey) {
-          this.touchHeaderModifiedAt(headerData, modifiedAtKey);
-        }
-
-        options.onCompleted?.({
-          saved: true,
-          modifiedAt: modifiedAtKey ? this.toText(headerData[modifiedAtKey]) : new Date().toISOString()
-        });
-        return;
-      }
-
-      this.savePort.save(request).pipe(
-        take(1),
-        catchError((error: unknown) => of({
-          saved: false,
-          errorMessage: this.resolveErrorMessage(error)
-        } as DocumentSaveResult))
-      ).subscribe((result) => {
-        if (!this.isCurrentAutosaveGeneration(scope, generation)) {
-          return;
-        }
-
-        if (result.saved && result.modifiedAt) {
-          if (modifiedAtKey) {
-            headerData[modifiedAtKey] = result.modifiedAt;
-          }
-
-          options.onCompleted?.(result);
-        } else {
-          if (options.onFailed) {
-            options.onFailed(result);
-          } else {
-            // Never convert a failed save to success when no failure callback is provided.
-            // Surface explicit failure for shared runtime diagnostics.
-            console.error(result.errorMessage || 'Save failed.');
-          }
-        }
-      });
-    }, options.delay);
-  }
-
-  private nextAutosaveGeneration(scope: string): number {
-    const next = (this.autosaveGenerations.get(scope) ?? 0) + 1;
-    this.autosaveGenerations.set(scope, next);
-    return next;
-  }
-
-  private isCurrentAutosaveGeneration(scope: string, generation: number): boolean {
-    return this.autosaveGenerations.get(scope) === generation;
   }
 
   handleEntryPopupAction(
@@ -480,29 +379,6 @@ export class DocumentStateService {
 
   private toText(value: unknown): string {
     return value === null || value === undefined ? '' : String(value);
-  }
-
-  private resolveErrorMessage(error: unknown): string {
-    if (this.isRecord(error)) {
-      const direct = this.toText(error['message']);
-      if (direct.length) {
-        return direct;
-      }
-
-      const nestedError = error['error'];
-      if (this.isRecord(nestedError)) {
-        const nested = this.toText(nestedError['message'] ?? nestedError['Message'] ?? nestedError['error_description']);
-        if (nested.length) {
-          return nested;
-        }
-      }
-    }
-
-    if (error instanceof Error && error.message.length) {
-      return error.message;
-    }
-
-    return 'Save failed.';
   }
 
   private resolveFieldValueType(field: FieldConfig): FieldValueType {

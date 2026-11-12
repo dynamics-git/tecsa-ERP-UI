@@ -56,4 +56,20 @@ describe('List in-flight read coalescing', () => {
     expect(ctx.loading).toBe(false);
     ctx.listLoadSubscription?.unsubscribe();
   });
+
+  it('uses existing infinite-scroll continuation without totals or a redundant final request', () => {
+    const service = new DocumentPageListLifecycleService();
+    const {ctx, replies, load} = context();
+    ctx.listDataSource.pageSize = 2;
+    service.loadFirstPage(ctx);
+    replies[0].next({value: [{systemId: 'one'}, {systemId: 'two'}], meta: {hasMore: true}});
+    service.loadNextPage(ctx);
+    expect(load.mock.calls[1]).toEqual([expect.anything(), expect.objectContaining({skip: 2, count: false})]);
+    replies[1].next({value: [{systemId: 'three'}, {systemId: 'four'}], meta: {hasMore: false}});
+    service.loadNextPage(ctx);
+    expect(ctx.rows).toHaveLength(4);
+    expect(ctx.hasMore).toBe(false);
+    expect(load).toHaveBeenCalledTimes(2);
+    ctx.listLoadSubscription?.unsubscribe();
+  });
 });

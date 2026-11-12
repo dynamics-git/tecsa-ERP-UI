@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SessionService } from '../../../core/services/session.service';
 import { providePlatformGovernance } from '../../../core/providers/platform-governance.provider';
 import { DATA_REST_SERVICE } from '../../data/data-source.service';
-import { DocumentHydrationOrchestratorService } from '../../data/document-hydration-orchestrator.service';
+import { DynamicForm } from '../../../shared/ui/dynamic-form/dynamic-form';
+import { By } from '@angular/platform-browser';
 import { ListPage } from './list-page';
 
 afterEach(() => {
@@ -19,9 +20,12 @@ describe('Header / Lines load priority', () => {
       systemId: 'header-1', systemRowVersion: 1, code: 'PO-1', vendorCode: 'V-1',
     };
     const line = { systemId: 'line-1', systemRowVersion: 1, headerCode: 'PO-1', description: 'First line' };
+    const pendingCaption = new Subject<unknown>();
     const get = vi.fn((endpoint: string) => {
       if (endpoint.startsWith('/fixtures/header-1')) return of({ data: { ...header } });
       if (endpoint.startsWith('/fixtureLines?')) return of({ data: [line], meta: { total: 1 } });
+      if (endpoint === '/vendors/V-1') return pendingCaption;
+      if (endpoint.startsWith('/vendors?')) return of({data: [{code: 'V-1', name: 'Vendor One'}]});
       throw new Error('Unexpected read: ' + endpoint);
     });
     TestBed.configureTestingModule({
@@ -34,12 +38,6 @@ describe('Header / Lines load priority', () => {
     });
     TestBed.inject(SessionService).SuperAdmin = true;
 
-    let resolveCaption!: (record: Record<string, unknown>) => void;
-    const pendingCaption = new Promise<Record<string, unknown>>(resolve => { resolveCaption = resolve; });
-    const captions = vi.spyOn(
-      TestBed.inject(DocumentHydrationOrchestratorService), 'resolveHeaderLookups',
-    ).mockReturnValue(pendingCaption);
-
     const fixture = TestBed.createComponent(ListPage);
     fixture.componentRef.setInput('documentOnly', true);
     fixture.componentRef.setInput('initialRecord', { ...header });
@@ -50,7 +48,7 @@ describe('Header / Lines load priority', () => {
     fixture.componentRef.setInput('headerConfig', {
       sections: [{ id: 'general', title: 'General', fields: [
         { key: 'code', label: 'Code' },
-        { key: 'vendorCode', label: 'Vendor', lookup: { endpoint: '/vendors', valueField: 'code', displayField: 'name' } },
+        { key: 'vendorCode', label: 'Vendor', type: 'dropdown', api: '/legacyVendors', lookup: { endpoint: '/vendors', valueField: 'code', displayField: 'name' } },
       ] }],
     });
     fixture.componentRef.setInput('lineConfig', {
@@ -69,11 +67,20 @@ describe('Header / Lines load priority', () => {
     }).activeDocumentWindowConfig;
     expect(active?.headerData['code']).toBe('PO-1');
     expect(active?.lineRows.some(row => row['description'] === 'First line')).toBe(true);
-    await vi.waitFor(() => expect(captions).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(get.mock.calls.filter(([endpoint]) => endpoint === '/vendors/V-1')).toHaveLength(1));
+    expect(get.mock.calls.filter(([endpoint]) => endpoint.startsWith('/vendors?'))).toHaveLength(1);
     expect(active?.headerData['__display_vendorCode']).toBeUndefined();
 
-    resolveCaption({ ...header, __display_vendorCode: 'Vendor One' });
-    await vi.waitFor(() => expect(active?.headerData['__display_vendorCode']).toBe('Vendor One'));
+    pendingCaption.next({data: {systemId: 'V-1', code: 'V-1', name: 'Vendor One'}});pendingCaption.complete();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      const form = fixture.debugElement.query(By.directive(DynamicForm)).componentInstance as DynamicForm;
+      expect(form.lookupLabel(form.sections[0].fields[1])).toBe('Vendor One');
+    });
+    const form = fixture.debugElement.query(By.directive(DynamicForm)).componentInstance as DynamicForm;
+    form.openLookup(form.sections[0].fields[1]);
+    expect(get.mock.calls.some(([endpoint]) => endpoint.startsWith('/legacyVendors'))).toBe(false);
+    expect(get.mock.calls.filter(([endpoint]) => endpoint.startsWith('/vendors?'))).toHaveLength(1);
     fixture.destroy();
   });
 });

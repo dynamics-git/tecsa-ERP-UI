@@ -7,8 +7,6 @@ import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { dataRestProvider } from './core/api/rest.provider';
 import { HttpInterceptorService } from './core/interceptors/http-interceptor';
-import { DocumentSaveService } from './core/services/document-save.service';
-import { DOCUMENT_SAVE_PORT } from './platform/public-api';
 import { providePlatformGovernance } from './core/providers/platform-governance.provider';
 
 export const appConfig: ApplicationConfig = {
@@ -20,10 +18,6 @@ export const appConfig: ApplicationConfig = {
       provide: HTTP_INTERCEPTORS,
       useClass: HttpInterceptorService,
       multi: true
-    },
-    {
-      provide: DOCUMENT_SAVE_PORT,
-      useClass: DocumentSaveService
     },
     ...providePlatformGovernance(),
     dataRestProvider,

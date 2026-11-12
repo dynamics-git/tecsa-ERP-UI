@@ -21,7 +21,10 @@ export interface DataMutation {
   readonly resources: readonly string[];
 }
 export const DATA_REST_SERVICE = new InjectionToken<DataRestService>('RestService');
+export const LOOKUP_PAGE_SIZE = 10;
 export interface DataSourceLoadOptions {
+  /** Internal selected-value cache scope; never sent as an API query parameter. */
+  selectedLookupScope?: string;
   maxAgeMs?: number;
   /** Called only when this read must await the server rather than a fresh cache hit. */
   onRequest?: () => void;
@@ -37,7 +40,7 @@ export class DataSourceService {
   private readonly mutationEvents = new Subject<DataMutation>();
   readonly mutations = this.mutationEvents.asObservable();
   sameResource(left: string, right: string): boolean { return this.resourcePath(left) === this.resourcePath(right); }
-  private readonly lists = new Map<string, { response: unknown; at: number }>();
+  private readonly lists = new Map<string, { response: unknown; at: number; selectedLookupScope?: string }>();
   private readonly requests = new Map<string, Observable<unknown>>();
   private readonly versions = new Map<string, string>();
   private readonly writes = new Map<string, Promise<unknown>>();
@@ -138,7 +141,7 @@ export class DataSourceService {
       });
       if (options.useCache) {
         if (this.lists.size >= 100) this.lists.delete(this.lists.keys().next().value!);
-        this.lists.set(key, { response: structuredClone(page), at: Date.now() });
+        this.lists.set(key, { response: structuredClone(page), at: Date.now(), selectedLookupScope: options.selectedLookupScope });
       }
       return page;
     })));
@@ -203,9 +206,25 @@ export class DataSourceService {
   getCachedLookup(lookup: FieldLookupConfig, id: unknown, record: Record<string, unknown>, header: Record<string, unknown> = {}): Record<string, unknown> | undefined {
     const query = lookupQuery({...lookup, filter: undefined}, record, '', header);
     if (!this.present(id) || !query.ready || !query.endpoint) return undefined;
-    // Collection-only lookups with filter dependencies must retain their constrained collection read.
-    if (lookup.recordRead === 'collection' && query.filter) return undefined;
-    return this.getCachedRecord({endpoint: query.endpoint, keyField: (lookup.valueField ?? 'systemId')}, id);
+    // A scoped collection may reuse only its exact configured choice page, not an unrelated detail entry.
+    const detail = lookup.recordRead === 'collection' && query.filter ? undefined
+      : this.getCachedRecord({endpoint: query.endpoint, keyField: (lookup.valueField ?? 'systemId')}, id);
+    if (detail) return detail;
+    const choices = lookupQuery(lookup, record, '', header);
+    if (!choices.ready) return undefined;
+    const page = this.getCachedList({endpoint: choices.endpoint!, defaultFilter: choices.filter,
+      paging: lookup.paging, pageSize: LOOKUP_PAGE_SIZE}, {count: false}, 30000) as DataPage | undefined;
+    const selected = page?.value.find(row => String(row[lookup.valueField ?? 'systemId']) === String(id));
+    if (selected) return structuredClone(selected);
+    // Reuse a previous selected batch in this exact dependency scope, even if its
+    // partial display records cannot seed complete CRUD detail reads.
+    const prefix = this.key(this.endpoint({endpoint: query.endpoint})) + '?';
+    for (const [key, entry] of this.lists) {
+      if (!key.startsWith(prefix) || entry.selectedLookupScope !== (query.filter ?? '') || Date.now() - entry.at >= 30000) continue;
+      const selected = (entry.response as DataPage).value.find(row => String(row[lookup.valueField ?? 'systemId']) === String(id));
+      if (selected) return structuredClone(selected);
+    }
+    return undefined;
   }
   /** Selected lookup records follow the same company and parent scope as searches. */
   loadLookup(lookup: FieldLookupConfig, id: unknown, record: Record<string, unknown>, header: Record<string, unknown> = {}): Observable<unknown> {
@@ -213,12 +232,12 @@ export class DataSourceService {
     if (!query.ready || !query.endpoint) return of(undefined);
     const cached = this.getCachedLookup(lookup, id, record, header);
     if (cached) return of(cached);
-    if (lookup.recordRead !== 'collection') return this.loadById({endpoint: query.endpoint}, id, {useCache: true, maxAgeMs: 30000});
+    if (lookup.recordRead !== 'collection') return this.loadById({endpoint: query.endpoint!}, id, {useCache: true, maxAgeMs: 30000});
     const identity = (lookup.valueField ?? 'systemId') + " eq '" + String(id).replace(/'/g, "''") + "'";
-    return this.loadList({endpoint: query.endpoint, defaultFilter: [query.filter, identity].filter(Boolean).map(value => '(' + value + ')').join(' and ')}, {top: 1, useCache: true, maxAgeMs: 30000, count: false}).pipe(map(response => {
-      const selected = (response as DataPage).value[0];
-      if (!selected) throw new Error('The selected lookup record is unavailable in this company and parent scope.');
-      return selected;
+    return this.loadList({endpoint: query.endpoint!, defaultFilter: [query.filter, identity].filter(Boolean).map(value => '(' + value + ')').join(' and ')}, {top: 1, useCache: true, maxAgeMs: 30000, count: false, selectedLookupScope: query.filter ?? ''}).pipe(map(response => {
+      const matches = (response as DataPage).value.filter(row => String(row[lookup.valueField ?? 'systemId']) === String(id));
+      if (matches.length !== 1) throw new Error('The selected lookup record is unavailable or ambiguous in this company and parent scope.');
+      return matches[0];
     }));
   }
   loadById(config: DataSourceConfig, id: unknown, options: DataSourceLoadOptions = {}): Observable<unknown> {
@@ -408,7 +427,7 @@ export class DataSourceService {
     else if (options.skip) params.set('$skip', String(options.skip));
     return `${this.endpoint({ ...config, endpoint: path })}?${params}`;
   }
-  private context(): string { return `${this.workspace.slug}|${this.session.Company}|${this.session.UserId}|${this.session.AccessToken}|${JSON.stringify(this.session.Permissions)}|${this.session.SuperAdmin}`; }
+  private context(): string { return `${this.workspace.slug}|${this.session.Company}|${this.session.UserId}|${this.session.AccessToken}|${this.session.dataAccessRevision}|${this.session.SuperAdmin}`; }
   private key(endpoint: string): string {
     const context = this.context();
     if (this.scope !== context) {

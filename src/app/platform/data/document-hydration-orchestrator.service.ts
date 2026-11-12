@@ -1,4 +1,4 @@
-import { lookupQuery } from './lookup-dependencies';
+import { lookupQuery, selectedLookupCaption } from './lookup-dependencies';
 import { FieldConfig } from '../models/field-config.model';
 import { LineColumnConfig } from '../models/line-config.model';
 import { Injectable, inject } from '@angular/core';
@@ -18,6 +18,8 @@ type LineLoadOptions = {
   /** The parent is an unchanged snapshot in the still-open page. Writes/Refresh invalidate its scoped pages. */
   reuseSnapshot?: boolean;
 };
+
+type LookupField = FieldConfig & Pick<LineColumnConfig, 'editableWhen'> & { readOnlyFillFields?: string[] };
 
 @Injectable({
   providedIn: 'root',
@@ -43,49 +45,57 @@ export class DocumentHydrationOrchestratorService {
     header: Record<string, unknown> = {},
     isCurrent: () => boolean = () => true,
     onRequest?: () => void,
+    onResolved?: (rows: Record<string, unknown>[]) => void,
   ): Promise<Record<string, unknown>[]> {
-    const fields: FieldConfig[] = columns.map((column) => ({
+    const readonlyTargets = new Set(columns.filter(column => column.readonly)
+      .map(column => column.field ?? column.id));
+    const fields: LookupField[] = columns.map((column) => ({
       key: column.field ?? column.id,
       label: column.label,
       lookup: column.lookup,
       optionsDataKey: column.optionsDataKey,
       displayFormat: column.displayFormat,
+      labelField: column.labelField,
+      editableWhen: column.editableWhen,
+      fill: column.fill,
+      readOnlyFillFields: Object.keys(column.fill ?? {}).filter(field => readonlyTargets.has(field)),
     }));
-    const result = await this.resolveListLookups(rows, fields, header, isCurrent, onRequest);
-    const readonlyTargets = new Set(columns.filter(column => column.readonly)
-      .map(column => column.field ?? column.id));
-    for (const row of result)
-      for (const [index, field] of fields.entries()) {
-        if (!field.lookup) continue;
-        const bucket = field.optionsDataKey ?? `__options_${field.key}`;
-        const options = row[bucket];
-        if (!Array.isArray(options)) continue;
-        // A read-only display field may be filled from the same selected master
-        // that resolved the Code. Never treat this derived caption as an edit.
-        const source = options.map(option => option?.record ?? option)
-          .find(record => record && String(record[field.lookup!.valueField ?? 'systemId']) === String(row[field.key]));
-        const fill = columns[index].fill;
-        if (source && fill && row[`__lookupRestricted_${field.key}`] !== true) {
-          for (const [destination, candidate] of Object.entries(fill)) {
-            if (!readonlyTargets.has(destination)) continue;
-            const fieldsToTry = Array.isArray(candidate) ? candidate : [candidate];
-            const value = fieldsToTry.map(key => source[key])
-              .find(value => value !== null && value !== undefined && String(value).length > 0);
-            if (value !== undefined) row[destination] = value;
+    const project = (result: Record<string, unknown>[]) => {
+      for (const row of result)
+        for (const [index, field] of fields.entries()) {
+          if (!field.lookup || field.editableWhen && !field.editableWhen.values.includes(row[field.editableWhen.field])) continue;
+          const bucket = field.optionsDataKey ?? `__options_${field.key}`;
+          const options = row[bucket];
+          if (!Array.isArray(options)) continue;
+          // A read-only display field may be filled from the same selected master
+          // that resolved the Code. Never treat this derived caption as an edit.
+          const source = options.map(option => option?.record ?? option)
+            .find(record => record && String(record[field.lookup!.valueField ?? 'systemId']) === String(row[field.key]));
+          const fill = columns[index].fill;
+          if (source && fill && row[`__lookupRestricted_${field.key}`] !== true) {
+            for (const [destination, candidate] of Object.entries(fill)) {
+              if (!readonlyTargets.has(destination) || this.hasValue(row[destination])) continue;
+              const fieldsToTry = Array.isArray(candidate) ? candidate : [candidate];
+              const value = fieldsToTry.map(key => source[key])
+                .find(value => value !== null && value !== undefined && String(value).length > 0);
+              if (value !== undefined) row[destination] = value;
+            }
           }
+          row[bucket] = options.map((option) => {
+            const record = option?.record ?? option;
+            return {
+              value: record[(field.lookup!.valueField ?? 'systemId')],
+              label: row[`__lookupRestricted_${field.key}`]
+                ? 'Restricted'
+                : this.lookupLabel(field, record),
+              record,
+            };
+          });
         }
-        row[bucket] = options.map((option) => {
-          const record = option?.record ?? option;
-          return {
-            value: record[(field.lookup!.valueField ?? 'systemId')],
-            label: row[`__lookupRestricted_${field.key}`]
-              ? 'Restricted'
-              : this.lookupLabel(field, record),
-            record,
-          };
-        });
-      }
-    return result;
+      return result;
+    };
+    return project(await this.resolveListLookups(rows, fields, header, isCurrent, onRequest,
+      onResolved ? result => onResolved(project(result)) : undefined));
   }
 
   private lookupLabel(field: FieldConfig, record: Record<string, unknown>): string {
@@ -99,10 +109,11 @@ export class DocumentHydrationOrchestratorService {
   /** Batch selected identities per scoped resource; never download entire master tables. */
   async resolveListLookups(
     rows: Record<string, unknown>[],
-    fields: FieldConfig[],
+    fields: LookupField[],
     header: Record<string, unknown> = {},
     isCurrent: () => boolean = () => true,
     onRequest?: () => void,
+    onResolved?: (rows: Record<string, unknown>[]) => void,
   ): Promise<Record<string, unknown>[]> {
     const records = rows.map((row) => ({ ...row }));
     type Target = { row: Record<string, unknown>; field: FieldConfig; id: string; stamp: string };
@@ -112,7 +123,13 @@ export class DocumentHydrationOrchestratorService {
     >();
     for (const row of records)
       for (const field of fields) {
-        if (!field.lookup || !this.hasValue(row[field.key])) continue;
+        if (!field.lookup || !this.hasValue(row[field.key])
+            || field.editableWhen && !field.editableWhen.values.includes(row[field.editableWhen.field])) continue;
+        const caption = selectedLookupCaption(field, row);
+        if (caption !== undefined && !field.readOnlyFillFields?.some(key => !this.hasValue(row[key]))) {
+          row['__display_' + field.key] = caption;
+          continue;
+        }
         const query = lookupQuery({ ...field.lookup, filter: undefined }, row, '', header);
         if (!query.ready || !query.endpoint) continue;
         const stamp = JSON.stringify([this.dataSource.getReadGeneration?.() ?? 0, query.endpoint, query.filter, this.dataSource.getResourceRevision?.({endpoint: query.endpoint}) ?? 0]);
@@ -138,6 +155,7 @@ export class DocumentHydrationOrchestratorService {
         group.targets.push({ row, field, id: String(row[field.key]), stamp });
         groups.set(key, group);
       }
+    if (isCurrent()) onResolved?.(records);
     const jobs: Array<() => Promise<void>> = [];
     for (const group of groups.values()) {
       const ids = [...new Set(group.targets.map((target) => target.id))].sort();
@@ -152,7 +170,7 @@ export class DocumentHydrationOrchestratorService {
             this.dataSource
               .loadList(
                 { endpoint: group.endpoint, defaultFilter: filter },
-                { top: chunk.length, useCache: true, maxAgeMs: 30000, count: false, onRequest },
+                { top: chunk.length, useCache: true, maxAgeMs: 30000, count: false, onRequest, selectedLookupScope: group.filter ?? '' },
               )
               .pipe(
                 optionalRequestTimeout<unknown>(this.timeoutPolicy.hydrationTimeoutMs),
@@ -176,6 +194,8 @@ export class DocumentHydrationOrchestratorService {
                 ? 'Restricted'
                 : page.failed ? 'Unable to load selected value' : 'Unavailable';
           }
+          // Publish this response now; an unrelated lookup must not delay its caption/fill.
+          if (isCurrent()) onResolved?.(records);
         });
       }
     }
@@ -359,14 +379,16 @@ export class DocumentHydrationOrchestratorService {
     for (;;) {
       const response = (await firstValueFrom(
         this.dataSource
-          .loadList(config, { top, skip: rows.length, useCache: true, maxAgeMs, onRequest })
+          .loadList(config, { top, skip: rows.length, count: false, useCache: true, maxAgeMs, onRequest })
           .pipe(optionalRequestTimeout<unknown>(timeoutMs)),
       )) as { value: Record<string, unknown>[]; meta: Record<string, unknown> };
       // A stale total must not make us reread an empty page without advancing.
       if (response.value.length === 0) return rows;
       rows.push(...response.value);
       const complete =
-        typeof response.meta['total'] === 'number'
+        typeof response.meta['hasMore'] === 'boolean'
+          ? !response.meta['hasMore']
+          : typeof response.meta['total'] === 'number'
           ? rows.length >= response.meta['total']
           : response.value.length < top;
       if (complete) return rows;

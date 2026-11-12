@@ -7,7 +7,7 @@
     </div>
 
     <div class="entry-window-actions">
-      <div class="entry-status-chip" [class]="'entry-status-chip tone-' + (resolvedStatusMessage?.tone ?? 'idle')" aria-live="polite">
+      <div class="entry-status-chip" [class]="'entry-status-chip tone-' + (resolvedStatusMessage?.tone ?? 'idle')" [attr.role]="resolvedStatusMessage?.tone === 'error' ? 'alert' : null" aria-live="polite">
         @if (resolvedStatusMessage && (!isInteractionLocked || resolvedStatusMessage.blocking !== true)) {
           <span class="status-dot" aria-hidden="true">
             @if (resolvedStatusMessage.tone === 'info') {
@@ -151,7 +151,7 @@
               }
             </div>
 
-            <app-dynamic-form [hidden]="collapsedSections.has(headerSection.id)"
+            <app-dynamic-form [hidden]="collapsedSections.has(headerSection.id)" [dataReady]="contentReady"
               [sections]="[headerSection]" [dependencySections]="resolvedHeaderSections"
               [data]="resolvedHeaderData"
               (draftChanged)="action.emit({actionKey: 'header-draft', payload: $event})"
@@ -250,8 +250,9 @@
       }
 
       <app-document-lines
+        (pointerdown)="action.emit({actionKey: 'line:interacted'})"
         [preferenceKey]="preferenceKey || pageLabel || 'document'" [worksheet]="worksheet" [headerData]="resolvedHeaderData" [columns]="resolvedLineColumns"
-        [rows]="resolvedLineRows" [disabled]="isInteractionLocked"
+        [rows]="resolvedLineRows" [dataReady]="contentReady" [disabled]="isInteractionLocked"
         [showSelection]="true" [rowCommands]="resolvedLineRowCommands"
         (action)="handleLineAction($event)"
         (dropdownOpened)="handleLineDropdownOpened($event)"

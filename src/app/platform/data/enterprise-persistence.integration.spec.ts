@@ -2,14 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SessionService } from '../../core/services/session.service';
-import { DocumentSaveService } from '../../core/services/document-save.service';
 import { DataSourceConfig } from '../models/data-source-config.model';
 const fixtureSource: DataSourceConfig = { endpoint: '/fixtureHeaders', keyField: 'Id', supportsCreate: true, supportsUpdate: true, supportsDelete: true };
 import { DATA_REST_SERVICE, DataRestService } from './data-source.service';
 import { DataSourceService } from './data-source.service';
 
 describe('Enterprise persistence integration', () => {
-  let entrySave: DocumentSaveService;
   let dataSource: DataSourceService;
   let restMock: DataRestService;
   let postCalls: Array<[string, unknown]>;
@@ -47,7 +45,6 @@ describe('Enterprise persistence integration', () => {
 
     TestBed.configureTestingModule({
       providers: [
-        DocumentSaveService,
         DataSourceService,
         {
           provide: DATA_REST_SERVICE,
@@ -65,7 +62,6 @@ describe('Enterprise persistence integration', () => {
       ]
     });
 
-    entrySave = TestBed.inject(DocumentSaveService);
     dataSource = TestBed.inject(DataSourceService);
   });
 
@@ -86,37 +82,12 @@ describe('Enterprise persistence integration', () => {
     expect(postCalls[0][1]).toEqual({ UnknownField: 'value' });
   });
 
-  it('returns save error when BC rejects readonly field update shape', async () => {
-    patchImpl = () => throwError(() => bcError("Control 'Status' is read-only and cannot be modified."));
-
-    let actualSaved = true;
-    let actualMessage = '';
-
-    const result = await firstValueFrom(entrySave.save({
-        scope: 'purchase-order-entry',
-        dataSourceConfig: fixtureSource,
-        headerSections: [{ id: 'header', fields: [{ key: 'VendorOrderNumber', label: 'Vendor Order Number', type: 'text' }] }],
-        headerData: {
-          Id: 'PO-ID-1', systemRowVersion: 1,
-          Status: 'Released',
-          VendorOrderNumber: 'V-123'
-        }
-      }));
-    actualSaved = result.saved;
-    actualMessage = result.errorMessage ?? '';
-
-    expect(actualSaved).toBeFalsy();
-    expect(actualMessage.toLowerCase()).toContain('read-only');
+  it('propagates readonly-field rejection through the shared update without retrying', async () => {
+    const error = bcError("Control 'Status' is read-only and cannot be modified.");
+    patchImpl = () => throwError(() => error);
+    await expect(firstValueFrom(dataSource.update(fixtureSource, 'PO-ID-1', {VendorOrderNumber: 'V-123'}, 1))).rejects.toBe(error);
     expect(patchCalls.length).toBe(1);
     expect(patchCalls[0][1]).toEqual({ VendorOrderNumber: 'V-123' });
-  });
-
-  it('reports missing save configuration without sending a patch request', () => {
-    let errorMessage = '';
-    entrySave.save({ scope: 'purchase-order-entry', headerData: { Id: 'PO-1' } })
-      .subscribe(result => { expect(result.saved).toBe(false); errorMessage = result.errorMessage ?? ''; });
-    expect(errorMessage).toContain('configuration is missing');
-    expect(patchCalls).toEqual([]);
   });
 
   it('surfaces delete error from BC response shape', async () => {

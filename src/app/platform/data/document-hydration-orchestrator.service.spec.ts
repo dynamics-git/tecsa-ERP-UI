@@ -5,6 +5,8 @@ import { SessionService } from '../../core/services/session.service';
 import { DataSourceConfig } from '../models/data-source-config.model';
 import { DATA_REST_SERVICE, DataSourceService } from './data-source.service';
 import { DocumentHydrationOrchestratorService } from './document-hydration-orchestrator.service';
+import { purchaseRequisitionLineConfig } from '../../features/purchasing/purchase-requisition/purchase-requisition.config';
+import { usersLineConfig } from '../../features/administration/users/users.config';
 
 describe('Document line pagination through the shared data source', () => {
   const config: DataSourceConfig = {
@@ -90,9 +92,45 @@ describe('Document line pagination through the shared data source', () => {
     expect(onRequest).not.toHaveBeenCalled();
   });
 
+  it('keeps infinite continuation without counting or fetching an extra page after a full final response', async () => {
+    const rows = [{systemId: 'one'}, {systemId: 'two'}, {systemId: 'three'}, {systemId: 'four'}];
+    get.mockReturnValueOnce(of({data: rows.slice(0, 2), meta: {hasMore: true, total: null}}));
+    get.mockReturnValueOnce(of({data: rows.slice(2), meta: {hasMore: false, total: null}}));
+    await expect(hydration.loadLineRowsForHeader(config, header)).resolves.toEqual(rows);
+    expect(get).toHaveBeenCalledTimes(2);
+    for (const [endpoint] of get.mock.calls) {
+      expect(new URL(endpoint, 'http://fixture').searchParams.get('$count')).toBe('false');
+    }
+  });
+
   it('propagates a failed line request instead of presenting it as an empty collection', async () => {
     get.mockReturnValue(throwError(() => new Error('Line request failed')));
     await expect(hydration.loadLineRowsForHeader(config, header)).rejects.toThrow('Line request failed');
     expect(get).toHaveBeenCalledOnce();
+  });
+
+  it('shows returned PR codes and descriptions without reading any master table', async () => {
+    const result = await hydration.resolveLineLookups([
+      {lineType: 'item', number: 'ITEM01', description:'Saved custom description',unitOfMeasureCode:'PCS',locationCode:'MAIN'},
+      {lineType: 'gl_account', number: 'GL01',description:'Saved account description'},
+    ], purchaseRequisitionLineConfig.columns);
+    expect(get).not.toHaveBeenCalled();
+    expect(result[0]).toMatchObject({description:'Saved custom description',__display_number:'ITEM01',__display_unitOfMeasureCode:'PCS',__display_locationCode:'MAIN'});
+    expect(result[1]).toMatchObject({description:'Saved account description',__display_number:'GL01'});
+  });
+
+  it('resolves a genuinely missing caption only against the active master', async () => {
+    get.mockReturnValue(of({data:[{number:'GL01',name:'Account'}]}));
+    const columns=purchaseRequisitionLineConfig.columns.map(column=>column.lookup&&column.field==='number'
+      ? {...column,lookup:{...column.lookup,displayField:'name'}}:column);
+    await hydration.resolveLineLookups([{lineType:'gl_account',number:'GL01'}],columns);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls[0][0]).toMatch(/^\/glAccounts\?/);
+  });
+
+  it('uses a returned read-only name without asking its master again', async () => {
+    const rows=await hydration.resolveLineLookups([{permissionSetCode:'REQ',permissionSetName:'Returned Name'}],usersLineConfig.columns);
+    expect(get).not.toHaveBeenCalled();
+    expect(rows[0]).toMatchObject({permissionSetName:'Returned Name',__display_permissionSetCode:'REQ'});
   });
 });

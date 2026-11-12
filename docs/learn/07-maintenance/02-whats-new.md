@@ -1,5 +1,249 @@
 # What's new in developer documentation
 
+## 13 November 2026: remove remaining card/filter counts and unchanged PATCH rereads
+
+Related-card business-key probes retain top=2 and reject zero/multiple matches,
+but no longer request an exact total count. Filter-panel choices also disable
+count without changing their bounded options or local reuse. Existing infinite
+scroll and configuration remain unchanged.
+
+Backend shared PATCH skips its final refresh only for unchanged plain records
+without write-stage behaviors/rules. Actual saves and hook paths retain refreshed
+database values. Focused coverage checks no-op persistence/read suppression,
+real-write refresh, hook refresh and stale-version rejection.
+
+Backend commit `a4307628` deployed successfully through the existing IIS workflow;
+health returned 200 and anonymous `/auth/me` returned 401 afterward. UI changes
+remain local for review. Production build, focused related-card/filter/navigation
+checks, documentation checks and lint passed. These checks do not establish full
+authenticated browser latency.
+
+## 13 November 2026: remove repeated CRUD request work
+
+Backend token-usage timestamp writes are disabled through Sanctum config.
+Shared uniqueness validation skips unchanged stored keys/scopes, preserving
+create/changed-key checks and database constraints. Read-only Users checks
+confirmed zero unchanged-key COUNT queries versus two before, and one check
+when Email changed. Company storage setup combines two queries into one while
+retaining live completeness guards; repeated template checks within one request
+reuse a connection/database snapshot.
+
+The existing infinite scroll remains. Lists, worksheets, modal lists and Lines
+request count=false and honor hasMore without introducing buttons or numbered
+pagination. A full final batch no longer causes an extra empty request. Backend
+total-count compatibility remains available to clients that request it.
+
+Backend commit `218fa7df` deployed successfully through the Windows IIS workflow;
+public health returned 200 and anonymous `/auth/me` returned 401. UI changes remain
+local for review, with production build, focused infinite-scroll/Lines/modal
+checks, documentation and lint passing. Full authenticated browser latency is
+not established by these checks.
+
+## 13 November 2026: reuse server permissions across API calls
+
+Backend PermissionService now reuses resolved grants for login and subsequent
+operation checks. Company membership and page/source field rules share a
+server-owned 60-second cache, isolated by database/user/Company/workspace. Warm
+checks avoid their repeated permission SQL. Backend security writes invalidate
+the generation, with commit/rollback handling and no publication of uncommitted
+security changes. The single IIS server uses a dedicated file store; multi-node
+operation requires shared storage. External SQL changes are bounded by TTL and
+need explicit cache clearing for immediate revocation. Existing enforcement and
+UI config remain; no database migration or posting change is involved.
+
+Backend commit `ba981e1b` deployed successfully to IIS from the performance branch.
+Public health returned 200 and unauthenticated `/auth/me` returned 401 afterward.
+A pre-deployment read-only comparison matched 48 old/new permission decisions;
+the old path issued 24 permission queries and warm new checks issued zero.
+Authenticated browser latency against this deployed revision remains to be checked.
+
+## 12 November 2026: reduce shared API startup and reuse selected batches
+
+Identical ordinary Notes/Files transports now share route shapes through the
+existing backend registry, retaining client URLs and owner authorization. Local
+boot+health samples fell from 932–969 to 520–528 ms, routes from 20,909 to 7,553
+and peak memory from 128 to 78 MB. Every published readable owner is matched in
+Company and workspace scopes; unknown/unreadable owners and query/body source
+spoofing remain rejected. Deployment clears stale route cache without raising
+HTTP worker memory. These measurements do not establish end-user CRUD latency.
+
+The UI reuses fresh partial selected-name batches within their exact dependency
+and access scope, requesting only unknown codes in later batches. It reuses the
+existing bounded page cache and does not promote partial DTOs to CRUD details.
+Cold names still require a selected-value read. Config structure stays unchanged.
+
+Backend commit `93ab158a` was deployed successfully through the Windows IIS
+workflow. Three public-health samples from the same client measured 1.769–1.916 s
+before deployment and 0.826–0.896 s afterward, all HTTP 200. These include network
+time and establish a health/startup improvement only, not authenticated CRUD
+latency, multi-user capacity or superiority over HLB.
+
+## 12 November 2026: align Items card and FactBox with the current API
+
+Items now uses 30 schema-matched fields across seven named sections, integer
+enums and business-code lookups instead of obsolete UUID/string-enum bindings.
+Manual No. creates through shared Core without waiting for Description/UOM;
+automatic-numbering flags were removed because Item has no declared allocator.
+The FactBox reuses the same identity, types and labels in four concise groups.
+Obsolete nested worksheet shortcuts were removed; their page conversion remains
+separate work. Installed metadata was checked read-only, with no product rows or
+schema changes. Focused UI coverage exercises one create, in-flight edits,
+changed-field PATCHes, full decimal strings, saved Refresh and FactBox labels.
+
+## 12 November 2026: refresh unsaved entry and clear obsolete parent errors
+
+Refresh no longer falls through to an early-return child refresh for an unsaved
+Header. After confirmed discard it opens a fresh configured entry, clears old
+validation/dirty state and cancels the previous autosave timer; cancel retains
+input. Subsequent entry can create normally. Saved Refresh still reads Header
+and Lines from the server. Missing-parent errors are replaced when valid Header
+edits/create progress resume, using the existing shared status message.
+
+## 12 November 2026: explain missing Header before child writes
+
+The existing child-write guard remains. A line interaction/add/copy/paste before
+Header creation now reports a visible error using the shared statusMessage.
+The silent parent-based editor lock was withdrawn; configured editability remains.
+Child POST/PATCH is blocked before Header POST success, during that POST, after
+rejection, or when a required configured parent key is missing. The existing
+shared status display renders the error once and exposes it as an accessible
+alert. An additional error banner was withdrawn because it duplicated the message.
+Business-key readiness includes headerPKProp/lineFKProp and parentFieldMap; it
+does not infer relationships from systemId or field required flags. Users tests
+cover rejected/pending Header creation and a later child POST using userName.
+
+## 12 November 2026: publish lookup responses without an all-resource wait
+
+The shared line resolver now publishes each completed selected-value batch with
+its configured caption/fill instead of withholding all results until the slowest
+lookup finishes. A received vendor name/address can render while country lookup
+is still pending. Stored editable descriptions, row versions and ordinary CRUD
+remain unchanged. Stale edits/navigation still reject late results. This fixes
+an extra UI wait; it does not claim a cold API response arrives instantly.
+
+## 12 November 2026: resolve saved lookup identities before choices
+
+The provisional automatic first-page preparation and selected-name wait were
+removed. Existing rows request only their missing saved identities in a bounded
+batch; they do not load an unrelated ten records first. Users SECURITY/SUPER
+names therefore use one filtered permissionSets read, with no unopened company
+choice read for blank company scope. Opening the dropdown still loads ten
+filtered choices, with scrolling and backend search. Code-only cold responses
+still need that selected-name API; this does not claim to remove server latency.
+
+## 12 November 2026: preserve selected values when opening dropdowns
+
+The shared dropdown keeps the current caption when opened instead of replacing
+it with an empty search editor. Search text remains separate from the stored
+selection. Arrow focus no longer opens and immediately closes the popup; choosing
+a result or explicitly clearing remains the only way to change the selection.
+
+## 12 November 2026: keep lookup fill in UI config
+
+The provisional backend permissionSetName virtual projection and the additional
+projection-authorization code were withdrawn. Users keeps its existing configured
+lookup/fill; no assignment API field is added solely to display a name. The
+original userName update restriction remains. Existing exact scoped choice pages
+can resolve selected names without another read, while partial DTOs remain
+ineligible as complete CRUD detail records. Selecting a record fills arbitrary
+configured targets locally; readonly/editable remains a config decision.
+
+## 12 November 2026: reduce backend context and storage read setup
+
+Company lookup and membership verification now share one record query. The
+storage path's prior-value read and SET use one statement, and its returned
+path is reused by existing metadata resolution. Original path restoration and
+negative company-access cases remain covered without product-schema changes.
+The provisional background dropdown preparation was subsequently removed.
+
+A small local probe against the configured remote database measured roughly
+721–728 ms for the previous storage setup and 443–455 ms for the corrected path
+on the same connection (three samples per variant). This is setup-only evidence,
+not a full-request improvement or a concurrency/capacity result. The observed
+Windows development server and remote DB connection remain runtime bottlenecks.
+
+## 12 November 2026: retire unused save port
+
+An initial first-page preparation experiment was withdrawn because saved codes
+outside that page could wait for choices and then require another API request.
+Current behavior resolves saved identities directly and loads choices on opening.
+
+The unused full-document autosave wrapper, global save port/service, provider and
+barrel export were removed. Ordinary Header/Line CRUD retains its existing field
+paths and failure retention. Create error wording now says record rather than
+draft. Legacy save-port consumers must use the shared field CRUD path; this is
+not a new page save extension point. Config formats and business document states
+remain unchanged. Live user-visible latency still needs runtime verification.
+
+## 12 November 2026: shared dropdown and API startup cleanup
+
+Data-cache identity no longer parses/serializes the entire permission matrix per
+record; stored-grant changes still revoke cached/in-flight reads. A configured
+header lookup bypasses legacy dropdown loading. Popup positioning responds to
+size/scroll/resize changes rather than every view check. Collection lookups match
+the requested configured identity instead of accepting the first returned row.
+Header and line dropdowns now request ten choices, continue on scroll and search
+on the server. Pending identical requests survive the listener handoff between
+reopens/rows instead of being cancelled and restarted. Fresh cached reopen and
+in-flight reuse are checked through the real shared DataSource. HLB eager-load
+behavior and official BC/SAP design references are documented without claiming
+their internals or universal page-size defaults.
+
+Backend bounded collections avoid a duplicate query-profile pass. Company choice
+DTOs now honor shared filtering/paging instead of reading the entire collection.
+Routing declarations reuse validation while source config is unchanged. Existing
+controller discovery participates in Laravel config caching; package registration
+and older-cache compatibility remain supported. Large route generation and live
+dropdown/saving responsiveness remain separate acceptance work.
+
+## 12 November 2026: remove duplicate ordinary CRUD authorization query
+
+Generated ordinary CRUD routes now rely on the existing EntityRuntime permission
+boundary instead of querying the same grant again in generated route middleware.
+Users/PR endpoints and Config + TypeScript + Shared Components remain unchanged.
+Business-controller and explicit middleware checks remain in place. Focused
+database-free verification checks the generated routes, retained custom checks
+and rejection of an unauthorized read by the real shared Runtime.
+
+## 11 November 2026: PR and Users shared CRUD request correction
+
+Shared Header/Line autosave now keeps one request in flight per record and sends
+the latest pending edits after success, retaining edits on failure without an
+automatic retry. Initial Card captions use the existing form/grid owners instead
+of duplicate page hydration; optional selected names do not block business rows.
+PR resolves its shared No. column only against the active Item/G/L binding.
+Returned codes/names now display directly; PR No./UOM/Location codes no longer
+cause initial master reads just to display the same values. Dropdown fill uses
+its chosen record immediately. Missing-name reads remain bounded and separate
+from record loading; saved editable Descriptions are preserved.
+Users assignment names follow the existing UI lookup/fill configuration. The
+provisional backend projection was withdrawn on 12 November; it is not the
+current assignment contract. Prepared/scoped lookup records are reused for names.
+Header/Lines load failures, business-key relations, permissions and row versions
+remain protected. PR Request Date is optional, matching its nullable column.
+PR's existing shared numbering behavior now accepts code-based series: manual No.
+or a selected No. Series creates the Header first. Quantity's unrelated master
+prerequisite was removed. The remaining `requiredDate` keys name optional date
+fields; they are not required-field rules. No new required fields were added.
+Unreachable legacy page-wide option preloading/background expansion helpers were
+removed; existing on-demand dropdown loading remains. Bundle budgets are unchanged.
+
+Laravel reuses resolved source/model metadata inside an invalidation-aware,
+database/search-path-scoped request. See [autosave](/documentation/core/fields-and-validation),
+[lookups](/documentation/core/lookups-and-fill) and
+[backend queries](/documentation/backend/queries-and-concurrency).
+Regression coverage verifies controlled request counts; this is not live latency
+or million-record acceptance. Older PR tests were aligned with current business
+code fields and the manual-or-series Header Number contract.
+
+No. Series config now uses `/noSeries` and `/noSeriesLines`, binds `code` to
+`seriesCode`, and uses `incrementByNo`/`open`. Description and Starting Date are
+optional. The current database has no PR-default-series field in Purchases &
+Payables Setup; PR can select an existing series directly. No new setup column
+or product database migration was added. Normal numbering uses the existing
+NumberSeriesService, keeps Company scope and transactional counter updates, and
+protects used series lines. Sequence-mode allocation remains unsupported.
+
 ## 7 November 2026: consistent list loading position
 
 Initial loading and refreshing an existing list now place the existing indicator

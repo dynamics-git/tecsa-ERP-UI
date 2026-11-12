@@ -25,7 +25,7 @@ export interface DocumentPageListLifecycleContext {
 
   buildFilter(scope: string): string;
   hydrateTargetsFromRecords(scope: string, records: unknown[]): void;
-  loadList(dataSource: DataSourceConfig, options: { skip: number; top: number; forceRefresh: boolean; cursor?: string }): Observable<unknown>;
+  loadList(dataSource: DataSourceConfig, options: { skip: number; top: number; forceRefresh: boolean; cursor?: string; count?: boolean }): Observable<unknown>;
   toRecords(response: unknown): unknown[];
   getErrorMessage(error: unknown): string;
   detectChanges(): void;
@@ -84,6 +84,7 @@ export class DocumentPageListLifecycleService {
     const loadOptions = {
       skip: reset ? 0 : ctx.rows.length,
       top: pageSize,
+      count: false,
       forceRefresh,
       cursor: reset ? undefined : ctx.cursor,
     };
@@ -117,6 +118,7 @@ export class DocumentPageListLifecycleService {
           const meta = (response as { meta?: Record<string, unknown> })?.meta ?? {};
           ctx.cursor = typeof meta['nextCursor'] === 'string' ? meta['nextCursor'] : undefined;
           ctx.hasMore = ctx.listDataSource.paging === 'cursor' ? !!ctx.cursor
+            : typeof meta['hasMore'] === 'boolean' ? meta['hasMore']
             : typeof meta['total'] === 'number' ? ctx.rows.length < meta['total'] : records.length === pageSize;
 
           this.stopListLoading(ctx);

@@ -57,6 +57,27 @@ Omit `autoSave: true`. Core uses the shared save policy when there is no manual 
 
 Manual-save pages are an explicit supported exception. They keep changes until Save/Apply and should have a business reason. Do not add a Save button merely because permission rows are new to the module.
 
+### Pending edits on the same record
+
+Header and line autosave each allow one request in flight per record. Edits made
+while it is pending stay in the existing dirty-field revision map; after success,
+one follow-up sends the latest pending values using the returned row version.
+An additional autosave signal does not enqueue another copy of that record's
+pending write. A failed/conflicted request retains edits and is not automatically
+retried. Unchanged lines are not saved because a header changed.
+
+`required` is an explicit field rule, not a requirement to validate the entire
+form before every existing-record PATCH. First creation still waits for declared
+create prerequisites, and backend constraints still apply. PR accepts either a
+manual Header No. or a selected No. Series. Its Number is conditionally required
+only when no series is selected. Shared backend numbering allocates the Number
+inside the Header POST transaction; Lines use the confirmed Header business key.
+PR Request Date is optional, matching its nullable database column; Quantity no
+longer requires a preceding master selection merely to autosave a draft line.
+Users requires its declared initial identity/password fields. This correction
+does not add mandatory fields. A missing/invalid series configuration is a visible
+create failure, not a blank-number saved Header or a silent fallback.
+
 ## Write callbacks
 
 `dataSource.hooks` supplies `beforeCreate`, `beforeUpdate`, `beforeDelete`, success callbacks and `onError`. A before callback can return a message to veto a write. Success callbacks observe confirmed API success. These callbacks do not create server transactions and cannot guarantee atomic header/line changes.

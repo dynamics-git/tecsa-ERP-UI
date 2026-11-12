@@ -59,6 +59,19 @@ export class SessionService {
   readonly permissionsLoaded$ = new BehaviorSubject<boolean>(false);
   readonly accessCenterChanged$ = new Subject<unknown>();
   readonly userProfileChanged$ = new Subject<unknown>();
+  private accessSnapshot: string[] = [];
+  private accessRevision = 0;
+
+  /** Compare stored grants without parsing/re-serializing the entire matrix per data-cache key. */
+  get dataAccessRevision(): number {
+    const snapshot = [this.permissionsKey, this.pagePermissionsKey, this.companySuperKey]
+      .map(key => this.readString(key));
+    if (snapshot.some((value, index) => value !== this.accessSnapshot[index])) {
+      this.accessSnapshot = snapshot;
+      this.accessRevision++;
+    }
+    return this.accessRevision;
+  }
 
   constructor(private readonly router: Router) {
     this.ensureSessionSchemaCompatibility();
@@ -137,7 +150,8 @@ export class SessionService {
   }
 
   get UserId(): string {
-    return this.readProperty(this.User, 'userId') || this.readProperty(this.User, 'UserId') || this.readProperty(this.User, 'systemId') || this.readProperty(this.User, 'SystemId') || this.readProperty(this.User, 'id') || this.readProperty(this.User, 'Id');
+    const user = this.User;
+    return this.readProperty(user, 'userId') || this.readProperty(user, 'UserId') || this.readProperty(user, 'systemId') || this.readProperty(user, 'SystemId') || this.readProperty(user, 'id') || this.readProperty(user, 'Id');
   }
 
   get Email(): string {

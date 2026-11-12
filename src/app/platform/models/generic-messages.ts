@@ -3,7 +3,7 @@ export const GENERIC_MESSAGES = {
   saveSuccessTitle: 'Saved',
   saveSuccessMessage: 'All changes saved.',
   createFailedTitle: 'Create failed',
-  createFailedMessage: 'Unable to create a new draft.',
+  createFailedMessage: 'Unable to create the record.',
   createSuccessTitle: 'Created',
   createSuccessMessage: 'Record created.',
   deleteFailedTitle: 'Delete failed',
