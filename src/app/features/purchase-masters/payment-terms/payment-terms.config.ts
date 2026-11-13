@@ -23,12 +23,12 @@ export const paymentTermsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 10,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
@@ -57,6 +57,8 @@ export const paymentTermsHeaderConfig: HeaderConfig = {
           validation: {
             min: 0,
             max: 100,
+            precision: 38,
+            scale: 20,
           },
         },
         {
@@ -81,6 +83,7 @@ export const paymentTermsListConfig: ListPageConfig & {
     endpoint: '/paymentTerms',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',

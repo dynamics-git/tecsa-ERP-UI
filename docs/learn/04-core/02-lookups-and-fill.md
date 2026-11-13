@@ -2,6 +2,22 @@
 
 A lookup selects a value from another source. Keep its stored business value, displayed caption and the selected record's CRUD identity distinct.
 
+## One remote choice path — 13 November 2026
+
+Remote fields declare `lookup` with the actual collection endpoint, stored
+`valueField`, caption and dependencies. The retired `MasterDataService` fallback
+endpoint cache and unused RunModal option/hydration resolvers are removed.
+There is no parallel five-minute cache returning successful empty choices after
+an API failure. Existing DataSource request sharing, scoped invalidation, first
+ten choices, backend search and infinite continuation remain the remote path.
+Fixed enums continue to use `options` directly, retaining integer values.
+
+Loaded line Type values are normalized through their declared `valueType`.
+An integer Type remains an integer so conditional No. lookup bindings still
+match after refresh. This does not add a Type/No. prerequisite to autosave.
+Legacy `api`/`optionsEndpoints` declarations are no longer used by feature
+configs; migrate external configs to `lookup` before adopting this correction.
+
 ## Store a code and display a name
 
 ```typescript

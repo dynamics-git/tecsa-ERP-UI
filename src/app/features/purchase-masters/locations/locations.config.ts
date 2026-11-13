@@ -23,12 +23,12 @@ export const locationsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 10,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'name',
           label: 'Name',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
@@ -40,12 +40,6 @@ export const locationsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 50,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -78,23 +72,23 @@ export const locationsHeaderConfig: HeaderConfig = {
           },
         },
         {
-          key: 'state',
+          key: 'county',
           label: 'State',
           type: 'text',
           validation: {
-            maxLength: 50,
+            maxLength: 30,
           },
         },
         {
-          key: 'postalCode',
+          key: 'postCode',
           label: 'Postal Code',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 20,
           },
         },
         {
-          key: 'countryCode',
+          key: 'countryRegionCode',
           label: 'Country Code',
           type: 'code',
           validation: {
@@ -117,6 +111,7 @@ export const locationsListConfig: ListPageConfig & {
     endpoint: '/locations',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',
@@ -143,17 +138,14 @@ export const locationsListConfig: ListPageConfig & {
         width: '140px',
       },
       {
-        field: 'state',
+        field: 'county',
         width: '140px',
       },
       {
-        field: 'countryCode',
+        field: 'countryRegionCode',
         width: '140px',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

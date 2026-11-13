@@ -19,6 +19,12 @@ export const dimensionsHeaderConfig: HeaderConfig = {
       order: 40,
       runModalPageId: 'dimension-values',
       runModalTarget: 'entry',
+      runModalRecord: {
+        source: 'header',
+        fields: {
+          code: 'code',
+        },
+      },
     },
   ],
   sections: [
@@ -34,21 +40,15 @@ export const dimensionsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 20,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'name',
           label: 'Name',
           type: 'text',
-          required: true,
           validation: {
-            maxLength: 100,
+            maxLength: 30,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -66,6 +66,7 @@ export const dimensionsListConfig: ListPageConfig & {
     endpoint: '/dimensions',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',
@@ -87,10 +88,7 @@ export const dimensionsListConfig: ListPageConfig & {
       {
         field: 'name',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

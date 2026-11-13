@@ -1,5 +1,22 @@
 # What's new in developer documentation
 
+## 13 November 2026: align feature configs and remove the retired dropdown path
+
+UI and backend work share `fix/ui-config-consistency-20261113`. Master/setup
+fields, enum values, business-code lookups, related worksheets and selected-row
+RunModal mappings are aligned to their installed APIs. Unsupported legacy
+columns and placeholder PO business buttons are removed. PO uses ordinary
+Purchase Header/Line CRUD with Order scope; no posting logic or number allocator
+has been added. Notification Setup retains its existing coherent Save because
+its policy validates related settings together. See the page-pattern article for endpoint and compatibility
+details, including the plain Payment Methods balancing-account code editor.
+
+The unused remote fallback cache and RunModal resolvers are removed. Integer
+Line Types remain integers when records load. A backend correction defers schema
+cache publication until commit and prevents transactional metadata leaking into
+other requests. These edits are for branch review; they do not establish live
+server/browser performance or completion of future business modules.
+
 ## 13 November 2026: remove remaining card/filter counts and unchanged PATCH rereads
 
 Related-card business-key probes retain top=2 and reject zero/multiple matches,

@@ -36,8 +36,8 @@ describe('Write metadata without duplicate page block lists',()=>{
   it('protects PR calculated fields with only their readonly declarations',()=>{
     const {updateBlockedFields,meaningfulFields,...source}=purchaseRequisitionLineConfig.dataSource;
     const pr=lineConfigDefaults({...purchaseRequisitionLineConfig,dataSource:source});
-    const row={lineType:'item',itemId:123,quantity:'2',estimatedUnitCost:'5',qtyPerUnitOfMeasure:'10',estimatedAmount:'10',convertedQuantity:'0',remainingQuantity:'2'};
-    expect(service.buildLineUpdatePayload(row,Object.keys(row),pr)).toEqual({lineType:'item',itemId:123,quantity:'2',estimatedUnitCost:'5'});
+    const row={lineType:'item',number:'ITEM001',quantity:'2',estimatedUnitCost:'5',qtyPerUnitOfMeasure:'10',estimatedAmount:'10',convertedQuantity:'0',remainingQuantity:'2'};
+    expect(service.buildLineUpdatePayload(row,Object.keys(row),pr)).toEqual({lineType:'item',number:'ITEM001',quantity:'2',estimatedUnitCost:'5'});
     const draft=service.createEmptyLineRow(pr,{number:'PR-TEST',documentType:'purchase_requisition'}, {defaultType:'item',emptyType:' ',byType:{}},{});
     expect(pr.dataSource.meaningfulFields!.some(key=>!!draft[key])).toBe(false);
     expect(pr.dataSource.meaningfulFields).toContain('description');
@@ -47,9 +47,9 @@ describe('Write metadata without duplicate page block lists',()=>{
     draft['description']='Draft before selecting a master';
     const payload=service.buildLineCreatePayload(draft,pr,['description']);
     expect(payload).toMatchObject({description:'Draft before selecting a master',lineType:'item',quantity:'1',documentNumber:'PR-TEST',documentType:'purchase_requisition'});
-    expect(payload).not.toHaveProperty('itemId');
+    expect(payload).not.toHaveProperty('number');
     expect(payload).not.toHaveProperty('estimatedAmount');
-    draft['itemId']=123;
-    expect(service.buildLineCreatePayload(draft,pr, ['itemId'])).not.toHaveProperty('locationId');
+    draft['number']='ITEM001';
+    expect(service.buildLineCreatePayload(draft,pr, ['number'])).not.toHaveProperty('locationCode');
   });
 });

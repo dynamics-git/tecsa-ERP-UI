@@ -6,13 +6,11 @@ import {
 } from '../../../platform/public-api';
 import { dimensionValuesFactBoxConfig } from './dimension-values.factbox.config';
 const dimensionValuesDataSource: DataSourceConfig = {
-  endpoint: '/dimensions',
   keyField: 'systemId',
-  navigation: {
-    parentEndpoint: '/dimensions',
-    parentIdFields: ['systemId'],
-    childCollection: 'values',
-  },
+  endpoint: '/dimensionValues',
+  headerPKProp: 'code',
+  lineFKProp: 'dimensionCode',
+  defaultSort: 'code asc',
   pageSize: 20,
 };
 
@@ -63,21 +61,15 @@ export const dimensionValuesLineConfig: LineConfig = {
       validation: {
         maxLength: 20,
       },
+      readonlyAfterCreate: true,
     },
     {
       id: 'name',
       label: 'Name',
       type: 'text',
-      required: true,
       validation: {
-        maxLength: 100,
+        maxLength: 50,
       },
-    },
-    {
-      id: 'isActive',
-      label: 'Is Active',
-      type: 'boolean',
-      defaultValue: true,
     },
   ],
 };

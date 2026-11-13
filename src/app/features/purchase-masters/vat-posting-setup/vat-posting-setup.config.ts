@@ -19,25 +19,26 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
           key: 'vatCalculationType',
           label: 'Vat Calculation Type',
           type: 'dropdown',
-          defaultValue: 'normal',
+          defaultValue: 0,
           options: [
             {
-              label: 'Normal',
-              value: 'normal',
+              label: 'Normal VAT',
+              value: 0,
             },
             {
-              label: 'Reverse charge',
-              value: 'reverse_charge',
+              label: 'Reverse Charge VAT',
+              value: 1,
             },
             {
-              label: 'Full',
-              value: 'full',
+              label: 'Full VAT',
+              value: 2,
             },
             {
-              label: 'Sales tax',
-              value: 'sales_tax',
+              label: 'Sales Tax',
+              value: 3,
             },
           ],
+          valueType: 'integer',
         },
         {
           key: 'vatPercent',
@@ -47,14 +48,14 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
           validation: {
             min: 0,
             max: 100,
-            precision: 9,
-            scale: 6,
+            precision: 38,
+            scale: 20,
           },
         },
         {
           key: 'vatIdentifier',
           label: 'Vat Identifier',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 20,
           },
@@ -82,23 +83,23 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
         {
           key: 'taxCategory',
           label: 'Tax Category',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 10,
           },
         },
         {
-          key: 'salesVatReportingCode',
+          key: 'saleVatReportingCode',
           label: 'Sales VAT Reporting Code',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 20,
           },
         },
         {
-          key: 'purchaseVatReportingCode',
+          key: 'purchVatReportingCode',
           label: 'Purchase VAT Reporting Code',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 20,
           },
@@ -106,8 +107,19 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
         {
           key: 'allowNonDeductibleVat',
           label: 'Allow Non Deductible VAT',
-          type: 'boolean',
-          defaultValue: false,
+          type: 'select',
+          defaultValue: 0,
+          valueType: 'integer',
+          options: [
+            {
+              label: 'Do Not Allow',
+              value: 0,
+            },
+            {
+              label: 'Allow',
+              value: 1,
+            },
+          ],
         },
         {
           key: 'nonDeductibleVatPercent',
@@ -117,15 +129,9 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
           validation: {
             min: 0,
             max: 100,
-            precision: 7,
-            scale: 4,
+            precision: 38,
+            scale: 20,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -134,90 +140,114 @@ export const vatPostingSetupHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'vatBusinessPostingGroupId',
+          key: 'vatBusPostingGroup',
           label: 'Vat Business Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          required: true,
+          valueType: 'code',
           readonlyAfterCreate: true,
           lookup: {
             endpoint: '/vatBusinessPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
+          defaultValue: '',
         },
         {
-          key: 'vatProductPostingGroupId',
+          key: 'vatProdPostingGroup',
           label: 'Vat Product Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          required: true,
+          valueType: 'code',
           readonlyAfterCreate: true,
           lookup: {
             endpoint: '/vatProductPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
+          defaultValue: '',
         },
         {
-          key: 'salesVatAccountId',
+          key: 'salesVatAccount',
           label: 'Sales VAT Account',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/glAccounts',
-            valueField: 'systemId',
+            valueField: 'number',
             displayField: 'number',
             searchFields: ['number', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[number] — [name]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'purchaseVatAccountId',
+          key: 'purchaseVatAccount',
           label: 'Purchase VAT Account',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/glAccounts',
-            valueField: 'systemId',
+            valueField: 'number',
             displayField: 'number',
             searchFields: ['number', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[number] — [name]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'reverseChargeVatAccountId',
+          key: 'reverseChrgVatAcc',
           label: 'Reverse Charge VAT Account',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/glAccounts',
-            valueField: 'systemId',
+            valueField: 'number',
             displayField: 'number',
             searchFields: ['number', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[number] — [name]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'nonDeductiblePurchaseVatAccountId',
+          key: 'nonDedPurchaseVatAccount',
           label: 'Non Deductible Purchase VAT Account',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/glAccounts',
-            valueField: 'systemId',
+            valueField: 'number',
             displayField: 'number',
             searchFields: ['number', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[number] — [name]',
+          validation: {
+            maxLength: 20,
+          },
         },
       ],
     },
@@ -234,10 +264,10 @@ export const vatPostingSetupListConfig: ListPageConfig & {
   dataSource: {
     endpoint: '/vatPostingSetup',
     keyField: 'systemId',
-    defaultSort: 'vatBusinessPostingGroupId asc',
+    defaultSort: 'vatBusPostingGroup asc',
   },
   identity: {
-    primaryField: '__display_vatBusinessPostingGroupId',
+    primaryField: '__display_vatBusPostingGroup',
     secondaryField: 'description',
   },
   module: 'Finance',
@@ -251,10 +281,10 @@ export const vatPostingSetupListConfig: ListPageConfig & {
   dataSurface: {
     columns: listColumns(vatPostingSetupHeaderConfig, [
       {
-        field: 'vatBusinessPostingGroupId',
+        field: 'vatBusPostingGroup',
       },
       {
-        field: 'vatProductPostingGroupId',
+        field: 'vatProdPostingGroup',
         width: '140px',
       },
       {
@@ -270,13 +300,10 @@ export const vatPostingSetupListConfig: ListPageConfig & {
         width: '140px',
       },
       {
-        field: 'purchaseVatAccountId',
+        field: 'purchaseVatAccount',
         width: '140px',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

@@ -23,21 +23,15 @@ export const reasonCodesHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 10,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -55,6 +49,7 @@ export const reasonCodesListConfig: ListPageConfig & {
     endpoint: '/reasonCodes',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',
@@ -76,10 +71,7 @@ export const reasonCodesListConfig: ListPageConfig & {
       {
         field: 'description',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

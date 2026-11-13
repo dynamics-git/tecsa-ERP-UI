@@ -6,13 +6,11 @@ import {
 } from '../../../platform/public-api';
 import { currencyExchangeRatesFactBoxConfig } from './currency-exchange-rates.factbox.config';
 const currencyExchangeRatesDataSource: DataSourceConfig = {
-  endpoint: '/currencies',
   keyField: 'systemId',
-  navigation: {
-    parentEndpoint: '/currencies',
-    parentIdFields: ['systemId'],
-    childCollection: 'exchangeRates',
-  },
+  endpoint: '/currencyExchangeRates',
+  headerPKProp: 'code',
+  lineFKProp: 'currencyCode',
+  defaultSort: 'startingDate asc',
   pageSize: 20,
 };
 
@@ -63,32 +61,25 @@ export const currencyExchangeRatesLineConfig: LineConfig = {
       readonlyAfterCreate: true,
     },
     {
-      id: 'foreignAmount',
+      id: 'exchangeRateAmount',
       label: 'Foreign Amount',
       type: 'decimal',
       defaultValue: '1',
       validation: {
-        precision: 20,
-        scale: 10,
+        precision: 38,
+        scale: 20,
         min: '0.000001',
       },
     },
     {
-      id: 'localAmount',
+      id: 'relationalExchRateAmount',
       label: 'Local Amount',
       type: 'decimal',
-      required: true,
       validation: {
-        precision: 20,
-        scale: 10,
+        precision: 38,
+        scale: 20,
         min: '0.000001',
       },
-    },
-    {
-      id: 'isActive',
-      label: 'Is Active',
-      type: 'boolean',
-      defaultValue: true,
     },
   ],
 };

@@ -22,8 +22,8 @@ export const inventorySetupHeaderConfig: HeaderConfig = {
           defaultValue: false,
         },
         {
-          key: 'allowNegativeInventory',
-          label: 'Allow Negative Inventory',
+          key: 'preventNegativeInventory',
+          label: 'Prevent Negative Inventory',
           type: 'boolean',
           defaultValue: false,
         },
@@ -34,102 +34,77 @@ export const inventorySetupHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'itemNoSeriesId',
+          key: 'itemNos',
           label: 'Item No Series',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
-            endpoint: '/numberSeries',
-            valueField: 'systemId',
+            endpoint: '/noSeries',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'transferOrderNoSeriesId',
+          key: 'transferOrderNos',
           label: 'Transfer Order No Series',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
-            endpoint: '/numberSeries',
-            valueField: 'systemId',
+            endpoint: '/noSeries',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
-        },
-        {
-          key: 'inTransitLocationId',
-          label: 'In Transit Location',
-          type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
-          lookup: {
-            endpoint: '/locations',
-            valueField: 'systemId',
-            displayField: 'code',
-            searchFields: ['code', 'name'],
+          validation: {
+            maxLength: 20,
           },
-          displayFormat: '[code] — [name]',
         },
+
         {
-          key: 'postedTransferShipmentNoSeriesId',
+          key: 'postedTransferShptNos',
           label: 'Posted Transfer Shipment No Series',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
-            endpoint: '/numberSeries',
-            valueField: 'systemId',
+            endpoint: '/noSeries',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'postedTransferReceiptNoSeriesId',
+          key: 'postedTransferRcptNos',
           label: 'Posted Transfer Receipt No Series',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
-            endpoint: '/numberSeries',
-            valueField: 'systemId',
+            endpoint: '/noSeries',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
-        },
-        {
-          key: 'warehouseBinMovementNoSeriesId',
-          label: 'Warehouse Bin Movement No Series',
-          type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
-          lookup: {
-            endpoint: '/numberSeries',
-            valueField: 'systemId',
-            displayField: 'code',
-            searchFields: ['code', 'description'],
+          validation: {
+            maxLength: 20,
           },
-          displayFormat: '[code] — [description]',
-        },
-        {
-          key: 'warehousePickWorksheetNoSeriesId',
-          label: 'Warehouse Pick Worksheet No Series',
-          type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
-          lookup: {
-            endpoint: '/numberSeries',
-            valueField: 'systemId',
-            displayField: 'code',
-            searchFields: ['code', 'description'],
-          },
-          displayFormat: '[code] — [description]',
         },
       ],
     },
@@ -147,11 +122,12 @@ export const inventorySetupListConfig: ListPageConfig & {
     endpoint: '/inventorySetup',
     keyField: 'systemId',
     singleton: true,
-    defaultSort: 'itemNoSeriesId asc',
+    defaultSort: 'itemNos asc',
     supportsCreate: false,
+    supportsDelete: false,
   },
   identity: {
-    primaryField: '__display_itemNoSeriesId',
+    primaryField: '__display_itemNos',
   },
   module: 'Inventory',
   menu: {
@@ -164,38 +140,28 @@ export const inventorySetupListConfig: ListPageConfig & {
   dataSurface: {
     columns: listColumns(inventorySetupHeaderConfig, [
       {
-        field: 'itemNoSeriesId',
+        field: 'itemNos',
       },
       {
-        field: 'transferOrderNoSeriesId',
+        field: 'transferOrderNos',
+        width: '140px',
+      },
+
+      {
+        field: 'postedTransferShptNos',
         width: '140px',
       },
       {
-        field: 'inTransitLocationId',
+        field: 'postedTransferRcptNos',
         width: '140px',
       },
-      {
-        field: 'postedTransferShipmentNoSeriesId',
-        width: '140px',
-      },
-      {
-        field: 'postedTransferReceiptNoSeriesId',
-        width: '140px',
-      },
-      {
-        field: 'warehouseBinMovementNoSeriesId',
-        width: '140px',
-      },
-      {
-        field: 'warehousePickWorksheetNoSeriesId',
-        width: '140px',
-      },
+
       {
         field: 'locationMandatory',
         width: '140px',
       },
       {
-        field: 'allowNegativeInventory',
+        field: 'preventNegativeInventory',
         width: '140px',
       },
       {

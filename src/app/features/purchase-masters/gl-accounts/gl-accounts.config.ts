@@ -19,6 +19,12 @@ export const glAccountsHeaderConfig: HeaderConfig = {
       order: 40,
       runModalPageId: 'gl-account-default-dimensions',
       runModalTarget: 'entry',
+      runModalRecord: {
+        source: 'header',
+        fields: {
+          number: 'number',
+        },
+      },
     },
   ],
   sections: [
@@ -34,12 +40,12 @@ export const glAccountsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 20,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'name',
           label: 'Name',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
@@ -47,7 +53,7 @@ export const glAccountsHeaderConfig: HeaderConfig = {
         {
           key: 'searchName',
           label: 'Search Name',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 100,
           },
@@ -56,29 +62,30 @@ export const glAccountsHeaderConfig: HeaderConfig = {
           key: 'accountType',
           label: 'Account Type',
           type: 'dropdown',
-          defaultValue: 'posting',
+          defaultValue: 0,
           options: [
             {
               label: 'Posting',
-              value: 'posting',
+              value: 0,
             },
             {
               label: 'Heading',
-              value: 'heading',
+              value: 1,
             },
             {
               label: 'Total',
-              value: 'total',
+              value: 2,
             },
             {
-              label: 'Begin total',
-              value: 'begin_total',
+              label: 'Begin-Total',
+              value: 3,
             },
             {
-              label: 'End total',
-              value: 'end_total',
+              label: 'End-Total',
+              value: 4,
             },
           ],
+          valueType: 'integer',
         },
         {
           key: 'incomeBalance',
@@ -86,14 +93,16 @@ export const glAccountsHeaderConfig: HeaderConfig = {
           type: 'dropdown',
           options: [
             {
-              label: 'Income statement',
-              value: 'income_statement',
+              label: 'Income Statement',
+              value: 0,
             },
             {
-              label: 'Balance sheet',
-              value: 'balance_sheet',
+              label: 'Balance Sheet',
+              value: 1,
             },
           ],
+          valueType: 'integer',
+          defaultValue: 0,
         },
         {
           key: 'accountCategory',
@@ -101,30 +110,36 @@ export const glAccountsHeaderConfig: HeaderConfig = {
           type: 'dropdown',
           options: [
             {
+              label: ' ',
+              value: 0,
+            },
+            {
               label: 'Assets',
-              value: 'assets',
+              value: 1,
             },
             {
               label: 'Liabilities',
-              value: 'liabilities',
+              value: 2,
             },
             {
               label: 'Equity',
-              value: 'equity',
+              value: 3,
             },
             {
               label: 'Income',
-              value: 'income',
+              value: 4,
             },
             {
-              label: 'Cost of goods sold',
-              value: 'cost_of_goods_sold',
+              label: 'Cost of Goods Sold',
+              value: 5,
             },
             {
               label: 'Expense',
-              value: 'expense',
+              value: 6,
             },
           ],
+          valueType: 'integer',
+          defaultValue: 0,
         },
         {
           key: 'totaling',
@@ -162,6 +177,7 @@ export const glAccountsListConfig: ListPageConfig & {
     endpoint: '/glAccounts',
     keyField: 'systemId',
     defaultSort: 'number asc',
+    headerPKProp: 'number',
   },
   identity: {
     primaryField: 'number',

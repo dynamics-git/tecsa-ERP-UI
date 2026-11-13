@@ -27,10 +27,11 @@ describe('RunModal navigation', () => {
   let runModal: RunModalService;
   let requests: string[];
   let fixture: ComponentFixture<RunModalHost>;
-  const header = { systemId: 'PO-1', number: 'PO-1', buyFromVendorName: 'Fixture Vendor', status: 'Open' };
+  const header = { systemId: 'PO-1', documentType: 1, number: 'PO-1', buyFromVendorName: 'Fixture Vendor', status: 0 };
   const line = {
     systemId: 'LINE-1',
-    documentNo: 'PO-1',
+    documentType: 1,
+    documentNumber: 'PO-1',
     lineNo: 10000,
     description: 'Fixture line',
     quantity: 2,
@@ -43,9 +44,9 @@ describe('RunModal navigation', () => {
       get: (endpoint) => {
         requests.push(endpoint);
         return of({
-          value: endpoint.startsWith('/purchaseOrderHeaders')
+          value: endpoint.startsWith('/purchaseHeaders')
             ? [{ ...header }]
-            : endpoint.startsWith('/purchaseOrderLines')
+            : endpoint.startsWith('/purchaseLines')
               ? [{ ...line }]
               : [],
         });
@@ -97,7 +98,7 @@ describe('RunModal navigation', () => {
     const child = popups[1];
     expect(configFor(child).headerData!['number']).toBe('PO-1');
     expect(configFor(child).lineRows![0]['description']).toBe('Fixture line');
-    expect(requests.some((endpoint) => endpoint.startsWith('/purchaseOrderLines') && endpoint.includes('PO-1'))).toBe(
+    expect(requests.some((endpoint) => endpoint.startsWith('/purchaseLines') && endpoint.includes('PO-1'))).toBe(
       true,
     );
     await fixture.componentInstance.closePopup(child);

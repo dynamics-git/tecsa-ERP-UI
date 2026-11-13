@@ -118,7 +118,7 @@ export class DocumentConfigDataService {
 
       if (column.defaultValue !== undefined) { row[field] = fieldDefaultValue(column); continue; }
       if (field === typeField) {
-        row[field] = defaultType;
+        row[field] = normalizeFieldValue(defaultType, resolvedValueType(column));
         continue;
       }
 
@@ -235,7 +235,7 @@ export class DocumentConfigDataService {
   ): unknown {
     const value = record[field];
     if (field === typeField) {
-      return this.lineMasters.resolveType(value, registry);
+      return normalizeFieldValue(this.lineMasters.resolveType(value, registry), resolvedValueType(column));
     }
 
     if (resolvedValueType(column) === 'number') {

@@ -145,14 +145,14 @@ describe('Login-owned Company permissions', () => {
     const operation=firstValueFrom(auth.login({email:user.email,password:'pass'}));
     const value={...grants(a,true),pages:[
       {pageId:'items',apiPath:'/items',pageCode:'items',canRead:true,canCreate:true,canUpdate:true,canDelete:true},
-      {pageId:'itemUnitsOfMeasure',apiPath:'/items/{itemSystemId}/unitsOfMeasure',pageCode:'items',canRead:true,canCreate:false,canUpdate:false,canDelete:false},
-      {pageId:'numberSeries',apiPath:'/numberSeries',pageCode:'number_series',canRead:true,canCreate:true,canUpdate:true,canDelete:true}]};
+      {pageId:'itemUnitsOfMeasure',apiPath:'/itemUnitsOfMeasure',pageCode:'items',canRead:true,canCreate:false,canUpdate:false,canDelete:false},
+      {pageId:'noSeries',apiPath:'/noSeries',pageCode:'no_series',canRead:true,canCreate:true,canUpdate:true,canDelete:true}]};
     http.expectOne(loginUrl).flush(login([a],a,value));
     await operation;
     const rows=session.Permissions as Record<string,unknown>[];
     expect(rows.find(row=>row['pageId']==='items')?.['canDelete']).toBe(true);
     expect(rows.find(row=>row['pageId']==='items-lines')?.['canDelete']).toBe(false);
-    expect(rows.find(row=>row['pageId']==='no-series')?.['apiPath']).toBe('/numberSeries');
+    expect(rows.find(row=>row['pageId']==='no-series')?.['apiPath']).toBe('/noSeries');
     expect(session.SuperAdmin).toBe(true);
   });
 });

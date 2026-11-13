@@ -38,7 +38,6 @@ export * from './document/line-command.service';
 export * from './data/line-master.service';
 export * from './pages/list-filter-state.service';
 export * from './pages/list-filter.service';
-export * from './data/master-data.service';
 export * from './pages/page-command.service';
 export * from './run-modal/run-modal-stack-policy.token';
 export * from './run-modal/run-modal-stack.service';

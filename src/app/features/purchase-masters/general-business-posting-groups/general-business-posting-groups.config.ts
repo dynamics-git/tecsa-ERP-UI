@@ -23,21 +23,15 @@ export const generalBusinessPostingGroupsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 20,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -46,18 +40,22 @@ export const generalBusinessPostingGroupsHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'defaultVatBusinessPostingGroupId',
+          key: 'defVatBusPostingGroup',
           label: 'Default VAT Business Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/vatBusinessPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
         },
       ],
     },
@@ -75,6 +73,7 @@ export const generalBusinessPostingGroupsListConfig: ListPageConfig & {
     endpoint: '/generalBusinessPostingGroups',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',
@@ -97,13 +96,10 @@ export const generalBusinessPostingGroupsListConfig: ListPageConfig & {
         field: 'description',
       },
       {
-        field: 'defaultVatBusinessPostingGroupId',
+        field: 'defVatBusPostingGroup',
         width: '140px',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

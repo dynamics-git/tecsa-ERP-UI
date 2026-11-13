@@ -19,6 +19,13 @@ export const dimensionCombinationsHeaderConfig: HeaderConfig = {
       order: 40,
       runModalPageId: 'dimension-value-combinations',
       runModalTarget: 'entry',
+      runModalRecord: {
+        source: 'header',
+        fields: {
+          dimension1Code: 'dimension1Code',
+          dimension2Code: 'dimension2Code',
+        },
+      },
     },
   ],
   sections: [
@@ -27,25 +34,21 @@ export const dimensionCombinationsHeaderConfig: HeaderConfig = {
       title: 'General',
       fields: [
         {
-          key: 'combinationType',
+          key: 'combinationRestriction',
           label: 'Combination Type',
           type: 'dropdown',
-          defaultValue: 'no_limitation',
-          required: true,
+          defaultValue: 0,
           options: [
             {
-              label: 'No limitation',
-              value: 'no_limitation',
-            },
-            {
               label: 'Limited',
-              value: 'limited',
+              value: 0,
             },
             {
               label: 'Blocked',
-              value: 'blocked',
+              value: 1,
             },
           ],
+          valueType: 'integer',
         },
       ],
     },
@@ -54,34 +57,44 @@ export const dimensionCombinationsHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'dimension1Id',
+          key: 'dimension1Code',
           label: 'Dimension1',
           type: 'lookup',
-          valueType: 'guid',
+          valueType: 'code',
           required: true,
           readonlyAfterCreate: true,
           lookup: {
             endpoint: '/dimensions',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [name]',
+          validation: {
+            maxLength: 20,
+          },
+          defaultValue: '',
         },
         {
-          key: 'dimension2Id',
+          key: 'dimension2Code',
           label: 'Dimension2',
           type: 'lookup',
-          valueType: 'guid',
+          valueType: 'code',
           required: true,
           readonlyAfterCreate: true,
           lookup: {
             endpoint: '/dimensions',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [name]',
+          validation: {
+            maxLength: 20,
+          },
+          defaultValue: '',
         },
       ],
     },
@@ -98,10 +111,10 @@ export const dimensionCombinationsListConfig: ListPageConfig & {
   dataSource: {
     endpoint: '/dimensionCombinations',
     keyField: 'systemId',
-    defaultSort: 'dimension1Id asc',
+    defaultSort: 'dimension1Code asc',
   },
   identity: {
-    primaryField: '__display_dimension1Id',
+    primaryField: '__display_dimension1Code',
   },
   module: 'Finance',
   menu: {
@@ -114,14 +127,14 @@ export const dimensionCombinationsListConfig: ListPageConfig & {
   dataSurface: {
     columns: listColumns(dimensionCombinationsHeaderConfig, [
       {
-        field: 'dimension1Id',
+        field: 'dimension1Code',
       },
       {
-        field: 'dimension2Id',
+        field: 'dimension2Code',
         width: '140px',
       },
       {
-        field: 'combinationType',
+        field: 'combinationRestriction',
         width: '140px',
       },
       {

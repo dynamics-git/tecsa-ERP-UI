@@ -48,7 +48,7 @@ describe('Header / Lines load priority', () => {
     fixture.componentRef.setInput('headerConfig', {
       sections: [{ id: 'general', title: 'General', fields: [
         { key: 'code', label: 'Code' },
-        { key: 'vendorCode', label: 'Vendor', type: 'dropdown', api: '/legacyVendors', lookup: { endpoint: '/vendors', valueField: 'code', displayField: 'name' } },
+        { key: 'vendorCode', label: 'Vendor', type: 'lookup', lookup: { endpoint: '/vendors', valueField: 'code', displayField: 'name' } },
       ] }],
     });
     fixture.componentRef.setInput('lineConfig', {
@@ -68,7 +68,7 @@ describe('Header / Lines load priority', () => {
     expect(active?.headerData['code']).toBe('PO-1');
     expect(active?.lineRows.some(row => row['description'] === 'First line')).toBe(true);
     await vi.waitFor(() => expect(get.mock.calls.filter(([endpoint]) => endpoint === '/vendors/V-1')).toHaveLength(1));
-    expect(get.mock.calls.filter(([endpoint]) => endpoint.startsWith('/vendors?'))).toHaveLength(1);
+    expect(get.mock.calls.filter(([endpoint]) => endpoint.startsWith('/vendors?'))).toHaveLength(0);
     expect(active?.headerData['__display_vendorCode']).toBeUndefined();
 
     pendingCaption.next({data: {systemId: 'V-1', code: 'V-1', name: 'Vendor One'}});pendingCaption.complete();

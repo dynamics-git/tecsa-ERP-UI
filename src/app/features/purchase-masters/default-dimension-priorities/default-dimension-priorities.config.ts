@@ -6,13 +6,11 @@ import {
 } from '../../../platform/public-api';
 import { defaultDimensionPrioritiesFactBoxConfig } from './default-dimension-priorities.factbox.config';
 const defaultDimensionPrioritiesDataSource: DataSourceConfig = {
-  endpoint: '/sourceCodes',
   keyField: 'systemId',
-  navigation: {
-    parentEndpoint: '/sourceCodes',
-    parentIdFields: ['systemId'],
-    childCollection: 'defaultDimensionPriorities',
-  },
+  endpoint: '/defaultDimensionPriorities',
+  headerPKProp: 'code',
+  lineFKProp: 'sourceCode',
+  defaultSort: 'priority asc',
   pageSize: 20,
 };
 
@@ -56,49 +54,20 @@ export const defaultDimensionPrioritiesLineConfig: LineConfig = {
   toolbarButtons: [],
   columns: [
     {
-      id: 'sourceType',
-      label: 'Source Type',
-      type: 'dropdown',
+      id: 'tableId',
+      label: 'Table ID',
+      type: 'integer',
       required: true,
       readonlyAfterCreate: true,
-      options: [
-        {
-          label: 'Gl account',
-          value: 'gl_account',
-        },
-        {
-          label: 'Vendor',
-          value: 'vendor',
-        },
-        {
-          label: 'Item',
-          value: 'item',
-        },
-        {
-          label: 'Customer',
-          value: 'customer',
-        },
-        {
-          label: 'Bank account',
-          value: 'bank_account',
-        },
-      ],
     },
     {
       id: 'priority',
       label: 'Priority',
       type: 'integer',
-      required: true,
       validation: {
         min: 1,
         max: 2147483647,
       },
-    },
-    {
-      id: 'isActive',
-      label: 'Is Active',
-      type: 'boolean',
-      defaultValue: true,
     },
   ],
 };

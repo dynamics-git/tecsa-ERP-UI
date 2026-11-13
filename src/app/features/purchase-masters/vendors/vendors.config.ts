@@ -19,6 +19,12 @@ export const vendorsHeaderConfig: HeaderConfig = {
       order: 40,
       runModalPageId: 'vendor-default-dimensions',
       runModalTarget: 'entry',
+      runModalRecord: {
+        source: 'header',
+        fields: {
+          number: 'number',
+        },
+      },
     },
   ],
   sections: [
@@ -34,12 +40,12 @@ export const vendorsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 20,
           },
+          required: true,
         },
         {
           key: 'name',
           label: 'Name',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
@@ -47,7 +53,7 @@ export const vendorsHeaderConfig: HeaderConfig = {
         {
           key: 'searchName',
           label: 'Search Name',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 100,
           },
@@ -61,11 +67,11 @@ export const vendorsHeaderConfig: HeaderConfig = {
           },
         },
         {
-          key: 'taxRegistrationNumber',
+          key: 'vatRegistrationNo',
           label: 'Tax Registration Number',
           type: 'text',
           validation: {
-            maxLength: 50,
+            maxLength: 20,
           },
         },
         {
@@ -80,21 +86,22 @@ export const vendorsHeaderConfig: HeaderConfig = {
           key: 'blocked',
           label: 'Blocked',
           type: 'dropdown',
-          defaultValue: 'none',
+          defaultValue: 0,
           options: [
             {
-              label: 'None',
-              value: 'none',
+              label: ' ',
+              value: 0,
             },
             {
               label: 'Payment',
-              value: 'payment',
+              value: 1,
             },
             {
               label: 'All',
-              value: 'all',
+              value: 2,
             },
           ],
+          valueType: 'integer',
         },
       ],
     },
@@ -131,46 +138,58 @@ export const vendorsHeaderConfig: HeaderConfig = {
           displayFormat: '[code] — [description]',
         },
         {
-          key: 'vendorPostingGroupId',
+          key: 'vendorPostingGroup',
           label: 'Vendor Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/vendorPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'generalBusinessPostingGroupId',
+          key: 'genBusPostingGroup',
           label: 'General Business Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/generalBusinessPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
-          key: 'vatBusinessPostingGroupId',
+          key: 'vatBusPostingGroup',
           label: 'Vat Business Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/vatBusinessPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
         },
         {
           key: 'currencyId',
@@ -217,23 +236,23 @@ export const vendorsHeaderConfig: HeaderConfig = {
           },
         },
         {
-          key: 'state',
+          key: 'county',
           label: 'State',
           type: 'text',
           validation: {
-            maxLength: 50,
+            maxLength: 30,
           },
         },
         {
-          key: 'postalCode',
+          key: 'postCode',
           label: 'Postal Code',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 20,
           },
         },
         {
-          key: 'countryCode',
+          key: 'countryRegionCode',
           label: 'Country Code',
           type: 'code',
           validation: {
@@ -249,7 +268,7 @@ export const vendorsHeaderConfig: HeaderConfig = {
           },
         },
         {
-          key: 'phoneNumber',
+          key: 'phoneNo',
           label: 'Phone Number',
           type: 'text',
           validation: {
@@ -257,15 +276,15 @@ export const vendorsHeaderConfig: HeaderConfig = {
           },
         },
         {
-          key: 'email',
+          key: 'eMail',
           label: 'Email',
           type: 'email',
           validation: {
-            maxLength: 255,
+            maxLength: 80,
           },
         },
         {
-          key: 'website',
+          key: 'homePage',
           label: 'Website',
           type: 'url',
           validation: {
@@ -318,7 +337,7 @@ export const vendorsListConfig: ListPageConfig & {
         width: '140px',
       },
       {
-        field: 'email',
+        field: 'eMail',
         width: '240px',
       },
       {
@@ -326,7 +345,7 @@ export const vendorsListConfig: ListPageConfig & {
         width: '140px',
       },
       {
-        field: 'countryCode',
+        field: 'countryRegionCode',
         width: '140px',
       },
       {

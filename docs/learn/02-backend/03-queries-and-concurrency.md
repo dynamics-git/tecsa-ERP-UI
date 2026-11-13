@@ -1,5 +1,17 @@
 # Query, write and handle concurrency
 
+## Publish schema metadata only after commit — 13 November 2026
+
+Cold PostgreSQL catalogue results read within a transaction are published to the
+shared schema cache only after commit, and only if its generation has not
+changed since the transaction began and the read occurred. Rollback discards
+publication. A connection that has executed schema DDL bypasses shared reads
+and publication until its outer transaction ends. Dirty state is isolated by
+connection so completing another connection cannot clear the writer's guard.
+DDL and transaction completion retain generation invalidation. This cache stores
+catalogue metadata only; authorization and product records use their existing
+separate mechanisms. No installed schema or API contract is changed.
+
 ## Return unchanged ordinary PATCH records without another SELECT
 
 After the normal permission, locked-record, version and validation checks, a

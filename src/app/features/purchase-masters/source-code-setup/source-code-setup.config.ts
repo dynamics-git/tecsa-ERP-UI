@@ -29,6 +29,9 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'description'],
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
         {
           key: 'sales',
@@ -44,6 +47,9 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'description'],
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
         {
           key: 'purchases',
@@ -59,6 +65,9 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'description'],
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
         {
           key: 'cashReceiptJournal',
@@ -74,6 +83,9 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'description'],
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
         {
           key: 'paymentJournal',
@@ -89,6 +101,9 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'description'],
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
         {
           key: 'itemJournal',
@@ -104,6 +119,9 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'description'],
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
         {
           key: 'exchangeRateAdjmt',
@@ -119,6 +137,9 @@ export const sourceCodeSetupHeaderConfig: HeaderConfig = {
             searchFields: ['code', 'description'],
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
       ],
     },

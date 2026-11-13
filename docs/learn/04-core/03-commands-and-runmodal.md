@@ -1,5 +1,11 @@
 # Commands and RunModal navigation
 
+Related worksheets validate their configured parent context before opening,
+including ordinary collection sources with `lineFKProp` as well as explicit
+navigation paths. Missing business-key members leave the current popup unchanged.
+Composite parent bindings must supply every member. This guard uses the declared
+relationship; it does not substitute the parent's CRUD `systemId` for a code.
+
 Standard commands come from shared core. Declare custom business actions or navigation through CommandConfig, with stable keys and existing icons.
 
 ## Shared presentation tokens

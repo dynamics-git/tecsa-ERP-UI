@@ -20,14 +20,14 @@ export const accountingPeriodsHeaderConfig: HeaderConfig = {
           label: 'Starting Date',
           type: 'date',
           required: true,
+          readonlyAfterCreate: true,
         },
         {
           key: 'name',
           label: 'Name',
           type: 'text',
-          required: true,
           validation: {
-            maxLength: 50,
+            maxLength: 10,
           },
         },
         {
@@ -52,6 +52,7 @@ export const accountingPeriodsListConfig: ListPageConfig & {
     endpoint: '/accountingPeriods',
     keyField: 'systemId',
     defaultSort: 'startingDate asc',
+    headerPKProp: 'startingDate',
   },
   identity: {
     primaryField: 'startingDate',

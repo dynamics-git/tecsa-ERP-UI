@@ -55,23 +55,23 @@ const pages = pageIds.map(
 );
 
 describe('Purchase master configuration integration', () => {
-  it('covers all 28 master surfaces with explicit capabilities and no duplicated FactBoxes', () => {
+  it('covers all 28 master surfaces using the installed API field identities and no duplicated FactBoxes', () => {
     expect(pages).toHaveLength(28);
     for (const page of pages) {
       expect(page).toBeDefined();
       expect(page.factBox?.enabled).toBe(true);
-      expect(page.dataSource?.supportsDelete).toBeUndefined();
+      expect(page.dataSource?.supportsDelete).toBe(page.dataSource?.singleton ? false : undefined);
       expect(page.dataSource?.keyField).toBe('systemId');
       expect(page.dataSource?.endpoint).toMatch(/^\/[A-Za-z]+$/);
       expect(page.menu?.route).toBe('/' + page.pageId);
-      expect(page.dataSurface?.columns.length).toBeGreaterThanOrEqual(4);
+      expect(page.dataSurface?.columns.length).toBeGreaterThanOrEqual(3);
       const module = featurePageModules.find((module) => Object.values(module).includes(page));
       const header = Object.entries(module!).find(([key]) => key.endsWith('HeaderConfig'))![1] as HeaderConfig;
       for (const field of header.sections.flatMap((section) => section.fields)) {
         expect(field.valueType ?? field.type).toBeDefined();
         if (field.type === 'lookup') {
-          expect(field.valueType).toBe('guid');
-          expect(field.lookup?.valueField).toBe('systemId');
+          expect(['code', 'guid']).toContain(field.valueType);
+          expect(field.lookup?.valueField).toBe(field.valueType === 'guid' ? 'systemId' : field.lookup?.displayField);
           expect(field.lookup?.endpoint).not.toContain('API');
         }
       }
@@ -196,13 +196,13 @@ describe('Purchase master configuration integration', () => {
 
   it('opens a complete list item immediately without another header or selected-UOM request or a document loader',async()=>{
     const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
-    const item={...Object.fromEntries(itemsHeaderConfig.sections.flatMap(section=>section.fields).map(field=>[field.key,null])),systemId:'item-reused',number:'REUSE',description:'Reuse',baseUnitOfMeasureId:'unit-reused',systemRowVersion:1};
+    const item={...Object.fromEntries(itemsHeaderConfig.sections.flatMap(section=>section.fields).map(field=>[field.key,null])),systemId:'item-reused',number:'REUSE',description:'Reuse',baseUnitOfMeasure:'EA',systemRowVersion:1};
     const get=vi.fn((url:string)=>url.endsWith('/apiCapabilities') ? of({data:{contractVersion:'1.0',entities:{},endpoints:[]}}) : url.startsWith('/items?') ? of({data:[item],meta:{total:1,recordShape:'complete'}}) : url.startsWith('/unitsOfMeasure?') ? of({data:[{systemId:'unit-reused',code:'EA',description:'Each',systemRowVersion:1}],meta:{total:1,recordShape:'complete'}}) : of({data:[],meta:{total:0}}));
     TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
     TestBed.inject(SessionService).SuperAdmin=true;
     const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
     const page=fixture.debugElement.query(By.directive(ListPage)).componentInstance as ListPage;
-    await vi.waitFor(()=>expect((page.rows[0] as any)?.__display_baseUnitOfMeasureId).toBe('EA — Each'));
+    await vi.waitFor(()=>expect((page.rows[0] as any)?.__display_baseUnitOfMeasure).toBe('EA'));
     get.mockClear();page.openRecord(page.rows[0]);
     await fixture.whenStable();fixture.detectChanges();
     let card!:ListPage;
@@ -219,7 +219,7 @@ describe('Purchase master configuration integration', () => {
   it('reuses all selected card fields across close/open and row changes beyond the HTTP cache TTL',async()=>{
     const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
     const empty=Object.fromEntries(itemsHeaderConfig.sections.flatMap(section=>section.fields).map(field=>[field.key,null]));
-    const rows=['a','b'].map(id=>({...empty,systemId:id,number:id,description:id,baseUnitOfMeasureId:'unit',generalProductPostingGroupId:'group',systemRowVersion:1}));
+    const rows=['a','b'].map(id=>({...empty,systemId:id,number:id,description:id,baseUnitOfMeasure:'EA',genProdPostingGroup:'TRADE',systemRowVersion:1}));
     const get=vi.fn((url:string)=>url.endsWith('/apiCapabilities') ? of({data:{contractVersion:'1.0',entities:{},endpoints:[]}}) : url.startsWith('/items?') ? of({data:rows,meta:{total:2,recordShape:'complete'}})
       : url.startsWith('/unitsOfMeasure?') ? of({data:[{systemId:'unit',code:'EA',description:'Each',systemRowVersion:1}],meta:{recordShape:'complete'}})
       : url.startsWith('/generalProductPostingGroups?') ? of({data:[{systemId:'group',code:'TRADE',description:'Trade',systemRowVersion:1}],meta:{recordShape:'complete'}})
@@ -235,7 +235,7 @@ describe('Purchase master configuration integration', () => {
         page.openRecord(page.rows[index]);await fixture.whenStable();fixture.detectChanges();
         let card!:ListPage;
         await vi.waitFor(()=>{fixture.detectChanges();card=fixture.debugElement.queryAll(By.directive(ListPage)).map(e=>e.componentInstance as ListPage).find(p=>p.documentOnly)!;expect(card?.inlineDocumentWindowConfig?.contentReady).toBe(true);});
-        expect(card.inlineDocumentWindowConfig!.headerData!['__display_generalProductPostingGroupId']).toBe('TRADE — Trade');
+        expect(card.inlineDocumentWindowConfig!.headerData!['__display_genProdPostingGroup']).toBe('TRADE');
         expect(card.popupLoading).toBe(false);expect(get.mock.calls.filter(([url])=>!url.endsWith('/apiCapabilities'))).toHaveLength(0);
         await card.requestClose();await fixture.whenStable();fixture.detectChanges();
       }
@@ -243,12 +243,11 @@ describe('Purchase master configuration integration', () => {
     }finally{now.mockRestore();fixture.destroy();}
   });
 
-  it('keeps a cold header visibly loading until its selected values are prepared', async () => {
+  it('keeps a cold header loading until its record arrives, then displays its saved UOM code without another read', async () => {
     const route = routes.find(route => route.path === '')!.children!.find(route => route.path === 'items')!;
     const caption = new Subject<unknown>();
     const get = vi.fn((url: string) => url.includes('/items/saved-item')
-      ? of({data:{systemId:'saved-item',number:'ITEM-1',description:'Item',baseUnitOfMeasureId:'saved-unit'}})
-      : url.startsWith('/unitsOfMeasure?') ? caption : of({data:[],meta:{total:0}}));
+      ? caption : of({data:[],meta:{total:0}}));
     TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
     TestBed.inject(SessionService).SuperAdmin=true;
     const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
@@ -256,9 +255,10 @@ describe('Purchase master configuration integration', () => {
     page.documentOnly=true;page.openRecord({systemId:'saved-item',number:'ITEM-1'});
     await vi.waitFor(()=>expect(caption.observers.length).toBeGreaterThan(0));
     fixture.detectChanges();expect(page.inlineDocumentWindowConfig?.contentReady).toBe(false);expect(page.popupLoading).toBe(true);
-    caption.next({data:[{systemId:'saved-unit',code:'EA',description:'Each'}],meta:{total:1}});caption.complete();
+    caption.next({data:{systemId:'saved-item',number:'ITEM-1',description:'Item',baseUnitOfMeasure:'EA'}});caption.complete();
     await vi.waitFor(()=>{fixture.detectChanges();expect(page.inlineDocumentWindowConfig?.contentReady).toBe(true);expect(page.popupLoading).toBe(false);});
     expect(fixture.nativeElement.querySelector('app-dynamic-form').textContent).toBeTruthy();
+    expect(get.mock.calls.some(([url]) => url.startsWith('/unitsOfMeasure'))).toBe(false);
     fixture.destroy();
   });
 
@@ -338,18 +338,16 @@ describe('Purchase master configuration integration', () => {
     }
   });
 
-  it('prepares selected header values before publishing a new list-page snapshot', async () => {
+  it('publishes a saved business code without waiting for a separate lookup request', async () => {
     const route=routes.find(route=>route.path==='')!.children!.find(route=>route.path==='items')!;
-    const caption=new Subject<unknown>();
-    const get=vi.fn((url:string)=>url.startsWith('/unitsOfMeasure?') ? caption : of({data:[{systemId:'item-1',number:'ITEM-1',description:'Item',baseUnitOfMeasureId:'unit-1'}],meta:{total:1}}));
+    const get=vi.fn((_url:string)=>of({data:[{systemId:'item-1',number:'ITEM-1',description:'Item',baseUnitOfMeasure:'EA'}],meta:{total:1}}));
     TestBed.configureTestingModule({imports:[route.component!],providers:[provideRouter([]),...providePlatformGovernance(),{provide:DATA_REST_SERVICE,useValue:{get}}]});
     TestBed.inject(SessionService).SuperAdmin=true;
     const fixture=TestBed.createComponent(route.component!);fixture.detectChanges();
     const page=fixture.debugElement.query(By.directive(ListPage)).componentInstance as ListPage;
-    await vi.waitFor(()=>expect(caption.observers.length).toBeGreaterThan(0));
-    expect(page.rows).toHaveLength(0);expect(page.loading).toBe(true);
-    caption.next({data:[{systemId:'unit-1',code:'EA',description:'Each'}],meta:{total:1}});caption.complete();
-    await vi.waitFor(()=>expect((page.rows[0] as any)?.__display_baseUnitOfMeasureId).toBe('EA — Each'));
+    await vi.waitFor(()=>expect((page.rows[0] as any)?.__display_baseUnitOfMeasure).toBe('EA'));
+    expect(page.loading).toBe(false);
+    expect(get.mock.calls.some(([url]) => url.startsWith('/unitsOfMeasure'))).toBe(false);
     fixture.destroy();
   });
 

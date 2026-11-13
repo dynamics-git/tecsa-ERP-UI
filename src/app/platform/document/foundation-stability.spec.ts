@@ -184,7 +184,7 @@ describe('PR document field layout follows its existing API', () => {
     const titles = [...fixture.nativeElement.querySelectorAll('.entry-work > .entry-section > .section-title h3')].map((element: any) => element.textContent.trim());
     expect(titles).toEqual(['General', 'Lines', 'Request Details', 'Processing']);
     const source = headerDataSourceDefaults(purchaseRequisitionListConfig.dataSource, purchaseRequisitionHeaderConfig);
-    expect(source.updateFields).toContain('locationId');
+    expect(source.updateFields).toContain('locationCode');
     for (const field of ['status', 'conversionStatus', 'purchaseOrderCount', 'statusChangedAt', 'systemCreatedAt', 'systemModifiedAt']) {
       expect(source.createFields).not.toContain(field);
       expect(source.updateFields).not.toContain(field);
@@ -197,7 +197,7 @@ describe('PR document field layout follows its existing API', () => {
       { label: 'Total Incl. SST', source: 'total', totalKey: 'total' },
     ]);
     const lines = lineConfigDefaults(purchaseRequisitionLineConfig);
-    expect(lines.dataSource.updateFields).toEqual(expect.arrayContaining(['unitOfMeasureId', 'locationId']));
+    expect(lines.dataSource.updateFields).toEqual(expect.arrayContaining(['unitOfMeasureCode', 'locationCode']));
     for (const field of ['qtyPerUnitOfMeasure', 'convertedQuantity', 'remainingQuantity', 'estimatedAmount']) expect(lines.dataSource.updateFields).not.toContain(field);
     fixture.destroy();
   });

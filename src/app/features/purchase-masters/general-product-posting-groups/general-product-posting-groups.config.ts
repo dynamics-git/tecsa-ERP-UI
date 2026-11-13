@@ -23,21 +23,15 @@ export const generalProductPostingGroupsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 20,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -46,18 +40,22 @@ export const generalProductPostingGroupsHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'defaultVatProductPostingGroupId',
+          key: 'defVatProdPostingGroup',
           label: 'Default VAT Product Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/vatProductPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 20,
+          },
         },
       ],
     },
@@ -75,6 +73,7 @@ export const generalProductPostingGroupsListConfig: ListPageConfig & {
     endpoint: '/generalProductPostingGroups',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',
@@ -97,13 +96,10 @@ export const generalProductPostingGroupsListConfig: ListPageConfig & {
         field: 'description',
       },
       {
-        field: 'defaultVatProductPostingGroupId',
+        field: 'defVatProdPostingGroup',
         width: '140px',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

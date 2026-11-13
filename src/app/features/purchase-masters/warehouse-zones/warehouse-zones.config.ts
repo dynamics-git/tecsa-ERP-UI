@@ -29,16 +29,9 @@ export const warehouseZonesHeaderConfig: HeaderConfig = {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -47,19 +40,24 @@ export const warehouseZonesHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'locationId',
+          key: 'locationCode',
           label: 'Location',
           type: 'lookup',
-          valueType: 'guid',
+          valueType: 'code',
           required: true,
           readonlyAfterCreate: true,
           lookup: {
             endpoint: '/locations',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [name]',
+          validation: {
+            maxLength: 10,
+          },
+          defaultValue: '',
         },
       ],
     },
@@ -93,7 +91,7 @@ export const warehouseZonesListConfig: ListPageConfig & {
   dataSurface: {
     columns: listColumns(warehouseZonesHeaderConfig, [
       {
-        field: 'locationId',
+        field: 'locationCode',
       },
       {
         field: 'code',
@@ -103,10 +101,7 @@ export const warehouseZonesListConfig: ListPageConfig & {
         field: 'description',
         width: '280px',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

@@ -2,6 +2,48 @@
 
 Use the same feature-folder pattern as Users and Purchase Requisition. Start from an existing reference page and change its business fields, rather than rebuilding editors, save handling or navigation.
 
+## Installed API alignment — 13 November 2026
+
+Master and setup configs now use the installed table/API field names, integer
+enum ordinals, decimal precision and business-code references. For example,
+posting setup stores `genBusPostingGroup`/`genProdPostingGroup`, setup number
+series store codes from `/noSeries`, and Vendors uses `vendorPostingGroup`,
+`vatRegistrationNo`, `postCode` and `eMail`. Existing UUID reference columns
+such as Vendor `paymentTermsId` remain UUIDs where the actual API declares them.
+Do not mechanically turn every relationship into either a UUID or a code.
+
+Unsupported legacy fields, including `isActive` on tables without that column,
+are removed from editors, list columns and FactBoxes. Descriptions and names
+are not blanket create prerequisites. Keep an explicit prerequisite when the
+API requires it or a manual business key must exist before creating children.
+Backend constraints and authentication rules remain authoritative.
+
+Related worksheets use ordinary collection endpoints: `/dimensionValues`,
+`/dimensionValueCombinations`, `/currencyExchangeRates`, `/itemUnitsOfMeasure`,
+`/defaultDimensions` and `/defaultDimensionPriorities`. Declare business parent
+bindings with `headerPKProp`, `lineFKProp`, `parentFieldMap` and, when needed,
+`parentFixedFields`. Dimension combinations bind both dimension codes; default
+dimensions also constrain `tableId` to the actual backend Table object identity.
+These are stored business fields, not an additional frontend source registry.
+
+RunModal explicitly maps the header or selected line's business values. A
+Dimension card receives `code: dimensionCode`, not a code labelled `systemId`.
+The shared card probe resolves exactly one API record before opening it.
+
+Purchase Order now follows the same ordinary CRUD pattern as PR, using
+`/purchaseHeaders` and `/purchaseLines`. Its fixed Order scope is integer
+`documentType: 1`; Lines bind both `documentType` and `documentNumber`. Its
+header has no published number allocator, so enter a manual No. before create.
+Existing backend line numbering remains in use. Placeholder posting, approval
+and release buttons have been removed; those processes remain separate work.
+Balancing Account No. on Payment Methods is one code field for the selected
+account type; a conditional account picker is not introduced in this correction.
+
+Notification Setup retains its existing coherent Save behavior: its backend
+policy validates event/template tokens and recipient mode with its selected
+recipient together. It is an existing business configuration exception, not an
+alternative ordinary master CRUD pattern. No notification policy is changed here.
+
 ## Four CRUD references — 7 November 2026
 
 Use these four existing features as the current configuration examples:
@@ -36,8 +78,8 @@ stored master-ID columns. Existing FactBox sections, menu, actions and calculati
 declarations are retained. Approval/conversion/posting actions remain deferred;
 their presence in configuration is not a claim that those backend commands work.
 
-PR currently requires a manually entered No. before draft creation. Selecting an
-optional number-series code does not generate a number in this CRUD phase.
+PR accepts either a manual No. or its configured backend number-series path.
+Its conditional No. prerequisite is separate from subsequent field PATCHes.
 The existing backend Enum supplies `documentTypeLabel` in record responses;
 an unsaved editor has no server-generated caption until its record is created.
 Do not substitute a frontend document-type constant or dictionary.

@@ -16,28 +16,22 @@ export const itemChargesHeaderConfig: HeaderConfig = {
       title: 'General',
       fields: [
         {
-          key: 'code',
+          key: 'number',
           label: 'Code',
           type: 'code',
           required: true,
           validation: {
             maxLength: 20,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -46,18 +40,22 @@ export const itemChargesHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'generalProductPostingGroupId',
+          key: 'genProdPostingGroup',
           label: 'General Product Posting Group',
           type: 'lookup',
-          valueType: 'guid',
-          required: true,
+          valueType: 'code',
           lookup: {
             endpoint: '/generalProductPostingGroups',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
+            recordRead: 'collection',
           },
-          displayFormat: '[code] — [description]',
+          displayFormat: '[number] — [description]',
+          validation: {
+            maxLength: 20,
+          },
+          defaultValue: '',
         },
       ],
     },
@@ -74,10 +72,11 @@ export const itemChargesListConfig: ListPageConfig & {
   dataSource: {
     endpoint: '/itemCharges',
     keyField: 'systemId',
-    defaultSort: 'code asc',
+    defaultSort: 'number asc',
+    headerPKProp: 'number',
   },
   identity: {
-    primaryField: 'code',
+    primaryField: 'number',
     secondaryField: 'description',
   },
   module: 'Inventory',
@@ -91,19 +90,16 @@ export const itemChargesListConfig: ListPageConfig & {
   dataSurface: {
     columns: listColumns(itemChargesHeaderConfig, [
       {
-        field: 'code',
+        field: 'number',
       },
       {
         field: 'description',
       },
       {
-        field: 'generalProductPostingGroupId',
+        field: 'genProdPostingGroup',
         width: '140px',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

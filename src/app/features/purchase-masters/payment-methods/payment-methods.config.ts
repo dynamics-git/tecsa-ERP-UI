@@ -23,41 +23,32 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 10,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
         },
         {
-          key: 'balancingAccountType',
+          key: 'balAccountType',
           label: 'Balancing Account Type',
           type: 'dropdown',
-          defaultValue: 'none',
+          defaultValue: 0,
           options: [
             {
-              label: 'None',
-              value: 'none',
+              label: 'G/L Account',
+              value: 0,
             },
             {
-              label: 'Gl account',
-              value: 'gl_account',
-            },
-            {
-              label: 'Bank account',
-              value: 'bank_account',
+              label: 'Bank Account',
+              value: 1,
             },
           ],
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
+          valueType: 'integer',
         },
       ],
     },
@@ -66,42 +57,12 @@ export const paymentMethodsHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'balancingGlAccountId',
-          label: 'Balancing G/L Account',
-          type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
-          hiddenWhen: {
-            field: 'balancingAccountType',
-            values: ['gl_account'],
-            negate: true,
+          key: 'balAccountNo',
+          label: 'Balancing Account No.',
+          type: 'code',
+          validation: {
+            maxLength: 20,
           },
-          lookup: {
-            endpoint: '/glAccounts',
-            valueField: 'systemId',
-            displayField: 'number',
-            searchFields: ['number', 'name'],
-          },
-          displayFormat: '[number] — [name]',
-        },
-        {
-          key: 'balancingBankAccountId',
-          label: 'Balancing Bank Account',
-          type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
-          hiddenWhen: {
-            field: 'balancingAccountType',
-            values: ['bank_account'],
-            negate: true,
-          },
-          lookup: {
-            endpoint: '/bankAccounts',
-            valueField: 'systemId',
-            displayField: 'number',
-            searchFields: ['number', 'name'],
-          },
-          displayFormat: '[number] — [name]',
         },
       ],
     },
@@ -119,6 +80,7 @@ export const paymentMethodsListConfig: ListPageConfig & {
     endpoint: '/paymentMethods',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',
@@ -141,21 +103,14 @@ export const paymentMethodsListConfig: ListPageConfig & {
         field: 'description',
       },
       {
-        field: 'balancingAccountType',
+        field: 'balAccountType',
         width: '140px',
       },
       {
-        field: 'balancingGlAccountId',
+        field: 'balAccountNo',
         width: '140px',
       },
-      {
-        field: 'balancingBankAccountId',
-        width: '140px',
-      },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

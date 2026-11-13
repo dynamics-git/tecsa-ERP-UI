@@ -156,7 +156,7 @@ export class RunModalService {
           this.failure = 'related-record-missing'; return false;
         }
       }
-      if (config.pageType === 'worksheet' && config.dataSource.navigation) {
+      if (config.pageType === 'worksheet' && (config.dataSource.navigation || config.dataSource.lineFKProp)) {
         try { this.data.relation(config.dataSource, record); }
         catch { this.failure = 'parent-context-missing'; return false; }
       }

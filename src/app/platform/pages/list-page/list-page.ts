@@ -33,7 +33,6 @@ import { LineCalculationService } from '../../document/line-calculation.service'
 import { LineCommandService } from '../../document/line-command.service';
 import { LineMasterRegistry, LineMasterService } from '../../data/line-master.service';
 import { ListFilterStateService } from '../list-filter-state.service';
-import { MasterDataService } from '../../data/master-data.service';
 import { PageCommandService } from '../page-command.service';
 import { RunModalStackService } from '../../run-modal/run-modal-stack.service';
 import { RUNTIME_TIMEOUT_POLICY, optionalRequestTimeout } from '../../data/runtime-timeout-policy.token';
@@ -102,7 +101,6 @@ export class ListPage implements OnInit, OnDestroy {
   private readonly deletes = inject(RecordDeleteService);
   private deleting = false;
   private readonly listFilterState = inject(ListFilterStateService);
-  private readonly masterData = inject(MasterDataService);
   private readonly pageCommands = inject(PageCommandService);
   private readonly confirmation = inject(ConfirmationService);
   private readonly popupStack = inject(RunModalStackService);
@@ -179,10 +177,6 @@ export class ListPage implements OnInit, OnDestroy {
     this.dirty = this.dirtyWorksheet;
   }
   private readonly loadingInstanceId = crypto.randomUUID();
-  private readonly loadedHeaderDropdownKeys = new Set<string>();
-  private readonly loadingHeaderDropdownKeys = new Set<string>();
-  private readonly loadedLineOptionKeys = new Set<string>();
-  private readonly loadingLineOptionKeys = new Set<string>();
 
   @ViewChild(DocumentWindow) private documentWindow?: DocumentWindow;
   /** Validate a developer-supplied value through the active editor and its normal save policy. */
@@ -257,7 +251,6 @@ export class ListPage implements OnInit, OnDestroy {
   }
   private activeDocumentWindowConfig?: DocumentWindowConfig;
   private optionFieldMap: Record<string, SelectOption[]> = {};
-  private headerDropdownRecords: Record<string, Record<string, unknown>[]> = {};
   private lineMasterRecordsByType: Record<string, Record<string, unknown>[]> = {};
   private lineMasterOptionsByType: Record<string, SelectOption[]> = {};
   private checkedRowKeys = new Set<string>();
@@ -425,7 +418,7 @@ export class ListPage implements OnInit, OnDestroy {
         lineSelectionChanged: (payload) => this.handleLineSelectionChanged(payload),
         headerChanged: (payload) => this.handleHeaderChanged(payload),
         autosave: (payload) => this.handleAutosave(payload),
-        command: (actionKey, payload) => this.handleEntryInteractionAction(actionKey, payload),
+        command: (actionKey) => this.handleEntryInteractionAction(actionKey),
         commands: {
           save: () => this.queueLocalAutosave(),
           apply: () => this.queueLocalAutosave(),
@@ -901,178 +894,11 @@ export class ListPage implements OnInit, OnDestroy {
     this.ensureTrailingEmptyRows();
   }
 
-  private handleEntryInteractionAction(actionKey: string, payload: unknown): void {
+  private handleEntryInteractionAction(actionKey: string): void {
     if (actionKey === 'line:interacted') {
       if (!this.hasReadyLineParent()) this.showLineParentError();
       return;
     }
-    if (actionKey === 'header:dropdown-opened') {
-      this.handleHeaderDropdownOpened(payload);
-      return;
-    }
-
-    if (actionKey === 'line:dropdown-opened') {
-      this.handleLineDropdownOpened(payload);
-    }
-  }
-
-  private handleHeaderDropdownOpened(payload: unknown): void {
-    if (!this.isRecord(payload)) {
-      return;
-    }
-
-    const fieldKey = this.toText(payload['fieldKey']).trim();
-    if (!fieldKey.length) {
-      return;
-    }
-
-    this.loadHeaderDropdownOptionsForField(fieldKey);
-  }
-
-  private handleLineDropdownOpened(payload: unknown): void {
-    if (!this.isRecord(payload) || !this.lineConfig) {
-      return;
-    }
-
-    const columnPayload = payload['column'];
-    if (!this.isRecord(columnPayload)) {
-      return;
-    }
-
-    const rowPayload = payload['row'];
-    const row = this.isRecord(rowPayload) ? rowPayload : undefined;
-    const field = this.toText(columnPayload['field'] ?? columnPayload['id']).trim();
-    if (!field.length) {
-      return;
-    }
-
-    this.loadLineDropdownOptionsForField(field, row);
-  }
-
-  private loadHeaderDropdownOptionsForField(fieldKey: string): void {
-    const fieldConfig = this.findHeaderFieldByKey(fieldKey);
-    if (!fieldConfig || fieldConfig.lookup || fieldConfig.type !== 'dropdown') {
-      return;
-    }
-
-    const optionsKey = fieldConfig.optionsDataKey?.trim() || `__options_${fieldConfig.key}`;
-    if (this.loadingHeaderDropdownKeys.has(optionsKey) || this.loadedHeaderDropdownKeys.has(optionsKey)) {
-      return;
-    }
-
-    const staticOptions = fieldConfig.options ?? [];
-    if (staticOptions.length) {
-      this.headerDropdownRecords[optionsKey] = staticOptions.map((option) => ({
-        value: option.value,
-        label: option.label,
-      }));
-      this.loadedHeaderDropdownKeys.add(optionsKey);
-      this.applyHeaderDropdownOptionsToActiveEntry();
-      return;
-    }
-
-    const endpoints = this.resolveApiEndpoints(fieldConfig.api ?? fieldConfig.optionsEndpoints);
-    if (fieldConfig.optionsSkipWhenSuperAdmin && this.sessionService.SuperAdmin) {
-      this.headerDropdownRecords[optionsKey] = [];
-      this.loadedHeaderDropdownKeys.add(optionsKey);
-      this.applyHeaderDropdownOptionsToActiveEntry();
-      return;
-    }
-
-    if (!endpoints.length) {
-      this.headerDropdownRecords[optionsKey] = [];
-      this.loadedHeaderDropdownKeys.add(optionsKey);
-      this.applyHeaderDropdownOptionsToActiveEntry();
-      return;
-    }
-
-    this.loadingHeaderDropdownKeys.add(optionsKey);
-    this.subscriptions.add(
-      this.masterData.loadFirstAvailableList(endpoints)
-        .pipe(catchError(() => of([])))
-        .subscribe((records) => {
-          this.loadingHeaderDropdownKeys.delete(optionsKey);
-          this.loadedHeaderDropdownKeys.add(optionsKey);
-          this.headerDropdownRecords[optionsKey] = this.toRecordList(records);
-          this.applyHeaderDropdownOptionsToActiveEntry();
-        }),
-    );
-  }
-
-  private applyHeaderDropdownOptionsToActiveEntry(): void {
-    const documentWindowConfig = this.activeDocumentWindowConfig;
-    if (!documentWindowConfig) {
-      return;
-    }
-
-    this.applyHeaderDropdownOptions(documentWindowConfig);
-    this.changeDetector.detectChanges();
-  }
-
-  private loadLineDropdownOptionsForField(fieldName: string, row?: Record<string, unknown>): void {
-    if (!this.lineConfig) {
-      return;
-    }
-
-    const column = this.lineConfig.columns.find((item) => this.getColumnField(item) === fieldName);
-    // Remote lookups own their selected-record hydration and paged choices.
-    if (!column || column.lookup || (column.cellType !== 'dropdown' && column.cellType !== 'select')) {
-      return;
-    }
-
-    const optionsKey = this.getLineColumnOptionsDataKey(fieldName);
-    if (!optionsKey.length || this.loadingLineOptionKeys.has(optionsKey) || this.loadedLineOptionKeys.has(optionsKey)) {
-      return;
-    }
-
-    if ((column.options ?? []).length) {
-      this.optionFieldMap[optionsKey] = (column.options ?? []).map((option) => ({
-        label: option.label,
-        value: this.toText(option.value),
-      }));
-      this.loadedLineOptionKeys.add(optionsKey);
-      this.applyLineOptionsToActiveRows();
-      return;
-    }
-
-    const endpoints = this.resolveApiEndpoints(column.api ?? column.optionsEndpoints);
-    if (!endpoints.length) {
-      this.optionFieldMap[optionsKey] = [];
-      this.loadedLineOptionKeys.add(optionsKey);
-      this.applyLineOptionsToActiveRows();
-      return;
-    }
-
-    this.loadingLineOptionKeys.add(optionsKey);
-    this.subscriptions.add(
-      this.masterData.loadFirstAvailableList(endpoints)
-        .pipe(catchError(() => of([])))
-        .subscribe((records) => {
-          this.loadingLineOptionKeys.delete(optionsKey);
-          this.loadedLineOptionKeys.add(optionsKey);
-
-          const valueFields = this.resolveConfiguredFields(column.valueField);
-          const labelFields = this.resolveConfiguredFields(column.labelField);
-          this.optionFieldMap[optionsKey] = this.masterData.toSelectOptions(records, valueFields, labelFields);
-
-          this.applyLineOptionsToActiveRows(row);
-        }),
-    );
-  }
-
-  private applyLineOptionsToActiveRows(row?: Record<string, unknown>): void {
-    const currentConfig = this.activeDocumentWindowConfig;
-    if (!currentConfig?.lineRows) {
-      return;
-    }
-
-    if (row) {
-      this.applyLineOptions([row]);
-    } else {
-      this.applyLineOptions(currentConfig.lineRows);
-    }
-
-    this.changeDetector.detectChanges();
   }
 
   private findHeaderFieldByKey(fieldKey: string) {
@@ -1336,7 +1162,6 @@ export class ListPage implements OnInit, OnDestroy {
     return this.documentConfigData.buildHeaderData(
       record,
       this.headerConfig.sections,
-      this.headerDropdownRecords,
     );
   }
 
@@ -2631,20 +2456,6 @@ export class ListPage implements OnInit, OnDestroy {
     }).pipe(map((response) => this.toCreatedRecord(response)));
   }
 
-  private applyHeaderDropdownOptions(documentWindowConfig: DocumentWindowConfig): void {
-    const headerData = documentWindowConfig.headerData;
-    if (!headerData) {
-      return;
-    }
-
-    for (const section of this.headerConfig.sections) {
-      for (const field of section.fields) {
-        const optionsKey = field.optionsDataKey?.trim() || `__options_${field.key}`;
-        headerData[optionsKey] = this.headerDropdownRecords[optionsKey] ?? headerData[optionsKey] ?? [];
-      }
-    }
-  }
-
   private applyLineOptions(rows: Record<string, unknown>[]): void {
     if (!this.lineConfig) {
       return;
@@ -2879,9 +2690,6 @@ export class ListPage implements OnInit, OnDestroy {
     });
   }
 
-  private resolveConfiguredFields(source: string | string[] | undefined): string[] {
-    return this.dataSourceResolver.resolveConfiguredFields({ source });
-  }
 
   private getLineFillTargetFields(fieldName: string): string[] {
     return this.dataSourceResolver.getLineFillTargetFields({
@@ -3003,10 +2811,6 @@ export class ListPage implements OnInit, OnDestroy {
     const queued = this.deferredLineSaveFields.get(row);
     this.deferredLineSaveFields.delete(row);
     return queued ? [...queued] : [];
-  }
-
-  private resolveApiEndpoints(source: string | string[] | undefined): string[] {
-    return this.dataSourceResolver.resolveApiEndpoints({ source });
   }
 
   private startPopupLoading(message: string): void {
@@ -3246,9 +3050,6 @@ export class ListPage implements OnInit, OnDestroy {
     return [];
   }
 
-  private toRecordList(source: unknown): Record<string, unknown>[] {
-    return this.valueMapper.toRecordList(source);
-  }
 
   private getErrorMessage(error: unknown): string {
     return this.apiError.toMessage(error, GENERIC_MESSAGES.listLoadFailed);

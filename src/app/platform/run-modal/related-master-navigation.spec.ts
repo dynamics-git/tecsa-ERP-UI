@@ -18,14 +18,14 @@ import { RunModalService } from './run-modal.service';
 import { RunModalStackService } from './run-modal-stack.service';
 
 const relatedPages = [
-  ['item-units-of-measure', '/items/item-1/unitsOfMeasure'],
-  ['item-default-dimensions', '/items/item-1/defaultDimensions'],
-  ['vendor-default-dimensions', '/vendors/item-1/defaultDimensions'],
-  ['currency-exchange-rates', '/currencies/item-1/exchangeRates'],
-  ['dimension-values', '/dimensions/item-1/values'],
-  ['gl-account-default-dimensions', '/glAccounts/item-1/defaultDimensions'],
-  ['default-dimension-priorities', '/sourceCodes/item-1/defaultDimensionPriorities'],
-  ['dimension-value-combinations', '/dimensionCombinations/item-1/valueCombinations'],
+  ['item-units-of-measure', '/itemUnitsOfMeasure', "itemNo eq 'CABLE-CAT6-2M'"],
+  ['item-default-dimensions', '/defaultDimensions', "number eq 'CABLE-CAT6-2M'"],
+  ['vendor-default-dimensions', '/defaultDimensions', "number eq 'CABLE-CAT6-2M'"],
+  ['currency-exchange-rates', '/currencyExchangeRates', "currencyCode eq 'PARENT'"],
+  ['dimension-values', '/dimensionValues', "dimensionCode eq 'PARENT'"],
+  ['gl-account-default-dimensions', '/defaultDimensions', "number eq 'CABLE-CAT6-2M'"],
+  ['default-dimension-priorities', '/defaultDimensionPriorities', "sourceCode eq 'PARENT'"],
+  ['dimension-value-combinations', '/dimensionValueCombinations', "dimension2Code eq 'PROJECT'"],
 ];
 
 describe('Related master pages use the shared navigation stack', () => {
@@ -44,7 +44,8 @@ describe('Related master pages use the shared navigation stack', () => {
   };
   const uomRow = {
     systemId: 'conversion-1',
-    unitOfMeasureId: '11111111-1111-4111-8111-111111111111',
+    code: 'PCS',
+    itemNo: 'CABLE-CAT6-2M',
     qtyPerUnitOfMeasure: '1',
     systemRowVersion: 1,
   };
@@ -65,7 +66,7 @@ describe('Related master pages use the shared navigation stack', () => {
             get: (url: string) => {
               requests.push(url);
               if (url.startsWith('/items?')) return of({data: relatedItemRows, meta: {hasMore: false}});
-              if (url.startsWith('/items/item-1/unitsOfMeasure'))
+              if (url.startsWith('/itemUnitsOfMeasure?'))
                 return of({ data: [{ ...uomRow }], meta: { total: 1 } });
               if (url === '/items/item-1') return of({ data: { ...item } });
               if (url === '/unitsOfMeasure/11111111-1111-4111-8111-111111111111')
@@ -127,17 +128,19 @@ describe('Related master pages use the shared navigation stack', () => {
     expect(write).not.toHaveBeenCalled();
   });
 
-  for (const [id, endpoint] of relatedPages) {
+  for (const [id, endpoint, filter] of relatedPages) {
     it('opens only the parent-scoped grid for ' + id, async () => {
       expect(
         await modal.open({
           pageId: id,
-          context: { headerData: { ...item, code: 'PARENT' } },
+          context: { headerData: { ...item, code: 'PARENT', dimension1Code: 'DEPARTMENT', dimension2Code: 'PROJECT' } },
           target: 'entry',
         }),
       ).toBe(true);
       await settle();
       expect(requests.some((url) => url.startsWith(endpoint + '?'))).toBe(true);
+      const query = new URL(requests.find(url => url.startsWith(endpoint + '?'))!, 'http://fixture').searchParams;
+      expect(query.get('$filter')).toContain(filter);
       expect(page(0).inlineDocumentWindowConfig?.headerSections).toEqual([]);
       expect(page(0).inlineDocumentWindowConfig?.factBoxConfig?.enabled).toBe(true);
       expect(fixture.nativeElement.querySelector('app-dynamic-form')).toBeNull();
@@ -153,7 +156,7 @@ describe('Related master pages use the shared navigation stack', () => {
     parent.selectedRow = {...item};
     parent.handleCommand({actionKey: 'cmd:factbox-dimensions'}); await vi.waitFor(() => expect({count: popups.length, error: parent.error, reason: modal.getLastOpenFailureReason()}).toMatchObject({count: 2})); await settle();
     expect(popups).toHaveLength(2); expect(data(popups[1]).runtimePage?.pageId).toBe('item-default-dimensions');
-    expect(requests.some(url => url.startsWith('/items/item-1/defaultDimensions'))).toBe(true);
+    expect(requests.some(url => url.startsWith('/defaultDimensions?'))).toBe(true);
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -194,7 +197,7 @@ describe('Related master pages use the shared navigation stack', () => {
     const parent = page(0);
     const parentState = parent.inlineDocumentWindowConfig!;
     expect(parentState.lineColumns).toEqual([]);
-    expect(requests.some((url) => url.startsWith('/items/item-1/unitsOfMeasure'))).toBe(false);
+    expect(requests.some((url) => url.startsWith('/itemUnitsOfMeasure?'))).toBe(false);
     expect(fixture.nativeElement.querySelectorAll('app-fact-box').length).toBe(1);
     // Exercise the navigation stack with an explicit fixture command. The current
     // Item card no longer publishes this legacy nested worksheet shortcut.
@@ -240,7 +243,7 @@ describe('Related master pages use the shared navigation stack', () => {
     const runtime = page(0);
     const grid = fixture.debugElement.query(By.directive(DocumentLines)).componentInstance as DocumentLines;
     const rows = runtime.inlineDocumentWindowConfig!.lineRows!;
-    const column = runtime.inlineDocumentWindowConfig!.lineColumns!.find(c => c.id === 'unitOfMeasureId')!;
+    const column = runtime.inlineDocumentWindowConfig!.lineColumns!.find(c => c.id === 'code')!;
     const quantity = runtime.inlineDocumentWindowConfig!.lineColumns!.find(c => c.id === 'qtyPerUnitOfMeasure')!;
     await vi.waitFor(() => expect(grid.lookupDisplay(column, rows[0])).toBe('PCS — Piece'));
     expect(grid.getCellValue(rows[0], quantity)).toBe('1');
@@ -277,7 +280,7 @@ describe('Related master pages use the shared navigation stack', () => {
     row['qtyPerUnitOfMeasure'] = '2';
     runtime.handleInlineAction({ actionKey: 'line:changed', payload: { row, column, value: '2' } });
     await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1));
-    expect(write.mock.calls[0][0]).toBe('/items/item-1/unitsOfMeasure/conversion-1');
+    expect(write.mock.calls[0][0]).toBe('/itemUnitsOfMeasure/conversion-1');
     expect(write.mock.calls[0][1]).toEqual({ qtyPerUnitOfMeasure: '2' });
     expect(write.mock.calls[0][2]).toBe('"1"');
     await settle();

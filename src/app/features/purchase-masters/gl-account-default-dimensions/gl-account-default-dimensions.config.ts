@@ -6,13 +6,14 @@ import {
 } from '../../../platform/public-api';
 import { glAccountDefaultDimensionsFactBoxConfig } from './gl-account-default-dimensions.factbox.config';
 const glAccountDefaultDimensionsDataSource: DataSourceConfig = {
-  endpoint: '/glAccounts',
   keyField: 'systemId',
-  navigation: {
-    parentEndpoint: '/glAccounts',
-    parentIdFields: ['systemId'],
-    childCollection: 'defaultDimensions',
+  endpoint: '/defaultDimensions',
+  headerPKProp: 'number',
+  lineFKProp: 'number',
+  parentFixedFields: {
+    tableId: 7000270,
   },
+  defaultSort: 'dimensionCode asc',
   pageSize: 20,
 };
 
@@ -32,7 +33,7 @@ export const glAccountDefaultDimensionsHeaderConfig: HeaderConfig = {
       runModalRecord: {
         source: 'activeLine',
         fields: {
-          systemId: 'dimensionId',
+          code: 'dimensionCode',
         },
       },
     },
@@ -73,65 +74,75 @@ export const glAccountDefaultDimensionsLineConfig: LineConfig = {
   toolbarButtons: [],
   columns: [
     {
-      id: 'dimensionId',
+      id: 'dimensionCode',
       label: 'Dimension',
       type: 'lookup',
-      valueType: 'guid',
+      valueType: 'code',
       required: true,
       readonlyAfterCreate: true,
       lookup: {
         endpoint: '/dimensions',
-        valueField: 'systemId',
+        valueField: 'code',
         displayField: 'code',
         searchFields: ['code', 'name'],
+        recordRead: 'collection',
       },
       displayFormat: '[code] — [name]',
+      validation: {
+        maxLength: 20,
+      },
+      defaultValue: '',
     },
     {
-      id: 'dimensionValueId',
+      id: 'dimensionValueCode',
       label: 'Dimension Value',
       type: 'lookup',
-      valueType: 'guid',
-      defaultValue: null,
+      valueType: 'code',
+      defaultValue: '',
       lookup: {
-        endpoint: '/dimensions/{dimensionId}/values',
-        valueField: 'systemId',
+        endpoint: '/dimensionValues',
+        valueField: 'code',
         displayField: 'code',
         searchFields: ['code', 'name'],
         recordRead: 'collection',
         dependsOn: [
           {
-            field: 'dimensionId',
-            valueFrom: 'dimensionId',
-            in: 'path',
+            field: 'dimensionCode',
+            valueFrom: 'dimensionCode',
+            in: 'filter',
           },
         ],
+        filter: 'blocked eq false',
       },
       displayFormat: '[code] — [name]',
+      validation: {
+        maxLength: 20,
+      },
     },
     {
       id: 'valuePosting',
       label: 'Value Posting',
       type: 'dropdown',
-      defaultValue: 'optional',
+      defaultValue: 0,
       options: [
         {
-          label: 'Optional',
-          value: 'optional',
+          label: ' ',
+          value: 0,
         },
         {
-          label: 'Code mandatory',
-          value: 'code_mandatory',
+          label: 'Code Mandatory',
+          value: 1,
         },
         {
-          label: 'Same code',
-          value: 'same_code',
+          label: 'Same Code',
+          value: 2,
         },
         {
-          label: 'No code',
-          value: 'no_code',
+          label: 'No Code',
+          value: 3,
         },
       ],
+      valueType: 'integer',
     },
   ],
 };

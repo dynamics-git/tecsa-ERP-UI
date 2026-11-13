@@ -6,13 +6,11 @@ import {
 } from '../../../platform/public-api';
 import { itemUnitsOfMeasureFactBoxConfig } from './item-units-of-measure.factbox.config';
 const itemUnitsOfMeasureDataSource: DataSourceConfig = {
-  endpoint: '/items',
   keyField: 'systemId',
-  navigation: {
-    parentEndpoint: '/items',
-    parentIdFields: ['systemId'],
-    childCollection: 'unitsOfMeasure',
-  },
+  endpoint: '/itemUnitsOfMeasure',
+  headerPKProp: 'number',
+  lineFKProp: 'itemNo',
+  defaultSort: 'code asc',
   pageSize: 20,
 };
 
@@ -32,7 +30,7 @@ export const itemUnitsOfMeasureHeaderConfig: HeaderConfig = {
       runModalRecord: {
         source: 'activeLine',
         fields: {
-          systemId: 'unitOfMeasureId',
+          code: 'code',
         },
       },
     },
@@ -73,29 +71,33 @@ export const itemUnitsOfMeasureLineConfig: LineConfig = {
   toolbarButtons: [],
   columns: [
     {
-      id: 'unitOfMeasureId',
+      id: 'code',
       label: 'Unit Of Measure',
       type: 'lookup',
-      valueType: 'guid',
+      valueType: 'code',
       required: true,
       readonlyAfterCreate: true,
       lookup: {
         endpoint: '/unitsOfMeasure',
-        valueField: 'systemId',
+        valueField: 'code',
         displayField: 'code',
         searchFields: ['code', 'description'],
+        recordRead: 'collection',
       },
       displayFormat: '[code] — [description]',
+      validation: {
+        maxLength: 10,
+      },
+      defaultValue: '',
     },
     {
       id: 'qtyPerUnitOfMeasure',
       label: 'Qty Per Unit Of Measure',
       type: 'decimal',
       defaultValue: '1',
-      required: true,
       validation: {
-        precision: 20,
-        scale: 6,
+        precision: 38,
+        scale: 20,
         min: '0.000001',
       },
     },

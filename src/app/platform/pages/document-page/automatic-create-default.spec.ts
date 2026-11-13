@@ -112,11 +112,12 @@ describe('Shared first-input automatic creation policy',()=>{
   expect(post.mock.calls[2][1]).not.toMatchObject({userName:'confirmed-user-id'});
   f.destroy();
  });
- it('Payment Terms without autoSave waits for input and required fields, creates once and retains newer edits during POST',async()=>{
+ it('Payment Terms creates on its manual Code without waiting for Description and retains edits during POST',async()=>{
   const {f,page,edit,post,patch,pending}=await setup();
   expect(post).not.toHaveBeenCalled();
-  edit('code','NET30');await f.whenStable();expect(post).not.toHaveBeenCalled();
-  edit('description','Original');await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
+  edit('code','NET30');await vi.waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][1]['description']).toBe('');
+  edit('description','Original');
   edit('description','Latest');expect(post).toHaveBeenCalledTimes(1);
   pending.next({data:{systemId:'created',systemRowVersion:1,code:'NET30',description:'Original'}});pending.complete();
   await vi.waitFor(()=>expect(patch).toHaveBeenCalled());

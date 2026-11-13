@@ -23,12 +23,12 @@ export const unitsOfMeasureHeaderConfig: HeaderConfig = {
           validation: {
             maxLength: 10,
           },
+          readonlyAfterCreate: true,
         },
         {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 50,
           },
@@ -36,16 +36,10 @@ export const unitsOfMeasureHeaderConfig: HeaderConfig = {
         {
           key: 'internationalStandardCode',
           label: 'International Standard Code',
-          type: 'text',
+          type: 'code',
           validation: {
             maxLength: 10,
           },
-        },
-        {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
         },
       ],
     },
@@ -63,6 +57,7 @@ export const unitsOfMeasureListConfig: ListPageConfig & {
     endpoint: '/unitsOfMeasure',
     keyField: 'systemId',
     defaultSort: 'code asc',
+    headerPKProp: 'code',
   },
   identity: {
     primaryField: 'code',
@@ -88,10 +83,7 @@ export const unitsOfMeasureListConfig: ListPageConfig & {
         field: 'internationalStandardCode',
         width: '140px',
       },
-      {
-        field: 'isActive',
-        width: '140px',
-      },
+
       {
         field: 'systemModifiedAt',
       },

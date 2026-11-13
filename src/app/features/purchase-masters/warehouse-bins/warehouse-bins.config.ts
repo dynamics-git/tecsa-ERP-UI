@@ -29,36 +29,26 @@ export const warehouseBinsHeaderConfig: HeaderConfig = {
           key: 'description',
           label: 'Description',
           type: 'text',
-          required: true,
           validation: {
             maxLength: 100,
           },
         },
+
         {
-          key: 'isActive',
-          label: 'Is Active',
-          type: 'boolean',
-          defaultValue: true,
-        },
-        {
-          key: 'binRole',
-          label: 'Bin Role',
-          type: 'dropdown',
-          defaultValue: 'storage',
-          options: [
-            {
-              label: 'Receiving',
-              value: 'receiving',
-            },
-            {
-              label: 'Storage',
-              value: 'storage',
-            },
-            {
-              label: 'Pick',
-              value: 'pick',
-            },
-          ],
+          key: 'binTypeCode',
+          label: 'Bin Type Code',
+          type: 'lookup',
+          valueType: 'code',
+          defaultValue: '',
+          validation: {
+            maxLength: 10,
+          },
+          lookup: {
+            endpoint: '/warehouseBinTypes',
+            valueField: 'code',
+            displayField: 'code',
+            recordRead: 'collection',
+          },
         },
       ],
     },
@@ -67,39 +57,49 @@ export const warehouseBinsHeaderConfig: HeaderConfig = {
       title: 'Posting & Defaults',
       fields: [
         {
-          key: 'locationId',
+          key: 'locationCode',
           label: 'Location',
           type: 'lookup',
-          valueType: 'guid',
+          valueType: 'code',
           required: true,
           readonlyAfterCreate: true,
           lookup: {
             endpoint: '/locations',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'name'],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [name]',
+          validation: {
+            maxLength: 10,
+          },
+          defaultValue: '',
         },
         {
-          key: 'zoneId',
+          key: 'zoneCode',
           label: 'Zone',
           type: 'lookup',
-          valueType: 'guid',
-          defaultValue: null,
+          valueType: 'code',
+          defaultValue: '',
           lookup: {
             endpoint: '/warehouseZones',
-            valueField: 'systemId',
+            valueField: 'code',
             displayField: 'code',
             searchFields: ['code', 'description'],
             dependsOn: [
               {
-                field: 'locationId',
-                valueFrom: 'locationId',
+                field: 'locationCode',
+                valueFrom: 'locationCode',
+                in: 'filter',
               },
             ],
+            recordRead: 'collection',
           },
           displayFormat: '[code] — [description]',
+          validation: {
+            maxLength: 10,
+          },
         },
       ],
     },
@@ -133,26 +133,23 @@ export const warehouseBinsListConfig: ListPageConfig & {
   dataSurface: {
     columns: listColumns(warehouseBinsHeaderConfig, [
       {
-        field: 'locationId',
+        field: 'locationCode',
       },
       {
         field: 'code',
         width: '140px',
       },
       {
-        field: 'zoneId',
+        field: 'zoneCode',
         width: '140px',
       },
       {
         field: 'description',
         width: '280px',
       },
+
       {
-        field: 'isActive',
-        width: '140px',
-      },
-      {
-        field: 'binRole',
+        field: 'binTypeCode',
         width: '140px',
       },
       {
